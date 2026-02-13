@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import String
+import uuid
+
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -8,14 +10,23 @@ from app.models.base import UUIDMixin
 
 
 class User(Base, UUIDMixin):
-    """Usuário do sistema (futuro: autenticação e recomendação)."""
+    """Usuário do sistema (A-01: vinculado a academia quando informado)."""
 
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    academy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("academies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
-    # Relacionamentos (lazy para não carregar em todo query)
+    academy: Mapped["Academy | None"] = relationship(
+        "Academy",
+        back_populates="users",
+        lazy="selectin",
+    )
     lesson_progresses: Mapped[list["LessonProgress"]] = relationship(
         "LessonProgress",
         back_populates="user",
@@ -23,6 +34,11 @@ class User(Base, UUIDMixin):
     )
     training_feedbacks: Mapped[list["TrainingFeedback"]] = relationship(
         "TrainingFeedback",
+        back_populates="user",
+        lazy="selectin",
+    )
+    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+        "MissionUsage",
         back_populates="user",
         lazy="selectin",
     )

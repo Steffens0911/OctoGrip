@@ -1,13 +1,23 @@
 """
 Seed expandido com dados iniciais para testar a API (S-04: 10+ lições; PF-01: missão por nível).
+Popula BD para que ranking, dificuldades, relatório semanal e listas não fiquem em branco.
 Rodar: python -m app.scripts.seed
 Com Docker: docker compose exec api python -m app.scripts.seed
 """
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.database import SessionLocal
-from app.models import Lesson, Mission, Position, Technique, User
+from app.models import (
+    Academy,
+    Lesson,
+    LessonProgress,
+    Mission,
+    Position,
+    Technique,
+    TrainingFeedback,
+    User,
+)
 
 
 def run_seed():
@@ -17,11 +27,52 @@ def run_seed():
             print("Seed já aplicado (existe usuário). Nada a fazer.")
             return
 
+        # A-03: tema semanal já definido para o professor ver
+        academy = Academy(
+            name="Academia Teste",
+            slug="academia-teste",
+            weekly_theme="Passagem de guarda",
+        )
+        db.add(academy)
+        db.flush()
+
+        # Segunda academia para lista não ficar vazia
+        academy2 = Academy(
+            name="Academia Norte",
+            slug="academia-norte",
+            weekly_theme="Controle de costas",
+        )
+        db.add(academy2)
+        db.flush()
+
+        # Vários usuários na primeira academia (para ranking com múltiplos nomes)
         user = User(
             email="aluno@jjb.com",
             name="Aluno Teste",
+            academy_id=academy.id,
         )
         db.add(user)
+        db.flush()
+        user2 = User(
+            email="maria@jjb.com",
+            name="Maria Silva",
+            academy_id=academy.id,
+        )
+        db.add(user2)
+        db.flush()
+        user3 = User(
+            email="pedro@jjb.com",
+            name="Pedro Santos",
+            academy_id=academy.id,
+        )
+        db.add(user3)
+        db.flush()
+        user_norte = User(
+            email="norte@jjb.com",
+            name="Atleta Norte",
+            academy_id=academy2.id,
+        )
+        db.add(user_norte)
         db.flush()
 
         # Posições (iniciante)
@@ -79,11 +130,13 @@ def run_seed():
             ("Recuperar guarda da meia", "recuperar-guarda-meia-aula", "Saindo da meia e recuperando a guarda.", 11, techniques[9].id),
         ]
         lessons = []
-        for title, slug, content, order, tech_id in lessons_data:
+        for i, (title, slug, content, order, tech_id) in enumerate(lessons_data):
+            # Algumas lições com video_url para não ficar em branco no app
+            video_url = f"https://example.com/videos/{slug}" if i < 4 else None
             lesson = Lesson(
                 title=title,
                 slug=slug,
-                video_url=None,
+                video_url=video_url,
                 content=content,
                 order_index=order,
                 technique_id=tech_id,
@@ -101,6 +154,7 @@ def run_seed():
             end_date=week_end,
             is_active=True,
             level="beginner",
+            theme="Passagem de guarda",
         )
         mission_intermediate = Mission(
             lesson_id=lessons[1].id,
@@ -108,19 +162,92 @@ def run_seed():
             end_date=week_end,
             is_active=True,
             level="intermediate",
+            theme="Base e postura",
         )
         db.add_all([mission_beginner, mission_intermediate])
+        db.flush()
+
+        # A-02: missão por academia (override): mesma semana, academia específica
+        mission_academy = Mission(
+            lesson_id=lessons[2].id,
+            start_date=today,
+            end_date=week_end,
+            is_active=True,
+            level="beginner",
+            theme="Quebrando a guarda",
+            academy_id=academy.id,
+        )
+        db.add(mission_academy)
+        # Missão para a segunda academia (professor vê 2 academias com conteúdo)
+        mission_academy2 = Mission(
+            lesson_id=lessons[3].id,
+            start_date=today,
+            end_date=week_end,
+            is_active=True,
+            level="beginner",
+            theme="Side control",
+            academy_id=academy2.id,
+        )
+        db.add(mission_academy2)
+        db.flush()
+
+        # LessonProgress: conclusões para ranking e relatório semanal não ficarem vazios
+        # Semana atual (para relatório semanal) e últimos dias (para ranking 30 dias)
+        now = datetime.now(timezone.utc)
+        base_week = now - timedelta(days=now.weekday())  # início da semana (segunda)
+        progress_data = [
+            (user.id, lessons[0].id, base_week + timedelta(days=1)),   # Aluno Teste, lição 0
+            (user.id, lessons[1].id, base_week + timedelta(days=2)),
+            (user.id, lessons[2].id, base_week + timedelta(days=3)),
+            (user2.id, lessons[0].id, base_week + timedelta(days=1)),     # Maria, lição 0
+            (user2.id, lessons[1].id, base_week + timedelta(days=2)),
+            (user2.id, lessons[2].id, base_week + timedelta(days=3)),
+            (user2.id, lessons[3].id, base_week + timedelta(days=4)),   # Maria mais uma
+            (user3.id, lessons[0].id, base_week + timedelta(days=2)),    # Pedro
+            (user3.id, lessons[1].id, base_week + timedelta(days=3)),
+            (user_norte.id, lessons[3].id, base_week + timedelta(days=1)),  # Atleta Norte
+        ]
+        for uid, lid, completed_at in progress_data:
+            lp = LessonProgress(
+                user_id=uid,
+                lesson_id=lid,
+                completed_at=completed_at,
+            )
+            db.add(lp)
+        db.flush()
+
+        # TrainingFeedback: dificuldades reportadas (T-02) para a tela não ficar vazia
+        feedback_data = [
+            (user.id, pos_guarda.id, "Dificuldade para manter a base."),
+            (user.id, pos_side.id, None),
+            (user2.id, pos_guarda.id, "Abertura da guarda difícil."),
+            (user2.id, pos_guarda.id, "Repetir mais vezes."),  # mesma posição, 2 reportes
+            (user3.id, pos_montada.id, "Escape complicado."),
+            (user_norte.id, pos_costas.id, None),
+        ]
+        for uid, pid, note in feedback_data:
+            tf = TrainingFeedback(
+                user_id=uid,
+                position_id=pid,
+                difficulty_level=1,
+                note=note,
+            )
+            db.add(tf)
+        db.flush()
 
         db.commit()
 
         print("Seed expandido aplicado com sucesso.")
         print()
         print("Resumo:")
-        print(f"  Usuário:     {user.id}")
-        print(f"  Posições:    {len(positions)}")
-        print(f"  Técnicas:    {len(techniques)}")
-        print(f"  Lições:      {len(lessons)}")
-        print(f"  Missões:     2 (beginner + intermediate)")
+        print(f"  Academias:  2 ({academy.name}, {academy2.name})")
+        print(f"  Usuários:   4 (3 em Academia Teste, 1 em Academia Norte)")
+        print(f"  Posições:   {len(positions)}")
+        print(f"  Técnicas:   {len(techniques)}")
+        print(f"  Lições:     {len(lessons)} (4 com video_url)")
+        print(f"  Missões:    4 (2 globais + 2 por academia)")
+        print(f"  Conclusões (LessonProgress): {len(progress_data)}")
+        print(f"  Dificuldades (TrainingFeedback): {len(feedback_data)}")
         print()
         print("IDs para usar no /docs:")
         print(f"  user_id:      {user.id}")
@@ -129,6 +256,7 @@ def run_seed():
         print("Endpoints para testar:")
         print("  GET  /mission_today")
         print("  GET  /lessons")
+        print("  GET  /academies, /academies/{id}/ranking, /difficulties, /report/weekly")
         print("  POST /lesson_complete   (body: user_id, lesson_id)")
         print("  POST /training_feedback (body: user_id, position_id, observation?)")
     except Exception as e:

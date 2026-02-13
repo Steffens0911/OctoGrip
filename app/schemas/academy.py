@@ -1,0 +1,80 @@
+"""Schemas para Academia (A-03, A-04)."""
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class AcademyCreate(BaseModel):
+    """Criação de academia."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    slug: str | None = Field(None, max_length=255)
+
+
+class AcademyRead(BaseModel):
+    """Leitura de uma academia."""
+
+    id: UUID
+    name: str
+    slug: str | None
+    weekly_theme: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class AcademyUpdateWeeklyTheme(BaseModel):
+    """Atualização do tema semanal (A-03: professor define)."""
+
+    weekly_theme: str | None = Field(None, max_length=128)
+
+
+class AcademyUpdate(BaseModel):
+    """Atualização parcial da academia (CRUD)."""
+
+    name: str | None = Field(None, min_length=1, max_length=255)
+    slug: str | None = Field(None, max_length=255)
+    weekly_theme: str | None = Field(None, max_length=128)
+
+
+class RankingEntry(BaseModel):
+    """Uma posição no ranking interno (A-04)."""
+
+    rank: int
+    user_id: UUID
+    name: str | None
+    completions_count: int
+
+
+class RankingResponse(BaseModel):
+    """Resposta GET /academies/{id}/ranking (A-04)."""
+
+    academy_id: UUID
+    period_days: int
+    entries: list[RankingEntry]
+
+
+class DifficultyEntry(BaseModel):
+    """T-02: Posição com quantidade de feedbacks de dificuldade."""
+
+    position_id: UUID
+    position_name: str
+    count: int
+
+
+class DifficultiesResponse(BaseModel):
+    """Resposta GET /academies/{id}/difficulties (T-02)."""
+
+    academy_id: UUID
+    entries: list[DifficultyEntry]
+
+
+class WeeklyReportResponse(BaseModel):
+    """T-03: Relatório semanal da academia (export simples)."""
+
+    academy_id: UUID
+    week_start: str
+    week_end: str
+    completions_count: int
+    active_users_count: int
+    entries: list[RankingEntry]

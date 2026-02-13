@@ -1,4 +1,4 @@
-# Backlog — JJB (AppBaby + bjj_app)
+# Backlog — JJB (bjj_app)
 
 Backlog de produto por fases e backlog técnico concluído.
 
@@ -63,26 +63,26 @@ Backlog de produto por fases e backlog técnico concluído.
 | ID   | Status | Item | Critérios de aceite |
 |------|--------|------|---------------------|
 | PF-01 | DONE | Missão por nível | beginner/intermediate |
-| PF-02 | TODO | Missão semanal | Tema da semana |
-| PF-03 | TODO | Repetição automática | Revisão após X dias |
-| PF-04 | TODO | Missão baseada em feedback | Posição difícil priorizada |
+| PF-02 | DONE | Missão semanal | Tema da semana |
+| PF-03 | DONE | Repetição automática | Revisão após X dias |
+| PF-04 | DONE | Missão baseada em feedback | Posição difícil priorizada |
 
 #### REF — Experiência do usuário
 
 | ID   | Status | Item | Critérios de aceite |
 |------|--------|------|---------------------|
-| UX-01 | TODO | Animação conclusão | Feedback visual consistente (mesma linguagem/resposta emocional) |
-| UX-02 | TODO | Progresso visual faixa branca | Barra por grau |
-| UX-03 | TODO | Tela missão clara em 1 segundo | Sem leitura longa |
-| UX-04 | TODO | Tempo estimado da missão | 2–3 min visível |
+| UX-01 | DONE | Animação conclusão | Feedback visual consistente (mesma linguagem/resposta emocional) |
+| UX-02 | DONE | Progresso visual faixa branca | Barra por grau |
+| UX-03 | DONE | Tela missão clara em 1 segundo | Sem leitura longa |
+| UX-04 | DONE | Tempo estimado da missão | 2–3 min visível |
 
 #### REF — Backend produto
 
 | ID   | Status | Item | Critérios de aceite |
 |------|--------|------|---------------------|
-| PB-01 | TODO | MissionUsage backend | Sync do uso local |
-| PB-02 | TODO | Métricas de retenção | % before training |
-| PB-03 | TODO | Histórico de missões | Últimas 7 missões |
+| PB-01 | DONE | MissionUsage backend | Sync do uso local |
+| PB-02 | DONE | Métricas de retenção | % before training |
+| PB-03 | DONE | Histórico de missões | Últimas 7 missões |
 
 ---
 
@@ -94,18 +94,18 @@ Backlog de produto por fases e backlog técnico concluído.
 
 | ID   | Status | Item | Critérios de aceite |
 |------|--------|------|---------------------|
-| A-01 | TODO | Model Academy | Usuário vinculado |
-| A-02 | TODO | Missão por academia | Override global |
-| A-03 | TODO | Tema semanal academia | Professor define |
-| A-04 | TODO | Ranking interno simples | Só academia |
+| A-01 | DONE | Model Academy | Usuário vinculado |
+| A-02 | DONE | Missão por academia | Override global |
+| A-03 | DONE | Tema semanal academia | Professor define |
+| A-04 | DONE | Ranking interno simples | Só academia |
 
 #### REF — Professor
 
 | ID   | Status | Item | Critérios de aceite |
 |------|--------|------|---------------------|
-| T-01 | TODO | Painel simples web | Criar missão em 10s |
-| T-02 | TODO | Visualização dificuldades | Posições mais marcadas |
-| T-03 | TODO | Export simples | Relatório semanal |
+| T-01 | DONE | Painel simples web | Criar missão em 10s |
+| T-02 | DONE | Visualização dificuldades | Posições mais marcadas |
+| T-03 | DONE | Export simples | Relatório semanal |
 
 ---
 
@@ -158,7 +158,7 @@ Backlog de produto por fases e backlog técnico concluído.
 
 Itens já implementados (engenharia).
 
-### Backend (AppBaby)
+### Backend (bjj_app)
 
 #### REF — Infraestrutura e base
 
@@ -217,6 +217,7 @@ Itens já implementados (engenharia).
 |------|--------|------|---------------------|
 | B-22 | DONE   | Registrar conclusão de lição | POST `/lesson_complete` (user_id, lesson_id); 409 se já concluída |
 | B-23 | DONE   | Registrar feedback de treino | POST `/training_feedback` (user_id, position_id, etc.) |
+| B-26 | DONE   | Listar posições para feedback | GET `/positions` para tela de reportar dificuldade no app |
 
 #### REF — Métricas
 
@@ -272,6 +273,17 @@ Itens já implementados (engenharia).
 |------|--------|------|---------------------|
 | F-13 | DONE   | Teste de widget | App inicia com HomeScreen e título "Missão do dia"; `flutter test` |
 
+#### REF — Integração completa com backend
+
+| ID   | Status | Item | Critérios de aceite |
+|------|--------|------|---------------------|
+| F-14 | DONE   | POST lesson_complete ao concluir | LessonScreen chama LessonCompleteService quando há lessonId (missão do dia ou biblioteca) |
+| F-15 | DONE   | Biblioteca de lições | Aba "Lições" no app; GET /lessons; lista lições; toque abre LessonScreen com missão derivada |
+| F-16 | DONE   | Reportar dificuldade | Tela acessível pelo Perfil; GET /positions; usuário escolhe posição e opcional observação; POST /training_feedback |
+| F-17 | DONE   | Histórico de missões | Na tela Progresso, seção "Últimas missões concluídas" com GET /mission_usages/history (últimas 7) |
+| F-18 | DONE   | Área do professor | Tela acessível pelo Perfil; abas Missões (CRUD com lições/datas/nível/tema/academia) e Academias (lista, detalhe com tema semanal, ranking, dificuldades, relatório semanal) |
+| F-19 | DONE   | Métricas de uso no app | Tela "Métricas de uso" no Perfil; GET /metrics/usage; exibe totais, últimos 7 dias, % antes/depois do treino |
+
 ---
 
 ## Resumo
@@ -279,8 +291,8 @@ Itens já implementados (engenharia).
 | Área | Conteúdo |
 |------|----------|
 | **Roadmap** | Fase 1 (MVP) + Fase 1.5 (validação de hábito) + Fases 2–5 (product fit, B2B, profissional, escala) |
-| **Backend DONE** | B-01 a B-25 — Infra, modelos, CRUD Lesson, Mission, missão do dia, exceções, health, seed, lesson_complete, training_feedback, metrics/usage, logging estruturado |
-| **Flutter DONE** | F-01 a F-13 — Estrutura, tema, Mission + cache, Home/Lesson, navegação, progresso, uso da missão, testes |
+| **Backend DONE** | B-01 a B-26 — Infra, modelos, CRUD Lesson, Mission, missão do dia, exceções, health, seed, lesson_complete, training_feedback, GET /positions, metrics/usage, logging estruturado |
+| **Flutter DONE** | F-01 a F-19 — Estrutura, tema, Mission + cache, Home/Lesson, navegação, progresso, uso da missão, testes; integração: lesson_complete ao concluir, biblioteca de lições, reportar dificuldade, histórico de missões, área professor, métricas de uso |
 
 ---
 

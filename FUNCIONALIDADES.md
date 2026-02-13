@@ -1,10 +1,10 @@
 # Funcionalidades implementadas
 
-Documento único com todas as funcionalidades do **backend (AppBaby)** e do **app Flutter (bjj_app)** até o momento.
+Documento único com todas as funcionalidades do **backend (bjj_app)** e do **app Flutter (bjj_app)** até o momento.
 
 ---
 
-## Backend (AppBaby) — FastAPI + PostgreSQL
+## Backend (bjj_app) — FastAPI + PostgreSQL
 
 ### Infraestrutura
 
@@ -18,7 +18,8 @@ Documento único com todas as funcionalidades do **backend (AppBaby)** e do **ap
 
 | Modelo | Descrição |
 |--------|-----------|
-| **User** | Usuário (email, name); UUID como PK |
+| **User** | Usuário (email, name, academy_id opcional); UUID como PK |
+| **Academy** | Academia (name, slug, weekly_theme); agrupa usuários e missões (A-01, A-02) |
 | **Position** | Posição do jiu-jitsu (name, slug, description) |
 | **Technique** | Técnica: de uma Position para outra (from_position_id, to_position_id) |
 | **Lesson** | Aula vinculada a uma Technique (title, slug, video_url, order_index) |
@@ -35,9 +36,34 @@ Documento único com todas as funcionalidades do **backend (AppBaby)** e do **ap
 | GET | `/health` | Health check simples |
 | GET | `/health/db` | Health check + conexão com PostgreSQL |
 | GET | `/lessons` | Lista aulas |
+| GET | `/positions` | Lista posições (para reportar dificuldade no app) |
 | GET | `/mission_today` | Missão do dia (título, video_url, técnica com posições) |
+| GET | `/mission_usages/history` | Histórico de missões concluídas (user_id, limit) |
+| GET | `/metrics/usage` | Métricas de uso (totais, últimos 7 dias, % antes do treino) |
 | POST | `/lesson_complete` | Registrar conclusão de lição (user_id, lesson_id); evita duplicata (409) |
 | POST | `/training_feedback` | Registrar dificuldade em posição (user_id, position_id, observation opcional) |
+
+#### Seção Academia (CRUD e relatórios)
+
+Ver documentação detalhada em **[docs/ACADEMIAS.md](docs/ACADEMIAS.md)**.
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/academies` | Lista academias |
+| POST | `/academies` | Criar academia (body: name, slug opcional) |
+| GET | `/academies/{id}` | Detalhe de uma academia |
+| PATCH | `/academies/{id}` | Atualizar academia (body: name?, slug?, weekly_theme?) |
+| DELETE | `/academies/{id}` | Excluir academia |
+| GET | `/academies/{id}/ranking` | Ranking interno (period_days, limit) |
+| GET | `/academies/{id}/difficulties` | Posições mais reportadas como difíceis |
+| GET | `/academies/{id}/report/weekly` | Relatório semanal (year, week opcionais) |
+| GET | `/academies/{id}/report/weekly/csv` | Relatório semanal em CSV |
+| GET | `/missions` | Lista missões (academy_id, limit opcionais) |
+| GET | `/missions/{id}` | Detalhe de uma missão |
+| POST | `/missions` | Criar missão (lesson_id, start_date, end_date, level, theme?, academy_id?) |
+| PATCH | `/missions/{id}` | Atualizar missão (campos parciais) |
+| DELETE | `/missions/{id}` | Excluir missão |
+| GET | `/missions/panel` | Painel web HTML para criar missão em 10s |
 
 - Validação de body (Pydantic); 404 para recurso não encontrado; 409 para conclusão duplicada
 - Exceções de domínio em `app/core/exceptions`; mapeamento para HTTP via exception handlers
@@ -90,6 +116,32 @@ Documento único com todas as funcionalidades do **backend (AppBaby)** e do **ap
 - Sem internet ou API indisponível: app usa última missão em cache e exibe **"Modo offline"**
 - Navegação (COMEÇAR / CONCLUIR) funciona normalmente com dados em cache
 
+### Área do professor (Perfil → Área do professor)
+
+O professor acessa pelo app (Perfil → **Área do professor**) e pode:
+
+1. **Missões (aba Missões)**
+   - **Listar** todas as missões (período, nível, tema).
+   - **Criar** missão: escolher lição (GET /lessons), data início e fim (YYYY-MM-DD), nível (beginner/intermediate/advanced), tema opcional, academia opcional. Botão + (FAB).
+   - **Editar** e **Excluir** por toque no card ou menu (⋮).
+   - Estado vazio: mensagem e orientação para criar a primeira missão.
+
+2. **Academias (aba Academias)**
+   - **Listar** academias; toque abre o detalhe.
+   - **Detalhe da academia:**
+     - **Tema da semana:** campo de texto + **Salvar tema** (PATCH /academies/{id}).
+     - **Ranking (últimos 30 dias):** lista legível (posição, nome, conclusões).
+     - **Dificuldades reportadas:** posições mais marcadas como difíceis (nome, quantidade de reportes).
+     - **Relatório semanal:** período da semana, total de conclusões, ativos e lista do ranking da semana.
+   - Estado vazio: mensagem quando não há academias cadastradas.
+
+### Outras telas do app
+
+- **Biblioteca de lições** (aba Lições): lista GET /lessons; toque abre a lição como LessonScreen (e envia POST /lesson_complete ao concluir).
+- **Reportar dificuldade** (Perfil): GET /positions, escolha da posição e observação opcional; POST /training_feedback.
+- **Histórico de missões** (Progresso): seção "Últimas missões concluídas" com GET /mission_usages/history.
+- **Métricas de uso** (Perfil): GET /metrics/usage com totais e % antes/depois do treino.
+
 ### Testes
 
 - Teste de widget: app inicia com HomeScreen e título "Missão do dia"
@@ -101,5 +153,5 @@ Documento único com todas as funcionalidades do **backend (AppBaby)** e do **ap
 
 | Área | O que está pronto |
 |------|-------------------|
-| **Backend** | API REST, modelos, missão do dia, conclusão de lição, feedback de treino, seed, CORS, exceções centralizadas |
-| **App** | Tela inicial com missão (online/offline), aviso modo offline, tela de lição (placeholder de vídeo), navegação, cache com SharedPreferences |
+| **Backend** | API REST, modelos, missão do dia, conclusão de lição, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
+| **App** | Tela inicial com missão (online/offline), lição, biblioteca de lições, progresso com histórico, reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (tema, ranking, dificuldades, relatório semanal) com listas legíveis |

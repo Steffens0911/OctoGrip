@@ -27,5 +27,17 @@ services:
       postgres:
         condition: service_healthy
 
+  viewer:
+    build:
+      context: ./viewer
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+    container_name: jjb_viewer
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:

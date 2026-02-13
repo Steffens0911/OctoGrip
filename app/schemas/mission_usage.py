@@ -1,0 +1,28 @@
+"""Schemas para sync de MissionUsage (PB-01)."""
+from datetime import datetime
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class MissionUsageItem(BaseModel):
+    """Um item de uso para sync (payload do app)."""
+
+    lesson_id: UUID
+    opened_at: datetime
+    completed_at: datetime
+    usage_type: str = Field(..., pattern="^(before_training|after_training)$")
+
+
+class MissionUsageSyncRequest(BaseModel):
+    """Body do POST /mission_usages/sync."""
+
+    user_id: UUID
+    usages: list[MissionUsageItem]
+
+
+class MissionUsageSyncResponse(BaseModel):
+    """Resposta do sync: quantos foram inseridos."""
+
+    synced: int
+    message: str = "Sync concluído."

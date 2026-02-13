@@ -27,7 +27,19 @@ class Mission(Base, UUIDMixin):
     end_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     level: Mapped[str] = mapped_column(String(32), nullable=False, default="beginner", index=True)
+    theme: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    academy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("academies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="NULL = missão global; preenchido = override da academia (A-02).",
+    )
 
+    academy: Mapped["Academy | None"] = relationship(
+        "Academy",
+        back_populates="missions",
+        lazy="selectin",
+    )
     lesson: Mapped["Lesson"] = relationship(
         "Lesson",
         back_populates="missions",

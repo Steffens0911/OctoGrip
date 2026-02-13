@@ -39,3 +39,8 @@ class Lesson(Base, UUIDMixin):
         back_populates="lesson",
         lazy="selectin",
     )
+    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+        "MissionUsage",
+        back_populates="lesson",
+        lazy="selectin",
+    )

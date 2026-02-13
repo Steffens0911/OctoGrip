@@ -43,6 +43,11 @@ class TechniqueNotFoundError(NotFoundError):
         super().__init__(message)
 
 
+class AcademyNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Academia não encontrada."):
+        super().__init__(message)
+
+
 # --- Conflict (409) ---
 
 
