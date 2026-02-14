@@ -18,6 +18,12 @@ class AcademyRead(BaseModel):
     name: str
     slug: str | None
     weekly_theme: str | None = None
+    weekly_technique_id: UUID | None = None
+    weekly_technique_name: str | None = None
+    weekly_technique_2_id: UUID | None = None
+    weekly_technique_2_name: str | None = None
+    weekly_technique_3_id: UUID | None = None
+    weekly_technique_3_name: str | None = None
 
     class Config:
         from_attributes = True
@@ -30,11 +36,14 @@ class AcademyUpdateWeeklyTheme(BaseModel):
 
 
 class AcademyUpdate(BaseModel):
-    """Atualização parcial da academia (CRUD)."""
+    """Atualização parcial da academia (CRUD). Até 3 técnicas = 3 missões semanais (seg-ter, qua-qui, sex-dom)."""
 
     name: str | None = Field(None, min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)
     weekly_theme: str | None = Field(None, max_length=128)
+    weekly_technique_id: UUID | None = None
+    weekly_technique_2_id: UUID | None = None
+    weekly_technique_3_id: UUID | None = None
 
 
 class RankingEntry(BaseModel):

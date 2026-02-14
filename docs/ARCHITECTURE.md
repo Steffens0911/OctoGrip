@@ -20,12 +20,21 @@ app/
 ├── schemas/             # Pydantic (request/response)
 ├── services/            # Regras de negócio e acesso a dados (recebem Session)
 └── routes/
-    ├── router.py        # Agregação de todos os routers (api_router)
+    ├── router.py           # Agregação de todos os routers (api_router)
+    ├── admin.py            # Painel HTML (missions/panel)
     ├── health.py
+    ├── academies.py        # CRUD academias, ranking, difficulties, report
+    ├── users.py
     ├── lessons.py
-    ├── mission.py
-    ├── lesson_complete.py
-    └── training_feedback.py
+    ├── techniques.py
+    ├── positions.py
+    ├── missions.py         # CRUD missões
+    ├── mission.py          # mission_today, mission_today/week
+    ├── mission_complete.py # POST conclusão por missão
+    ├── mission_usages.py   # sync, history
+    ├── lesson_complete.py  # status, POST conclusão de lição
+    ├── training_feedback.py
+    └── metrics.py
 ```
 
 ## Fluxo de uma requisição
@@ -42,6 +51,17 @@ Novas exceções de domínio devem herdar de `AppError` (ou `NotFoundError` para
 - **Routes:** apenas orquestram (Depends(get_db), chamada ao service, return response); não contêm try/except para exceções de domínio.
 - **IDs:** UUID como PK em todos os models; uso de `UUIDMixin` para id, created_at, updated_at.
 - **Config:** variáveis em `app/config.py` via `pydantic_settings`; uso de `.env` em desenvolvimento.
+
+## Modelos principais
+
+| Modelo | Descrição |
+|--------|-----------|
+| User, Academy, Professor | Usuários vinculados a academia |
+| Position, Technique, Lesson | Conteúdo (posições, técnicas, lições) |
+| Mission | Missão = técnica + período + academia |
+| LessonProgress | Conclusão de lição (user, lesson) |
+| MissionUsage | Conclusão de missão (user, mission, usage_type) |
+| TrainingFeedback | Dificuldade reportada em posição |
 
 ## Evolução futura
 

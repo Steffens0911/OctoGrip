@@ -6,8 +6,11 @@ import 'package:viewer/config.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
+import 'package:viewer/models/mission_history_item.dart';
+import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
+import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/user.dart';
 
 class ApiException implements Exception {
@@ -94,11 +97,13 @@ class ApiService {
     String? name,
     String? slug,
     String? weeklyTheme,
+    String? weeklyTechniqueId,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (weeklyTheme != null) body['weekly_theme'] = weeklyTheme;
+    if (weeklyTechniqueId != null) body['weekly_technique_id'] = weeklyTechniqueId;
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/academies/$id'),
@@ -380,7 +385,7 @@ class ApiService {
   }
 
   Future<Mission> createMission({
-    required String lessonId,
+    required String techniqueId,
     required String startDate,
     required String endDate,
     String level = 'beginner',
@@ -391,7 +396,7 @@ class ApiService {
       Uri.parse('$baseUrl/missions'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'lesson_id': lessonId,
+        'technique_id': techniqueId,
         'start_date': startDate,
         'end_date': endDate,
         'level': level,
@@ -406,7 +411,7 @@ class ApiService {
 
   Future<Mission> updateMission(
     String id, {
-    String? lessonId,
+    String? techniqueId,
     String? startDate,
     String? endDate,
     String? level,
@@ -414,7 +419,7 @@ class ApiService {
     String? academyId,
   }) async {
     final body = <String, dynamic>{};
-    if (lessonId != null) body['lesson_id'] = lessonId;
+    if (techniqueId != null) body['technique_id'] = techniqueId;
     if (startDate != null) body['start_date'] = startDate;
     if (endDate != null) body['end_date'] = endDate;
     if (level != null) body['level'] = level;
@@ -433,5 +438,114 @@ class ApiService {
   Future<void> deleteMission(String id) async {
     final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id')));
     _throwIfNotOk(r, await _decodeResponse(r));
+  }
+
+  // ---------- Área do aluno (missão do dia, conclusão, histórico, feedback, métricas) ----------
+  Future<MissionToday> getMissionToday({
+    String level = 'beginner',
+    String? userId,
+    String? academyId,
+  }) async {
+    var uri = Uri.parse('$baseUrl/mission_today').replace(queryParameters: {
+      'level': level,
+      if (userId != null) 'user_id': userId,
+      if (academyId != null) 'academy_id': academyId,
+    });
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return MissionToday.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Lista das 3 missões da semana (Seg–Ter, Qua–Qui, Sex–Dom) para exibição ao aluno.
+  Future<MissionWeek> getMissionWeek({
+    String level = 'beginner',
+    String? userId,
+    String? academyId,
+  }) async {
+    var uri = Uri.parse('$baseUrl/mission_today/week').replace(queryParameters: {
+      'level': level,
+      if (userId != null) 'user_id': userId,
+      if (academyId != null) 'academy_id': academyId,
+    });
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return MissionWeek.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Indica se a lição já foi concluída pelo usuário (para botão desabilitado ao abrir).
+  Future<bool> getLessonCompleteStatus({required String userId, required String lessonId}) async {
+    final uri = Uri.parse('$baseUrl/lesson_complete/status').replace(queryParameters: {
+      'user_id': userId,
+      'lesson_id': lessonId,
+    });
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    return map['completed'] as bool? ?? false;
+  }
+
+  Future<void> postLessonComplete({required String userId, required String lessonId}) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/lesson_complete'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'user_id': userId, 'lesson_id': lessonId}),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
+  }
+
+  /// Conclusão por missão (missão do dia). usageType: before_training | after_training.
+  Future<void> postMissionComplete({
+    required String userId,
+    required String missionId,
+    String usageType = 'after_training',
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/mission_complete'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'user_id': userId,
+        'mission_id': missionId,
+        'usage_type': usageType,
+      }),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
+  }
+
+  Future<List<MissionHistoryItem>> getMissionUsagesHistory(String userId, {int limit = 7}) async {
+    final uri = Uri.parse('$baseUrl/mission_usages/history').replace(queryParameters: {
+      'user_id': userId,
+      'limit': limit.toString(),
+    });
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    final list = map['missions'] as List<dynamic>? ?? [];
+    return list.map((e) => MissionHistoryItem.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> postTrainingFeedback({
+    required String userId,
+    required String positionId,
+    String? observation,
+  }) async {
+    final body = <String, dynamic>{'user_id': userId, 'position_id': positionId};
+    if (observation != null && observation.isNotEmpty) body['observation'] = observation;
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/training_feedback'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
+  }
+
+  Future<UsageMetrics> getMetricsUsage() async {
+    final r = await _req(http.get(Uri.parse('$baseUrl/metrics/usage')));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return UsageMetrics.fromJson(data! as Map<String, dynamic>);
   }
 }

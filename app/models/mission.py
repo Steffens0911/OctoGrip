@@ -12,16 +12,16 @@ from app.models.base import UUIDMixin
 
 class Mission(Base, UUIDMixin):
     """
-    Entrega diária: vincula uma Lesson a um período (start_date..end_date).
-    Separa conteúdo (Lesson) da programação da missão do dia.
-    Preparado para futura recomendação automática (ex.: algoritmo por progresso/feedback).
+    Missão do dia: vincula uma Técnica a um período (start_date..end_date).
+    Conclusão por missão (MissionUsage.mission_id). A-02: academy_id = override por academia.
     """
 
     __tablename__ = "missions"
 
-    lesson_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("lessons.id", ondelete="RESTRICT"),
+    technique_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("techniques.id", ondelete="RESTRICT"),
         nullable=False,
+        index=True,
     )
     start_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     end_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
@@ -40,8 +40,13 @@ class Mission(Base, UUIDMixin):
         back_populates="missions",
         lazy="selectin",
     )
-    lesson: Mapped["Lesson"] = relationship(
-        "Lesson",
+    technique: Mapped["Technique"] = relationship(
+        "Technique",
         back_populates="missions",
         lazy="joined",
+    )
+    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+        "MissionUsage",
+        back_populates="mission",
+        lazy="selectin",
     )

@@ -6,9 +6,9 @@ from pydantic import BaseModel
 
 
 class MissionHistoryItem(BaseModel):
-    """Uma missão no histórico."""
+    """Uma missão no histórico (conclusão por missão ou legado por lição)."""
 
-    lesson_id: UUID
+    lesson_id: UUID | None = None  # legado; conclusão por missão usa technique
     lesson_title: str
     completed_at: datetime
     usage_type: str

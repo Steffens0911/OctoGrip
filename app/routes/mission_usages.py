@@ -26,11 +26,11 @@ def mission_usages_sync(
 @router.get("/history", response_model=MissionHistoryResponse)
 def mission_usages_history(
     user_id: UUID,
-    limit: int = 7,
+    limit: int = 500,
     db: Session = Depends(get_db),
 ):
-    """Últimas 7 (ou N) missões concluídas do usuário (PB-03)."""
-    items = get_mission_history(db, user_id, limit=min(limit, 50))
+    """Todas (ou últimas N) missões concluídas do usuário (PB-03). Default 500."""
+    items = get_mission_history(db, user_id, limit=min(limit, 500))
     return MissionHistoryResponse(
         missions=[MissionHistoryItem(**x) for x in items],
     )

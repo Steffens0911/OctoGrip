@@ -70,6 +70,13 @@ def position_update(
 @router.delete("/{position_id}", status_code=204)
 def position_remove(position_id: UUID, db: Session = Depends(get_db)):
     """Remove uma posição (falha se houver técnicas vinculadas)."""
-    if not delete_position(db, position_id):
-        raise HTTPException(status_code=404, detail="Posição não encontrada.")
-    return None
+    try:
+        if not delete_position(db, position_id):
+            raise HTTPException(status_code=404, detail="Posição não encontrada.")
+        return None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir: existem técnicas vinculadas a esta posição.",
+        )

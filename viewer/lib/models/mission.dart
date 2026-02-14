@@ -1,6 +1,6 @@
 class Mission {
   final String id;
-  final String lessonId;
+  final String techniqueId;
   final String startDate;
   final String endDate;
   final String level;
@@ -10,7 +10,7 @@ class Mission {
 
   Mission({
     required this.id,
-    required this.lessonId,
+    required this.techniqueId,
     required this.startDate,
     required this.endDate,
     required this.level,
@@ -22,7 +22,7 @@ class Mission {
   factory Mission.fromJson(Map<String, dynamic> json) {
     return Mission(
       id: json['id'] as String,
-      lessonId: json['lesson_id'] as String,
+      techniqueId: json['technique_id'] as String,
       startDate: json['start_date'] as String,
       endDate: json['end_date'] as String,
       level: json['level'] as String,
@@ -34,7 +34,7 @@ class Mission {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'lesson_id': lessonId,
+        'technique_id': techniqueId,
         'start_date': startDate,
         'end_date': endDate,
         'level': level,

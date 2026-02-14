@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/services/academy_service.dart';
+import 'package:viewer/services/api_service.dart';
 
 /// Lista e CRUD de academias (seção professor).
 class AcademiesScreen extends StatefulWidget {
@@ -77,94 +79,108 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
   Future<void> _openForm({Academy? existing}) async {
     final nameController = TextEditingController(text: existing?.name ?? '');
     final slugController = TextEditingController(text: existing?.slug ?? '');
-    final themeController =
-        TextEditingController(text: existing?.weeklyTheme ?? '');
     final isEdit = existing != null;
+    List<Technique> techniques = [];
+    if (isEdit) {
+      try {
+        techniques = await ApiService().getTechniques();
+      } catch (_) {}
+    }
+    String? selectedTechniqueId = existing?.weeklyTechniqueId;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isEdit ? 'Editar academia' : 'Nova academia'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nome',
-                  hintText: 'Nome da academia',
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text(isEdit ? 'Editar academia' : 'Nova academia'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome',
+                    hintText: 'Nome da academia',
+                  ),
+                  textCapitalization: TextCapitalization.words,
                 ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: slugController,
-                decoration: const InputDecoration(
-                  labelText: 'Slug (opcional)',
-                  hintText: 'identificador-unico',
-                ),
-              ),
-              if (isEdit) ...[
                 const SizedBox(height: 12),
                 TextField(
-                  controller: themeController,
+                  controller: slugController,
                   decoration: const InputDecoration(
-                    labelText: 'Tema da semana',
-                    hintText: 'Ex: Guarda e passagem',
+                    labelText: 'Slug (opcional)',
+                    hintText: 'identificador-unico',
                   ),
-                  maxLines: 2,
                 ),
+                if (isEdit) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedTechniqueId,
+                    decoration: const InputDecoration(
+                      labelText: 'Missão do dia (técnica)',
+                      hintText: 'Tema da semana = técnica para os alunos',
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                      ...techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                    ],
+                    onChanged: (v) => setDialogState(() => selectedTechniqueId = v),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'A técnica selecionada será a missão do dia para todos os alunos.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Informe o nome da academia.')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx);
+                try {
+                  if (isEdit) {
+                    await _service.update(
+                      existing!.id,
+                      name: name,
+                      slug: slugController.text.trim().isEmpty
+                          ? null
+                          : slugController.text.trim(),
+                      weeklyTechniqueId: selectedTechniqueId,
+                    );
+                  } else {
+                    await _service.create(
+                      name: name,
+                      slug: slugController.text.trim().isEmpty
+                          ? null
+                          : slugController.text.trim(),
+                    );
+                  }
+                  if (mounted) _load();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.toString())),
+                    );
+                  }
+                }
+              },
+              child: Text(isEdit ? 'Salvar' : 'Criar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Informe o nome da academia.')),
-                );
-                return;
-              }
-              Navigator.pop(ctx);
-              try {
-                if (isEdit) {
-                  await _service.update(
-                    existing!.id,
-                    name: name,
-                    slug: slugController.text.trim().isEmpty
-                        ? null
-                        : slugController.text.trim(),
-                    weeklyTheme: themeController.text.trim().isEmpty
-                        ? null
-                        : themeController.text.trim(),
-                  );
-                } else {
-                  await _service.create(
-                    name: name,
-                    slug: slugController.text.trim().isEmpty
-                        ? null
-                        : slugController.text.trim(),
-                  );
-                }
-                if (mounted) _load();
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString())),
-                  );
-                }
-              }
-            },
-            child: Text(isEdit ? 'Salvar' : 'Criar'),
-          ),
-        ],
       ),
     );
   }
@@ -259,9 +275,10 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                 ),
                 title: Text(a.name),
                 subtitle: Text(
-                  [if (a.slug != null && a.slug!.isNotEmpty) a.slug, a.weeklyTheme]
-                      .where((e) => e != null && e.toString().isNotEmpty)
-                      .join(' · '),
+                  [
+                    if (a.slug != null && a.slug!.isNotEmpty) a.slug,
+                    a.weeklyTechniqueName ?? a.weeklyTheme,
+                  ].where((e) => e != null && e.toString().isNotEmpty).join(' · '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -4,10 +4,26 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.mission import MissionTodayResponse
-from app.services.mission_service import get_mission_today_response
+from app.schemas.mission import MissionTodayResponse, MissionWeekResponse
+from app.services.mission_service import get_mission_today_response, get_mission_week_response
 
 router = APIRouter()
+
+
+@router.get("/week", response_model=MissionWeekResponse)
+def mission_week(
+    db: Session = Depends(get_db),
+    level: str = "beginner",
+    user_id: UUID | None = None,
+    academy_id: UUID | None = None,
+):
+    """
+    Retorna as 3 missões da semana (Missão 1, 2, 3) para listagem ao aluno.
+    Cada entrada pode ter mission preenchida ou null.
+    """
+    return get_mission_week_response(
+        db, level=level, user_id=user_id, academy_id=academy_id
+    )
 
 
 @router.get("", response_model=MissionTodayResponse)

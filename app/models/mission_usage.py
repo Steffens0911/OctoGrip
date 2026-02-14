@@ -13,8 +13,8 @@ from app.models.base import UUIDMixin
 
 class MissionUsage(Base, UUIDMixin):
     """
-    Uso de missão por usuário: abertura, conclusão e momento (before_training / after_training).
-    Sincronizado pelo app (PB-01). Base para métricas de retenção (PB-02) e histórico (PB-03).
+    Conclusão de missão por usuário (conclusão por missão).
+    mission_id preenchido = conclusão da missão do dia; lesson_id legado (opcional).
     """
 
     __tablename__ = "mission_usages"
@@ -24,9 +24,14 @@ class MissionUsage(Base, UUIDMixin):
         nullable=False,
         index=True,
     )
-    lesson_id: Mapped[uuid.UUID] = mapped_column(
+    mission_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("missions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    lesson_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("lessons.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -38,4 +43,13 @@ class MissionUsage(Base, UUIDMixin):
     )
 
     user: Mapped["User"] = relationship("User", back_populates="mission_usages")
-    lesson: Mapped["Lesson"] = relationship("Lesson", back_populates="mission_usages")
+    mission: Mapped["Mission | None"] = relationship(
+        "Mission",
+        back_populates="mission_usages",
+        lazy="selectin",
+    )
+    lesson: Mapped["Lesson | None"] = relationship(
+        "Lesson",
+        back_populates="mission_usages",
+        lazy="selectin",
+    )

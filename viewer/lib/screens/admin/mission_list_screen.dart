@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission.dart';
-import 'package:viewer/models/lesson.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/mission_form_screen.dart';
 
@@ -15,17 +15,17 @@ class MissionListScreen extends StatefulWidget {
 class _MissionListScreenState extends State<MissionListScreen> {
   final _api = ApiService();
   List<Mission> _list = [];
-  List<Lesson> _lessons = [];
+  List<Technique> _techniques = [];
   bool _loading = true;
   String? _error;
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getMissions(), _api.getLessons()]);
+      final results = await Future.wait([_api.getMissions(), _api.getTechniques()]);
       setState(() {
         _list = results[0] as List<Mission>;
-        _lessons = results[1] as List<Lesson>;
+        _techniques = results[1] as List<Technique>;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -44,7 +44,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
     _load();
   }
 
-  String _lessonTitle(String id) => _lessons.where((l) => l.id == id).map((l) => l.title).firstOrNull ?? id;
+  String _techniqueName(String id) => _techniques.where((t) => t.id == id).map((t) => t.name).firstOrNull ?? id;
 
   Future<void> _openForm([Mission? m]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => MissionFormScreen(mission: m)));
@@ -87,7 +87,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      title: Text(_lessonTitle(m.lessonId)),
+                      title: Text(_techniqueName(m.techniqueId)),
                       subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),

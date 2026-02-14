@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS missions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS ix_missions_lesson_id ON missions(lesson_id);
+-- Índice lesson_id removido: migração 009 troca missions por technique_id
 CREATE INDEX IF NOT EXISTS ix_missions_start_date ON missions(start_date);
 CREATE INDEX IF NOT EXISTS ix_missions_end_date ON missions(end_date);
 CREATE INDEX IF NOT EXISTS ix_missions_is_active ON missions(is_active);

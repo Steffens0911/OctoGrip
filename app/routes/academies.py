@@ -2,9 +2,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
+from app.models import Academy
 from fastapi.responses import PlainTextResponse
 
 from app.schemas.academy import (
@@ -31,10 +32,36 @@ from app.services.academy_service import (
 router = APIRouter()
 
 
+def _academy_to_read(a: Academy) -> AcademyRead:
+    return AcademyRead(
+        id=a.id,
+        name=a.name,
+        slug=a.slug,
+        weekly_theme=a.weekly_theme,
+        weekly_technique_id=a.weekly_technique_id,
+        weekly_technique_name=a.weekly_technique.name if a.weekly_technique else None,
+        weekly_technique_2_id=a.weekly_technique_2_id,
+        weekly_technique_2_name=a.weekly_technique_2.name if a.weekly_technique_2 else None,
+        weekly_technique_3_id=a.weekly_technique_3_id,
+        weekly_technique_3_name=a.weekly_technique_3.name if a.weekly_technique_3 else None,
+    )
+
+
 @router.get("", response_model=list[AcademyRead])
 def academy_list(db: Session = Depends(get_db)):
-    """Lista academias (para painel do professor)."""
-    return list_academies(db)
+    """Lista academias (para painel do professor), com nomes das 3 técnicas semanais."""
+    academies = (
+        db.query(Academy)
+        .options(
+            joinedload(Academy.weekly_technique),
+            joinedload(Academy.weekly_technique_2),
+            joinedload(Academy.weekly_technique_3),
+        )
+        .order_by(Academy.name)
+        .limit(100)
+        .all()
+    )
+    return [_academy_to_read(a) for a in academies]
 
 
 @router.post("", response_model=AcademyRead, status_code=201)
@@ -48,11 +75,20 @@ def academy_get(
     academy_id: UUID,
     db: Session = Depends(get_db),
 ):
-    """Retorna uma academia por ID."""
-    academy = get_academy(db, academy_id)
+    """Retorna uma academia por ID (com nomes das 3 técnicas semanais se houver)."""
+    academy = (
+        db.query(Academy)
+        .options(
+            joinedload(Academy.weekly_technique),
+            joinedload(Academy.weekly_technique_2),
+            joinedload(Academy.weekly_technique_3),
+        )
+        .filter(Academy.id == academy_id)
+        .first()
+    )
     if not academy:
         raise HTTPException(status_code=404, detail="Academia não encontrada.")
-    return academy
+    return _academy_to_read(academy)
 
 
 @router.patch("/{academy_id}", response_model=AcademyRead)
@@ -61,17 +97,23 @@ def academy_update(
     body: AcademyUpdate,
     db: Session = Depends(get_db),
 ):
-    """Atualiza academia (nome, slug e/ou tema semanal)."""
-    academy = update_academy(
-        db,
-        academy_id,
-        name=body.name,
-        slug=body.slug,
-        weekly_theme=body.weekly_theme,
-    )
+    """Atualiza academia (nome, slug, tema e/ou as 3 missões semanais). Campos omitidos não são alterados; null limpa a técnica."""
+    updates = body.model_dump(exclude_unset=True)
+    academy = update_academy(db, academy_id, **updates)
     if not academy:
         raise HTTPException(status_code=404, detail="Academia não encontrada.")
-    return academy
+    db.refresh(academy)
+    academy = (
+        db.query(Academy)
+        .options(
+            joinedload(Academy.weekly_technique),
+            joinedload(Academy.weekly_technique_2),
+            joinedload(Academy.weekly_technique_3),
+        )
+        .filter(Academy.id == academy_id)
+        .first()
+    )
+    return _academy_to_read(academy)
 
 
 @router.delete("/{academy_id}", status_code=204)

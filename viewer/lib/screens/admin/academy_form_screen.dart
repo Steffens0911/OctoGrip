@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 
 class AcademyFormScreen extends StatefulWidget {
@@ -16,7 +17,9 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
   final _api = ApiService();
   final _nameCtrl = TextEditingController();
   final _slugCtrl = TextEditingController();
-  final _themeCtrl = TextEditingController();
+  List<Technique> _techniques = [];
+  String? _weeklyTechniqueId;
+  bool _loading = true;
   bool _saving = false;
   String? _error;
 
@@ -26,7 +29,23 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
     if (widget.academy != null) {
       _nameCtrl.text = widget.academy!.name;
       _slugCtrl.text = widget.academy!.slug ?? '';
-      _themeCtrl.text = widget.academy!.weeklyTheme ?? '';
+      _weeklyTechniqueId = widget.academy!.weeklyTechniqueId;
+    }
+    _loadTechniques();
+  }
+
+  Future<void> _loadTechniques() async {
+    try {
+      final list = await _api.getTechniques();
+      if (mounted) setState(() {
+        _techniques = list;
+        _loading = false;
+        if (_weeklyTechniqueId == null && widget.academy?.weeklyTechniqueId != null) {
+          _weeklyTechniqueId = widget.academy!.weeklyTechniqueId;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -34,7 +53,6 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _slugCtrl.dispose();
-    _themeCtrl.dispose();
     super.dispose();
   }
 
@@ -62,10 +80,13 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           widget.academy!.id,
           name: _nameCtrl.text.trim(),
           slug: _slugCtrl.text.trim().isEmpty ? null : _slugCtrl.text.trim(),
-          weeklyTheme: _themeCtrl.text.trim().isEmpty ? null : _themeCtrl.text.trim(),
+          weeklyTechniqueId: _weeklyTechniqueId,
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Academia atualizada')));
+          final msg = _weeklyTechniqueId != null
+              ? 'Academia atualizada. Missão do dia definida para todos os alunos.'
+              : 'Academia atualizada';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
           Navigator.pop(context);
         }
       }
@@ -95,37 +116,54 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(labelText: 'Nome'),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Nome'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _slugCtrl,
+                    decoration: const InputDecoration(labelText: 'Slug (opcional)'),
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _weeklyTechniqueId,
+                    decoration: const InputDecoration(
+                      labelText: 'Tema da semana (missão do dia)',
+                      hintText: 'Selecione a técnica para todos os alunos',
+                    ),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                      ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                    ],
+                    onChanged: (v) => setState(() => _weeklyTechniqueId = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'A técnica selecionada aparecerá como missão do dia para todos os alunos desta academia.',
+                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                  ],
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Salvar'),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _slugCtrl,
-              decoration: const InputDecoration(labelText: 'Slug (opcional)'),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _themeCtrl,
-              decoration: const InputDecoration(labelText: 'Tema semanal'),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: Colors.red)),
-            ],
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _saving ? null : _save,
-              child: _saving ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Salvar'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

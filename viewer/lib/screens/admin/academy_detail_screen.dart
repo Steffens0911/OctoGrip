@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/academy_service.dart';
+import 'package:viewer/services/api_service.dart';
 
-/// Detalhe da academia: tema semanal, ranking, dificuldades, relatório semanal.
+/// Detalhe da academia: missão do dia (técnica), ranking, dificuldades, relatório semanal.
 class AcademyDetailScreen extends StatefulWidget {
   final Academy academy;
   final VoidCallback onUpdated;
@@ -22,8 +24,13 @@ class AcademyDetailScreen extends StatefulWidget {
 
 class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   final AcademyService _service = AcademyService();
+  final ApiService _api = ApiService();
   late Academy _academy;
-  final TextEditingController _themeController = TextEditingController();
+  List<Technique> _techniques = [];
+  String? _weeklyTechniqueId;
+  String? _weeklyTechnique2Id;
+  String? _weeklyTechnique3Id;
+  bool _loadingTechniques = true;
   bool _savingTheme = false;
   Map<String, dynamic>? _ranking;
   Map<String, dynamic>? _difficulties;
@@ -35,14 +42,23 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   void initState() {
     super.initState();
     _academy = widget.academy;
-    _themeController.text = _academy.weeklyTheme ?? '';
+    _weeklyTechniqueId = _academy.weeklyTechniqueId;
+    _weeklyTechnique2Id = _academy.weeklyTechnique2Id;
+    _weeklyTechnique3Id = _academy.weeklyTechnique3Id;
+    _loadTechniques();
     _loadRankingAndReport();
   }
 
-  @override
-  void dispose() {
-    _themeController.dispose();
-    super.dispose();
+  Future<void> _loadTechniques() async {
+    try {
+      final list = await _api.getTechniques();
+      if (mounted) setState(() {
+        _techniques = list;
+        _loadingTechniques = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingTechniques = false);
+    }
   }
 
   Future<void> _loadRankingAndReport() async {
@@ -69,21 +85,29 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   }
 
   Future<void> _saveTheme() async {
-    final value = _themeController.text.trim();
     setState(() => _savingTheme = true);
     try {
-      final updated = await _service.update(
+      final updated = await _service.updateWeeklyMissions(
         _academy.id,
-        weeklyTheme: value.isEmpty ? null : value,
+        weeklyTechniqueId: _weeklyTechniqueId,
+        weeklyTechnique2Id: _weeklyTechnique2Id,
+        weeklyTechnique3Id: _weeklyTechnique3Id,
       );
       if (updated != null && mounted) {
         setState(() {
           _academy = updated;
+          _weeklyTechniqueId = updated.weeklyTechniqueId;
+          _weeklyTechnique2Id = updated.weeklyTechnique2Id;
+          _weeklyTechnique3Id = updated.weeklyTechnique3Id;
           _savingTheme = false;
         });
         widget.onUpdated();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tema salvo.')),
+          SnackBar(
+            content: Text(_weeklyTechniqueId != null || _weeklyTechnique2Id != null || _weeklyTechnique3Id != null
+                ? 'Missões semanais atualizadas para todos os alunos.'
+                : 'Tema salvo.'),
+          ),
         );
       }
     } catch (e) {
@@ -137,83 +161,76 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () async {
-              final nameController =
-                  TextEditingController(text: _academy.name);
-              final slugController =
-                  TextEditingController(text: _academy.slug ?? '');
-              final themeController =
-                  TextEditingController(text: _academy.weeklyTheme ?? '');
+              final nameController = TextEditingController(text: _academy.name);
+              final slugController = TextEditingController(text: _academy.slug ?? '');
+              String? techniqueId = _academy.weeklyTechniqueId;
               await showDialog<void>(
                 context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Editar academia'),
-                  content: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                          controller: nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nome',
+                builder: (ctx) => StatefulBuilder(
+                  builder: (context, setDialogState) => AlertDialog(
+                    title: const Text('Editar academia'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            controller: nameController,
+                            decoration: const InputDecoration(labelText: 'Nome'),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: slugController,
-                          decoration: const InputDecoration(
-                            labelText: 'Slug (opcional)',
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: slugController,
+                            decoration: const InputDecoration(labelText: 'Slug (opcional)'),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: themeController,
-                          decoration: const InputDecoration(
-                            labelText: 'Tema da semana',
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: techniqueId,
+                            decoration: const InputDecoration(labelText: 'Missão do dia (técnica)'),
+                            items: [
+                              const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                              ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                            ],
+                            onChanged: (v) => setDialogState(() => techniqueId = v),
                           ),
-                          maxLines: 2,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text('Cancelar'),
-                    ),
-                    FilledButton(
-                      onPressed: () async {
-                        final name = nameController.text.trim();
-                        if (name.isEmpty) return;
-                        Navigator.pop(ctx);
-                        try {
-                          final updated = await _service.update(
-                            _academy.id,
-                            name: name,
-                            slug: slugController.text.trim().isEmpty
-                                ? null
-                                : slugController.text.trim(),
-                            weeklyTheme:
-                                themeController.text.trim().isEmpty
-                                    ? null
-                                    : themeController.text.trim(),
-                          );
-                          if (updated != null && mounted) {
-                            setState(() => _academy = updated);
-                            _themeController.text =
-                                updated.weeklyTheme ?? '';
-                            widget.onUpdated();
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(e.toString())),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancelar'),
+                      ),
+                      FilledButton(
+                        onPressed: () async {
+                          final name = nameController.text.trim();
+                          if (name.isEmpty) return;
+                          Navigator.pop(ctx);
+                          try {
+                            final updated = await _service.update(
+                              _academy.id,
+                              name: name,
+                              slug: slugController.text.trim().isEmpty ? null : slugController.text.trim(),
+                              weeklyTechniqueId: techniqueId,
                             );
+                            if (updated != null && mounted) {
+                              setState(() {
+                                _academy = updated;
+                                _weeklyTechniqueId = updated.weeklyTechniqueId;
+                              });
+                              widget.onUpdated();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString())),
+                              );
+                            }
                           }
-                        }
-                      },
-                      child: const Text('Salvar'),
-                    ),
-                  ],
+                        },
+                        child: const Text('Salvar'),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
@@ -260,21 +277,60 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Tema da semana',
+                        'Missões semanais (3 técnicas)',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               color: AppTheme.textPrimary,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 8),
-                      TextField(
-                        controller: _themeController,
-                        decoration: const InputDecoration(
-                          hintText: 'Ex: Guarda e passagem',
-                        ),
-                        maxLines: 2,
-                        onChanged: (_) => setState(() {}),
+                      Text(
+                        'Seg–ter, qua–qui e sex–dom: cada técnica aparece como missão do dia nesse período.',
+                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                       ),
+                      const SizedBox(height: 12),
+                      if (_loadingTechniques)
+                        const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+                      else ...[
+                        DropdownButtonFormField<String>(
+                          value: _weeklyTechniqueId,
+                          decoration: const InputDecoration(
+                            labelText: 'Missão 1 (seg–ter)',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                          ],
+                          onChanged: (v) => setState(() => _weeklyTechniqueId = v),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _weeklyTechnique2Id,
+                          decoration: const InputDecoration(
+                            labelText: 'Missão 2 (qua–qui)',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                          ],
+                          onChanged: (v) => setState(() => _weeklyTechnique2Id = v),
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: _weeklyTechnique3Id,
+                          decoration: const InputDecoration(
+                            labelText: 'Missão 3 (sex–dom)',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: [
+                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                          ],
+                          onChanged: (v) => setState(() => _weeklyTechnique3Id = v),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       SizedBox(
                         width: double.infinity,
@@ -284,12 +340,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
+                                  child: CircularProgressIndicator(strokeWidth: 2),
                                 )
                               : const Icon(Icons.save),
-                          label: Text(_savingTheme ? 'Salvando...' : 'Salvar tema'),
+                          label: Text(_savingTheme ? 'Salvando...' : 'Salvar missões semanais'),
                         ),
                       ),
                     ],

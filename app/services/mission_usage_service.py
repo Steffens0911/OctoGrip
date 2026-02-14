@@ -1,4 +1,4 @@
-"""Serviço de sync de MissionUsage (PB-01)."""
+"""Serviço de sync de MissionUsage (PB-01) e conclusão por missão."""
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import UserNotFoundError
-from app.models import Lesson, MissionUsage, User
+from app.models import Lesson, LessonProgress, MissionUsage, User
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +17,8 @@ def sync_mission_usages(
     usages: list[dict],
 ) -> int:
     """
-    Insere registros de uso enviados pelo app.
-    Valida user e lesson; ignora duplicatas (mesmo user, lesson, completed_at).
-    Retorna quantidade inserida.
+    Insere registros de uso enviados pelo app (legado: lesson_id).
+    Valida user e lesson; ignora duplicatas.
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -61,6 +60,7 @@ def sync_mission_usages(
 
         record = MissionUsage(
             user_id=user_id,
+            mission_id=None,
             lesson_id=lesson_id,
             opened_at=opened_at,
             completed_at=completed_at,
@@ -94,23 +94,57 @@ def _parse_dt(value) -> datetime:
 
 def get_mission_history(db: Session, user_id: UUID, limit: int = 7) -> list[dict]:
     """
-    Últimas N missões concluídas do usuário (PB-03).
-    Ordenado por completed_at DESC. Retorna lista de dict com lesson_id, lesson_title, completed_at, usage_type.
+    Últimas N conclusões (por missão ou legado por lição).
+    Retorna dict com lesson_id (opcional), lesson_title, completed_at, usage_type.
     """
-    rows = (
+    from app.models import Mission
+
+    usage_rows = (
         db.query(MissionUsage)
         .filter(MissionUsage.user_id == user_id)
-        .options(joinedload(MissionUsage.lesson))
+        .options(
+            joinedload(MissionUsage.mission).joinedload(Mission.technique),
+            joinedload(MissionUsage.lesson),
+        )
         .order_by(MissionUsage.completed_at.desc())
-        .limit(limit)
+        .limit(limit * 2)
         .all()
     )
-    return [
-        {
+    items = []
+    for r in usage_rows:
+        if r.mission_id and r.mission and r.mission.technique:
+            items.append({
+                "lesson_id": None,
+                "lesson_title": r.mission.technique.name,
+                "completed_at": r.completed_at,
+                "usage_type": r.usage_type,
+            })
+        elif r.lesson_id and r.lesson:
+            items.append({
+                "lesson_id": r.lesson_id,
+                "lesson_title": r.lesson.title,
+                "completed_at": r.completed_at,
+                "usage_type": r.usage_type,
+            })
+
+    lesson_ids_in_usage = {r.lesson_id for r in usage_rows if r.lesson_id is not None}
+
+    progress_q = (
+        db.query(LessonProgress)
+        .filter(LessonProgress.user_id == user_id)
+        .options(joinedload(LessonProgress.lesson))
+        .order_by(LessonProgress.completed_at.desc())
+    )
+    if lesson_ids_in_usage:
+        progress_q = progress_q.filter(~LessonProgress.lesson_id.in_(lesson_ids_in_usage))
+    progress_rows = progress_q.limit(limit * 2).all()
+    for r in progress_rows:
+        items.append({
             "lesson_id": r.lesson_id,
             "lesson_title": r.lesson.title if r.lesson else "",
             "completed_at": r.completed_at,
-            "usage_type": r.usage_type,
-        }
-        for r in rows
-    ]
+            "usage_type": "after_training",
+        })
+
+    items.sort(key=lambda x: x["completed_at"], reverse=True)
+    return items[:limit]

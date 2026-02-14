@@ -68,8 +68,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
     <main class="main">
       <div id="panel-academies" class="panel active">
         <div class="toolbar"><h1>Academias</h1><button class="btn btn-primary" data-action="new-academy">Nova academia</button></div>
-        <div id="form-academy" class="form-card hidden"><h3 id="form-academy-title">Nova academia</h3><form id="f-academy"><input type="hidden" name="id"><div class="form-row"><label>Nome</label><input name="name" required></div><div class="form-row"><label>Slug (opcional)</label><input name="slug" placeholder="url-amigavel"></div><div class="form-row"><label>Tema semanal (edição)</label><input name="weekly_theme" placeholder="Ex: Passagem de guarda"></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-academy" class="msg hidden"></div></div>
-        <table><thead><tr><th>Nome</th><th>Slug</th><th>Tema semanal</th><th>Ações</th></tr></thead><tbody id="tbl-academies"></tbody></table>
+        <div id="form-academy" class="form-card hidden"><h3 id="form-academy-title">Nova academia</h3><form id="f-academy"><input type="hidden" name="id"><div class="form-row"><label>Nome</label><input name="name" required></div><div class="form-row"><label>Slug (opcional)</label><input name="slug" placeholder="url-amigavel"></div><div class="form-row"><label>Missão do dia (técnica)</label><select name="weekly_technique_id"><option value="">— Nenhuma —</option></select></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-academy" class="msg hidden"></div></div>
+        <table><thead><tr><th>Nome</th><th>Slug</th><th>Missão do dia</th><th>Ações</th></tr></thead><tbody id="tbl-academies"></tbody></table>
       </div>
       <div id="panel-users" class="panel">
         <div class="toolbar"><h1>Usuários</h1><button class="btn btn-primary" data-action="new-user">Novo usuário</button></div>
@@ -93,8 +93,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
       </div>
       <div id="panel-missions" class="panel">
         <div class="toolbar"><h1>Missões</h1><button class="btn btn-primary" data-action="new-mission">Nova missão</button></div>
-        <div id="form-mission" class="form-card hidden"><h3 id="form-mission-title">Nova missão</h3><form id="f-mission"><input type="hidden" name="id"><div class="form-row"><label>Lição</label><select name="lesson_id" required></select></div><div class="form-row"><label>Início</label><input name="start_date" type="date" required></div><div class="form-row"><label>Fim</label><input name="end_date" type="date" required></div><div class="form-row"><label>Nível</label><select name="level"><option value="beginner">Iniciante</option><option value="intermediate">Intermediário</option></select></div><div class="form-row"><label>Tema</label><input name="theme"></div><div class="form-row"><label>Academia</label><select name="academy_id"><option value="">Global</option></select></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-mission" class="msg hidden"></div></div>
-        <table><thead><tr><th>Lição</th><th>Início</th><th>Fim</th><th>Nível</th><th>Tema</th><th>Ações</th></tr></thead><tbody id="tbl-missions"></tbody></table>
+        <div id="form-mission" class="form-card hidden"><h3 id="form-mission-title">Nova missão</h3><form id="f-mission"><input type="hidden" name="id"><div class="form-row"><label>Técnica</label><select name="technique_id" required></select></div><div class="form-row"><label>Início</label><input name="start_date" type="date" required></div><div class="form-row"><label>Fim</label><input name="end_date" type="date" required></div><div class="form-row"><label>Nível</label><select name="level"><option value="beginner">Iniciante</option><option value="intermediate">Intermediário</option></select></div><div class="form-row"><label>Tema</label><input name="theme"></div><div class="form-row"><label>Academia</label><select name="academy_id"><option value="">Global</option></select></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-mission" class="msg hidden"></div></div>
+        <table><thead><tr><th>Técnica</th><th>Início</th><th>Fim</th><th>Nível</th><th>Tema</th><th>Ações</th></tr></thead><tbody id="tbl-missions"></tbody></table>
       </div>
     </main>
   </div>
@@ -128,17 +128,20 @@ _ADMIN_HTML = """<!DOCTYPE html>
   async function loadAcademies() {
     const list = await get('/academies');
     const tbody = $('tbl-academies');
-    tbody.innerHTML = list.map(a => '<tr><td>' + escapeHtml(a.name) + '</td><td>' + escapeHtml(a.slug || '') + '</td><td>' + escapeHtml(a.weekly_theme || '') + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-academy="' + a.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-academy="' + a.id + '">Excluir</button></td></tr>').join('');
+    tbody.innerHTML = list.map(a => '<tr><td>' + escapeHtml(a.name) + '</td><td>' + escapeHtml(a.slug || '') + '</td><td>' + escapeHtml(a.weekly_technique_name || a.weekly_theme || '') + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-academy="' + a.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-academy="' + a.id + '">Excluir</button></td></tr>').join('');
     tbody.querySelectorAll('[data-edit-academy]').forEach(b => b.addEventListener('click', () => editAcademy(b.dataset.editAcademy)));
     tbody.querySelectorAll('[data-delete-academy]').forEach(b => b.addEventListener('click', () => deleteAcademy(b.dataset.deleteAcademy)));
   }
-  function showAcademyForm(editId) {
+  async function showAcademyForm(editId) {
     const form = $('form-academy'); form.classList.remove('hidden'); $('form-academy-title').textContent = editId ? 'Editar academia' : 'Nova academia';
-    sel('#f-academy input[name="id"]').value = editId || ''; sel('#f-academy input[name="name"]').value = ''; sel('#f-academy input[name="slug"]').value = ''; sel('#f-academy input[name="weekly_theme"]').value = '';
-    if (editId) get('/academies/' + editId).then(a => { sel('#f-academy input[name="name"]').value = a.name; sel('#f-academy input[name="slug"]').value = a.slug || ''; sel('#f-academy input[name="weekly_theme"]').value = a.weekly_theme || ''; }).catch(() => {});
+    const techniques = await get('/techniques');
+    const selTc = $('f-academy').querySelector('select[name="weekly_technique_id"]');
+    selTc.innerHTML = '<option value="">— Nenhuma —</option>' + techniques.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>').join('');
+    sel('#f-academy input[name="id"]').value = editId || ''; sel('#f-academy input[name="name"]').value = ''; sel('#f-academy input[name="slug"]').value = ''; selTc.value = '';
+    if (editId) get('/academies/' + editId).then(a => { sel('#f-academy input[name="name"]').value = a.name; sel('#f-academy input[name="slug"]').value = a.slug || ''; selTc.value = a.weekly_technique_id || ''; }).catch(() => {});
   }
   document.querySelector('[data-action="new-academy"]').addEventListener('click', () => showAcademyForm(null));
-  document.getElementById('f-academy').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-academy'); try { if (id) { await patch('/academies/' + id, { weekly_theme: fd.get('weekly_theme') || null }); showMsg('msg-academy', 'Tema atualizado.', true); } else { await post('/academies', { name: fd.get('name'), slug: fd.get('slug') || null }); showMsg('msg-academy', 'Academia criada.', true); $('form-academy').classList.add('hidden'); loadAcademies(); } } catch (err) { showMsg('msg-academy', err.detail || err.message || 'Erro', false); } });
+  document.getElementById('f-academy').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-academy'); try { if (id) { await patch('/academies/' + id, { name: fd.get('name'), slug: fd.get('slug') || null, weekly_technique_id: fd.get('weekly_technique_id') || null }); showMsg('msg-academy', 'Academia atualizada. Missão do dia definida.', true); } else { await post('/academies', { name: fd.get('name'), slug: fd.get('slug') || null }); showMsg('msg-academy', 'Academia criada.', true); $('form-academy').classList.add('hidden'); loadAcademies(); } } catch (err) { showMsg('msg-academy', err.detail || err.message || 'Erro', false); } });
   async function editAcademy(id) { showAcademyForm(id); }
   async function deleteAcademy(id) { if (!confirm('Excluir esta academia?')) return; try { await del('/academies/' + id); $('form-academy').classList.add('hidden'); loadAcademies(); } catch (e) { alert(e.detail || 'Erro'); } }
 
@@ -217,21 +220,21 @@ _ADMIN_HTML = """<!DOCTYPE html>
   async function deletePosition(id) { if (!confirm('Excluir esta posição?')) return; try { await del('/positions/' + id); $('form-position').classList.add('hidden'); loadPositions(); } catch (e) { alert(e.detail || 'Erro'); } }
 
   async function loadMissions() {
-    const [list, lessons, academies] = await Promise.all([get('/missions'), get('/lessons'), get('/academies')]);
-    const selLe = $('f-mission').querySelector('select[name="lesson_id"]'); selLe.innerHTML = lessons.map(l => '<option value="' + l.id + '">' + escapeHtml(l.title) + '</option>').join('');
+    const [list, techniques, academies] = await Promise.all([get('/missions'), get('/techniques'), get('/academies')]);
+    const selTc = $('f-mission').querySelector('select[name="technique_id"]'); selTc.innerHTML = techniques.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>').join('');
     const selAc = $('f-mission').querySelector('select[name="academy_id"]'); selAc.innerHTML = '<option value="">Global</option>' + academies.map(a => '<option value="' + a.id + '">' + escapeHtml(a.name) + '</option>').join('');
     const tbody = $('tbl-missions');
-    tbody.innerHTML = list.map(m => { const l = lessons.find(x => x.id === m.lesson_id); return '<tr><td>' + (l ? l.title : m.lesson_id) + '</td><td>' + m.start_date + '</td><td>' + m.end_date + '</td><td>' + m.level + '</td><td>' + escapeHtml(m.theme || '') + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-mission="' + m.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-mission="' + m.id + '">Excluir</button></td></tr>'; }).join('');
+    tbody.innerHTML = list.map(m => { const t = techniques.find(x => x.id === m.technique_id); return '<tr><td>' + (t ? t.name : (m.technique_id || '')) + '</td><td>' + m.start_date + '</td><td>' + m.end_date + '</td><td>' + m.level + '</td><td>' + escapeHtml(m.theme || '') + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-mission="' + m.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-mission="' + m.id + '">Excluir</button></td></tr>'; }).join('');
     tbody.querySelectorAll('[data-edit-mission]').forEach(b => b.addEventListener('click', () => editMission(b.dataset.editMission)));
     tbody.querySelectorAll('[data-delete-mission]').forEach(b => b.addEventListener('click', () => deleteMission(b.dataset.deleteMission)));
   }
   function showMissionForm(editId) {
     const form = $('form-mission'); form.classList.remove('hidden'); $('form-mission-title').textContent = editId ? 'Editar missão' : 'Nova missão';
     sel('#f-mission input[name="id"]').value = editId || ''; const today = new Date().toISOString().slice(0, 10); const end = new Date(); end.setDate(end.getDate() + 6); sel('#f-mission input[name="start_date"]').value = today; sel('#f-mission input[name="end_date"]').value = end.toISOString().slice(0, 10); sel('#f-mission input[name="theme"]').value = ''; sel('#f-mission select[name="academy_id"]').value = '';
-    if (editId) get('/missions/' + editId).then(m => { sel('#f-mission select[name="lesson_id"]').value = m.lesson_id; sel('#f-mission input[name="start_date"]').value = m.start_date; sel('#f-mission input[name="end_date"]').value = m.end_date; sel('#f-mission select[name="level"]').value = m.level; sel('#f-mission input[name="theme"]').value = m.theme || ''; sel('#f-mission select[name="academy_id"]').value = m.academy_id || ''; }).catch(() => {});
+    if (editId) get('/missions/' + editId).then(m => { sel('#f-mission select[name="technique_id"]').value = m.technique_id || ''; sel('#f-mission input[name="start_date"]').value = m.start_date; sel('#f-mission input[name="end_date"]').value = m.end_date; sel('#f-mission select[name="level"]').value = m.level; sel('#f-mission input[name="theme"]').value = m.theme || ''; sel('#f-mission select[name="academy_id"]').value = m.academy_id || ''; }).catch(() => {});
   }
   document.querySelector('[data-action="new-mission"]').addEventListener('click', () => showMissionForm(null));
-  document.getElementById('f-mission').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-mission'); const body = { lesson_id: fd.get('lesson_id'), start_date: fd.get('start_date'), end_date: fd.get('end_date'), level: fd.get('level'), theme: fd.get('theme') || null, academy_id: fd.get('academy_id') || null }; try { if (id) { await patch('/missions/' + id, body); showMsg('msg-mission', 'Missão atualizada.', true); } else { await post('/missions', body); showMsg('msg-mission', 'Missão criada.', true); $('form-mission').classList.add('hidden'); loadMissions(); } } catch (err) { showMsg('msg-mission', (Array.isArray(err.detail) ? err.detail.map(x => x.msg).join(' ') : err.detail) || err.message || 'Erro', false); } });
+  document.getElementById('f-mission').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-mission'); const body = { technique_id: fd.get('technique_id'), start_date: fd.get('start_date'), end_date: fd.get('end_date'), level: fd.get('level'), theme: fd.get('theme') || null, academy_id: fd.get('academy_id') || null }; try { if (id) { await patch('/missions/' + id, body); showMsg('msg-mission', 'Missão atualizada.', true); } else { await post('/missions', body); showMsg('msg-mission', 'Missão criada.', true); $('form-mission').classList.add('hidden'); loadMissions(); } } catch (err) { showMsg('msg-mission', (Array.isArray(err.detail) ? err.detail.map(x => x.msg).join(' ') : err.detail) || err.message || 'Erro', false); } });
   async function editMission(id) { showMissionForm(id); }
   async function deleteMission(id) { if (!confirm('Excluir esta missão?')) return; try { await del('/missions/' + id); $('form-mission').classList.add('hidden'); loadMissions(); } catch (e) { alert(e.detail || 'Erro'); } }
 

@@ -40,5 +40,19 @@ def complete_lesson(db: Session, user_id: UUID, lesson_id: UUID) -> LessonProgre
     db.add(progress)
     db.commit()
     db.refresh(progress)
+
     logger.info("complete_lesson", extra={"user_id": str(user_id), "lesson_id": str(lesson_id)})
     return progress
+
+
+def is_lesson_completed(db: Session, user_id: UUID, lesson_id: UUID) -> bool:
+    """Retorna True se o usuário já concluiu a lição."""
+    return (
+        db.query(LessonProgress)
+        .filter(
+            LessonProgress.user_id == user_id,
+            LessonProgress.lesson_id == lesson_id,
+        )
+        .first()
+        is not None
+    )

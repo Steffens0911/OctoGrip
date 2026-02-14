@@ -145,11 +145,11 @@ def run_seed():
             lessons.append(lesson)
         db.flush()
 
-        # Missões por nível (PF-01): esta semana, beginner = lição 0, intermediate = lição 1
+        # Missões por nível (PF-01): esta semana, beginner/intermediate = técnica da lição 0/1
         today = date.today()
         week_end = today + timedelta(days=6)
         mission_beginner = Mission(
-            lesson_id=lessons[0].id,
+            technique_id=lessons[0].technique_id,
             start_date=today,
             end_date=week_end,
             is_active=True,
@@ -157,7 +157,7 @@ def run_seed():
             theme="Passagem de guarda",
         )
         mission_intermediate = Mission(
-            lesson_id=lessons[1].id,
+            technique_id=lessons[1].technique_id,
             start_date=today,
             end_date=week_end,
             is_active=True,
@@ -167,9 +167,9 @@ def run_seed():
         db.add_all([mission_beginner, mission_intermediate])
         db.flush()
 
-        # A-02: missão por academia (override): mesma semana, academia específica
+        # A-02: missão por academia (override)
         mission_academy = Mission(
-            lesson_id=lessons[2].id,
+            technique_id=lessons[2].technique_id,
             start_date=today,
             end_date=week_end,
             is_active=True,
@@ -178,9 +178,8 @@ def run_seed():
             academy_id=academy.id,
         )
         db.add(mission_academy)
-        # Missão para a segunda academia (professor vê 2 academias com conteúdo)
         mission_academy2 = Mission(
-            lesson_id=lessons[3].id,
+            technique_id=lessons[3].technique_id,
             start_date=today,
             end_date=week_end,
             is_active=True,
@@ -252,9 +251,11 @@ def run_seed():
         print("IDs para usar no /docs:")
         print(f"  user_id:      {user.id}")
         print(f"  lesson_id:    {lessons[0].id} (primeira lição)")
+        print(f"  mission_id:   {mission_beginner.id} (missão do dia, GET /mission_today)")
         print()
         print("Endpoints para testar:")
         print("  GET  /mission_today")
+        print("  POST /mission_complete (body: user_id, mission_id)")
         print("  GET  /lessons")
         print("  GET  /academies, /academies/{id}/ranking, /difficulties, /report/weekly")
         print("  POST /lesson_complete   (body: user_id, lesson_id)")

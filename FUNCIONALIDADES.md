@@ -19,11 +19,12 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 | Modelo | Descrição |
 |--------|-----------|
 | **User** | Usuário (email, name, academy_id opcional); UUID como PK |
-| **Academy** | Academia (name, slug, weekly_theme); agrupa usuários e missões (A-01, A-02) |
+| **Academy** | Academia (name, slug, weekly_theme); 3 técnicas semanais (weekly_technique_id, weekly_technique_2_id, weekly_technique_3_id) para Missão 1, 2, 3 (A-01, A-02, A-03) |
 | **Position** | Posição do jiu-jitsu (name, slug, description) |
 | **Technique** | Técnica: de uma Position para outra (from_position_id, to_position_id) |
 | **Lesson** | Aula vinculada a uma Technique (title, slug, video_url, order_index) |
 | **LessonProgress** | Conclusão de lição por usuário (user_id, lesson_id, completed_at); constraint única (user, lesson) |
+| **MissionUsage** | Conclusão de missão (user_id, mission_id, usage_type: before_training \| after_training); constraint única (user, mission) |
 | **TrainingFeedback** | Dificuldade em posição (user_id, position_id, difficulty_level, note) |
 
 - PKs em **UUID**; timestamps **created_at** e **updated_at** (UUIDMixin)
@@ -37,8 +38,11 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 | GET | `/health/db` | Health check + conexão com PostgreSQL |
 | GET | `/lessons` | Lista aulas |
 | GET | `/positions` | Lista posições (para reportar dificuldade no app) |
-| GET | `/mission_today` | Missão do dia (título, video_url, técnica com posições) |
+| GET | `/mission_today` | Missão do dia (título, video_url, técnica com posições); `already_completed` indica se já concluiu |
+| GET | `/mission_today/week` | 3 missões semanais (Missão 1, Missão 2, Missão 3) por nível/academia |
 | GET | `/mission_usages/history` | Histórico de missões concluídas (user_id, limit) |
+| GET | `/lesson_complete/status` | Verifica se lição já foi concluída (user_id, lesson_id) |
+| POST | `/mission_complete` | Conclusão por missão (user_id, mission_id, usage_type: before_training \| after_training); 409 se já concluiu |
 | GET | `/metrics/usage` | Métricas de uso (totais, últimos 7 dias, % antes do treino) |
 | POST | `/lesson_complete` | Registrar conclusão de lição (user_id, lesson_id); evita duplicata (409) |
 | POST | `/training_feedback` | Registrar dificuldade em posição (user_id, position_id, observation opcional) |
@@ -116,6 +120,21 @@ Ver documentação detalhada em **[docs/ACADEMIAS.md](docs/ACADEMIAS.md)**.
 - Sem internet ou API indisponível: app usa última missão em cache e exibe **"Modo offline"**
 - Navegação (COMEÇAR / CONCLUIR) funciona normalmente com dados em cache
 
+### Conclusão de missão e lição (aluno)
+
+- **Botão "Concluir"**: Ao concluir (missão ou lição), a API retorna 409 se já concluído; o app troca o botão por **"Missão concluída"** ou **"Lição concluída"** e desabilita.
+- **Conclusão conhecida ao abrir**: Se a lição/missão já estiver concluída ao abrir a tela (via `alreadyCompleted` ou `GET /lesson_complete/status`), o botão já aparece desabilitado com texto de conclusão.
+- **Diálogo "Antes/Depois do treino"**: Ao concluir missão, o app exibe diálogo perguntando **"Quando você visualizou?"** com opções **Antes do treino** ou **Depois do treino**; o valor é enviado em `POST /mission_complete` como `usage_type`.
+
+### Três missões semanais (aluno)
+
+- **StudentHomeScreen**: Exibe 3 cards — **Missão 1**, **Missão 2**, **Missão 3** — cada um com a missão do slot (ou vazio se não houver). Rótulos sem dias (antes era "Seg–Ter", etc.).
+- **Professor (AcademyDetailScreen)**: Pode definir até 3 técnicas semanais por academia; cada slot (1, 2, 3) mapeia para seg-ter, qua-qui, sex-dom. Se só técnica 1 estiver preenchida, missão aparece apenas no slot 1.
+
+### Meu progresso
+
+- **Data sem horário**: A tela "Meu progresso" exibe apenas a **data** (ex.: 12/02/2025), sem horário, nas entradas do histórico.
+
 ### Área do professor (Perfil → Área do professor)
 
 O professor acessa pelo app (Perfil → **Área do professor**) e pode:
@@ -129,6 +148,7 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 2. **Academias (aba Academias)**
    - **Listar** academias; toque abre o detalhe.
    - **Detalhe da academia:**
+     - **Missões semanais:** 3 dropdowns para selecionar técnica (Missão 1, Missão 2, Missão 3). Se só Missão 1 estiver preenchida, aparece missão apenas no slot 1.
      - **Tema da semana:** campo de texto + **Salvar tema** (PATCH /academies/{id}).
      - **Ranking (últimos 30 dias):** lista legível (posição, nome, conclusões).
      - **Dificuldades reportadas:** posições mais marcadas como difíceis (nome, quantidade de reportes).
@@ -153,5 +173,5 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 
 | Área | O que está pronto |
 |------|-------------------|
-| **Backend** | API REST, modelos, missão do dia, conclusão de lição, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
-| **App** | Tela inicial com missão (online/offline), lição, biblioteca de lições, progresso com histórico, reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (tema, ranking, dificuldades, relatório semanal) com listas legíveis |
+| **Backend** | API REST, modelos, missão do dia, 3 missões semanais, conclusão de lição/missão (com usage_type), lesson_complete/status, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (3 técnicas semanais, tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
+| **App** | Tela inicial com 3 missões semanais, lição (botão concluído desabilitado quando já feito), diálogo antes/depois do treino ao concluir missão, biblioteca de lições, progresso com histórico (data sem horário), reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (3 missões semanais, tema, ranking, dificuldades, relatório semanal) |

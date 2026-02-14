@@ -20,3 +20,9 @@ class LessonCompleteResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class LessonCompleteStatusResponse(BaseModel):
+    """Resposta GET /lesson_complete/status — indica se a lição já foi concluída pelo usuário."""
+
+    completed: bool

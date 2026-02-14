@@ -3,12 +3,24 @@ class Academy {
   final String name;
   final String? slug;
   final String? weeklyTheme;
+  final String? weeklyTechniqueId;
+  final String? weeklyTechniqueName;
+  final String? weeklyTechnique2Id;
+  final String? weeklyTechnique2Name;
+  final String? weeklyTechnique3Id;
+  final String? weeklyTechnique3Name;
 
   Academy({
     required this.id,
     required this.name,
     this.slug,
     this.weeklyTheme,
+    this.weeklyTechniqueId,
+    this.weeklyTechniqueName,
+    this.weeklyTechnique2Id,
+    this.weeklyTechnique2Name,
+    this.weeklyTechnique3Id,
+    this.weeklyTechnique3Name,
   });
 
   factory Academy.fromJson(Map<String, dynamic> json) {
@@ -17,6 +29,12 @@ class Academy {
       name: json['name'] as String,
       slug: json['slug'] as String?,
       weeklyTheme: json['weekly_theme'] as String?,
+      weeklyTechniqueId: json['weekly_technique_id'] as String?,
+      weeklyTechniqueName: json['weekly_technique_name'] as String?,
+      weeklyTechnique2Id: json['weekly_technique_2_id'] as String?,
+      weeklyTechnique2Name: json['weekly_technique_2_name'] as String?,
+      weeklyTechnique3Id: json['weekly_technique_3_id'] as String?,
+      weeklyTechnique3Name: json['weekly_technique_3_name'] as String?,
     );
   }
 
@@ -25,6 +43,9 @@ class Academy {
         'name': name,
         'slug': slug,
         'weekly_theme': weeklyTheme,
+        'weekly_technique_id': weeklyTechniqueId,
+        'weekly_technique_2_id': weeklyTechnique2Id,
+        'weekly_technique_3_id': weeklyTechnique3Id,
       };
 }
 

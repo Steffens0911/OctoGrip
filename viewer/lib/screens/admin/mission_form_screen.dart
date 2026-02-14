@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission.dart';
-import 'package:viewer/models/lesson.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -17,11 +17,11 @@ class MissionFormScreen extends StatefulWidget {
 class _MissionFormScreenState extends State<MissionFormScreen> {
   final _api = ApiService();
   final _themeCtrl = TextEditingController();
-  List<Lesson> _lessons = [];
+  List<Technique> _techniques = [];
   List<Academy> _academies = [];
   final _startDateCtrl = TextEditingController();
   final _endDateCtrl = TextEditingController();
-  String? _lessonId;
+  String? _techniqueId;
   String? _academyId;
   String _level = 'beginner';
   bool _loading = true;
@@ -36,7 +36,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
     final end = now.add(const Duration(days: 6));
     final endStr = '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
     if (widget.mission != null) {
-      _lessonId = widget.mission!.lessonId;
+      _techniqueId = widget.mission!.techniqueId;
       _academyId = widget.mission!.academyId;
       _startDateCtrl.text = widget.mission!.startDate;
       _endDateCtrl.text = widget.mission!.endDate;
@@ -51,12 +51,12 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait([_api.getLessons(), _api.getAcademies()]);
+      final results = await Future.wait([_api.getTechniques(), _api.getAcademies()]);
       setState(() {
-        _lessons = results[0] as List<Lesson>;
+        _techniques = results[0] as List<Technique>;
         _academies = results[1] as List<Academy>;
         _loading = false;
-        if (_lessonId == null && widget.mission != null) _lessonId = widget.mission!.lessonId;
+        if (_techniqueId == null && widget.mission != null) _techniqueId = widget.mission!.techniqueId;
       });
     } catch (_) {
       setState(() => _loading = false);
@@ -72,8 +72,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   }
 
   Future<void> _save() async {
-    if (_lessonId == null) {
-      setState(() => _error = 'Selecione uma lição');
+    if (_techniqueId == null) {
+      setState(() => _error = 'Selecione uma técnica');
       return;
     }
     final startDate = _startDateCtrl.text.trim();
@@ -86,7 +86,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
     try {
       if (widget.mission == null) {
         await _api.createMission(
-          lessonId: _lessonId!,
+          techniqueId: _techniqueId!,
           startDate: startDate,
           endDate: endDate,
           level: _level,
@@ -96,7 +96,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       } else {
         await _api.updateMission(
           widget.mission!.id,
-          lessonId: _lessonId,
+          techniqueId: _techniqueId,
           startDate: startDate,
           endDate: endDate,
           level: _level,
@@ -133,10 +133,10 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _lessonId,
-                    decoration: const InputDecoration(labelText: 'Lição'),
-                    items: _lessons.map((l) => DropdownMenuItem(value: l.id, child: Text(l.title))).toList(),
-                    onChanged: (v) => setState(() => _lessonId = v),
+                    value: _techniqueId,
+                    decoration: const InputDecoration(labelText: 'Técnica'),
+                    items: _techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                    onChanged: (v) => setState(() => _techniqueId = v),
                   ),
                   const SizedBox(height: 16),
                   TextField(

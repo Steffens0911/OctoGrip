@@ -2,6 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -62,6 +63,13 @@ def technique_update(
 @router.delete("/{technique_id}", status_code=204)
 def technique_delete(technique_id: UUID, db: Session = Depends(get_db)):
     """Remove uma técnica."""
-    if not delete_technique(db, technique_id):
-        raise HTTPException(status_code=404, detail="Técnica não encontrada.")
-    return None
+    try:
+        if not delete_technique(db, technique_id):
+            raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        return None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Não é possível excluir: existem lições ou missões vinculadas a esta técnica.",
+        )

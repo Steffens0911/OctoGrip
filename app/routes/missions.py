@@ -45,10 +45,10 @@ def missions_get(mission_id: UUID, db: Session = Depends(get_db)):
 
 @router.post("", response_model=MissionRead, status_code=201)
 def missions_create(body: MissionCreate, db: Session = Depends(get_db)):
-    """T-01: Cria uma missão (painel do professor)."""
+    """T-01: Cria uma missão (técnica + período)."""
     mission = create_mission(
         db,
-        lesson_id=body.lesson_id,
+        technique_id=body.technique_id,
         start_date=body.start_date,
         end_date=body.end_date,
         level=body.level,
@@ -110,8 +110,8 @@ _PANEL_HTML = """<!DOCTYPE html>
 <body>
   <h1>Criar missão (10s)</h1>
   <form id="f">
-    <label>Lição</label>
-    <select name="lesson_id" required><option value="">Carregando...</option></select>
+    <label>Técnica</label>
+    <select name="technique_id" required><option value="">Carregando...</option></select>
     <label>Início</label>
     <input type="date" name="start_date" required>
     <label>Fim</label>
@@ -133,11 +133,11 @@ _PANEL_HTML = """<!DOCTYPE html>
     const $ = (id) => document.getElementById(id);
     const sel = (q) => document.querySelector(q);
 
-    async function loadLessons() {
-      const r = await fetch(API + '/lessons');
-      const lessons = await r.json();
-      const select = sel('select[name="lesson_id"]');
-      select.innerHTML = lessons.map(l => '<option value="' + l.id + '">' + l.title + '</option>').join('');
+    async function loadTechniques() {
+      const r = await fetch(API + '/techniques');
+      const techniques = await r.json();
+      const select = sel('select[name="technique_id"]');
+      select.innerHTML = techniques.map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
     }
     async function loadAcademies() {
       const r = await fetch(API + '/academies');
@@ -153,7 +153,7 @@ _PANEL_HTML = """<!DOCTYPE html>
       sel('input[name="end_date"]').value = end.toISOString().slice(0, 10);
     }
 
-    loadLessons().then(() => {}).catch(() => sel('select[name="lesson_id"]').innerHTML = '<option value="">Erro ao carregar</option>');
+    loadTechniques().then(() => {}).catch(() => sel('select[name="technique_id"]').innerHTML = '<option value="">Erro ao carregar</option>');
     loadAcademies().then(() => {}).catch(() => {});
     setDefaultDates();
 
@@ -161,7 +161,7 @@ _PANEL_HTML = """<!DOCTYPE html>
       e.preventDefault();
       const fd = new FormData(e.target);
       const body = {
-        lesson_id: fd.get('lesson_id'),
+        technique_id: fd.get('technique_id'),
         start_date: fd.get('start_date'),
         end_date: fd.get('end_date'),
         level: fd.get('level'),

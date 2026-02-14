@@ -66,11 +66,17 @@ class AcademyService {
     String? name,
     String? slug,
     String? weeklyTheme,
+    String? weeklyTechniqueId,
+    String? weeklyTechnique2Id,
+    String? weeklyTechnique3Id,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (weeklyTheme != null) body['weekly_theme'] = weeklyTheme;
+    if (weeklyTechniqueId != null) body['weekly_technique_id'] = weeklyTechniqueId;
+    if (weeklyTechnique2Id != null) body['weekly_technique_2_id'] = weeklyTechnique2Id;
+    if (weeklyTechnique3Id != null) body['weekly_technique_3_id'] = weeklyTechnique3Id;
     if (body.isEmpty) return get(id);
     final response = await http.patch(
       Uri.parse('$_academiesUrl/$id'),
@@ -81,6 +87,32 @@ class AcademyService {
     if (response.statusCode != 200) {
       throw AcademyServiceException(
           'Falha ao atualizar academia: ${response.statusCode}');
+    }
+    return Academy.fromJson(
+        json.decode(response.body) as Map<String, dynamic>);
+  }
+
+  /// Atualiza as 3 missões semanais (seg-ter, qua-qui, sex-dom). Passa null para limpar.
+  Future<Academy?> updateWeeklyMissions(
+    String id, {
+    String? weeklyTechniqueId,
+    String? weeklyTechnique2Id,
+    String? weeklyTechnique3Id,
+  }) async {
+    final body = <String, dynamic>{
+      'weekly_technique_id': weeklyTechniqueId,
+      'weekly_technique_2_id': weeklyTechnique2Id,
+      'weekly_technique_3_id': weeklyTechnique3Id,
+    };
+    final response = await http.patch(
+      Uri.parse('$_academiesUrl/$id'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(body),
+    );
+    if (response.statusCode == 404) return null;
+    if (response.statusCode != 200) {
+      throw AcademyServiceException(
+          'Falha ao atualizar missões: ${response.statusCode}');
     }
     return Academy.fromJson(
         json.decode(response.body) as Map<String, dynamic>);

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
-import 'package:viewer/screens/admin/lesson_list_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/position_list_screen.dart';
 import 'package:viewer/screens/admin/mission_list_screen.dart';
@@ -48,17 +47,6 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           _AdminTile(
-            icon: Icons.menu_book,
-            title: 'Lições',
-            subtitle: 'Conteúdo das aulas',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const LessonListScreen(),
-              ),
-            ),
-          ),
-          _AdminTile(
             icon: Icons.sports_martial_arts,
             title: 'Técnicas',
             subtitle: 'Técnicas (de/para posição)',
@@ -83,7 +71,7 @@ class AdminSectionScreen extends StatelessWidget {
           _AdminTile(
             icon: Icons.flag,
             title: 'Missões',
-            subtitle: 'Missões (período, lição, nível)',
+            subtitle: 'Missões (período, técnica, nível)',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(

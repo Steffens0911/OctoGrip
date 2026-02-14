@@ -10,6 +10,7 @@ from app.core.logging_config import setup_logging
 from app.database import engine
 from app.models import Base  # importa todos os models via __init__ (registro para create_all)
 from app.routes.router import api_router
+from app.run_migrations import run_migrations
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -25,9 +26,10 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Cria tabelas ao subir a API (MVP; em produção use migrations)."""
+    """Cria tabelas e aplica migrações SQL ao subir a API."""
     setup_logging(level=settings.LOG_LEVEL)
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     yield
 
 

@@ -27,6 +27,12 @@ Para subir só a API e o Postgres (sem o viewer):
 docker compose up --build postgres api
 ```
 
+Para subir API e Viewer (sem rebuild do Postgres):
+
+```bash
+docker compose up -d --build api viewer
+```
+
 ## Seed (dados de teste)
 
 Para popular o banco com 1 usuário, 2 posições, 1 técnica e 1 lição (e testar os endpoints no /docs):
@@ -74,8 +80,9 @@ Resumo: **professor = navegador em /missions/panel e /docs**; **aluno = app Flut
 | GET    | /health/db         | Health check + banco          |
 | GET    | /lessons           | Lista aulas                   |
 | GET    | /mission_today     | Missão do dia                 |
+| GET    | /mission_today/week | 3 missões semanais (Missão 1, 2, 3) |
 | GET    | /academies/{id}    | Dados da academia             |
-| PATCH  | /academies/{id}    | Tema semanal (professor, A-03) |
+| PATCH  | /academies/{id}    | Atualizar academia (incl. 3 técnicas semanais) |
 | GET    | /academies              | Lista academias         |
 | GET    | /academies/{id}/ranking | Ranking interno (A-04)  |
 | GET    | /academies/{id}/difficulties | Dificuldades (T-02) |
@@ -88,7 +95,13 @@ Resumo: **professor = navegador em /missions/panel e /docs**; **aluno = app Flut
 | DELETE | /missions/{id}           | Excluir missão          |
 | GET    | /missions/panel         | **Painel professor (web)** |
 | POST   | /lesson_complete   | Registrar conclusão de lição  |
+| GET    | /lesson_complete/status | Verifica se lição já foi concluída |
+| POST   | /mission_complete  | Registrar conclusão de missão (usage_type: before_training \| after_training) |
+| GET    | /mission_usages/history | Histórico de missões concluídas |
 | POST   | /training_feedback | Registrar dificuldade (posição) |
+| GET    | /metrics/usage     | Métricas de uso              |
+
+**Documentação detalhada:** [docs/API.md](docs/API.md)
 
 ## Estrutura
 
@@ -107,7 +120,7 @@ app/
     └── ...
 ```
 
-Detalhes em [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+**Documentação completa:** [docs/INDEX.md](docs/INDEX.md) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Variáveis de ambiente
 
