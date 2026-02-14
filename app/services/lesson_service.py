@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import LessonNotFoundError, TechniqueNotFoundError
 from app.core.slug import ensure_unique_slug, make_slug
@@ -12,15 +12,31 @@ logger = logging.getLogger(__name__)
 
 
 def list_lessons(db: Session):
-    """Lista todas as aulas ordenadas por order_index."""
-    lessons = db.query(Lesson).order_by(Lesson.order_index.asc()).all()
+    """Lista todas as aulas ordenadas por order_index, com técnica e posições."""
+    lessons = (
+        db.query(Lesson)
+        .options(
+            joinedload(Lesson.technique).joinedload(Technique.from_position),
+            joinedload(Lesson.technique).joinedload(Technique.to_position),
+        )
+        .order_by(Lesson.order_index.asc())
+        .all()
+    )
     logger.debug("list_lessons", extra={"count": len(lessons)})
     return lessons
 
 
 def get_lesson_by_id(db: Session, lesson_id: UUID) -> Lesson:
     """Retorna uma aula por ID. Levanta LessonNotFoundError se não existir."""
-    lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+    lesson = (
+        db.query(Lesson)
+        .options(
+            joinedload(Lesson.technique).joinedload(Technique.from_position),
+            joinedload(Lesson.technique).joinedload(Technique.to_position),
+        )
+        .filter(Lesson.id == lesson_id)
+        .first()
+    )
     if not lesson:
         logger.info("get_lesson_by_id not_found", extra={"lesson_id": str(lesson_id)})
         raise LessonNotFoundError("Lição não encontrada.")

@@ -167,15 +167,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             if (d.techniqueName != null && d.techniqueName!.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(
-                d.techniqueName!,
+                d.positionName != null && d.positionName!.isNotEmpty
+                    ? '${d.techniqueName!} ${d.positionName}'
+                    : d.techniqueName!,
                 style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
               ),
             ],
-            if (d.positionName != null && d.positionName!.isNotEmpty)
-              Text(
-                'Posição: ${d.positionName}',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-              ),
             if (d.estimatedDurationSeconds != null && d.estimatedDurationSeconds! > 0) ...[
               const SizedBox(height: 4),
               Text(

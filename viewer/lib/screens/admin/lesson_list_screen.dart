@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
+import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/lesson_form_screen.dart';
@@ -16,16 +17,18 @@ class _LessonListScreenState extends State<LessonListScreen> {
   final _api = ApiService();
   List<Lesson> _list = [];
   List<Technique> _techniques = [];
+  List<Position> _positions = [];
   bool _loading = true;
   String? _error;
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getLessons(), _api.getTechniques()]);
+      final results = await Future.wait([_api.getLessons(), _api.getTechniques(), _api.getPositions()]);
       setState(() {
         _list = results[0] as List<Lesson>;
         _techniques = results[1] as List<Technique>;
+        _positions = results[2] as List<Position>;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -44,7 +47,24 @@ class _LessonListScreenState extends State<LessonListScreen> {
     _load();
   }
 
-  String _techniqueName(String id) => _techniques.where((t) => t.id == id).map((t) => t.name).firstOrNull ?? id;
+  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
+
+  String _techniqueWithPosition(String techniqueId) {
+    final t = _techniques.where((x) => x.id == techniqueId).firstOrNull;
+    if (t == null) return techniqueId;
+    final from = _positionName(t.fromPositionId);
+    final to = _positionName(t.toPositionId);
+    return '${t.name} da posição $from → para posição $to';
+  }
+
+  String _lessonTechniqueDisplay(Lesson l) {
+    if (l.techniqueName != null && l.techniqueName!.isNotEmpty) {
+      return l.positionName != null && l.positionName!.isNotEmpty
+          ? '${l.techniqueName!} ${l.positionName}'
+          : l.techniqueName!;
+    }
+    return _techniqueWithPosition(l.techniqueId);
+  }
 
   Future<void> _openForm([Lesson? l]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => LessonFormScreen(lesson: l)));
@@ -88,7 +108,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       title: Text(l.title),
-                      subtitle: Text('${_techniqueName(l.techniqueId)} · ordem ${l.orderIndex}'),
+                      subtitle: Text('${_lessonTechniqueDisplay(l)} · ordem ${l.orderIndex}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(l)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(l)),

@@ -97,7 +97,7 @@ def _mission_to_today_response(
     """Monta MissionTodayResponse a partir de Mission (technique e posições já carregados)."""
     technique = mission.technique
     description = technique.description or ""
-    position_name = f"{technique.from_position.name} → {technique.to_position.name}"
+    position_name = f"da posição {technique.from_position.name} → para posição {technique.to_position.name}"
     video_url = _get_video_url(technique)
     already_completed = False
     if db is not None and user_id is not None:
@@ -178,7 +178,7 @@ def get_mission_today_response(
     if not technique:
         logger.info("get_mission_today_response", extra={"found": False})
         return None
-    position_name = f"{technique.from_position.name} → {technique.to_position.name}"
+    position_name = f"da posição {technique.from_position.name} → para posição {technique.to_position.name}"
     return MissionTodayResponse(
         mission_id=None,
         technique_id=technique.id,

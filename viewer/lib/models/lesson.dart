@@ -6,6 +6,9 @@ class Lesson {
   final String? content;
   final int orderIndex;
   final String techniqueId;
+  final String? techniqueName;
+  final String? positionName;
+  final String? techniqueVideoUrl;
 
   Lesson({
     required this.id,
@@ -15,6 +18,9 @@ class Lesson {
     this.content,
     required this.orderIndex,
     required this.techniqueId,
+    this.techniqueName,
+    this.positionName,
+    this.techniqueVideoUrl,
   });
 
   factory Lesson.fromJson(Map<String, dynamic> json) {
@@ -26,6 +32,9 @@ class Lesson {
       content: json['content'] as String?,
       orderIndex: (json['order_index'] as num).toInt(),
       techniqueId: json['technique_id'] as String,
+      techniqueName: json['technique_name'] as String?,
+      positionName: json['position_name'] as String?,
+      techniqueVideoUrl: json['technique_video_url'] as String?,
     );
   }
 

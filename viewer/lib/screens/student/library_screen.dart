@@ -47,14 +47,32 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
   }
 
+  Widget? _lessonSubtitle(Lesson lesson) {
+    final parts = <String>[];
+    if (lesson.techniqueName != null && lesson.techniqueName!.isNotEmpty) {
+      parts.add(lesson.positionName != null && lesson.positionName!.isNotEmpty
+          ? '${lesson.techniqueName!} ${lesson.positionName}'
+          : lesson.techniqueName!);
+    }
+    if (lesson.content != null && lesson.content!.isNotEmpty) {
+      parts.add(lesson.content!.length > 60 ? '${lesson.content!.substring(0, 60)}...' : lesson.content!);
+    }
+    if (parts.isEmpty) return null;
+    return Text(parts.join(' · '), style: TextStyle(fontSize: 12, color: AppTheme.textSecondary));
+  }
+
   void _openLesson(Lesson lesson) {
     final data = LessonViewData(
       lessonId: lesson.id,
       missionId: null,
       title: lesson.title,
       description: lesson.content ?? '',
-      videoUrl: lesson.videoUrl ?? '',
+      videoUrl: (lesson.techniqueVideoUrl != null && lesson.techniqueVideoUrl!.trim().isNotEmpty)
+          ? lesson.techniqueVideoUrl!
+          : (lesson.videoUrl ?? ''),
       userId: widget.userId,
+      techniqueName: lesson.techniqueName,
+      positionName: lesson.positionName,
     );
     Navigator.push(
       context,
@@ -104,9 +122,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                               child: const Icon(Icons.menu_book, color: AppTheme.primary),
                             ),
                             title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: lesson.content != null && lesson.content!.isNotEmpty
-                                ? Text(lesson.content!.length > 80 ? '${lesson.content!.substring(0, 80)}...' : lesson.content!, style: TextStyle(fontSize: 12, color: AppTheme.textSecondary))
-                                : null,
+                            subtitle: _lessonSubtitle(lesson),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => _openLesson(lesson),
                           ),

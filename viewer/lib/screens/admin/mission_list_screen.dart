@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission.dart';
+import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/mission_form_screen.dart';
@@ -16,16 +17,18 @@ class _MissionListScreenState extends State<MissionListScreen> {
   final _api = ApiService();
   List<Mission> _list = [];
   List<Technique> _techniques = [];
+  List<Position> _positions = [];
   bool _loading = true;
   String? _error;
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getMissions(), _api.getTechniques()]);
+      final results = await Future.wait([_api.getMissions(), _api.getTechniques(), _api.getPositions()]);
       setState(() {
         _list = results[0] as List<Mission>;
         _techniques = results[1] as List<Technique>;
+        _positions = results[2] as List<Position>;
         _loading = false;
       });
     } on ApiException catch (e) {
@@ -44,7 +47,15 @@ class _MissionListScreenState extends State<MissionListScreen> {
     _load();
   }
 
-  String _techniqueName(String id) => _techniques.where((t) => t.id == id).map((t) => t.name).firstOrNull ?? id;
+  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
+
+  String _techniqueWithPosition(String techniqueId) {
+    final t = _techniques.where((x) => x.id == techniqueId).firstOrNull;
+    if (t == null) return techniqueId;
+    final from = _positionName(t.fromPositionId);
+    final to = _positionName(t.toPositionId);
+    return '${t.name} da posição $from → para posição $to';
+  }
 
   Future<void> _openForm([Mission? m]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => MissionFormScreen(mission: m)));
@@ -87,7 +98,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      title: Text(_techniqueName(m.techniqueId)),
+                      title: Text(_techniqueWithPosition(m.techniqueId)),
                       subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),

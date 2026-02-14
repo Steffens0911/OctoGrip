@@ -29,6 +29,23 @@ class Lesson(Base, UUIDMixin):
         "Technique",
         back_populates="lessons",
     )
+
+    @property
+    def technique_name(self) -> str | None:
+        return self.technique.name if self.technique else None
+
+    @property
+    def position_name(self) -> str | None:
+        if not self.technique or not self.technique.from_position or not self.technique.to_position:
+            return None
+        return f"da posição {self.technique.from_position.name} → para posição {self.technique.to_position.name}"
+
+    @property
+    def technique_video_url(self) -> str | None:
+        """Vídeo da técnica, usado como fallback quando a lição não tem video_url."""
+        if not self.technique or not self.technique.video_url or not self.technique.video_url.strip():
+            return None
+        return self.technique.video_url.strip()
     lesson_progresses: Mapped[list["LessonProgress"]] = relationship(
         "LessonProgress",
         back_populates="lesson",

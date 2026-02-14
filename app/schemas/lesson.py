@@ -15,6 +15,9 @@ class LessonRead(BaseModel):
     order_index: int
     technique_id: UUID
     created_at: datetime
+    technique_name: str | None = None
+    position_name: str | None = None
+    technique_video_url: str | None = None
 
     class Config:
         from_attributes = True

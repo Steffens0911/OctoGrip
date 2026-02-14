@@ -88,7 +88,7 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       title: Text(t.name),
-                      subtitle: Text('${_positionName(t.fromPositionId)} → ${_positionName(t.toPositionId)}'),
+                      subtitle: Text('da posição ${_positionName(t.fromPositionId)} → para posição ${_positionName(t.toPositionId)}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(t)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(t)),

@@ -282,7 +282,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               if (m.techniqueName.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(
-                  m.techniqueName,
+                  m.positionName.isNotEmpty
+                      ? '${m.techniqueName} ${m.positionName}'
+                      : m.techniqueName,
                   style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
                 ),
               ],
