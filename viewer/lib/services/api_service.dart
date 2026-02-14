@@ -191,22 +191,23 @@ class ApiService {
   Future<Lesson> createLesson({
     required String techniqueId,
     required String title,
-    required String slug,
+    String? slug,
     String? videoUrl,
     String? content,
     int orderIndex = 0,
   }) async {
+    final body = <String, dynamic>{
+      'technique_id': techniqueId,
+      'title': title,
+      'video_url': videoUrl,
+      'content': content,
+      'order_index': orderIndex,
+    };
+    if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
     final r = await _req(http.post(
       Uri.parse('$baseUrl/lessons'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'technique_id': techniqueId,
-        'title': title,
-        'slug': slug,
-        'video_url': videoUrl,
-        'content': content,
-        'order_index': orderIndex,
-      }),
+      body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -262,21 +263,24 @@ class ApiService {
 
   Future<Technique> createTechnique({
     required String name,
-    required String slug,
+    String? slug,
     String? description,
+    String? videoUrl,
     required String fromPositionId,
     required String toPositionId,
   }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'from_position_id': fromPositionId,
+      'to_position_id': toPositionId,
+    };
+    if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
+    if (description != null) body['description'] = description;
+    if (videoUrl != null && videoUrl.trim().isNotEmpty) body['video_url'] = videoUrl.trim();
     final r = await _req(http.post(
       Uri.parse('$baseUrl/techniques'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'name': name,
-        'slug': slug,
-        'description': description,
-        'from_position_id': fromPositionId,
-        'to_position_id': toPositionId,
-      }),
+      body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -288,6 +292,7 @@ class ApiService {
     String? name,
     String? slug,
     String? description,
+    String? videoUrl,
     String? fromPositionId,
     String? toPositionId,
   }) async {
@@ -295,6 +300,7 @@ class ApiService {
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (description != null) body['description'] = description;
+    if (videoUrl != null) body['video_url'] = videoUrl.trim().isEmpty ? null : videoUrl.trim();
     if (fromPositionId != null) body['from_position_id'] = fromPositionId;
     if (toPositionId != null) body['to_position_id'] = toPositionId;
     final r = await _req(http.put(
@@ -330,13 +336,16 @@ class ApiService {
 
   Future<Position> createPosition({
     required String name,
-    required String slug,
+    String? slug,
     String? description,
   }) async {
+    final body = <String, dynamic>{'name': name};
+    if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
+    if (description != null) body['description'] = description;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/positions'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'name': name, 'slug': slug, 'description': description}),
+      body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);

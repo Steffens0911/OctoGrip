@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Position
 
 logger = logging.getLogger(__name__)
@@ -22,13 +23,18 @@ def get_position(db: Session, position_id: UUID) -> Position | None:
 def create_position(
     db: Session,
     name: str,
-    slug: str,
+    slug: str | None = None,
     description: str | None = None,
 ) -> Position:
-    """Cria uma posição."""
+    """Cria uma posição. Slug gerado automaticamente a partir do nome se omitido."""
+    if not slug or not str(slug).strip():
+        base = make_slug(name, fallback="posicao")
+        slug = ensure_unique_slug(db, Position, "slug", base)
+    else:
+        slug = slug.strip()
     position = Position(
         name=name.strip(),
-        slug=slug.strip(),
+        slug=slug,
         description=description.strip() if description else None,
     )
     db.add(position)

@@ -37,7 +37,7 @@ def position_get(position_id: UUID, db: Session = Depends(get_db)):
 def position_create(body: PositionCreate, db: Session = Depends(get_db)):
     """Cria uma nova posição."""
     try:
-        return create_position(db, name=body.name, slug=body.slug, description=body.description)
+        return create_position(db, name=body.name, slug=body.slug or None, description=body.description)
     except IntegrityError:
         db.rollback()
         raise HTTPException(

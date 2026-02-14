@@ -162,7 +162,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
             icon: const Icon(Icons.edit),
             onPressed: () async {
               final nameController = TextEditingController(text: _academy.name);
-              final slugController = TextEditingController(text: _academy.slug ?? '');
               String? techniqueId = _academy.weeklyTechniqueId;
               await showDialog<void>(
                 context: context,
@@ -176,11 +175,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           TextField(
                             controller: nameController,
                             decoration: const InputDecoration(labelText: 'Nome'),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: slugController,
-                            decoration: const InputDecoration(labelText: 'Slug (opcional)'),
                           ),
                           const SizedBox(height: 12),
                           DropdownButtonFormField<String>(
@@ -209,7 +203,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             final updated = await _service.update(
                               _academy.id,
                               name: name,
-                              slug: slugController.text.trim().isEmpty ? null : slugController.text.trim(),
                               weeklyTechniqueId: techniqueId,
                             );
                             if (updated != null && mounted) {
@@ -260,16 +253,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_academy.slug != null && _academy.slug!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    _academy.slug!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
-                  ),
-                ),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),

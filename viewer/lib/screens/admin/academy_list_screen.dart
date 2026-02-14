@@ -137,9 +137,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                               ),
                               title: Text(a.name),
                               subtitle: Text(
-                                [a.slug, a.weeklyTheme]
-                                    .where((x) => x != null && x.isNotEmpty)
-                                    .join(' · '),
+                                a.weeklyTheme ?? '',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),

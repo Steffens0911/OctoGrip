@@ -37,6 +37,7 @@ def get_today_mission(
     options = (
         joinedload(Mission.technique).joinedload(Technique.from_position),
         joinedload(Mission.technique).joinedload(Technique.to_position),
+        joinedload(Mission.technique).joinedload(Technique.lessons),
     )
 
     mission = None
@@ -72,6 +73,18 @@ def get_today_mission(
     return mission
 
 
+def _get_video_url(technique: Technique) -> str:
+    """Retorna video_url da técnica ou da primeira lição com vídeo (ordenada por order_index)."""
+    url = (technique.video_url or "").strip()
+    if url:
+        return url
+    lessons = sorted(technique.lessons or [], key=lambda L: L.order_index)
+    for lesson in lessons:
+        if lesson.video_url and lesson.video_url.strip():
+            return lesson.video_url.strip()
+    return ""
+
+
 def _mission_to_today_response(
     mission: Mission,
     mission_title: str = "Missão do dia",
@@ -85,6 +98,7 @@ def _mission_to_today_response(
     technique = mission.technique
     description = technique.description or ""
     position_name = f"{technique.from_position.name} → {technique.to_position.name}"
+    video_url = _get_video_url(technique)
     already_completed = False
     if db is not None and user_id is not None:
         already_completed = (
@@ -103,7 +117,7 @@ def _mission_to_today_response(
         mission_title=mission_title,
         lesson_title=technique.name,
         description=description,
-        video_url="",
+        video_url=video_url,
         position_name=position_name,
         technique_name=technique.name,
         objective=technique.description,
@@ -157,6 +171,7 @@ def get_mission_today_response(
         .options(
             joinedload(Technique.from_position),
             joinedload(Technique.to_position),
+            joinedload(Technique.lessons),
         )
         .first()
     )
@@ -171,7 +186,7 @@ def get_mission_today_response(
         mission_title="Missão do dia",
         lesson_title=technique.name,
         description=technique.description or "",
-        video_url="",
+        video_url=_get_video_url(technique),
         position_name=position_name,
         technique_name=technique.name,
         objective=technique.description,
@@ -211,6 +226,7 @@ def get_mission_week_response(
     options = (
         joinedload(Mission.technique).joinedload(Technique.from_position),
         joinedload(Mission.technique).joinedload(Technique.to_position),
+        joinedload(Mission.technique).joinedload(Technique.lessons),
     )
 
     # Se só técnica 1 está configurada, a missão é da semana inteira: mostrar só no slot 1

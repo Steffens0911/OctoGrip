@@ -17,6 +17,7 @@ class Technique(Base, UUIDMixin):
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     from_position_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("positions.id", ondelete="RESTRICT"),

@@ -80,7 +80,7 @@ class _PositionListScreenState extends State<PositionListScreen> {
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
                       title: Text(p.name),
-                      subtitle: Text(p.slug),
+                      subtitle: Text(p.description ?? ''),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(p)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(p)),

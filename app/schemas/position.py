@@ -15,10 +15,10 @@ class PositionRead(BaseModel):
 
 
 class PositionCreate(BaseModel):
-    """Criação de posição."""
+    """Criação de posição. Slug opcional (gerado automaticamente a partir do nome)."""
 
     name: str = Field(..., min_length=1, max_length=255)
-    slug: str = Field(..., max_length=255)
+    slug: str | None = Field(None, max_length=255)
     description: str | None = None
 
 

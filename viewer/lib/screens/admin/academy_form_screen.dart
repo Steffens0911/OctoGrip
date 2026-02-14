@@ -16,7 +16,6 @@ class AcademyFormScreen extends StatefulWidget {
 class _AcademyFormScreenState extends State<AcademyFormScreen> {
   final _api = ApiService();
   final _nameCtrl = TextEditingController();
-  final _slugCtrl = TextEditingController();
   List<Technique> _techniques = [];
   String? _weeklyTechniqueId;
   bool _loading = true;
@@ -28,7 +27,6 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
     super.initState();
     if (widget.academy != null) {
       _nameCtrl.text = widget.academy!.name;
-      _slugCtrl.text = widget.academy!.slug ?? '';
       _weeklyTechniqueId = widget.academy!.weeklyTechniqueId;
     }
     _loadTechniques();
@@ -52,7 +50,6 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _slugCtrl.dispose();
     super.dispose();
   }
 
@@ -67,10 +64,7 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
     });
     try {
       if (widget.academy == null) {
-        await _api.createAcademy(
-          name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim().isEmpty ? null : _slugCtrl.text.trim(),
-        );
+        await _api.createAcademy(name: _nameCtrl.text.trim());
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Academia criada')));
           Navigator.pop(context);
@@ -79,7 +73,6 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
         await _api.updateAcademy(
           widget.academy!.id,
           name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim().isEmpty ? null : _slugCtrl.text.trim(),
           weeklyTechniqueId: _weeklyTechniqueId,
         );
         if (mounted) {
@@ -126,11 +119,6 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                   TextField(
                     controller: _nameCtrl,
                     decoration: const InputDecoration(labelText: 'Nome'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _slugCtrl,
-                    decoration: const InputDecoration(labelText: 'Slug (opcional)'),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(

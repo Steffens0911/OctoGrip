@@ -16,7 +16,6 @@ class LessonFormScreen extends StatefulWidget {
 class _LessonFormScreenState extends State<LessonFormScreen> {
   final _api = ApiService();
   final _titleCtrl = TextEditingController();
-  final _slugCtrl = TextEditingController();
   final _videoCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
   final _orderCtrl = TextEditingController(text: '0');
@@ -31,7 +30,6 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
     super.initState();
     if (widget.lesson != null) {
       _titleCtrl.text = widget.lesson!.title;
-      _slugCtrl.text = widget.lesson!.slug;
       _videoCtrl.text = widget.lesson!.videoUrl ?? '';
       _contentCtrl.text = widget.lesson!.content ?? '';
       _orderCtrl.text = widget.lesson!.orderIndex.toString();
@@ -56,7 +54,6 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   @override
   void dispose() {
     _titleCtrl.dispose();
-    _slugCtrl.dispose();
     _videoCtrl.dispose();
     _contentCtrl.dispose();
     _orderCtrl.dispose();
@@ -64,8 +61,8 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   }
 
   Future<void> _save() async {
-    if (_titleCtrl.text.trim().isEmpty || _slugCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Título e slug são obrigatórios');
+    if (_titleCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Título é obrigatório');
       return;
     }
     if (_techniqueId == null) {
@@ -79,7 +76,6 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
         await _api.createLesson(
           techniqueId: _techniqueId!,
           title: _titleCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
           videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           content: _contentCtrl.text.trim().isEmpty ? null : _contentCtrl.text.trim(),
           orderIndex: orderIndex,
@@ -89,7 +85,6 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
           widget.lesson!.id,
           techniqueId: _techniqueId,
           title: _titleCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
           videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           content: _contentCtrl.text.trim().isEmpty ? null : _contentCtrl.text.trim(),
           orderIndex: orderIndex,
@@ -132,9 +127,7 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
             const SizedBox(height: 16),
             TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
             const SizedBox(height: 16),
-            TextField(controller: _slugCtrl, decoration: const InputDecoration(labelText: 'Slug')),
-            const SizedBox(height: 16),
-            TextField(controller: _videoCtrl, decoration: const InputDecoration(labelText: 'URL do vídeo'), keyboardType: TextInputType.url),
+            TextField(controller: _videoCtrl, decoration: const InputDecoration(labelText: 'Link do YouTube (opcional)'), keyboardType: TextInputType.url),
             const SizedBox(height: 16),
             TextField(controller: _contentCtrl, decoration: const InputDecoration(labelText: 'Conteúdo (opcional)'), maxLines: 3),
             const SizedBox(height: 16),

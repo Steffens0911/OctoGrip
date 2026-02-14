@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
-from app.models import Academy, Mission, Technique
+from app.models import Academy, Mission, MissionUsage, Technique
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +88,13 @@ def update_mission(
     mission = db.query(Mission).filter(Mission.id == mission_id).first()
     if not mission:
         return None
-    if technique_id is not None:
+    if technique_id is not None and technique_id != mission.technique_id:
         technique = db.query(Technique).filter(Technique.id == technique_id).first()
         if not technique:
             return None
+        deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == mission_id).delete()
+        if deleted:
+            logger.info("update_mission cleared_usage", extra={"mission_id": str(mission_id), "deleted": deleted})
         mission.technique_id = technique_id
     if start_date is not None:
         mission.start_date = start_date
@@ -188,6 +191,13 @@ def upsert_academy_week_missions(
                     .first()
                 )
                 if existing:
+                    if existing.technique_id != tech_id:
+                        deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == existing.id).delete()
+                        if deleted:
+                            logger.info(
+                                "upsert_academy_week_missions cleared_usage",
+                                extra={"mission_id": str(existing.id), "deleted": deleted},
+                            )
                     existing.technique_id = tech_id
                     existing.end_date = slot_end
                     db.commit()
@@ -237,6 +247,13 @@ def upsert_academy_week_missions(
                 .first()
             )
             if existing:
+                if existing.technique_id != t1:
+                    deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == existing.id).delete()
+                    if deleted:
+                        logger.info(
+                            "upsert_academy_week_missions cleared_usage",
+                            extra={"mission_id": str(existing.id), "deleted": deleted},
+                        )
                 existing.technique_id = t1
                 existing.start_date = week_start
                 existing.end_date = week_end

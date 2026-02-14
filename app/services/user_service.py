@@ -4,7 +4,12 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models import User
+from app.models import (
+    LessonProgress,
+    MissionUsage,
+    TrainingFeedback,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +56,22 @@ def update_user(
 
 
 def delete_user(db: Session, user_id: UUID) -> bool:
+    """Exclui o usuário e, em cascata, seus progressos, usos de missão e feedbacks."""
     user = get_user(db, user_id)
     if not user:
         return False
+    # Exclusão em cascata no app: remove registros vinculados antes do usuário
+    db.query(LessonProgress).filter(LessonProgress.user_id == user_id).delete(
+        synchronize_session="fetch"
+    )
+    db.query(MissionUsage).filter(MissionUsage.user_id == user_id).delete(
+        synchronize_session="fetch"
+    )
+    db.query(TrainingFeedback).filter(TrainingFeedback.user_id == user_id).delete(
+        synchronize_session="fetch"
+    )
+    # Expirar o user para evitar estado inconsistente das collections
+    db.expire(user)
     db.delete(user)
     db.commit()
     logger.info("delete_user", extra={"user_id": str(user_id)})

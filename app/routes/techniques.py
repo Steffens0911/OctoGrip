@@ -39,10 +39,11 @@ def technique_create(body: TechniqueCreate, db: Session = Depends(get_db)):
     return create_technique(
         db,
         name=body.name,
-        slug=body.slug,
         from_position_id=body.from_position_id,
         to_position_id=body.to_position_id,
+        slug=body.slug or None,
         description=body.description,
+        video_url=body.video_url or None,
     )
 
 

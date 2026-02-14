@@ -24,6 +24,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 009 | mission_technique_and_usage_mission | `missions.technique_id`; `mission_usages.mission_id` |
 | 010 | academy_weekly_technique | `academies.weekly_technique_id` (Missão 1) |
 | 011 | academy_weekly_techniques_2_and_3 | `academies.weekly_technique_2_id`, `weekly_technique_3_id` |
+| 012 | technique_video_url | `techniques.video_url` (link YouTube) |
 
 ---
 

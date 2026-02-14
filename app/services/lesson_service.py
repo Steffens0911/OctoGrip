@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import LessonNotFoundError, TechniqueNotFoundError
+from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Lesson, Technique
 from app.schemas.lesson import LessonCreate, LessonUpdate
 
@@ -27,15 +28,20 @@ def get_lesson_by_id(db: Session, lesson_id: UUID) -> Lesson:
 
 
 def create_lesson(db: Session, data: LessonCreate) -> Lesson:
-    """Cria uma aula. Levanta TechniqueNotFoundError se a técnica não existir."""
+    """Cria uma aula. Slug gerado automaticamente a partir do título se omitido."""
     technique = db.query(Technique).filter(Technique.id == data.technique_id).first()
     if not technique:
         logger.info("create_lesson technique_not_found", extra={"technique_id": str(data.technique_id)})
         raise TechniqueNotFoundError("Técnica não encontrada.")
+    if not data.slug or not str(data.slug).strip():
+        base = make_slug(data.title, fallback="licao")
+        slug = ensure_unique_slug(db, Lesson, "slug", base)
+    else:
+        slug = data.slug.strip()
     lesson = Lesson(
         technique_id=data.technique_id,
         title=data.title,
-        slug=data.slug,
+        slug=slug,
         video_url=data.video_url,
         content=data.content,
         order_index=data.order_index,

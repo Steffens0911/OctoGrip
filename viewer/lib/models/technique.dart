@@ -3,6 +3,7 @@ class Technique {
   final String name;
   final String slug;
   final String? description;
+  final String? videoUrl;
   final String fromPositionId;
   final String toPositionId;
 
@@ -11,6 +12,7 @@ class Technique {
     required this.name,
     required this.slug,
     this.description,
+    this.videoUrl,
     required this.fromPositionId,
     required this.toPositionId,
   });
@@ -21,6 +23,7 @@ class Technique {
       name: json['name'] as String,
       slug: json['slug'] as String,
       description: json['description'] as String?,
+      videoUrl: json['video_url'] as String?,
       fromPositionId: json['from_position_id'] as String,
       toPositionId: json['to_position_id'] as String,
     );
@@ -31,6 +34,7 @@ class Technique {
         'name': name,
         'slug': slug,
         'description': description,
+        'video_url': videoUrl,
         'from_position_id': fromPositionId,
         'to_position_id': toPositionId,
       };

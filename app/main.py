@@ -14,13 +14,23 @@ from app.run_migrations import run_migrations
 
 
 def register_exception_handlers(app: FastAPI) -> None:
-    """Mapeia exceções de domínio para respostas HTTP."""
+    """Mapeia exceções de domínio e erros não tratados para respostas HTTP (com CORS)."""
 
     @app.exception_handler(AppError)
     def app_error_handler(request, exc: AppError):
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.message},
+        )
+
+    @app.exception_handler(Exception)
+    def unhandled_exception_handler(request, exc: Exception):
+        """Qualquer exceção não tratada vira 500 com JSON; evita resposta sem CORS."""
+        import logging
+        logging.getLogger(__name__).exception("Exceção não tratada: %s", exc)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc) or "Erro interno do servidor."},
         )
 
 

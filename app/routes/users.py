@@ -2,7 +2,6 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -52,13 +51,16 @@ def user_update(user_id: UUID, body: UserUpdate, db: Session = Depends(get_db)):
 
 @router.delete("/{user_id}", status_code=204)
 def user_delete(user_id: UUID, db: Session = Depends(get_db)):
+    """Exclui o usuário e, em cascata, progressos, usos de missão e feedbacks."""
     try:
         if not delete_user(db, user_id):
             raise HTTPException(status_code=404, detail="Usuário não encontrado.")
         return None
-    except IntegrityError:
+    except HTTPException:
+        raise
+    except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=409,
-            detail="Não é possível excluir: existem registros vinculados (progresso, missões, feedback).",
+            status_code=500,
+            detail=f"Erro ao excluir usuário: {e!s}",
         )

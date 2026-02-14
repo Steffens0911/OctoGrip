@@ -15,7 +15,6 @@ class PositionFormScreen extends StatefulWidget {
 class _PositionFormScreenState extends State<PositionFormScreen> {
   final _api = ApiService();
   final _nameCtrl = TextEditingController();
-  final _slugCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   bool _saving = false;
   String? _error;
@@ -25,7 +24,6 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
     super.initState();
     if (widget.position != null) {
       _nameCtrl.text = widget.position!.name;
-      _slugCtrl.text = widget.position!.slug;
       _descCtrl.text = widget.position!.description ?? '';
     }
   }
@@ -33,14 +31,13 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _slugCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _slugCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Nome e slug são obrigatórios');
+    if (_nameCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Nome é obrigatório');
       return;
     }
     setState(() { _saving = true; _error = null; });
@@ -48,14 +45,12 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
       if (widget.position == null) {
         await _api.createPosition(
           name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         );
       } else {
         await _api.updatePosition(
           widget.position!.id,
           name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         );
       }
@@ -88,8 +83,6 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nome')),
-            const SizedBox(height: 16),
-            TextField(controller: _slugCtrl, decoration: const InputDecoration(labelText: 'Slug')),
             const SizedBox(height: 16),
             TextField(controller: _descCtrl, decoration: const InputDecoration(labelText: 'Descrição (opcional)'), maxLines: 2),
             if (_error != null) ...[const SizedBox(height: 16), Text(_error!, style: const TextStyle(color: Colors.red))],

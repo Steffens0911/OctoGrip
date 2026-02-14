@@ -21,11 +21,11 @@ class LessonRead(BaseModel):
 
 
 class LessonCreate(BaseModel):
-    """Schema para criar Lesson."""
+    """Schema para criar Lesson. Slug opcional (gerado automaticamente a partir do título)."""
 
     technique_id: UUID
     title: str
-    slug: str
+    slug: str | None = None
     video_url: str | None = None
     content: str | None = None
     order_index: int = 0

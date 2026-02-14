@@ -16,7 +16,7 @@ class TechniqueFormScreen extends StatefulWidget {
 class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
   final _api = ApiService();
   final _nameCtrl = TextEditingController();
-  final _slugCtrl = TextEditingController();
+  final _videoCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   List<Position> _positions = [];
   String? _fromPositionId;
@@ -30,7 +30,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
     super.initState();
     if (widget.technique != null) {
       _nameCtrl.text = widget.technique!.name;
-      _slugCtrl.text = widget.technique!.slug;
+      _videoCtrl.text = widget.technique!.videoUrl ?? '';
       _descCtrl.text = widget.technique!.description ?? '';
       _fromPositionId = widget.technique!.fromPositionId;
       _toPositionId = widget.technique!.toPositionId;
@@ -55,14 +55,14 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _slugCtrl.dispose();
+    _videoCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_nameCtrl.text.trim().isEmpty || _slugCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Nome e slug são obrigatórios');
+    if (_nameCtrl.text.trim().isEmpty) {
+      setState(() => _error = 'Nome é obrigatório');
       return;
     }
     if (_fromPositionId == null || _toPositionId == null) {
@@ -74,7 +74,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
       if (widget.technique == null) {
         await _api.createTechnique(
           name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
+          videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           fromPositionId: _fromPositionId!,
           toPositionId: _toPositionId!,
@@ -83,7 +83,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
         await _api.updateTechnique(
           widget.technique!.id,
           name: _nameCtrl.text.trim(),
-          slug: _slugCtrl.text.trim(),
+          videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
           fromPositionId: _fromPositionId,
           toPositionId: _toPositionId,
@@ -117,7 +117,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
           children: [
             TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nome')),
             const SizedBox(height: 16),
-            TextField(controller: _slugCtrl, decoration: const InputDecoration(labelText: 'Slug')),
+            TextField(controller: _videoCtrl, decoration: const InputDecoration(labelText: 'Link do YouTube (opcional)'), keyboardType: TextInputType.url),
             const SizedBox(height: 16),
             if (_loadingPositions) const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
             else ...[

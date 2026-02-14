@@ -78,7 +78,6 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
 
   Future<void> _openForm({Academy? existing}) async {
     final nameController = TextEditingController(text: existing?.name ?? '');
-    final slugController = TextEditingController(text: existing?.slug ?? '');
     final isEdit = existing != null;
     List<Technique> techniques = [];
     if (isEdit) {
@@ -103,14 +102,6 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                     hintText: 'Nome da academia',
                   ),
                   textCapitalization: TextCapitalization.words,
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: slugController,
-                  decoration: const InputDecoration(
-                    labelText: 'Slug (opcional)',
-                    hintText: 'identificador-unico',
-                  ),
                 ),
                 if (isEdit) ...[
                   const SizedBox(height: 12),
@@ -155,18 +146,10 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                     await _service.update(
                       existing!.id,
                       name: name,
-                      slug: slugController.text.trim().isEmpty
-                          ? null
-                          : slugController.text.trim(),
                       weeklyTechniqueId: selectedTechniqueId,
                     );
                   } else {
-                    await _service.create(
-                      name: name,
-                      slug: slugController.text.trim().isEmpty
-                          ? null
-                          : slugController.text.trim(),
-                    );
+                    await _service.create(name: name);
                   }
                   if (mounted) _load();
                 } catch (e) {

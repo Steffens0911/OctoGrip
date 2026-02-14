@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/widgets/youtube_player_embed.dart';
 
 /// Tela de visualização de uma lição (missão do dia ou biblioteca). Botão Concluir registra no backend.
 class LessonViewScreen extends StatefulWidget {
@@ -18,6 +20,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
   final _api = ApiService();
   bool _completing = false;
   bool _alreadyCompleted = false;
+  bool _reelsMode = false;
   String? _error;
 
   @override
@@ -62,25 +65,27 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Quando você visualizou?'),
-        content: const Text(
-          'Em que momento você assistiu ou revisou esta técnica?',
+      builder: (ctx) => PointerInterceptor(
+        child: AlertDialog(
+          title: const Text('Quando você visualizou?'),
+          content: const Text(
+            'Em que momento você assistiu ou revisou esta técnica?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'before_training'),
+              child: const Text('Antes do treino'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'after_training'),
+              child: const Text('Depois do treino'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, 'before_training'),
-            child: const Text('Antes do treino'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, 'after_training'),
-            child: const Text('Depois do treino'),
-          ),
-        ],
       ),
     );
   }
@@ -179,24 +184,18 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            Container(
-              height: 200,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: d.videoUrl.isNotEmpty
-                    ? const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.video_library, size: 48, color: AppTheme.textSecondary),
-                          SizedBox(height: 8),
-                          Text('Vídeo em breve', style: TextStyle(color: AppTheme.textSecondary)),
-                        ],
-                      )
-                    : const Text('Vídeo em breve', style: TextStyle(color: AppTheme.textSecondary)),
-              ),
+            YoutubePlayerEmbed(videoUrl: d.videoUrl.isNotEmpty ? d.videoUrl : null, reelsMode: _reelsMode),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                FilterChip(
+                  label: const Text('Modo Reels'),
+                  selected: _reelsMode,
+                  onSelected: (v) => setState(() => _reelsMode = v),
+                  selectedColor: AppTheme.primary.withValues(alpha: 0.3),
+                  checkmarkColor: AppTheme.primary,
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             if (d.description.isNotEmpty)

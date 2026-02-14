@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Technique
 
 logger = logging.getLogger(__name__)
@@ -22,18 +23,25 @@ def get_technique(db: Session, technique_id: UUID) -> Technique | None:
 def create_technique(
     db: Session,
     name: str,
-    slug: str,
     from_position_id: UUID,
     to_position_id: UUID,
+    slug: str | None = None,
     description: str | None = None,
+    video_url: str | None = None,
 ) -> Technique:
-    """Cria uma técnica."""
+    """Cria uma técnica. Slug gerado automaticamente a partir do nome se omitido."""
+    if not slug or not str(slug).strip():
+        base = make_slug(name, fallback="tecnica")
+        slug = ensure_unique_slug(db, Technique, "slug", base)
+    else:
+        slug = slug.strip()
     technique = Technique(
         name=name.strip(),
-        slug=slug.strip(),
+        slug=slug,
         from_position_id=from_position_id,
         to_position_id=to_position_id,
         description=description.strip() if description else None,
+        video_url=video_url.strip() if video_url and video_url.strip() else None,
     )
     db.add(technique)
     db.commit()
@@ -48,6 +56,7 @@ def update_technique(
     name: str | None = None,
     slug: str | None = None,
     description: str | None = None,
+    video_url: str | None = None,
     from_position_id: UUID | None = None,
     to_position_id: UUID | None = None,
 ) -> Technique | None:
@@ -61,6 +70,8 @@ def update_technique(
         technique.slug = slug.strip()
     if description is not None:
         technique.description = description.strip() if description else None
+    if video_url is not None:
+        technique.video_url = video_url.strip() if video_url and video_url.strip() else None
     if from_position_id is not None:
         technique.from_position_id = from_position_id
     if to_position_id is not None:
