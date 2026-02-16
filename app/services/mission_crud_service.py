@@ -1,26 +1,41 @@
-"""CRUD de Mission para painel do professor (T-01). Missão = técnica + período."""
+"""CRUD de Mission para painel do professor (T-01). Missão = técnica + slot da academia (sem datas)."""
 import logging
-from datetime import date, timedelta
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
-from app.models import Academy, Mission, MissionUsage, Technique
+from app.models import Academy, Lesson, Mission, MissionUsage, Technique
 
 logger = logging.getLogger(__name__)
+
+
+def _first_lesson_id_for_technique(db: Session, technique_id: UUID) -> UUID | None:
+    """Retorna o id da primeira lição da técnica (por order_index)."""
+    first = (
+        db.query(Lesson)
+        .filter(Lesson.technique_id == technique_id)
+        .order_by(Lesson.order_index.asc())
+        .first()
+    )
+    return first.id if first else None
 
 
 def create_mission(
     db: Session,
     technique_id: UUID,
-    start_date: date,
-    end_date: date,
     level: str = "beginner",
     theme: str | None = None,
     academy_id: UUID | None = None,
+    lesson_id: UUID | None = None,
+    multiplier: int = 1,
+    *,
+    slot_index: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> Mission:
-    """T-01: Cria uma missão (técnica + período). Valida technique e opcionalmente academy."""
+    """Cria uma missão (técnica + slot da academia). Se lesson_id não for informado, usa a primeira lição da técnica."""
     technique = db.query(Technique).filter(Technique.id == technique_id).first()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
@@ -31,14 +46,20 @@ def create_mission(
     level_n = (level or "beginner").lower().strip()
     if level_n not in ("beginner", "intermediate"):
         level_n = "beginner"
+    if lesson_id is None:
+        lesson_id = _first_lesson_id_for_technique(db, technique_id)
+    mult = max(1, multiplier) if multiplier is not None else 1
     mission = Mission(
         technique_id=technique_id,
+        lesson_id=lesson_id,
+        slot_index=slot_index,
         start_date=start_date,
         end_date=end_date,
         is_active=True,
         level=level_n,
         theme=theme,
         academy_id=academy_id,
+        multiplier=mult,
     )
     db.add(mission)
     db.commit()
@@ -65,7 +86,7 @@ def list_missions(
     limit: int = 100,
 ) -> list[Mission]:
     """Lista missões, opcionalmente filtradas por academia."""
-    q = db.query(Mission).order_by(Mission.start_date.desc()).limit(limit)
+    q = db.query(Mission).order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc()).limit(limit)
     if academy_id is not None:
         q = q.filter(Mission.academy_id == academy_id)
     return q.all()
@@ -76,18 +97,23 @@ def update_mission(
     mission_id: UUID,
     *,
     technique_id: UUID | None = None,
+    lesson_id: UUID | None = None,
+    slot_index: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
     level: str | None = None,
     theme: str | None = None,
     academy_id: UUID | None = None,
     is_active: bool | None = None,
+    multiplier: int | None = None,
     _set_academy_id_none: bool = False,
 ) -> Mission | None:
     """Atualiza uma missão (campos opcionais). Use _set_academy_id_none=True para limpar academia."""
     mission = db.query(Mission).filter(Mission.id == mission_id).first()
     if not mission:
         return None
+    if lesson_id is not None:
+        mission.lesson_id = lesson_id
     if technique_id is not None and technique_id != mission.technique_id:
         technique = db.query(Technique).filter(Technique.id == technique_id).first()
         if not technique:
@@ -96,10 +122,14 @@ def update_mission(
         if deleted:
             logger.info("update_mission cleared_usage", extra={"mission_id": str(mission_id), "deleted": deleted})
         mission.technique_id = technique_id
+        if lesson_id is None:
+            mission.lesson_id = _first_lesson_id_for_technique(db, technique_id)
     if start_date is not None:
         mission.start_date = start_date
     if end_date is not None:
         mission.end_date = end_date
+    if slot_index is not None:
+        mission.slot_index = slot_index
     if level is not None:
         mission.level = level if level.lower() in ("beginner", "intermediate") else "beginner"
     if theme is not None:
@@ -110,6 +140,8 @@ def update_mission(
         mission.academy_id = academy_id
     if is_active is not None:
         mission.is_active = is_active
+    if multiplier is not None and multiplier >= 1:
+        mission.multiplier = multiplier
     db.commit()
     db.refresh(mission)
     logger.info("update_mission", extra={"mission_id": str(mission_id)})
@@ -131,14 +163,12 @@ def upsert_academy_week_missions(
     db: Session,
     academy_id: UUID,
     technique_ids: tuple[UUID | None, UUID | None, UUID | None],
-    week_start: date,
-    week_end: date,
+    week_start: date | None = None,
+    week_end: date | None = None,
 ) -> list[Mission]:
     """
-    Cria ou atualiza as missões da academia para a semana.
-    technique_ids = (slot1, slot2, slot3): seg-ter, qua-qui, sex-dom.
-    Se só slot1 preenchido: uma missão por nível para a semana inteira (comportamento legado).
-    Se 2 ou 3 preenchidos: uma missão por nível por slot, com intervalos seg-ter, qua-qui, sex-dom.
+    Cria ou atualiza as 3 missões da academia por slot_index (0, 1, 2).
+    Sem datas: cada academia define suas missões pelos 3 slots.
     """
     t1, t2, t3 = technique_ids
     academy = db.query(Academy).filter(Academy.id == academy_id).first()
@@ -146,93 +176,15 @@ def upsert_academy_week_missions(
         raise AcademyNotFoundError()
 
     result: list[Mission] = []
-    use_three_slots = t2 is not None or t3 is not None
+    m1 = getattr(academy, "weekly_multiplier_1", 1) or 1
+    m2 = getattr(academy, "weekly_multiplier_2", 1) or 1
+    m3 = getattr(academy, "weekly_multiplier_3", 1) or 1
 
-    if use_three_slots:
-        # Slots: seg-ter (0-1), qua-qui (2-3), sex-dom (4-6)
-        slots: list[tuple[date, date, UUID | None]] = [
-            (week_start, week_start + timedelta(days=1), t1),
-            (week_start + timedelta(days=2), week_start + timedelta(days=3), t2),
-            (week_start + timedelta(days=4), week_end, t3),
-        ]
-        # Remover missões da academia que cobrem a semana inteira (legado)
-        for level in ("beginner", "intermediate"):
-            full_week = (
-                db.query(Mission)
-                .filter(
-                    Mission.academy_id == academy_id,
-                    Mission.level == level,
-                    Mission.start_date == week_start,
-                    Mission.end_date == week_end,
-                )
-                .first()
-            )
-            if full_week:
-                db.delete(full_week)
-                db.commit()
-                logger.info(
-                    "upsert_academy_week_missions removed_full_week",
-                    extra={"academy_id": str(academy_id), "level": level},
-                )
-        for slot_start, slot_end, tech_id in slots:
-            if tech_id is None:
-                continue
-            technique = db.query(Technique).filter(Technique.id == tech_id).first()
-            if not technique:
-                raise TechniqueNotFoundError("Técnica não encontrada.")
-            for level in ("beginner", "intermediate"):
-                existing = (
-                    db.query(Mission)
-                    .filter(
-                        Mission.academy_id == academy_id,
-                        Mission.level == level,
-                        Mission.start_date == slot_start,
-                    )
-                    .first()
-                )
-                if existing:
-                    if existing.technique_id != tech_id:
-                        deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == existing.id).delete()
-                        if deleted:
-                            logger.info(
-                                "upsert_academy_week_missions cleared_usage",
-                                extra={"mission_id": str(existing.id), "deleted": deleted},
-                            )
-                    existing.technique_id = tech_id
-                    existing.end_date = slot_end
-                    db.commit()
-                    db.refresh(existing)
-                    result.append(existing)
-                else:
-                    mission = create_mission(
-                        db,
-                        technique_id=tech_id,
-                        start_date=slot_start,
-                        end_date=slot_end,
-                        level=level,
-                        academy_id=academy_id,
-                        theme=technique.name,
-                    )
-                    result.append(mission)
-    else:
-        # Apenas técnica 1: uma missão por nível para a semana inteira (legado)
-        if t1 is None:
-            return result
-        # Remover missões de slot (seg-ter, qua-qui, sex-dom) se existirem
-        slot_missions = (
-            db.query(Mission)
-            .filter(
-                Mission.academy_id == academy_id,
-                Mission.start_date >= week_start,
-                Mission.end_date <= week_end,
-            )
-            .all()
-        )
-        for m in slot_missions:
-            if (m.end_date - m.start_date).days < 6:
-                db.delete(m)
-        db.commit()
-        technique = db.query(Technique).filter(Technique.id == t1).first()
+    tech_slots = [(t1, m1), (t2, m2), (t3, m3)]
+    for slot_idx, (tech_id, mult) in enumerate(tech_slots):
+        if tech_id is None:
+            continue
+        technique = db.query(Technique).filter(Technique.id == tech_id).first()
         if not technique:
             raise TechniqueNotFoundError("Técnica não encontrada.")
         for level in ("beginner", "intermediate"):
@@ -241,34 +193,75 @@ def upsert_academy_week_missions(
                 .filter(
                     Mission.academy_id == academy_id,
                     Mission.level == level,
-                    Mission.start_date <= week_end,
-                    Mission.end_date >= week_start,
+                    Mission.slot_index == slot_idx,
                 )
                 .first()
             )
             if existing:
-                if existing.technique_id != t1:
-                    deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == existing.id).delete()
-                    if deleted:
-                        logger.info(
-                            "upsert_academy_week_missions cleared_usage",
-                            extra={"mission_id": str(existing.id), "deleted": deleted},
-                        )
-                existing.technique_id = t1
-                existing.start_date = week_start
-                existing.end_date = week_end
-                db.commit()
-                db.refresh(existing)
-                result.append(existing)
+                if existing.technique_id != tech_id:
+                    existing.is_active = False
+                    db.commit()
+                    mission = create_mission(
+                        db,
+                        technique_id=tech_id,
+                        level=level,
+                        academy_id=academy_id,
+                        theme=technique.name,
+                        multiplier=mult,
+                        slot_index=slot_idx,
+                    )
+                    result.append(mission)
+                    logger.info(
+                        "upsert_academy_week_missions new_mission_after_technique_change",
+                        extra={"old_mission_id": str(existing.id), "new_mission_id": str(mission.id)},
+                    )
+                else:
+                    existing.multiplier = mult
+                    db.commit()
+                    db.refresh(existing)
+                    result.append(existing)
             else:
                 mission = create_mission(
                     db,
-                    technique_id=t1,
-                    start_date=week_start,
-                    end_date=week_end,
+                    technique_id=tech_id,
                     level=level,
                     academy_id=academy_id,
                     theme=technique.name,
+                    multiplier=mult,
+                    slot_index=slot_idx,
                 )
                 result.append(mission)
+
+    if t1 is None and t2 is None and t3 is None:
+        for level in ("beginner", "intermediate"):
+            for slot_idx in (0, 1, 2):
+                old = (
+                    db.query(Mission)
+                    .filter(
+                        Mission.academy_id == academy_id,
+                        Mission.level == level,
+                        Mission.slot_index == slot_idx,
+                    )
+                    .first()
+                )
+                if old:
+                    db.delete(old)
+                    db.commit()
+    else:
+        for slot_idx, (tech_id, _) in enumerate(tech_slots):
+            if tech_id is not None:
+                continue
+            for level in ("beginner", "intermediate"):
+                old = (
+                    db.query(Mission)
+                    .filter(
+                        Mission.academy_id == academy_id,
+                        Mission.level == level,
+                        Mission.slot_index == slot_idx,
+                    )
+                    .first()
+                )
+                if old:
+                    db.delete(old)
+                    db.commit()
     return result

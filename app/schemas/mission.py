@@ -5,26 +5,31 @@ from pydantic import BaseModel
 
 
 class MissionCreate(BaseModel):
-    """T-01: Criação de missão pelo professor (painel web). Missão = técnica + período."""
+    """T-01: Criação de missão. Missão = lição (ou técnica) + período."""
 
     technique_id: UUID
+    lesson_id: UUID | None = None
     start_date: date
     end_date: date
     level: str = "beginner"
     theme: str | None = None
     academy_id: UUID | None = None
+    multiplier: int = 1
 
 
 class MissionUpdate(BaseModel):
     """Atualização parcial de missão (editar)."""
 
     technique_id: UUID | None = None
+    lesson_id: UUID | None = None
+    slot_index: int | None = None
     start_date: date | None = None
     end_date: date | None = None
     level: str | None = None
     theme: str | None = None
     academy_id: UUID | None = None
     is_active: bool | None = None
+    multiplier: int | None = None
 
 
 class MissionRead(BaseModel):
@@ -32,12 +37,15 @@ class MissionRead(BaseModel):
 
     id: UUID
     technique_id: UUID
-    start_date: date
-    end_date: date
+    lesson_id: UUID | None = None
+    slot_index: int | None = None
+    start_date: date | None = None
+    end_date: date | None = None
     level: str
     theme: str | None
     academy_id: UUID | None
     is_active: bool = True
+    multiplier: int = 1
 
     class Config:
         from_attributes = True
@@ -60,6 +68,7 @@ class MissionTodayResponse(BaseModel):
     weekly_theme: str | None = None
     is_review: bool = False
     already_completed: bool = False
+    multiplier: int = 1
 
 
 class MissionWeekSlotResponse(BaseModel):

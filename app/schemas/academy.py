@@ -24,6 +24,11 @@ class AcademyRead(BaseModel):
     weekly_technique_2_name: str | None = None
     weekly_technique_3_id: UUID | None = None
     weekly_technique_3_name: str | None = None
+    visible_lesson_id: UUID | None = None
+    visible_lesson_name: str | None = None
+    weekly_multiplier_1: int = 1
+    weekly_multiplier_2: int = 1
+    weekly_multiplier_3: int = 1
 
     class Config:
         from_attributes = True
@@ -44,6 +49,10 @@ class AcademyUpdate(BaseModel):
     weekly_technique_id: UUID | None = None
     weekly_technique_2_id: UUID | None = None
     weekly_technique_3_id: UUID | None = None
+    visible_lesson_id: UUID | None = None
+    weekly_multiplier_1: int | None = None
+    weekly_multiplier_2: int | None = None
+    weekly_multiplier_3: int | None = None
 
 
 class RankingEntry(BaseModel):

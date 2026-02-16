@@ -1,5 +1,4 @@
-/// URL base da API (ajuste para seu ambiente).
-const String kApiBaseUrl = String.fromEnvironment(
-  'API_BASE_URL',
-  defaultValue: 'http://localhost:8000',
-);
+/// URL base da API. Em web lê do script no index.html (mesmo host da página, porta 8000).
+import 'config_stub.dart' if (dart.library.html) 'config_web.dart' as _impl;
+
+String get kApiBaseUrl => _impl.getApiBaseUrl();

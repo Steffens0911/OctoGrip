@@ -92,18 +92,30 @@ class AcademyService {
         json.decode(response.body) as Map<String, dynamic>);
   }
 
-  /// Atualiza as 3 missões semanais (seg-ter, qua-qui, sex-dom). Passa null para limpar.
+  /// Atualiza as 3 missões e pontuações base. Pontos ao confirmar = pontuação base do slot × faixa do oponente.
   Future<Academy?> updateWeeklyMissions(
     String id, {
     String? weeklyTechniqueId,
     String? weeklyTechnique2Id,
     String? weeklyTechnique3Id,
+    int? weeklyMultiplier1,
+    int? weeklyMultiplier2,
+    int? weeklyMultiplier3,
   }) async {
     final body = <String, dynamic>{
       'weekly_technique_id': weeklyTechniqueId,
       'weekly_technique_2_id': weeklyTechnique2Id,
       'weekly_technique_3_id': weeklyTechnique3Id,
     };
+    if (weeklyMultiplier1 != null && weeklyMultiplier1 >= 1) {
+      body['weekly_multiplier_1'] = weeklyMultiplier1;
+    }
+    if (weeklyMultiplier2 != null && weeklyMultiplier2 >= 1) {
+      body['weekly_multiplier_2'] = weeklyMultiplier2;
+    }
+    if (weeklyMultiplier3 != null && weeklyMultiplier3 >= 1) {
+      body['weekly_multiplier_3'] = weeklyMultiplier3;
+    }
     final response = await http.patch(
       Uri.parse('$_academiesUrl/$id'),
       headers: {'Content-Type': 'application/json'},

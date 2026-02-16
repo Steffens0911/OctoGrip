@@ -5,7 +5,9 @@ import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
-import 'package:viewer/screens/student/library_screen.dart';
+import 'package:viewer/screens/student/my_executions_screen.dart';
+import 'package:viewer/screens/student/pending_confirmations_screen.dart';
+import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/progress_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -18,18 +20,50 @@ class StudentHomeScreen extends StatefulWidget {
   State<StudentHomeScreen> createState() => _StudentHomeScreenState();
 }
 
-class _StudentHomeScreenState extends State<StudentHomeScreen> {
+class _StudentHomeScreenState extends State<StudentHomeScreen>
+    with WidgetsBindingObserver {
   final _api = ApiService();
   List<UserModel> _users = [];
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
+  int? _userPoints;
+  Map<String, dynamic>? _collectiveGoal;
   bool _loading = true;
   String? _error;
+
+  /// Mapeia faixa do usuário para level da API (beginner/intermediate).
+  static String _levelFromGraduation(String? g) {
+    if (g == null || g.isEmpty) return 'beginner';
+    switch (g.toLowerCase()) {
+      case 'purple':
+      case 'brown':
+      case 'black':
+        return 'intermediate';
+      default:
+        return 'beginner';
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _selectedUser != null) {
+      _loadMissionWeek();
+      _loadUserPoints();
+      _loadCollectiveGoal();
+    }
   }
 
   Future<void> _load() async {
@@ -45,9 +79,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         _selectedUser = users.isNotEmpty ? users.first : null;
         _loading = false;
       });
-      if (_selectedUser != null) _loadMissionWeek();
+      if (_selectedUser != null) {
+        await _loadMissionWeek();
+        await _loadUserPoints();
+        await _loadCollectiveGoal();
+      }
     } catch (e) {
-      setState(() {
+      if (mounted) setState(() {
         _loading = false;
         _error = e.toString();
       });
@@ -58,15 +96,41 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     if (_selectedUser == null) return;
     setState(() => _error = null);
     try {
+      final level = _levelFromGraduation(_selectedUser!.graduation);
       final week = await _api.getMissionWeek(
         userId: _selectedUser!.id,
         academyId: _selectedUser!.academyId,
+        level: level,
       );
       if (mounted) setState(() => _missionWeek = week);
     } catch (e) {
       if (mounted) setState(() => _missionWeek = null);
       if (e.toString().contains('404')) return;
       if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _loadUserPoints() async {
+    if (_selectedUser == null) return;
+    try {
+      final res = await _api.getUserPoints(_selectedUser!.id);
+      if (mounted) setState(() => _userPoints = res['points'] as int?);
+    } catch (_) {
+      if (mounted) setState(() => _userPoints = null);
+    }
+  }
+
+  Future<void> _loadCollectiveGoal() async {
+    final academyId = _selectedUser?.academyId;
+    if (academyId == null || academyId.isEmpty) {
+      setState(() => _collectiveGoal = null);
+      return;
+    }
+    try {
+      final res = await _api.getCollectiveGoalCurrent(academyId);
+      if (mounted) setState(() => _collectiveGoal = res);
+    } catch (_) {
+      if (mounted) setState(() => _collectiveGoal = null);
     }
   }
 
@@ -78,6 +142,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       ),
     );
     _loadMissionWeek();
+    _loadUserPoints();
+    _loadCollectiveGoal();
   }
 
   @override
@@ -123,13 +189,39 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             const SizedBox(height: 12),
             _buildUserSelector(),
             const SizedBox(height: 20),
+            if (_collectiveGoal != null) _buildCollectiveGoalCard(),
+            if (_collectiveGoal != null) const SizedBox(height: 16),
+            if (_selectedUser != null &&
+                (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Vincule este usuário a uma academia em Administração → Usuários para ver as missões semanais.',
+                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_selectedUser != null &&
+                (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
+              const SizedBox(height: 16),
             if (_missionWeek != null) _buildMissionWeekSection(),
             if (_missionWeek == null && !_loading && _selectedUser != null)
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Text(
-                    'Nenhuma missão da semana no momento.',
+                    _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
+                        ? 'Configure a academia do usuário para ver as missões.'
+                        : 'Nenhuma missão da semana no momento.',
                     style: TextStyle(color: AppTheme.textSecondary),
                   ),
                 ),
@@ -149,7 +241,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Usuário (MVP)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Usuário (MVP)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                Text(
+                  'Pontos: ${_userPoints ?? '—'}',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary),
+                ),
+              ],
+            ),
             const SizedBox(height: 6),
             DropdownButtonFormField<UserModel>(
               value: _selectedUser,
@@ -167,9 +268,50 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 setState(() {
                   _selectedUser = u;
                   _missionWeek = null;
+                  _userPoints = null;
                 });
                 _loadMissionWeek();
+                _loadUserPoints();
+                _loadCollectiveGoal();
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollectiveGoalCard() {
+    final g = _collectiveGoal!;
+    final goal = g['goal'] as Map<String, dynamic>?;
+    final current = g['current_count'] as int? ?? 0;
+    final target = g['target_count'] as int? ?? 0;
+    final techniqueName = goal?['technique_name'] as String? ?? 'técnica';
+    final progress = target > 0 ? (current / target).clamp(0.0, 1.0) : 0.0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Meta da semana',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '$current / $target execuções de $techniqueName',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey.shade300,
+              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
+              minHeight: 8,
             ),
           ],
         ),
@@ -184,7 +326,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Missões da semana',
+          'Missões',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: AppTheme.textPrimary,
                 fontWeight: FontWeight.bold,
@@ -240,8 +382,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       description: m.description,
       videoUrl: m.videoUrl,
       userId: _selectedUser!.id,
+      academyId: _selectedUser!.academyId,
       techniqueName: m.techniqueName,
       positionName: m.positionName,
+      multiplier: m.multiplier,
       estimatedDurationSeconds: m.estimatedDurationSeconds,
       alreadyCompleted: m.alreadyCompleted,
     );
@@ -315,17 +459,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _ShortcutTile(
-          icon: Icons.menu_book,
-          title: 'Biblioteca de lições',
-          subtitle: 'Ver todas as lições',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => LibraryScreen(userId: userId),
-            ),
-          ),
-        ),
-        _ShortcutTile(
           icon: Icons.trending_up,
           title: 'Meu progresso',
           subtitle: 'Todas as missões cumpridas',
@@ -333,6 +466,45 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => ProgressScreen(userId: userId),
+            ),
+          ),
+        ),
+        _ShortcutTile(
+          icon: Icons.list_alt,
+          title: 'Log de pontuação',
+          subtitle: 'Histórico de pontos ganhos',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PointsLogScreen(
+                userId: userId,
+                userName: _selectedUser?.name ?? _selectedUser?.email,
+              ),
+            ),
+          ),
+        ),
+        _ShortcutTile(
+          icon: Icons.how_to_reg,
+          title: 'Confirmações pendentes',
+          subtitle: 'Confirmar execuções em você',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PendingConfirmationsScreen(
+                userId: userId,
+                userName: _selectedUser?.name ?? _selectedUser?.email,
+              ),
+            ),
+          ),
+        ),
+        _ShortcutTile(
+          icon: Icons.send_outlined,
+          title: 'Minhas solicitações',
+          subtitle: 'Status das confirmações que você pediu',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MyExecutionsScreen(userId: userId),
             ),
           ),
         ),

@@ -13,6 +13,7 @@ class LessonRead(BaseModel):
     video_url: str | None
     content: str | None
     order_index: int
+    base_points: int | None = None
     technique_id: UUID
     created_at: datetime
     technique_name: str | None = None
@@ -32,6 +33,7 @@ class LessonCreate(BaseModel):
     video_url: str | None = None
     content: str | None = None
     order_index: int = 0
+    base_points: int | None = None
 
 
 class LessonUpdate(BaseModel):
@@ -43,3 +45,4 @@ class LessonUpdate(BaseModel):
     video_url: str | None = None
     content: str | None = None
     order_index: int | None = None
+    base_points: int | None = None

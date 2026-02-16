@@ -28,6 +28,7 @@ def create_technique(
     slug: str | None = None,
     description: str | None = None,
     video_url: str | None = None,
+    base_points: int | None = None,
 ) -> Technique:
     """Cria uma técnica. Slug gerado automaticamente a partir do nome se omitido."""
     if not slug or not str(slug).strip():
@@ -42,6 +43,7 @@ def create_technique(
         to_position_id=to_position_id,
         description=description.strip() if description else None,
         video_url=video_url.strip() if video_url and video_url.strip() else None,
+        base_points=base_points,
     )
     db.add(technique)
     db.commit()
@@ -57,6 +59,7 @@ def update_technique(
     slug: str | None = None,
     description: str | None = None,
     video_url: str | None = None,
+    base_points: int | None = None,
     from_position_id: UUID | None = None,
     to_position_id: UUID | None = None,
 ) -> Technique | None:
@@ -72,6 +75,8 @@ def update_technique(
         technique.description = description.strip() if description else None
     if video_url is not None:
         technique.video_url = video_url.strip() if video_url and video_url.strip() else None
+    if base_points is not None:
+        technique.base_points = base_points
     if from_position_id is not None:
         technique.from_position_id = from_position_id
     if to_position_id is not None:

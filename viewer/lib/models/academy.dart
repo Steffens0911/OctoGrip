@@ -9,6 +9,11 @@ class Academy {
   final String? weeklyTechnique2Name;
   final String? weeklyTechnique3Id;
   final String? weeklyTechnique3Name;
+  final String? visibleLessonId;
+  final String? visibleLessonName;
+  final int weeklyMultiplier1;
+  final int weeklyMultiplier2;
+  final int weeklyMultiplier3;
 
   Academy({
     required this.id,
@@ -21,6 +26,11 @@ class Academy {
     this.weeklyTechnique2Name,
     this.weeklyTechnique3Id,
     this.weeklyTechnique3Name,
+    this.visibleLessonId,
+    this.visibleLessonName,
+    this.weeklyMultiplier1 = 1,
+    this.weeklyMultiplier2 = 1,
+    this.weeklyMultiplier3 = 1,
   });
 
   factory Academy.fromJson(Map<String, dynamic> json) {
@@ -35,6 +45,11 @@ class Academy {
       weeklyTechnique2Name: json['weekly_technique_2_name'] as String?,
       weeklyTechnique3Id: json['weekly_technique_3_id'] as String?,
       weeklyTechnique3Name: json['weekly_technique_3_name'] as String?,
+      visibleLessonId: json['visible_lesson_id'] as String?,
+      visibleLessonName: json['visible_lesson_name'] as String?,
+      weeklyMultiplier1: json['weekly_multiplier_1'] as int? ?? 1,
+      weeklyMultiplier2: json['weekly_multiplier_2'] as int? ?? 1,
+      weeklyMultiplier3: json['weekly_multiplier_3'] as int? ?? 1,
     );
   }
 

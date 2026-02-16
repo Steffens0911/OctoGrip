@@ -54,6 +54,8 @@ def missions_create(body: MissionCreate, db: Session = Depends(get_db)):
         level=body.level,
         theme=body.theme,
         academy_id=body.academy_id,
+        lesson_id=body.lesson_id,
+        multiplier=body.multiplier,
     )
     return mission
 

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.models import Academy
+from app.models import Academy, CollectiveGoal
 from fastapi.responses import PlainTextResponse
 
 from app.schemas.academy import (
@@ -18,6 +18,11 @@ from app.schemas.academy import (
     RankingResponse,
     WeeklyReportResponse,
 )
+from app.schemas.collective_goal import (
+    CollectiveGoalCreate,
+    CollectiveGoalCurrentResponse,
+    CollectiveGoalRead,
+)
 from app.services.academy_service import (
     create_academy,
     delete_academy,
@@ -27,6 +32,12 @@ from app.services.academy_service import (
     get_academy_weekly_report,
     list_academies,
     update_academy,
+)
+from app.services.collective_goal_service import (
+    count_executions_for_goal,
+    create_goal,
+    get_current_goal_for_academy,
+    list_goals_for_academy,
 )
 
 router = APIRouter()
@@ -44,6 +55,11 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         weekly_technique_2_name=a.weekly_technique_2.name if a.weekly_technique_2 else None,
         weekly_technique_3_id=a.weekly_technique_3_id,
         weekly_technique_3_name=a.weekly_technique_3.name if a.weekly_technique_3 else None,
+        visible_lesson_id=a.visible_lesson_id,
+        visible_lesson_name=a.visible_lesson.title if a.visible_lesson else None,
+        weekly_multiplier_1=a.weekly_multiplier_1,
+        weekly_multiplier_2=a.weekly_multiplier_2,
+        weekly_multiplier_3=a.weekly_multiplier_3,
     )
 
 
@@ -56,6 +72,7 @@ def academy_list(db: Session = Depends(get_db)):
             joinedload(Academy.weekly_technique),
             joinedload(Academy.weekly_technique_2),
             joinedload(Academy.weekly_technique_3),
+            joinedload(Academy.visible_lesson),
         )
         .order_by(Academy.name)
         .limit(100)
@@ -82,6 +99,7 @@ def academy_get(
             joinedload(Academy.weekly_technique),
             joinedload(Academy.weekly_technique_2),
             joinedload(Academy.weekly_technique_3),
+            joinedload(Academy.visible_lesson),
         )
         .filter(Academy.id == academy_id)
         .first()
@@ -109,6 +127,7 @@ def academy_update(
             joinedload(Academy.weekly_technique),
             joinedload(Academy.weekly_technique_2),
             joinedload(Academy.weekly_technique_3),
+            joinedload(Academy.visible_lesson),
         )
         .filter(Academy.id == academy_id)
         .first()
@@ -205,3 +224,67 @@ def academy_report_weekly_csv(
         ],
     ]
     return "\n".join(lines)
+
+
+# ---------- Metas coletivas (gamificação) ----------
+
+
+def _goal_to_read(g) -> CollectiveGoalRead:
+    return CollectiveGoalRead(
+        id=g.id,
+        academy_id=g.academy_id,
+        technique_id=g.technique_id,
+        target_count=g.target_count,
+        start_date=g.start_date,
+        end_date=g.end_date,
+        created_at=g.created_at,
+        technique_name=g.technique.name if g.technique else None,
+    )
+
+
+@router.get("/{academy_id}/collective_goals/current", response_model=CollectiveGoalCurrentResponse | None)
+def collective_goal_current(academy_id: UUID, db: Session = Depends(get_db)):
+    """Meta coletiva da semana atual para a academia (com progresso)."""
+    goal = get_current_goal_for_academy(db, academy_id)
+    if not goal:
+        return None
+    current = count_executions_for_goal(db, goal)
+    return CollectiveGoalCurrentResponse(
+        goal=_goal_to_read(goal),
+        current_count=current,
+        target_count=goal.target_count,
+    )
+
+
+@router.get("/{academy_id}/collective_goals", response_model=list[CollectiveGoalRead])
+def collective_goals_list(academy_id: UUID, db: Session = Depends(get_db)):
+    """Lista metas coletivas da academia."""
+    goals = list_goals_for_academy(db, academy_id)
+    return [_goal_to_read(g) for g in goals]
+
+
+@router.post("/{academy_id}/collective_goals", response_model=CollectiveGoalRead, status_code=201)
+def collective_goal_create(
+    academy_id: UUID,
+    body: CollectiveGoalCreate,
+    db: Session = Depends(get_db),
+):
+    """Cria meta coletiva (admin/professor)."""
+    if get_academy(db, academy_id) is None:
+        raise HTTPException(status_code=404, detail="Academia não encontrada.")
+    goal = create_goal(
+        db,
+        academy_id=academy_id,
+        technique_id=body.technique_id,
+        target_count=body.target_count,
+        start_date=body.start_date,
+        end_date=body.end_date,
+    )
+    db.refresh(goal)
+    goal = (
+        db.query(CollectiveGoal)
+        .options(joinedload(CollectiveGoal.technique))
+        .filter(CollectiveGoal.id == goal.id)
+        .first()
+    )
+    return _goal_to_read(goal)

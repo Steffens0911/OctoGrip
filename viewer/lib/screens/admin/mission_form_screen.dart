@@ -17,6 +17,7 @@ class MissionFormScreen extends StatefulWidget {
 class _MissionFormScreenState extends State<MissionFormScreen> {
   final _api = ApiService();
   final _themeCtrl = TextEditingController();
+  final _multiplierCtrl = TextEditingController();
   List<Technique> _techniques = [];
   List<Academy> _academies = [];
   final _startDateCtrl = TextEditingController();
@@ -24,6 +25,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   String? _techniqueId;
   String? _academyId;
   String _level = 'beginner';
+  int _multiplier = 1;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -42,10 +44,12 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       _endDateCtrl.text = widget.mission!.endDate;
       _level = widget.mission!.level;
       _themeCtrl.text = widget.mission!.theme ?? '';
+      _multiplier = widget.mission!.multiplier;
     } else {
       _startDateCtrl.text = startStr;
       _endDateCtrl.text = endStr;
     }
+    _multiplierCtrl.text = _multiplier.toString();
     _load();
   }
 
@@ -66,6 +70,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   @override
   void dispose() {
     _themeCtrl.dispose();
+    _multiplierCtrl.dispose();
     _startDateCtrl.dispose();
     _endDateCtrl.dispose();
     super.dispose();
@@ -82,6 +87,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       setState(() => _error = 'Preencha início e fim');
       return;
     }
+    final mult = int.tryParse(_multiplierCtrl.text.trim());
+    final multVal = (mult != null && mult >= 1) ? mult : 1;
     setState(() { _saving = true; _error = null; });
     try {
       if (widget.mission == null) {
@@ -92,6 +99,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
           level: _level,
           theme: _themeCtrl.text.trim().isEmpty ? null : _themeCtrl.text.trim(),
           academyId: _academyId,
+          multiplier: multVal,
         );
       } else {
         await _api.updateMission(
@@ -102,6 +110,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
           level: _level,
           theme: _themeCtrl.text.trim().isEmpty ? null : _themeCtrl.text.trim(),
           academyId: _academyId,
+          multiplier: multVal,
         );
       }
       if (mounted) {
@@ -161,6 +170,16 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                   ),
                   const SizedBox(height: 16),
                   TextField(controller: _themeCtrl, decoration: const InputDecoration(labelText: 'Tema (opcional)')),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _multiplierCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Multiplicador',
+                      hintText: '1',
+                      helperText: 'Pontos ao concluir = multiplicador × faixa do usuário',
+                    ),
+                  ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _academyId,

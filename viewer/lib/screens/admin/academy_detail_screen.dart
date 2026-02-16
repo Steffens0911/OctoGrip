@@ -30,6 +30,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   String? _weeklyTechniqueId;
   String? _weeklyTechnique2Id;
   String? _weeklyTechnique3Id;
+  int _weeklyMultiplier1 = 1;
+  int _weeklyMultiplier2 = 1;
+  int _weeklyMultiplier3 = 1;
+  late final TextEditingController _mult1Controller;
+  late final TextEditingController _mult2Controller;
+  late final TextEditingController _mult3Controller;
   bool _loadingTechniques = true;
   bool _savingTheme = false;
   Map<String, dynamic>? _ranking;
@@ -45,8 +51,22 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _weeklyTechniqueId = _academy.weeklyTechniqueId;
     _weeklyTechnique2Id = _academy.weeklyTechnique2Id;
     _weeklyTechnique3Id = _academy.weeklyTechnique3Id;
+    _weeklyMultiplier1 = _academy.weeklyMultiplier1;
+    _weeklyMultiplier2 = _academy.weeklyMultiplier2;
+    _weeklyMultiplier3 = _academy.weeklyMultiplier3;
+    _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
+    _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
+    _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
     _loadTechniques();
     _loadRankingAndReport();
+  }
+
+  @override
+  void dispose() {
+    _mult1Controller.dispose();
+    _mult2Controller.dispose();
+    _mult3Controller.dispose();
+    super.dispose();
   }
 
   Future<void> _loadTechniques() async {
@@ -92,6 +112,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         weeklyTechniqueId: _weeklyTechniqueId,
         weeklyTechnique2Id: _weeklyTechnique2Id,
         weeklyTechnique3Id: _weeklyTechnique3Id,
+        weeklyMultiplier1: _weeklyMultiplier1,
+        weeklyMultiplier2: _weeklyMultiplier2,
+        weeklyMultiplier3: _weeklyMultiplier3,
       );
       if (updated != null && mounted) {
         setState(() {
@@ -99,6 +122,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           _weeklyTechniqueId = updated.weeklyTechniqueId;
           _weeklyTechnique2Id = updated.weeklyTechnique2Id;
           _weeklyTechnique3Id = updated.weeklyTechnique3Id;
+          _weeklyMultiplier1 = updated.weeklyMultiplier1;
+          _weeklyMultiplier2 = updated.weeklyMultiplier2;
+          _weeklyMultiplier3 = updated.weeklyMultiplier3;
+          _mult1Controller.text = _weeklyMultiplier1.toString();
+          _mult2Controller.text = _weeklyMultiplier2.toString();
+          _mult3Controller.text = _weeklyMultiplier3.toString();
           _savingTheme = false;
         });
         widget.onUpdated();
@@ -268,7 +297,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Seg–ter, qua–qui e sex–dom: cada técnica aparece como missão do dia nesse período.',
+                        'As técnicas selecionadas aparecem como missões no painel do aluno enquanto estiverem configuradas.',
                         style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                       ),
                       const SizedBox(height: 12),
@@ -278,7 +307,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         DropdownButtonFormField<String>(
                           value: _weeklyTechniqueId,
                           decoration: const InputDecoration(
-                            labelText: 'Missão 1 (seg–ter)',
+                            labelText: 'Missão 1',
                             border: OutlineInputBorder(),
                           ),
                           items: [
@@ -291,7 +320,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         DropdownButtonFormField<String>(
                           value: _weeklyTechnique2Id,
                           decoration: const InputDecoration(
-                            labelText: 'Missão 2 (qua–qui)',
+                            labelText: 'Missão 2',
                             border: OutlineInputBorder(),
                           ),
                           items: [
@@ -304,7 +333,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         DropdownButtonFormField<String>(
                           value: _weeklyTechnique3Id,
                           decoration: const InputDecoration(
-                            labelText: 'Missão 3 (sex–dom)',
+                            labelText: 'Missão 3',
                             border: OutlineInputBorder(),
                           ),
                           items: [
@@ -312,6 +341,68 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
                           ],
                           onChanged: (v) => setState(() => _weeklyTechnique3Id = v),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Pontuação base (por slot)',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _mult1Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Missão 1',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (v) {
+                                  final n = int.tryParse(v);
+                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier1 = n);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _mult2Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Missão 2',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (v) {
+                                  final n = int.tryParse(v);
+                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier2 = n);
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _mult3Controller,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                  labelText: 'Missão 3',
+                                  border: OutlineInputBorder(),
+                                ),
+                                onChanged: (v) {
+                                  final n = int.tryParse(v);
+                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier3 = n);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
+                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                         ),
                       ],
                       const SizedBox(height: 12),

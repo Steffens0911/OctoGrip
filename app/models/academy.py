@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -40,6 +40,15 @@ class Academy(Base, UUIDMixin):
         index=True,
         comment="Técnica slot 3 (sex-dom).",
     )
+    visible_lesson_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Lição em destaque visível para os alunos da academia.",
+    )
+    weekly_multiplier_1: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    weekly_multiplier_2: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    weekly_multiplier_3: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
 
     weekly_technique: Mapped["Technique | None"] = relationship(
         "Technique",
@@ -56,6 +65,11 @@ class Academy(Base, UUIDMixin):
         foreign_keys=[weekly_technique_3_id],
         lazy="selectin",
     )
+    visible_lesson: Mapped["Lesson | None"] = relationship(
+        "Lesson",
+        foreign_keys=[visible_lesson_id],
+        lazy="selectin",
+    )
     users: Mapped[list["User"]] = relationship(
         "User",
         back_populates="academy",
@@ -68,6 +82,11 @@ class Academy(Base, UUIDMixin):
     )
     missions: Mapped[list["Mission"]] = relationship(
         "Mission",
+        back_populates="academy",
+        lazy="selectin",
+    )
+    collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
+        "CollectiveGoal",
         back_populates="academy",
         lazy="selectin",
     )

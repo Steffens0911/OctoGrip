@@ -6,10 +6,40 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Academy, LessonProgress, MissionUsage, Position, TrainingFeedback, User
+from app.models import Academy, LessonProgress, Mission, MissionUsage, Position, TrainingFeedback, User
 from app.services.mission_crud_service import upsert_academy_week_missions
 
 logger = logging.getLogger(__name__)
+
+
+def ensure_weekly_missions_if_needed(db: Session, academy_id: UUID) -> None:
+    """
+    Se a academia tem técnicas configuradas, executa upsert para garantir que as missões
+    existam (persistem enquanto configuradas).
+    """
+    academy = db.query(Academy).filter(Academy.id == academy_id).first()
+    if not academy:
+        return
+    if (
+        academy.weekly_technique_id is None
+        and academy.weekly_technique_2_id is None
+        and academy.weekly_technique_3_id is None
+    ):
+        return
+    t1 = academy.weekly_technique_id
+    t2 = academy.weekly_technique_2_id
+    t3 = academy.weekly_technique_3_id
+    try:
+        upsert_academy_week_missions(
+            db, academy_id, (t1, t2, t3),
+            date(2020, 1, 6), date(2099, 12, 31),
+        )
+        logger.info(
+            "ensure_weekly_missions_if_needed",
+            extra={"academy_id": str(academy_id)},
+        )
+    except Exception as e:
+        logger.exception("ensure_weekly_missions_if_needed: %s", e)
 
 
 def get_academy(db: Session, academy_id: UUID) -> Academy | None:
@@ -71,6 +101,7 @@ def update_academy(db: Session, academy_id: UUID, **kwargs) -> Academy | None:
     if not academy:
         return None
     technique_keys = {"weekly_technique_id", "weekly_technique_2_id", "weekly_technique_3_id"}
+    multiplier_keys = {"weekly_multiplier_1", "weekly_multiplier_2", "weekly_multiplier_3"}
     for key, value in kwargs.items():
         if key == "name" and value is not None:
             academy.name = value.strip()
@@ -80,16 +111,20 @@ def update_academy(db: Session, academy_id: UUID, **kwargs) -> Academy | None:
             academy.weekly_theme = value
         elif key in technique_keys:
             setattr(academy, key, value)
-    # Se alguma técnica foi alterada, (re)criar missões da semana
-    if technique_keys & set(kwargs.keys()):
-        today = date.today()
-        week_start = today - timedelta(days=today.weekday())
-        week_end = week_start + timedelta(days=6)
+        elif key == "visible_lesson_id":
+            academy.visible_lesson_id = value
+        elif key in multiplier_keys and value is not None and value >= 1:
+            setattr(academy, key, value)
+    # Se técnica ou multiplicador foi alterado, (re)criar missões (persistem enquanto configuradas)
+    if (technique_keys | multiplier_keys) & set(kwargs.keys()):
         t1 = academy.weekly_technique_id
         t2 = academy.weekly_technique_2_id
         t3 = academy.weekly_technique_3_id
         try:
-            upsert_academy_week_missions(db, academy_id, (t1, t2, t3), week_start, week_end)
+            upsert_academy_week_missions(
+                db, academy_id, (t1, t2, t3),
+                date(2020, 1, 6), date(2099, 12, 31),
+            )
         except Exception as e:
             logger.exception("update_academy upsert_academy_week_missions: %s", e)
             raise

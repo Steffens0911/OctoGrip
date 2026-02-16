@@ -14,6 +14,7 @@ class MissionToday {
   final String? weeklyTheme;
   final bool isReview;
   final bool alreadyCompleted;
+  final int multiplier;
 
   MissionToday({
     this.missionId,
@@ -30,6 +31,7 @@ class MissionToday {
     this.weeklyTheme,
     this.isReview = false,
     this.alreadyCompleted = false,
+    this.multiplier = 1,
   });
 
   factory MissionToday.fromJson(Map<String, dynamic> json) {
@@ -48,6 +50,7 @@ class MissionToday {
       weeklyTheme: json['weekly_theme'] as String?,
       isReview: json['is_review'] as bool? ?? false,
       alreadyCompleted: json['already_completed'] as bool? ?? false,
+      multiplier: json['multiplier'] as int? ?? 1,
     );
   }
 }

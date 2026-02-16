@@ -16,6 +16,12 @@ class User(Base, UUIDMixin):
 
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    graduation: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        index=True,
+        comment="Faixa: white, blue, purple, brown, black.",
+    )
     academy_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("academies.id", ondelete="SET NULL"),
         nullable=True,
@@ -40,5 +46,17 @@ class User(Base, UUIDMixin):
     mission_usages: Mapped[list["MissionUsage"]] = relationship(
         "MissionUsage",
         back_populates="user",
+        lazy="selectin",
+    )
+    technique_executions_as_executor: Mapped[list["TechniqueExecution"]] = relationship(
+        "TechniqueExecution",
+        foreign_keys="TechniqueExecution.user_id",
+        back_populates="user",
+        lazy="selectin",
+    )
+    technique_executions_as_opponent: Mapped[list["TechniqueExecution"]] = relationship(
+        "TechniqueExecution",
+        foreign_keys="TechniqueExecution.opponent_id",
+        back_populates="opponent",
         lazy="selectin",
     )

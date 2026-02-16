@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,9 +17,12 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[LessonRead])
-def get_lessons(db: Session = Depends(get_db)):
-    """Lista todas as aulas ordenadas por order_index."""
-    return list_lessons(db)
+def get_lessons(
+    academy_id: UUID | None = Query(None, description="Se informado e academia tiver lição visível, retorna só ela."),
+    db: Session = Depends(get_db),
+):
+    """Lista aulas ordenadas por order_index. Com academy_id, retorna apenas a lição visível da academia (se houver)."""
+    return list_lessons(db, academy_id=academy_id)
 
 
 @router.get("/{lesson_id}", response_model=LessonRead)

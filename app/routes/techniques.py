@@ -44,6 +44,7 @@ def technique_create(body: TechniqueCreate, db: Session = Depends(get_db)):
         slug=body.slug or None,
         description=body.description,
         video_url=body.video_url or None,
+        base_points=body.base_points,
     )
 
 

@@ -14,9 +14,18 @@ class UserFormScreen extends StatefulWidget {
 }
 
 class _UserFormScreenState extends State<UserFormScreen> {
+  static const List<MapEntry<String, String>> _graduations = [
+    MapEntry('white', 'Branca'),
+    MapEntry('blue', 'Azul'),
+    MapEntry('purple', 'Roxa'),
+    MapEntry('brown', 'Marrom'),
+    MapEntry('black', 'Preta'),
+  ];
+
   final _api = ApiService();
   final _emailCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  String? _graduation;
   String? _academyId;
   List<Academy> _academies = [];
   bool _loadingAcademies = true;
@@ -29,7 +38,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (widget.user != null) {
       _emailCtrl.text = widget.user!.email;
       _nameCtrl.text = widget.user!.name ?? '';
+      _graduation = widget.user!.graduation?.isNotEmpty == true ? widget.user!.graduation : 'white';
       _academyId = widget.user!.academyId;
+    } else {
+      _graduation = 'white';
     }
     _loadAcademies();
   }
@@ -59,12 +71,18 @@ class _UserFormScreenState extends State<UserFormScreen> {
       setState(() => _error = 'E-mail é obrigatório');
       return;
     }
+    final grad = _graduation?.trim();
+    if (grad == null || grad.isEmpty) {
+      setState(() => _error = 'Graduação (faixa) é obrigatória');
+      return;
+    }
     setState(() { _saving = true; _error = null; });
     try {
       if (widget.user == null) {
         await _api.createUser(
           email: _emailCtrl.text.trim(),
           name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+          graduation: grad,
           academyId: _academyId,
         );
         if (mounted) {
@@ -75,6 +93,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         await _api.updateUser(
           widget.user!.id,
           name: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text.trim(),
+          graduation: grad,
           academyId: _academyId,
         );
         if (mounted) {
@@ -105,6 +124,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
             TextField(controller: _emailCtrl, decoration: const InputDecoration(labelText: 'E-mail'), enabled: !isEdit, keyboardType: TextInputType.emailAddress),
             const SizedBox(height: 16),
             TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Nome')),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _graduation ?? 'white',
+              decoration: const InputDecoration(labelText: 'Graduação (faixa) *'),
+              items: _graduations.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
+              onChanged: (v) => setState(() => _graduation = v ?? 'white'),
+            ),
             const SizedBox(height: 16),
             _loadingAcademies ? const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
                 : DropdownButtonFormField<String>(

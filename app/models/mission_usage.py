@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,6 +41,7 @@ class MissionUsage(Base, UUIDMixin):
         nullable=False,
         comment="before_training | after_training",
     )
+    points_awarded: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="mission_usages")
     mission: Mapped["Mission | None"] = relationship(

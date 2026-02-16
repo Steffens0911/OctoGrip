@@ -2,11 +2,13 @@
 import logging
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models import (
     LessonProgress,
     MissionUsage,
+    TechniqueExecution,
     TrainingFeedback,
     User,
 )
@@ -14,8 +16,15 @@ from app.models import (
 logger = logging.getLogger(__name__)
 
 
-def list_users(db: Session, limit: int = 200) -> list[User]:
-    return db.query(User).order_by(User.email).limit(limit).all()
+def list_users(
+    db: Session,
+    limit: int = 200,
+    academy_id: UUID | None = None,
+) -> list[User]:
+    q = db.query(User).order_by(User.email)
+    if academy_id is not None:
+        q = q.filter(User.academy_id == academy_id)
+    return q.limit(limit).all()
 
 
 def get_user(db: Session, user_id: UUID) -> User | None:
@@ -26,9 +35,16 @@ def create_user(
     db: Session,
     email: str,
     name: str | None = None,
+    graduation: str | None = None,
     academy_id: UUID | None = None,
 ) -> User:
-    user = User(email=email.strip(), name=name.strip() if name else None, academy_id=academy_id)
+    grad = graduation.strip() if graduation and graduation.strip() else None
+    user = User(
+        email=email.strip(),
+        name=name.strip() if name else None,
+        graduation=grad,
+        academy_id=academy_id,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -40,6 +56,7 @@ def update_user(
     db: Session,
     user_id: UUID,
     name: str | None = None,
+    graduation: str | None = None,
     academy_id: UUID | None = None,
 ) -> User | None:
     user = get_user(db, user_id)
@@ -47,6 +64,8 @@ def update_user(
         return None
     if name is not None:
         user.name = name.strip() if name else None
+    if graduation is not None:
+        user.graduation = graduation.strip() if graduation and graduation.strip() else None
     if academy_id is not None:
         user.academy_id = academy_id
     db.commit()
@@ -67,6 +86,12 @@ def delete_user(db: Session, user_id: UUID) -> bool:
     db.query(MissionUsage).filter(MissionUsage.user_id == user_id).delete(
         synchronize_session="fetch"
     )
+    db.query(TechniqueExecution).filter(
+        or_(
+            TechniqueExecution.user_id == user_id,
+            TechniqueExecution.opponent_id == user_id,
+        )
+    ).delete(synchronize_session="fetch")
     db.query(TrainingFeedback).filter(TrainingFeedback.user_id == user_id).delete(
         synchronize_session="fetch"
     )

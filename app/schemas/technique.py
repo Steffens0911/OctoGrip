@@ -10,6 +10,7 @@ class TechniqueRead(BaseModel):
     slug: str
     description: str | None
     video_url: str | None = None
+    base_points: int | None = None
     from_position_id: UUID
     to_position_id: UUID
 
@@ -24,6 +25,7 @@ class TechniqueCreate(BaseModel):
     slug: str | None = Field(None, max_length=255)
     description: str | None = None
     video_url: str | None = Field(None, max_length=512)
+    base_points: int | None = None
     from_position_id: UUID
     to_position_id: UUID
 
@@ -33,5 +35,6 @@ class TechniqueUpdate(BaseModel):
     slug: str | None = Field(None, max_length=255)
     description: str | None = None
     video_url: str | None = Field(None, max_length=512)
+    base_points: int | None = None
     from_position_id: UUID | None = None
     to_position_id: UUID | None = None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +18,7 @@ class Technique(Base, UUIDMixin):
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    base_points: Mapped[int | None] = mapped_column(Integer, nullable=True, default=10)
 
     from_position_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("positions.id", ondelete="RESTRICT"),
@@ -45,6 +46,11 @@ class Technique(Base, UUIDMixin):
     )
     missions: Mapped[list["Mission"]] = relationship(
         "Mission",
+        back_populates="technique",
+        lazy="selectin",
+    )
+    collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
+        "CollectiveGoal",
         back_populates="technique",
         lazy="selectin",
     )

@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import UserNotFoundError
+from app.core.graduation import points_for_graduation
 from app.models import Mission, MissionUsage, User
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ def complete_mission(
 
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
+    # Pontos = faixa do aluno: ×1 branca, ×2 azul, ×3 roxa (marrom=4, preta=5)
+    points_awarded = points_for_graduation(user.graduation)
     now = datetime.now(timezone.utc)
     usage = MissionUsage(
         user_id=user_id,
@@ -60,6 +63,7 @@ def complete_mission(
         opened_at=now,
         completed_at=now,
         usage_type=usage_type,
+        points_awarded=points_awarded,
     )
     db.add(usage)
     db.commit()

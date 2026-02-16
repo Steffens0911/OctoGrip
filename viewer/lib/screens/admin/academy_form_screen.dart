@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -17,7 +18,9 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
   final _api = ApiService();
   final _nameCtrl = TextEditingController();
   List<Technique> _techniques = [];
+  List<Lesson> _lessons = [];
   String? _weeklyTechniqueId;
+  String? _visibleLessonId;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -28,18 +31,27 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
     if (widget.academy != null) {
       _nameCtrl.text = widget.academy!.name;
       _weeklyTechniqueId = widget.academy!.weeklyTechniqueId;
+      _visibleLessonId = widget.academy!.visibleLessonId;
     }
-    _loadTechniques();
+    _load();
   }
 
-  Future<void> _loadTechniques() async {
+  Future<void> _load() async {
+    if (widget.academy == null) {
+      setState(() => _loading = false);
+      return;
+    }
     try {
-      final list = await _api.getTechniques();
+      final results = await Future.wait([_api.getTechniques(), _api.getLessons()]);
       if (mounted) setState(() {
-        _techniques = list;
+        _techniques = results[0] as List<Technique>;
+        _lessons = results[1] as List<Lesson>;
         _loading = false;
         if (_weeklyTechniqueId == null && widget.academy?.weeklyTechniqueId != null) {
           _weeklyTechniqueId = widget.academy!.weeklyTechniqueId;
+        }
+        if (_visibleLessonId == null && widget.academy?.visibleLessonId != null) {
+          _visibleLessonId = widget.academy!.visibleLessonId;
         }
       });
     } catch (_) {
@@ -74,6 +86,8 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           widget.academy!.id,
           name: _nameCtrl.text.trim(),
           weeklyTechniqueId: _weeklyTechniqueId,
+          visibleLessonId: _visibleLessonId,
+          updateVisibleLesson: true,
         );
         if (mounted) {
           final msg = _weeklyTechniqueId != null
@@ -109,7 +123,7 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: _loading
+      body: _loading && isEdit
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -120,24 +134,45 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                     controller: _nameCtrl,
                     decoration: const InputDecoration(labelText: 'Nome'),
                   ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _weeklyTechniqueId,
-                    decoration: const InputDecoration(
-                      labelText: 'Tema da semana (missão do dia)',
-                      hintText: 'Selecione a técnica para todos os alunos',
+                  // Tema da semana e lição visível só ao editar (nova academia = só nome)
+                  if (isEdit) ...[
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _weeklyTechniqueId,
+                      decoration: const InputDecoration(
+                        labelText: 'Tema da semana (missão do dia)',
+                        hintText: 'Selecione a técnica para todos os alunos',
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                        ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                      ],
+                      onChanged: (v) => setState(() => _weeklyTechniqueId = v),
                     ),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                      ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-                    ],
-                    onChanged: (v) => setState(() => _weeklyTechniqueId = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'A técnica selecionada aparecerá como missão do dia para todos os alunos desta academia.',
-                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'A técnica selecionada aparecerá como missão do dia para todos os alunos desta academia.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: _visibleLessonId,
+                      decoration: const InputDecoration(
+                        labelText: 'Lição visível para o aluno',
+                        hintText: 'Selecione a lição em destaque',
+                      ),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+                        ..._lessons.map((l) => DropdownMenuItem(value: l.id, child: Text(l.title))),
+                      ],
+                      onChanged: (v) => setState(() => _visibleLessonId = v),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'A lição selecionada aparecerá em destaque na biblioteca do aluno.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                    ),
+                  ],
                   if (_error != null) ...[
                     const SizedBox(height: 16),
                     Text(_error!, style: const TextStyle(color: Colors.red)),

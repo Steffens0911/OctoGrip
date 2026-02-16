@@ -6,11 +6,12 @@ import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/services/api_service.dart';
 
-/// Lista de lições (GET /lessons). Toque abre a lição e permite concluir.
+/// Lista de lições (GET /lessons). Se [academyId] for passado, a lição visível da academia aparece em destaque.
 class LibraryScreen extends StatefulWidget {
   final String userId;
+  final String? academyId;
 
-  const LibraryScreen({super.key, required this.userId});
+  const LibraryScreen({super.key, required this.userId, this.academyId});
 
   @override
   State<LibraryScreen> createState() => _LibraryScreenState();
@@ -18,7 +19,8 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   final _api = ApiService();
-  List<Lesson> _lessons = [];
+  List<Lesson> _featuredLessons = [];
+  List<Lesson> _allLessons = [];
   bool _loading = true;
   String? _error;
 
@@ -34,9 +36,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _error = null;
     });
     try {
-      final list = await _api.getLessons();
+      List<Lesson> featured = [];
+      if (widget.academyId != null) {
+        featured = await _api.getLessons(academyId: widget.academyId);
+      }
+      final all = await _api.getLessons();
       if (mounted) setState(() {
-        _lessons = list;
+        _featuredLessons = featured;
+        _allLessons = all;
         _loading = false;
       });
     } catch (e) {
@@ -46,6 +53,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       });
     }
   }
+
 
   Widget? _lessonSubtitle(Lesson lesson) {
     final parts = <String>[];
@@ -71,6 +79,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ? lesson.techniqueVideoUrl!
           : (lesson.videoUrl ?? ''),
       userId: widget.userId,
+      academyId: widget.academyId,
       techniqueName: lesson.techniqueName,
       positionName: lesson.positionName,
     );
@@ -102,32 +111,66 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
                 )
-              : _lessons.isEmpty
+              : _allLessons.isEmpty
                   ? Center(
                       child: Text(
                         'Nenhuma lição cadastrada.',
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                     )
-                  : ListView.builder(
+                  : ListView(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _lessons.length,
-                      itemBuilder: (context, i) {
-                        final lesson = _lessons[i];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                              child: const Icon(Icons.menu_book, color: AppTheme.primary),
+                      children: [
+                        if (_featuredLessons.isNotEmpty) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Lição em destaque',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppTheme.primary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
-                            title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: _lessonSubtitle(lesson),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => _openLesson(lesson),
                           ),
-                        );
-                      },
+                          ..._featuredLessons.map((lesson) => Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                    child: const Icon(Icons.star, color: AppTheme.primary),
+                                  ),
+                                  title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                  subtitle: _lessonSubtitle(lesson),
+                                  trailing: const Icon(Icons.chevron_right),
+                                  onTap: () => _openLesson(lesson),
+                                ),
+                              )),
+                          const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Todas as lições',
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ),
+                        ],
+                        ..._allLessons.map((lesson) => Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.menu_book, color: AppTheme.primary),
+                                ),
+                                title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: _lessonSubtitle(lesson),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => _openLesson(lesson),
+                              ),
+                            )),
+                      ],
                     ),
     );
   }

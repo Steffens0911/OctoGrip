@@ -39,6 +39,36 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_selected.clamp(0, _titles.length - 1)]),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: _selected == 0 ? null : () => setState(() => _selected = 0),
+                    child: const Text('Início'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: _selected == 1 ? null : () => setState(() => _selected = 1),
+                    child: const Text('Painel'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.tonal(
+                    onPressed: _selected == 2 ? null : () => setState(() => _selected = 2),
+                    child: const Text('Admin'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       drawer: Drawer(
         child: ListView(

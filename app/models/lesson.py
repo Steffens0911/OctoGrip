@@ -19,6 +19,7 @@ class Lesson(Base, UUIDMixin):
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    base_points: Mapped[int | None] = mapped_column(Integer, nullable=True, default=10)
 
     technique_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("techniques.id", ondelete="RESTRICT"),
@@ -28,6 +29,11 @@ class Lesson(Base, UUIDMixin):
     technique: Mapped["Technique"] = relationship(
         "Technique",
         back_populates="lessons",
+    )
+    missions: Mapped[list["Mission"]] = relationship(
+        "Mission",
+        back_populates="lesson",
+        lazy="selectin",
     )
 
     @property
@@ -53,6 +59,11 @@ class Lesson(Base, UUIDMixin):
     )
     mission_usages: Mapped[list["MissionUsage"]] = relationship(
         "MissionUsage",
+        back_populates="lesson",
+        lazy="selectin",
+    )
+    technique_executions: Mapped[list["TechniqueExecution"]] = relationship(
+        "TechniqueExecution",
         back_populates="lesson",
         lazy="selectin",
     )

@@ -7,6 +7,7 @@ class Mission {
   final String? theme;
   final String? academyId;
   final bool isActive;
+  final int multiplier;
 
   Mission({
     required this.id,
@@ -17,6 +18,7 @@ class Mission {
     this.theme,
     this.academyId,
     this.isActive = true,
+    this.multiplier = 1,
   });
 
   factory Mission.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class Mission {
       theme: json['theme'] as String?,
       academyId: json['academy_id'] as String?,
       isActive: json['is_active'] as bool? ?? true,
+      multiplier: json['multiplier'] as int? ?? 1,
     );
   }
 
@@ -41,5 +44,6 @@ class Mission {
         'theme': theme,
         'academy_id': academyId,
         'is_active': isActive,
+        'multiplier': multiplier,
       };
 }

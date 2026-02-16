@@ -25,6 +25,31 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 010 | academy_weekly_technique | `academies.weekly_technique_id` (Missão 1) |
 | 011 | academy_weekly_techniques_2_and_3 | `academies.weekly_technique_2_id`, `weekly_technique_3_id` |
 | 012 | technique_video_url | `techniques.video_url` (link YouTube) |
+| 013 | user_graduation | `users.graduation` (faixa: white, blue, purple, brown, black) |
+| 014 | technique_executions | Tabela `technique_executions` (gamificação: execução em adversário, confirmação, pontos) |
+| 015 | collective_goals | Tabela `collective_goals` (meta coletiva semanal por técnica) |
+| 016 | mission_lesson_id | `missions.lesson_id` (UUID, nullable, FK para `lessons`); backfill com 1ª lição da técnica |
+| 017 | lesson_technique_base_points | `lessons.base_points`, `techniques.base_points` (Integer, default 10) |
+| 018 | academy_visible_lesson | `academies.visible_lesson_id` (UUID, nullable, FK para `lessons`) |
+| 019 | execution_lesson_id | `technique_executions.lesson_id` (nullable); `mission_id` nullable; CHECK um de mission_id ou lesson_id |
+| 020 | mission_multiplier_academy_multipliers_points | `missions.multiplier`; `academies.weekly_multiplier_1/2/3`; `mission_usages.points_awarded` |
+| 021 | mission_slot_index | `missions.slot_index` (0,1,2); `start_date`/`end_date` opcionais |
+
+---
+
+## Script manual: zerar posições, técnicas e missões
+
+Para limpar todos os dados de posições, técnicas, lições e missões (e tabelas dependentes), execute **uma vez** o script (não é aplicado no startup):
+
+```bash
+docker compose exec -T postgres psql -U jjb -d jjb_db < scripts/zerar_posicoes_tecnicas_missoes.sql
+```
+
+Ou, com o arquivo já no container:
+
+```bash
+docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_posicoes_tecnicas_missoes.sql
+```
 
 ---
 
@@ -32,3 +57,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 
 - **Migration 009:** missions passou de `lesson_id` para `technique_id`; mission_usages passou de `lesson_id` para `mission_id`.
 - **Migrations 010-011:** academias podem ter até 3 técnicas semanais (Missão 1, 2, 3).
+- **Migration 016:** missão passa a referenciar uma lição específica; unifica conteúdo de missão e lição (título, vídeo, etc. vêm da lição quando `lesson_id` está preenchido).
+- **Migrations 017-019:** pontuação base em lição/técnica; lição visível por academia; execução por lição (sem missão), com `mission_id` ou `lesson_id`.
+- **Migration 020:** multiplicador por missão; multiplicadores por slot semanal da academia; pontos em MissionUsage ao concluir missão (multiplicador × faixa).
+- **Migration 021:** missões da academia identificadas por `slot_index` (0, 1, 2); sem dependência de datas. Cada academia cria suas 3 missões; `start_date`/`end_date` opcionais (legado).
