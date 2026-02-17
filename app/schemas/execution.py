@@ -38,7 +38,9 @@ class ExecutionRead(BaseModel):
     confirmed_by: UUID | None = None
     # Dados anexados (opcional)
     executor_name: str | None = None
+    executor_graduation: str | None = None
     opponent_name: str | None = None
+    opponent_graduation: str | None = None
     technique_name: str | None = None
 
     class Config:

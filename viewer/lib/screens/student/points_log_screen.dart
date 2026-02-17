@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Histórico de pontuação do usuário (execuções confirmadas e conclusões de missão).
 class PointsLogScreen extends StatefulWidget {
@@ -36,7 +37,7 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
         _loading = false;
       });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 

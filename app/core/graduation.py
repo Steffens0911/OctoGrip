@@ -16,6 +16,22 @@ GRADUATION_POINTS: dict[str, int] = {
     "black": 5,
 }
 
+GRADUATION_LABELS: dict[str, str] = {
+    "white": "Branca",
+    "blue": "Azul",
+    "purple": "Roxa",
+    "brown": "Marrom",
+    "black": "Preta",
+}
+
+
+def graduation_label(graduation: str | None) -> str | None:
+    """Retorna o label em português da faixa. None se inválida ou vazia."""
+    if not graduation or not graduation.strip():
+        return None
+    return GRADUATION_LABELS.get(graduation.strip().lower())
+
+
 def points_for_graduation(graduation: str | None) -> int:
     """Retorna os pontos base da faixa (1-5). Se inválida ou None, retorna 0."""
     if not graduation or not graduation.strip():

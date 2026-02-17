@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/position_form_screen.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class PositionListScreen extends StatefulWidget {
   const PositionListScreen({super.key});
@@ -21,14 +22,9 @@ class _PositionListScreenState extends State<PositionListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final list = await _api.getPositions();
-      setState(() { _list = list; _loading = false; });
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _loading = false;
-      });
+      if (mounted) setState(() { _list = list; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -40,7 +36,7 @@ class _PositionListScreenState extends State<PositionListScreen> {
 
   Future<void> _openForm([Position? p]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => PositionFormScreen(position: p)));
-    _load();
+    if (mounted) _load();
   }
 
   Future<void> _delete(Position p) async {
@@ -55,10 +51,10 @@ class _PositionListScreenState extends State<PositionListScreen> {
     if (ok != true) return;
     try {
       await _api.deletePosition(p.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posição excluída')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 

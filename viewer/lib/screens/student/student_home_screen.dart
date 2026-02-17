@@ -8,9 +8,9 @@ import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
-import 'package:viewer/screens/student/progress_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Tela inicial da área do aluno: seletor de usuário (MVP), missões da semana e atalhos.
 class StudentHomeScreen extends StatefulWidget {
@@ -44,6 +44,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
+  /// Label da faixa para exibição (nome – faixa).
+  static String _faixaLabel(String? g) {
+    if (g == null || g.isEmpty) return '';
+    switch (g.toLowerCase()) {
+      case 'white': return 'Branca';
+      case 'blue': return 'Azul';
+      case 'purple': return 'Roxa';
+      case 'brown': return 'Marrom';
+      case 'black': return 'Preta';
+      default: return g;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,21 +87,59 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     });
     try {
       final users = await _api.getUsers();
+      if (!mounted) return;
+      final selected = users.isNotEmpty ? users.first : null;
       setState(() {
         _users = users;
-        _selectedUser = users.isNotEmpty ? users.first : null;
+        _selectedUser = selected;
         _loading = false;
       });
-      if (_selectedUser != null) {
-        await _loadMissionWeek();
-        await _loadUserPoints();
-        await _loadCollectiveGoal();
+      if (selected != null) {
+        final level = _levelFromGraduation(selected.graduation);
+        await Future.wait([
+          _loadMissionWeekWith(selected.id, selected.academyId, level),
+          _loadUserPointsWith(selected.id),
+          _loadCollectiveGoalWith(selected.academyId),
+        ]);
+        if (mounted) setState(() {});
       }
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
+    }
+  }
+
+  Future<void> _loadMissionWeekWith(String userId, String? academyId, String level) async {
+    try {
+      final week = await _api.getMissionWeek(userId: userId, academyId: academyId, level: level);
+      if (mounted) setState(() => _missionWeek = week);
+    } catch (e) {
+      if (mounted) setState(() => _missionWeek = null);
+      if (!e.toString().contains('404') && mounted) setState(() => _error = userFacingMessage(e));
+    }
+  }
+
+  Future<void> _loadUserPointsWith(String userId) async {
+    try {
+      final res = await _api.getUserPoints(userId);
+      if (mounted) setState(() => _userPoints = res['points'] as int?);
+    } catch (_) {
+      if (mounted) setState(() => _userPoints = null);
+    }
+  }
+
+  Future<void> _loadCollectiveGoalWith(String? academyId) async {
+    if (academyId == null || academyId.isEmpty) {
+      if (mounted) setState(() => _collectiveGoal = null);
+      return;
+    }
+    try {
+      final res = await _api.getCollectiveGoalCurrent(academyId);
+      if (mounted) setState(() => _collectiveGoal = res);
+    } catch (_) {
+      if (mounted) setState(() => _collectiveGoal = null);
     }
   }
 
@@ -106,7 +157,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     } catch (e) {
       if (mounted) setState(() => _missionWeek = null);
       if (e.toString().contains('404')) return;
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = userFacingMessage(e));
     }
   }
 
@@ -149,7 +200,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   @override
   Widget build(BuildContext context) {
     if (_loading && _users.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
     }
     if (_error != null && _users.isEmpty) {
       return Center(
@@ -168,46 +219,53 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: () async {
-        await _load();
-        if (_selectedUser != null) await _loadMissionWeek();
-      },
+      onRefresh: _load,
+      color: AppTheme.primary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8),
             Text(
-              'Área do aluno',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.textPrimary,
-                    fontWeight: FontWeight.bold,
+              'Olá',
+              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: AppTheme.textPrimaryOf(context),
                   ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
+            Text(
+              'Suas missões e atividades da semana',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+            const SizedBox(height: 24),
             _buildUserSelector(),
             const SizedBox(height: 20),
             if (_collectiveGoal != null) _buildCollectiveGoalCard(),
             if (_collectiveGoal != null) const SizedBox(height: 16),
             if (_selectedUser != null &&
                 (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'Vincule este usuário a uma academia em Administração → Usuários para ver as missões semanais.',
-                          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                        ),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Colors.orange.shade700),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Vincule este usuário a uma academia em Administração → Usuários para ver as missões semanais.',
+                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             if (_selectedUser != null &&
@@ -215,19 +273,31 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               const SizedBox(height: 16),
             if (_missionWeek != null) _buildMissionWeekSection(),
             if (_missionWeek == null && !_loading && _selectedUser != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text(
-                    _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
-                        ? 'Configure a academia do usuário para ver as missões.'
-                        : 'Nenhuma missão da semana no momento.',
-                    style: TextStyle(color: AppTheme.textSecondary),
-                  ),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceOf(context),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.borderOf(context)),
+                ),
+                child: Text(
+                  _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
+                      ? 'Configure a academia do usuário para ver as missões.'
+                      : 'Nenhuma missão da semana no momento.',
+                  style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                 ),
               ),
             if (_missionWeek == null && _selectedUser != null) const SizedBox(height: 16),
-            _buildShortcuts(),
+            if (_selectedUser != null) ...[
+              Text(
+                'Atalhos',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppTheme.textPrimaryOf(context),
+                    ),
+              ),
+              const SizedBox(height: 12),
+              _buildShortcuts(),
+            ],
           ],
         ),
       ),
@@ -235,16 +305,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Widget _buildUserSelector() {
-    return Card(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Usuário (MVP)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                Text('Usuário (MVP)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context))),
                 Text(
                   'Pontos: ${_userPoints ?? '—'}',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary),
@@ -259,20 +335,30 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               ),
               items: _users
-                  .map((u) => DropdownMenuItem(
-                        value: u,
-                        child: Text('${u.name ?? u.email} (${u.email})'),
-                      ))
+                  .map((u) {
+                    final displayName = u.name ?? u.email;
+                    final faixa = _faixaLabel(u.graduation);
+                    return DropdownMenuItem(
+                      value: u,
+                      child: Text(faixa.isNotEmpty ? '$displayName – $faixa' : displayName),
+                    );
+                  })
                   .toList(),
-              onChanged: (u) {
+              onChanged: (u) async {
                 setState(() {
                   _selectedUser = u;
                   _missionWeek = null;
                   _userPoints = null;
                 });
-                _loadMissionWeek();
-                _loadUserPoints();
-                _loadCollectiveGoal();
+                if (u != null) {
+                  final level = _levelFromGraduation(u.graduation);
+                  await Future.wait([
+                    _loadMissionWeekWith(u.id, u.academyId, level),
+                    _loadUserPointsWith(u.id),
+                    _loadCollectiveGoalWith(u.academyId),
+                  ]);
+                  if (mounted) setState(() {});
+                }
               },
             ),
           ],
@@ -288,9 +374,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     final target = g['target_count'] as int? ?? 0;
     final techniqueName = goal?['technique_name'] as String? ?? 'técnica';
     final progress = target > 0 ? (current / target).clamp(0.0, 1.0) : 0.0;
-    return Card(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.primary.withValues(alpha: 0.08),
+            AppTheme.primary.withValues(alpha: 0.04),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -307,11 +406,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 10),
-            LinearProgressIndicator(
-              value: progress,
-              backgroundColor: Colors.grey.shade300,
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primary),
-              minHeight: 8,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: AppTheme.borderOf(context),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                minHeight: 8,
+              ),
             ),
           ],
         ),
@@ -322,56 +424,74 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Widget _buildMissionWeekSection() {
     final entries = _missionWeek!.entries;
     if (entries.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Missões',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppTheme.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            leading: Icon(Icons.flag, color: AppTheme.primary, size: 28),
+            title: Text(
+              'Missões da semana',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: AppTheme.textPrimaryOf(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            children: [
+              for (int i = 0; i < entries.length; i++) ...[
+                if (i > 0) const SizedBox(height: 12),
+                _buildMissionCard(entries[i].periodLabel, entries[i].mission),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        ...entries.map((slot) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildMissionCard(slot.periodLabel, slot.mission),
-            )),
-      ],
+      ),
     );
   }
 
   Widget _buildMissionCard(String periodLabel, MissionToday? m) {
     if (m == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Icon(Icons.flag_outlined, color: Colors.grey.shade400, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      periodLabel,
-                      style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceOf(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderOf(context)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.flag_outlined, color: Colors.grey.shade400, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    periodLabel,
+                    style: TextStyle(
+                      color: AppTheme.textSecondaryOf(context),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Nenhuma missão neste período',
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Nenhuma missão neste período',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -389,65 +509,63 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       estimatedDurationSeconds: m.estimatedDurationSeconds,
       alreadyCompleted: m.alreadyCompleted,
     );
-    return Card(
-      child: InkWell(
-        onTap: () => _openLesson(data),
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderOf(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Icon(Icons.flag, color: AppTheme.primary, size: 28),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      periodLabel,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                  if (m.alreadyCompleted)
-                    Icon(Icons.check_circle, color: Colors.green.shade700, size: 22),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                m.missionTitle.isNotEmpty ? m.missionTitle : m.lessonTitle,
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              if (m.techniqueName.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  m.positionName.isNotEmpty
-                      ? '${m.techniqueName} ${m.positionName}'
-                      : m.techniqueName,
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+              Icon(Icons.flag, color: AppTheme.primary, size: 28),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  periodLabel,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: AppTheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-              ],
-              if (m.estimatedDurationSeconds != null && m.estimatedDurationSeconds! > 0) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '~${m.estimatedDurationSeconds! ~/ 60} min',
-                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-                ),
-              ],
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: () => _openLesson(data),
-                icon: Icon(m.alreadyCompleted ? Icons.visibility : Icons.play_arrow, size: 20),
-                label: Text(m.alreadyCompleted ? 'Ver novamente' : 'Começar'),
               ),
+              if (m.alreadyCompleted)
+                Icon(Icons.check_circle, color: Colors.green.shade700, size: 22),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          Text(
+            m.missionTitle.isNotEmpty ? m.missionTitle : m.lessonTitle,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppTheme.textPrimaryOf(context),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (m.techniqueName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              m.positionName.isNotEmpty
+                  ? '${m.techniqueName} ${m.positionName}'
+                  : m.techniqueName,
+              style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 14),
+            ),
+          ],
+          if (m.estimatedDurationSeconds != null && m.estimatedDurationSeconds! > 0) ...[
+            const SizedBox(height: 4),
+            Text(
+              '~${m.estimatedDurationSeconds! ~/ 60} min',
+              style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: () => _openLesson(data),
+            icon: Icon(m.alreadyCompleted ? Icons.visibility_rounded : Icons.play_arrow_rounded, size: 20),
+            label: Text(m.alreadyCompleted ? 'Ver novamente' : 'Começar'),
+          ),
+        ],
       ),
     );
   }
@@ -458,17 +576,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _ShortcutTile(
-          icon: Icons.trending_up,
-          title: 'Meu progresso',
-          subtitle: 'Todas as missões cumpridas',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProgressScreen(userId: userId),
-            ),
-          ),
-        ),
         _ShortcutTile(
           icon: Icons.list_alt,
           title: 'Log de pontuação',
@@ -515,7 +622,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ReportDifficultyScreen(userId: userId),
+              builder: (context) => ReportDifficultyScreen(
+                userId: userId,
+                academyId: _selectedUser?.academyId,
+              ),
             ),
           ),
         ),
@@ -539,17 +649,58 @@ class _ShortcutTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-          child: Icon(icon, color: AppTheme.primary),
+        child: Material(
+        color: AppTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderOf(context)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: AppTheme.primary, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppTheme.textPrimaryOf(context),
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppTheme.textSecondaryOf(context),
+                              fontSize: 13,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textMutedOf(context)),
+              ],
+            ),
+          ),
         ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
       ),
     );
   }

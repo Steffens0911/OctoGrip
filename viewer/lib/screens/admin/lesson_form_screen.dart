@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class LessonFormScreen extends StatefulWidget {
   final Lesson? lesson;
@@ -19,9 +21,11 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   final _videoCtrl = TextEditingController();
   final _contentCtrl = TextEditingController();
   final _orderCtrl = TextEditingController(text: '0');
+  List<Academy> _academies = [];
   List<Technique> _techniques = [];
+  String? _academyId;
   String? _techniqueId;
-  bool _loadingTechniques = true;
+  bool _loading = true;
   bool _saving = false;
   String? _error;
 
@@ -33,21 +37,37 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
       _videoCtrl.text = widget.lesson!.videoUrl ?? '';
       _contentCtrl.text = widget.lesson!.content ?? '';
       _orderCtrl.text = widget.lesson!.orderIndex.toString();
+      _academyId = widget.lesson!.academyId;
       _techniqueId = widget.lesson!.techniqueId;
     }
-    _loadTechniques();
+    _load();
   }
 
-  Future<void> _loadTechniques() async {
+  Future<void> _load() async {
     try {
-      final list = await _api.getTechniques();
+      final academies = await _api.getAcademies();
+      if (!mounted) return;
       setState(() {
-        _techniques = list;
-        _loadingTechniques = false;
-        if (_techniqueId == null && widget.lesson != null) _techniqueId = widget.lesson!.techniqueId;
+        _academies = academies;
+        _loading = false;
+      });
+      if (_academyId != null) await _loadTechniques(_academyId!);
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadTechniques(String academyId) async {
+    try {
+      final techniques = await _api.getTechniques(academyId: academyId);
+      if (mounted) setState(() {
+        _techniques = techniques;
+        if (_techniqueId != null && !techniques.any((t) => t.id == _techniqueId)) {
+          _techniqueId = null;
+        }
       });
     } catch (_) {
-      setState(() => _loadingTechniques = false);
+      if (mounted) setState(() => _techniques = []);
     }
   }
 
@@ -63,6 +83,10 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   Future<void> _save() async {
     if (_titleCtrl.text.trim().isEmpty) {
       setState(() => _error = 'Título é obrigatório');
+      return;
+    }
+    if (widget.lesson == null && _academyId == null) {
+      setState(() => _error = 'Selecione uma academia');
       return;
     }
     if (_techniqueId == null) {
@@ -94,13 +118,8 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _saving = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 
@@ -116,14 +135,35 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_loadingTechniques) const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
-            else
+            if (_loading) const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
+            else ...[
+              DropdownButtonFormField<String>(
+                value: _academyId,
+                decoration: const InputDecoration(labelText: 'Academia'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('— Selecione academia —')),
+                  ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                ],
+                onChanged: (v) async {
+                  setState(() {
+                    _academyId = v;
+                    _techniques = [];
+                    _techniqueId = null;
+                  });
+                  if (v != null) await _loadTechniques(v);
+                },
+              ),
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _techniqueId,
-                decoration: const InputDecoration(labelText: 'Técnica'),
+                decoration: InputDecoration(
+                  labelText: 'Técnica',
+                  hintText: _academyId == null ? 'Selecione academia primeiro' : null,
+                ),
                 items: _techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
                 onChanged: (v) => setState(() => _techniqueId = v),
               ),
+            ],
             const SizedBox(height: 16),
             TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
             const SizedBox(height: 16),

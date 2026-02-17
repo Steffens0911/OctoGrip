@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
+import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
+import 'package:viewer/screens/admin/position_form_screen.dart';
+import 'package:viewer/screens/admin/technique_form_screen.dart';
 import 'package:viewer/services/academy_service.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Detalhe da academia: missão do dia (técnica), ranking, dificuldades, relatório semanal.
 class AcademyDetailScreen extends StatefulWidget {
@@ -27,6 +32,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   final ApiService _api = ApiService();
   late Academy _academy;
   List<Technique> _techniques = [];
+  List<Position> _positions = [];
   String? _weeklyTechniqueId;
   String? _weeklyTechnique2Id;
   String? _weeklyTechnique3Id;
@@ -37,7 +43,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   late final TextEditingController _mult2Controller;
   late final TextEditingController _mult3Controller;
   bool _loadingTechniques = true;
+  bool _loadingPositions = true;
   bool _savingTheme = false;
+  bool _resetting = false;
   Map<String, dynamic>? _ranking;
   Map<String, dynamic>? _difficulties;
   AcademyWeeklyReport? _weeklyReport;
@@ -58,6 +66,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
     _loadTechniques();
+    _loadPositions();
     _loadRankingAndReport();
   }
 
@@ -71,13 +80,94 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
 
   Future<void> _loadTechniques() async {
     try {
-      final list = await _api.getTechniques();
+      final list = await _api.getTechniques(academyId: _academy.id);
       if (mounted) setState(() {
         _techniques = list;
         _loadingTechniques = false;
       });
     } catch (_) {
       if (mounted) setState(() => _loadingTechniques = false);
+    }
+  }
+
+  Future<void> _loadPositions() async {
+    try {
+      final list = await _api.getPositions(academyId: _academy.id);
+      if (mounted) setState(() {
+        _positions = list;
+        _loadingPositions = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingPositions = false);
+    }
+  }
+
+  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
+
+  Future<void> _openPositionForm([Position? p]) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PositionFormScreen(academyId: _academy.id, position: p),
+      ),
+    );
+    if (mounted) _loadPositions();
+  }
+
+  Future<void> _openTechniqueForm([Technique? t]) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TechniqueFormScreen(academyId: _academy.id, technique: t),
+      ),
+    );
+    if (mounted) {
+      _loadTechniques();
+      _loadPositions();
+    }
+  }
+
+  Future<void> _deletePosition(Position p) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir posição'),
+        content: Text('Excluir "${p.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _api.deletePosition(p.id, academyId: _academy.id);
+      if (mounted) _loadPositions();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posição excluída')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+    }
+  }
+
+  Future<void> _deleteTechnique(Technique t) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir técnica'),
+        content: Text('Excluir "${t.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _api.deleteTechnique(t.id, academyId: _academy.id);
+      if (mounted) _loadTechniques();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnica excluída')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 
@@ -90,15 +180,15 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       final ranking = await _service.getRanking(_academy.id);
       final difficulties = await _service.getDifficulties(_academy.id);
       final report = await _service.getWeeklyReport(_academy.id);
-      setState(() {
+      if (mounted) setState(() {
         _ranking = ranking;
         _difficulties = difficulties;
         _weeklyReport = report;
         _loadingExtra = false;
       });
     } catch (e) {
-      setState(() {
-        _errorExtra = e.toString().replaceFirst('AcademyServiceException: ', '');
+      if (mounted) setState(() {
+        _errorExtra = userFacingMessage(e);
         _loadingExtra = false;
       });
     }
@@ -143,7 +233,50 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (mounted) {
         setState(() => _savingTheme = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(userFacingMessage(e))),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetMissions() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reiniciar missões'),
+        content: const Text(
+          'Reiniciar missões desta academia? Todos poderão fazer as posições novamente. '
+          'A pontuação já conquistada será preservada.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Reiniciar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _resetting = true);
+    try {
+      final result = await _service.resetMissions(_academy.id);
+      if (mounted) {
+        setState(() => _resetting = false);
+        final msg = result['message'] as String? ?? 'Missões reiniciadas. Pontuação preservada.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: AppTheme.primary),
+        );
+        _loadRankingAndReport();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _resetting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Colors.red),
         );
       }
     }
@@ -175,7 +308,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(userFacingMessage(e))),
         );
       }
     }
@@ -244,7 +377,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           } catch (e) {
                             if (mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(e.toString())),
+                                SnackBar(content: Text(userFacingMessage(e))),
                               );
                             }
                           }
@@ -275,13 +408,160 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadRankingAndReport,
+        onRefresh: () async {
+          await _loadRankingAndReport();
+          _loadTechniques();
+          _loadPositions();
+        },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppTheme.screenPadding(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Card(
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                    child: const Icon(Icons.edit_note, color: AppTheme.primary),
+                  ),
+                  title: const Text('Editar pontos dos alunos', style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: const Text('Ajustar pontuação manual dos alunos desta academia'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AcademyPointsEditScreen(
+                        academyId: _academy.id,
+                        academyName: _academy.name,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionTitle(title: 'Posições'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Posições desta academia',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: () => _openPositionForm(),
+                            tooltip: 'Nova posição',
+                          ),
+                        ],
+                      ),
+                      if (_loadingPositions)
+                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+                      else if (_positions.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Nenhuma posição. Adicione posições para criar técnicas.',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _positions.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final p = _positions[i];
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(p.name),
+                              subtitle: p.description != null && p.description!.isNotEmpty ? Text(p.description!, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
+                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openPositionForm(p)),
+                                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deletePosition(p)),
+                              ]),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionTitle(title: 'Técnicas'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Técnicas desta academia',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: () => _openTechniqueForm(),
+                            tooltip: 'Nova técnica',
+                          ),
+                        ],
+                      ),
+                      if (_loadingTechniques)
+                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+                      else if (_techniques.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Nenhuma técnica. Adicione posições primeiro, depois crie técnicas.',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _techniques.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final t = _techniques[i];
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(t.name),
+                              subtitle: Text(
+                                '${_positionName(t.fromPositionId)} → ${_positionName(t.toPositionId)}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openTechniqueForm(t)),
+                                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deleteTechnique(t)),
+                              ]),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -351,10 +631,11 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                               ),
                         ),
                         const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final narrow = AppTheme.isNarrow(context);
+                            final fields = [
+                              TextFormField(
                                 controller: _mult1Controller,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
@@ -366,10 +647,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   if (n != null && n >= 1) setState(() => _weeklyMultiplier1 = n);
                                 },
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
+                              TextFormField(
                                 controller: _mult2Controller,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
@@ -381,10 +659,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   if (n != null && n >= 1) setState(() => _weeklyMultiplier2 = n);
                                 },
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
+                              TextFormField(
                                 controller: _mult3Controller,
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
@@ -396,8 +671,27 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   if (n != null && n >= 1) setState(() => _weeklyMultiplier3 = n);
                                 },
                               ),
-                            ),
-                          ],
+                            ];
+                            if (narrow) {
+                              return Column(
+                                children: fields
+                                    .map((f) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 12),
+                                          child: f,
+                                        ))
+                                    .toList(),
+                              );
+                            }
+                            return Row(
+                              children: [
+                                Expanded(child: fields[0]),
+                                const SizedBox(width: 12),
+                                Expanded(child: fields[1]),
+                                const SizedBox(width: 12),
+                                Expanded(child: fields[2]),
+                              ],
+                            );
+                          },
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -406,19 +700,49 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         ),
                       ],
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _savingTheme ? null : _saveTheme,
-                          icon: _savingTheme
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.save),
-                          label: Text(_savingTheme ? 'Salvando...' : 'Salvar missões semanais'),
-                        ),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final narrow = AppTheme.isNarrow(context);
+                          final saveBtn = FilledButton.icon(
+                            onPressed: _savingTheme ? null : _saveTheme,
+                            icon: _savingTheme
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.save),
+                            label: Text(_savingTheme ? 'Salvando...' : 'Salvar missões semanais'),
+                          );
+                          final resetBtn = OutlinedButton.icon(
+                            onPressed: _resetting ? null : _resetMissions,
+                            icon: _resetting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.refresh),
+                            label: Text(_resetting ? 'Reiniciando...' : 'Reiniciar missões'),
+                          );
+                          if (narrow) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                saveBtn,
+                                const SizedBox(height: 8),
+                                resetBtn,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: saveBtn),
+                              const SizedBox(width: 12),
+                              Expanded(child: resetBtn),
+                            ],
+                          );
+                        },
                       ),
                     ],
                   ),

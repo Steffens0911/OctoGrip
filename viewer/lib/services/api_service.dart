@@ -190,12 +190,12 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<UserModel> updateUser(String id, {String? name, String? graduation, String? academyId}) async {
-    final body = <String, dynamic>{
-      'name': name,
-      'graduation': graduation,
-      'academy_id': academyId,
-    };
+  Future<UserModel> updateUser(String id, {String? name, String? graduation, String? academyId, int? pointsAdjustment}) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (graduation != null) body['graduation'] = graduation;
+    if (academyId != null) body['academy_id'] = academyId;
+    if (pointsAdjustment != null) body['points_adjustment'] = pointsAdjustment;
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/users/$id'),
       headers: {'Content-Type': 'application/json'},
@@ -289,22 +289,26 @@ class ApiService {
   }
 
   // ---------- Techniques ----------
-  Future<List<Technique>> getTechniques() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/techniques')));
+  /// Lista técnicas da academia. [academyId] obrigatório.
+  Future<List<Technique>> getTechniques({required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.get(uri));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
     return raw.map((e) => Technique.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<Technique> getTechnique(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/techniques/$id')));
+  Future<Technique> getTechnique(String id, {required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.get(uri));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Technique.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<Technique> createTechnique({
+    required String academyId,
     required String name,
     String? slug,
     String? description,
@@ -313,6 +317,7 @@ class ApiService {
     required String toPositionId,
   }) async {
     final body = <String, dynamic>{
+      'academy_id': academyId,
       'name': name,
       'from_position_id': fromPositionId,
       'to_position_id': toPositionId,
@@ -332,6 +337,7 @@ class ApiService {
 
   Future<Technique> updateTechnique(
     String id, {
+    required String academyId,
     String? name,
     String? slug,
     String? description,
@@ -346,8 +352,9 @@ class ApiService {
     if (videoUrl != null) body['video_url'] = videoUrl.trim().isEmpty ? null : videoUrl.trim();
     if (fromPositionId != null) body['from_position_id'] = fromPositionId;
     if (toPositionId != null) body['to_position_id'] = toPositionId;
+    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
-      Uri.parse('$baseUrl/techniques/$id'),
+      uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     ));
@@ -356,33 +363,38 @@ class ApiService {
     return Technique.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<void> deleteTechnique(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/techniques/$id')));
+  Future<void> deleteTechnique(String id, {required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.delete(uri));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
   // ---------- Positions ----------
-  Future<List<Position>> getPositions() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/positions')));
+  /// Lista posições da academia. [academyId] obrigatório.
+  Future<List<Position>> getPositions({required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/positions').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.get(uri));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
     return raw.map((e) => Position.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  Future<Position> getPosition(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/positions/$id')));
+  Future<Position> getPosition(String id, {required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.get(uri));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Position.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<Position> createPosition({
+    required String academyId,
     required String name,
     String? slug,
     String? description,
   }) async {
-    final body = <String, dynamic>{'name': name};
+    final body = <String, dynamic>{'academy_id': academyId, 'name': name};
     if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
     if (description != null) body['description'] = description;
     final r = await _req(http.post(
@@ -397,6 +409,7 @@ class ApiService {
 
   Future<Position> updatePosition(
     String id, {
+    required String academyId,
     String? name,
     String? slug,
     String? description,
@@ -405,8 +418,9 @@ class ApiService {
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (description != null) body['description'] = description;
+    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
-      Uri.parse('$baseUrl/positions/$id'),
+      uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     ));
@@ -415,8 +429,9 @@ class ApiService {
     return Position.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<void> deletePosition(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/positions/$id')));
+  Future<void> deletePosition(String id, {required String academyId}) async {
+    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.delete(uri));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 

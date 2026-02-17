@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class PositionFormScreen extends StatefulWidget {
+  final String academyId;
   final Position? position;
 
-  const PositionFormScreen({super.key, this.position});
+  const PositionFormScreen({super.key, required this.academyId, this.position});
 
   @override
   State<PositionFormScreen> createState() => _PositionFormScreenState();
@@ -44,12 +46,14 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
     try {
       if (widget.position == null) {
         await _api.createPosition(
+          academyId: widget.academyId,
           name: _nameCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         );
       } else {
         await _api.updatePosition(
           widget.position!.id,
+          academyId: widget.academyId,
           name: _nameCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
         );
@@ -58,15 +62,8 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _saving = false; });
     } catch (e) {
-      setState(() {
-        _error = e.toString().contains('TimeoutException')
-            ? 'A requisição expirou (15 s). Verifique se a API está rodando em ${_api.baseUrl}'
-            : 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 

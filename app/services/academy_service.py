@@ -6,18 +6,25 @@ from uuid import UUID
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Academy, LessonProgress, Mission, MissionUsage, Position, TrainingFeedback, User
+from app.models import Academy, LessonProgress, Mission, MissionUsage, Position, TechniqueExecution, TrainingFeedback, User
 from app.services.mission_crud_service import upsert_academy_week_missions
 
 logger = logging.getLogger(__name__)
 
 
-def ensure_weekly_missions_if_needed(db: Session, academy_id: UUID) -> None:
+def ensure_weekly_missions_if_needed(
+    db: Session,
+    academy_id: UUID,
+    *,
+    academy: Academy | None = None,
+) -> None:
     """
     Se a academia tem técnicas configuradas, executa upsert para garantir que as missões
     existam (persistem enquanto configuradas).
+    Se academy for passado, evita nova query.
     """
-    academy = db.query(Academy).filter(Academy.id == academy_id).first()
+    if academy is None:
+        academy = db.query(Academy).filter(Academy.id == academy_id).first()
     if not academy:
         return
     if (
@@ -45,6 +52,49 @@ def ensure_weekly_missions_if_needed(db: Session, academy_id: UUID) -> None:
 def get_academy(db: Session, academy_id: UUID) -> Academy | None:
     """Retorna a academia por ID."""
     return db.query(Academy).filter(Academy.id == academy_id).first()
+
+
+def reset_academy_missions(db: Session, academy_id: UUID) -> dict:
+    """
+    Reinicia as missões da academia: limpa MissionUsage e TechniqueExecution
+    das missões desta academia. Antes de excluir, soma os pontos de cada usuário
+    e adiciona em points_adjustment para preservar a pontuação.
+    Retorna {message, users_affected}.
+    """
+    academy = db.query(Academy).filter(Academy.id == academy_id).first()
+    if not academy:
+        return {"message": "Academia não encontrada.", "users_affected": 0}
+
+    mission_ids = [m.id for m in db.query(Mission).filter(Mission.academy_id == academy_id).all()]
+    if not mission_ids:
+        db.commit()
+        return {"message": "Missões reiniciadas. Nenhuma conclusão existente.", "users_affected": 0}
+
+    # Somar pontos por usuário (MissionUsage + TechniqueExecution confirmadas)
+    user_points: dict[UUID, int] = {}
+    for u in db.query(MissionUsage).filter(MissionUsage.mission_id.in_(mission_ids)).all():
+        if u.user_id:
+            pts = u.points_awarded or 0
+            user_points[u.user_id] = user_points.get(u.user_id, 0) + pts
+    for e in db.query(TechniqueExecution).filter(
+        TechniqueExecution.mission_id.in_(mission_ids),
+        TechniqueExecution.status == "confirmed",
+    ).all():
+        pts = e.points_awarded or 0
+        user_points[e.user_id] = user_points.get(e.user_id, 0) + pts
+
+    # Adicionar ao points_adjustment de cada usuário
+    for user_id, pts in user_points.items():
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.points_adjustment = (user.points_adjustment or 0) + pts
+
+    # Excluir MissionUsage e TechniqueExecution
+    db.query(MissionUsage).filter(MissionUsage.mission_id.in_(mission_ids)).delete(synchronize_session="fetch")
+    db.query(TechniqueExecution).filter(TechniqueExecution.mission_id.in_(mission_ids)).delete(synchronize_session="fetch")
+    db.commit()
+    logger.info("reset_academy_missions", extra={"academy_id": str(academy_id), "users_affected": len(user_points)})
+    return {"message": "Missões reiniciadas. Pontuação preservada.", "users_affected": len(user_points)}
 
 
 def list_academies(db: Session, limit: int = 100) -> list[Academy]:

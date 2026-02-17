@@ -10,6 +10,7 @@ class UserRead(BaseModel):
     name: str | None
     graduation: str | None = None
     academy_id: UUID | None = None
+    points_adjustment: int = 0
 
     class Config:
         from_attributes = True
@@ -45,6 +46,7 @@ class UserUpdate(BaseModel):
     name: str | None = Field(None, max_length=255)
     graduation: str | None = Field(None, max_length=32)
     academy_id: UUID | None = None
+    points_adjustment: int | None = None
 
     @field_validator("graduation")
     @classmethod

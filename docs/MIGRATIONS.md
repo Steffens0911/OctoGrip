@@ -34,6 +34,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 019 | execution_lesson_id | `technique_executions.lesson_id` (nullable); `mission_id` nullable; CHECK um de mission_id ou lesson_id |
 | 020 | mission_multiplier_academy_multipliers_points | `missions.multiplier`; `academies.weekly_multiplier_1/2/3`; `mission_usages.points_awarded` |
 | 021 | mission_slot_index | `missions.slot_index` (0,1,2); `start_date`/`end_date` opcionais |
+| 022 | user_points_adjustment | `users.points_adjustment` (ajuste manual de pontos por admin) |
 
 ---
 

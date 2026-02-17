@@ -3,6 +3,7 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Lista de execuções pendentes de confirmação (o usuário é o adversário).
 class PendingConfirmationsScreen extends StatefulWidget {
@@ -33,7 +34,7 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
       final list = await _api.getPendingConfirmations(widget.userId);
       if (mounted) setState(() { _list = list; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -52,8 +53,20 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red.shade700),
+        SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Colors.red.shade700),
       );
+    }
+  }
+
+  static String _faixaLabel(String? g) {
+    if (g == null || g.isEmpty) return '';
+    switch (g.toLowerCase()) {
+      case 'white': return 'Branca';
+      case 'blue': return 'Azul';
+      case 'purple': return 'Roxa';
+      case 'brown': return 'Marrom';
+      case 'black': return 'Preta';
+      default: return g;
     }
   }
 
@@ -75,7 +88,7 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red.shade700),
+        SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Colors.red.shade700),
       );
     }
   }
@@ -146,7 +159,11 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
                           final e = _list[i];
                           final id = e['id'] as String?;
                           final executorName = e['executor_name'] as String? ?? 'Alguém';
+                          final executorGrad = e['executor_graduation'] as String?;
+                          final faixa = _faixaLabel(executorGrad);
+                          final nameWithFaixa = faixa.isNotEmpty ? '$executorName (faixa $faixa)' : executorName;
                           final techniqueName = e['technique_name'] as String? ?? 'a técnica';
+                          final narrow = AppTheme.isNarrow(context);
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             child: Padding(
@@ -155,29 +172,49 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   Text(
-                                    '$executorName disse que aplicou $techniqueName em você.',
+                                    '$nameWithFaixa disse que aplicou $techniqueName em você.',
                                     style: Theme.of(context).textTheme.bodyLarge,
                                   ),
                                   const SizedBox(height: 12),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      TextButton(
-                                        onPressed: id == null ? null : () => _rejectDontRemember(id),
-                                        child: Text('Não lembro', style: TextStyle(color: Colors.grey.shade700)),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      TextButton(
-                                        onPressed: id == null ? null : () => _confirm(id, 'attempted_correctly'),
-                                        child: const Text('Tentativa correta'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      FilledButton(
-                                        onPressed: id == null ? null : () => _confirm(id, 'executed_successfully'),
-                                        child: const Text('Executou com sucesso'),
-                                      ),
-                                    ],
-                                  ),
+                                  if (narrow)
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        FilledButton(
+                                          onPressed: id == null ? null : () => _confirm(id, 'executed_successfully'),
+                                          child: const Text('Executou com sucesso'),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        TextButton(
+                                          onPressed: id == null ? null : () => _confirm(id, 'attempted_correctly'),
+                                          child: const Text('Tentativa correta'),
+                                        ),
+                                        TextButton(
+                                          onPressed: id == null ? null : () => _rejectDontRemember(id),
+                                          child: Text('Não lembro', style: TextStyle(color: Colors.grey.shade700)),
+                                        ),
+                                      ],
+                                    )
+                                  else
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        TextButton(
+                                          onPressed: id == null ? null : () => _rejectDontRemember(id),
+                                          child: Text('Não lembro', style: TextStyle(color: Colors.grey.shade700)),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        TextButton(
+                                          onPressed: id == null ? null : () => _confirm(id, 'attempted_correctly'),
+                                          child: const Text('Tentativa correta'),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        FilledButton(
+                                          onPressed: id == null ? null : () => _confirm(id, 'executed_successfully'),
+                                          child: const Text('Executou com sucesso'),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),

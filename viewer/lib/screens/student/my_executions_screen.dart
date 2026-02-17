@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Lista de execuções criadas pelo usuário (executor). Mostra status e mensagem quando o adversário não aceitou.
 class MyExecutionsScreen extends StatefulWidget {
@@ -31,7 +32,19 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
       final list = await _api.getMyExecutions(widget.userId);
       if (mounted) setState(() { _list = list; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+    }
+  }
+
+  static String _faixaLabel(String? g) {
+    if (g == null || g.isEmpty) return '';
+    switch (g.toLowerCase()) {
+      case 'white': return 'Branca';
+      case 'blue': return 'Azul';
+      case 'purple': return 'Roxa';
+      case 'brown': return 'Marrom';
+      case 'black': return 'Preta';
+      default: return g;
     }
   }
 
@@ -90,6 +103,9 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                           final status = e['status'] as String?;
                           final techniqueName = e['technique_name'] as String? ?? 'técnica';
                           final opponentName = e['opponent_name'] as String? ?? 'Colega';
+                          final opponentGrad = e['opponent_graduation'] as String?;
+                          final faixa = _faixaLabel(opponentGrad);
+                          final opponentWithFaixa = faixa.isNotEmpty ? '$opponentName (faixa $faixa)' : opponentName;
                           final isRejectedDontRemember = status == 'rejected_dont_remember';
                           return Card(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -107,7 +123,7 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Em $opponentName',
+                                    'Em $opponentWithFaixa',
                                     style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                                   ),
                                   const SizedBox(height: 8),
@@ -143,7 +159,7 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                   if (isRejectedDontRemember) ...[
                                     const SizedBox(height: 8),
                                     Text(
-                                      '$opponentName não aceitou a posição atribuída a você.',
+                                      '$opponentWithFaixa não aceitou a posição atribuída a você.',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: Colors.orange.shade800,

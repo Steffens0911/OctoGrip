@@ -1,6 +1,7 @@
 """Geração de slug a partir de texto e garantia de unicidade."""
 import re
 from typing import TypeVar
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -15,11 +16,24 @@ def make_slug(text: str, fallback: str = "item") -> str:
     return slug or fallback
 
 
-def ensure_unique_slug(db: Session, model_class: type[M], slug_attr: str, base_slug: str) -> str:
-    """Retorna base_slug ou base_slug-2, base_slug-3, ... até ser único na tabela."""
+def ensure_unique_slug(
+    db: Session,
+    model_class: type[M],
+    slug_attr: str,
+    base_slug: str,
+    academy_id: UUID | None = None,
+    academy_attr: str = "academy_id",
+) -> str:
+    """Retorna base_slug ou base_slug-2, base_slug-3, ... até ser único.
+    Se academy_id informado, unicidade é por (academy_id, slug); senão por slug apenas."""
     slug = base_slug
     n = 2
-    while db.query(model_class).filter(getattr(model_class, slug_attr) == slug).first() is not None:
+    while True:
+        q = db.query(model_class).filter(getattr(model_class, slug_attr) == slug)
+        if academy_id is not None:
+            q = q.filter(getattr(model_class, academy_attr) == academy_id)
+        if q.first() is None:
+            break
         slug = f"{base_slug}-{n}"
         n += 1
     return slug

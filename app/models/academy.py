@@ -90,3 +90,14 @@ class Academy(Base, UUIDMixin):
         back_populates="academy",
         lazy="selectin",
     )
+    positions: Mapped[list["Position"]] = relationship(
+        "Position",
+        back_populates="academy",
+        lazy="selectin",
+    )
+    techniques: Mapped[list["Technique"]] = relationship(
+        "Technique",
+        back_populates="academy",
+        foreign_keys="Technique.academy_id",
+        lazy="selectin",
+    )

@@ -10,9 +10,12 @@ from app.models import Position
 logger = logging.getLogger(__name__)
 
 
-def list_positions(db: Session, limit: int = 200) -> list[Position]:
-    """Lista posições ordenadas por nome."""
-    return db.query(Position).order_by(Position.name).limit(limit).all()
+def list_positions(db: Session, academy_id: UUID | None = None, limit: int = 200) -> list[Position]:
+    """Lista posições ordenadas por nome. Se academy_id informado, filtra por academia."""
+    q = db.query(Position)
+    if academy_id is not None:
+        q = q.filter(Position.academy_id == academy_id)
+    return q.order_by(Position.name).limit(limit).all()
 
 
 def get_position(db: Session, position_id: UUID) -> Position | None:
@@ -22,17 +25,19 @@ def get_position(db: Session, position_id: UUID) -> Position | None:
 
 def create_position(
     db: Session,
+    academy_id: UUID,
     name: str,
     slug: str | None = None,
     description: str | None = None,
 ) -> Position:
-    """Cria uma posição. Slug gerado automaticamente a partir do nome se omitido."""
+    """Cria uma posição na academia. Slug gerado automaticamente a partir do nome se omitido."""
     if not slug or not str(slug).strip():
         base = make_slug(name, fallback="posicao")
-        slug = ensure_unique_slug(db, Position, "slug", base)
+        slug = ensure_unique_slug(db, Position, "slug", base, academy_id=academy_id)
     else:
         slug = slug.strip()
     position = Position(
+        academy_id=academy_id,
         name=name.strip(),
         slug=slug,
         description=description.strip() if description else None,

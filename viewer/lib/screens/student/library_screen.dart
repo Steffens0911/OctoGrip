@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
+import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -49,7 +50,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
     }
   }

@@ -3,11 +3,13 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class TechniqueFormScreen extends StatefulWidget {
+  final String academyId;
   final Technique? technique;
 
-  const TechniqueFormScreen({super.key, this.technique});
+  const TechniqueFormScreen({super.key, required this.academyId, this.technique});
 
   @override
   State<TechniqueFormScreen> createState() => _TechniqueFormScreenState();
@@ -40,15 +42,15 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
 
   Future<void> _loadPositions() async {
     try {
-      final list = await _api.getPositions();
-      setState(() {
+      final list = await _api.getPositions(academyId: widget.academyId);
+      if (mounted) setState(() {
         _positions = list;
         _loadingPositions = false;
         if (_fromPositionId == null && widget.technique != null) _fromPositionId = widget.technique!.fromPositionId;
         if (_toPositionId == null && widget.technique != null) _toPositionId = widget.technique!.toPositionId;
       });
     } catch (_) {
-      setState(() => _loadingPositions = false);
+      if (mounted) setState(() => _loadingPositions = false);
     }
   }
 
@@ -73,6 +75,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
     try {
       if (widget.technique == null) {
         await _api.createTechnique(
+          academyId: widget.academyId,
           name: _nameCtrl.text.trim(),
           videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
@@ -82,6 +85,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
       } else {
         await _api.updateTechnique(
           widget.technique!.id,
+          academyId: widget.academyId,
           name: _nameCtrl.text.trim(),
           videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
           description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
@@ -93,13 +97,8 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _saving = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 

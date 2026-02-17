@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission.dart';
-import 'package:viewer/models/position.dart';
-import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/mission_form_screen.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -16,28 +15,19 @@ class MissionListScreen extends StatefulWidget {
 class _MissionListScreenState extends State<MissionListScreen> {
   final _api = ApiService();
   List<Mission> _list = [];
-  List<Technique> _techniques = [];
-  List<Position> _positions = [];
   bool _loading = true;
   String? _error;
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getMissions(), _api.getTechniques(), _api.getPositions()]);
-      setState(() {
-        _list = results[0] as List<Mission>;
-        _techniques = results[1] as List<Technique>;
-        _positions = results[2] as List<Position>;
+      final list = await _api.getMissions();
+      if (mounted) setState(() {
+        _list = list;
         _loading = false;
       });
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _loading = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -59,7 +49,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
 
   Future<void> _openForm([Mission? m]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => MissionFormScreen(mission: m)));
-    _load();
+    if (mounted) _load();
   }
 
   Future<void> _delete(Mission m) async {
@@ -74,10 +64,10 @@ class _MissionListScreenState extends State<MissionListScreen> {
     if (ok != true) return;
     try {
       await _api.deleteMission(m.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Missão excluída')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 
@@ -98,7 +88,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
-                      title: Text(_techniqueWithPosition(m.techniqueId)),
+                      title: Text(_missionTitle(m)),
                       subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),

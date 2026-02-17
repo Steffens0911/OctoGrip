@@ -76,6 +76,7 @@ def user_update(user_id: UUID, body: UserUpdate, db: Session = Depends(get_db)):
         name=payload.get("name"),
         graduation=payload.get("graduation"),
         academy_id=payload.get("academy_id"),
+        points_adjustment=payload.get("points_adjustment"),
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")

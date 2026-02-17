@@ -105,6 +105,7 @@ def _mission_to_today_response(
     db: Session | None = None,
     user_id: UUID | None = None,
     display_multiplier: int | None = None,
+    already_completed_override: bool | None = None,
 ) -> MissionTodayResponse:
     """Monta MissionTodayResponse. Se mission.lesson existe, usa a lição (missão = mesma coisa que a lição)."""
     technique = mission.technique
@@ -134,28 +135,31 @@ def _mission_to_today_response(
             first_lesson = min(technique.lessons, key=lambda L: L.order_index)
             lesson_id = first_lesson.id
 
-    already_completed = False
-    if db is not None and user_id is not None:
-        has_usage = (
-            db.query(MissionUsage)
-            .filter(
-                MissionUsage.user_id == user_id,
-                MissionUsage.mission_id == mission.id,
+    if already_completed_override is not None:
+        already_completed = already_completed_override
+    else:
+        already_completed = False
+        if db is not None and user_id is not None:
+            has_usage = (
+                db.query(MissionUsage)
+                .filter(
+                    MissionUsage.user_id == user_id,
+                    MissionUsage.mission_id == mission.id,
+                )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
-        has_confirmed_execution = (
-            db.query(TechniqueExecution)
-            .filter(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.mission_id == mission.id,
-                TechniqueExecution.status == "confirmed",
+            has_confirmed_execution = (
+                db.query(TechniqueExecution)
+                .filter(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.mission_id == mission.id,
+                    TechniqueExecution.status == "confirmed",
+                )
+                .first()
+                is not None
             )
-            .first()
-            is not None
-        )
-        already_completed = has_usage or has_confirmed_execution
+            already_completed = has_usage or has_confirmed_execution
     mult = display_multiplier if display_multiplier is not None else (getattr(mission, "multiplier", 1) or 1)
     return MissionTodayResponse(
         mission_id=mission.id,
@@ -263,15 +267,17 @@ def get_mission_week_response(
     """
     from app.models import User
 
-    user = db.query(User).filter(User.id == user_id).first() if user_id else None
-    resolved_academy_id = academy_id
-    if resolved_academy_id is None and user and user.academy_id is not None:
-        resolved_academy_id = user.academy_id
+    user = None
+    if user_id:
+        user = (
+            db.query(User)
+            .options(joinedload(User.academy).joinedload(Academy.weekly_technique))
+            .filter(User.id == user_id)
+            .first()
+        )
+    resolved_academy_id = academy_id or (user.academy_id if user else None)
 
     grad_mult = max(1, points_for_graduation(user.graduation) if user else 1)
-
-    if resolved_academy_id is not None:
-        ensure_weekly_missions_if_needed(db, resolved_academy_id)
 
     level_n = (level or "beginner").lower().strip()
     if level_n not in ("beginner", "intermediate"):
@@ -288,22 +294,78 @@ def get_mission_week_response(
     entries: list[MissionWeekSlotResponse] = []
     period_labels = ["Missão 1", "Missão 2", "Missão 3"]
 
-    for slot_idx, period_label in enumerate(period_labels):
-        mission = None
-        if resolved_academy_id is not None:
-            mission = (
+    missions_by_slot: dict[int, Mission] = {}
+    academy = None
+    if resolved_academy_id is not None:
+        if user and user.academy_id == resolved_academy_id and user.academy is not None:
+            academy = user.academy
+        else:
+            academy = (
+                db.query(Academy)
+                .filter(Academy.id == resolved_academy_id)
+                .options(joinedload(Academy.weekly_technique))
+                .first()
+            )
+        all_missions = (
+            db.query(Mission)
+            .filter(
+                Mission.is_active.is_(True),
+                Mission.academy_id == resolved_academy_id,
+                Mission.level == level_n,
+                Mission.slot_index.in_((0, 1, 2)),
+            )
+            .options(*options)
+            .all()
+        )
+        need_ensure = (
+            academy is not None
+            and (academy.weekly_technique_id or academy.weekly_technique_2_id or academy.weekly_technique_3_id)
+            and sum(1 for m in all_missions if m.technique) < 3
+        )
+        if need_ensure:
+            ensure_weekly_missions_if_needed(db, resolved_academy_id, academy=academy)
+            all_missions = (
                 db.query(Mission)
                 .filter(
                     Mission.is_active.is_(True),
                     Mission.academy_id == resolved_academy_id,
                     Mission.level == level_n,
-                    Mission.slot_index == slot_idx,
+                    Mission.slot_index.in_((0, 1, 2)),
                 )
                 .options(*options)
-                .first()
+                .all()
             )
+        missions_by_slot = {m.slot_index: m for m in all_missions if m.technique}
+
+    completed_mission_ids: set[UUID] = set()
+    if user_id is not None and missions_by_slot:
+        mission_ids = [m.id for m in missions_by_slot.values()]
+        usages = (
+            db.query(MissionUsage.mission_id)
+            .filter(
+                MissionUsage.user_id == user_id,
+                MissionUsage.mission_id.in_(mission_ids),
+            )
+            .all()
+        )
+        for (mid,) in usages:
+            completed_mission_ids.add(mid)
+        execs = (
+            db.query(TechniqueExecution.mission_id)
+            .filter(
+                TechniqueExecution.user_id == user_id,
+                TechniqueExecution.mission_id.in_(mission_ids),
+                TechniqueExecution.status == "confirmed",
+            )
+            .all()
+        )
+        for (mid,) in execs:
+            completed_mission_ids.add(mid)
+
+    for slot_idx, period_label in enumerate(period_labels):
+        mission = missions_by_slot.get(slot_idx)
         if mission and mission.technique:
-            logger.info(
+            logger.debug(
                 "get_mission_week_response slot_found",
                 extra={
                     "slot": slot_idx + 1,
@@ -313,7 +375,6 @@ def get_mission_week_response(
                 },
             )
             weekly_theme = mission.theme
-            academy = db.query(Academy).filter(Academy.id == resolved_academy_id).first()
             if academy:
                 if slot_idx == 0 and academy.weekly_technique and academy.weekly_technique.name:
                     weekly_theme = academy.weekly_technique.name
@@ -322,19 +383,20 @@ def get_mission_week_response(
             payload = _mission_to_today_response(
                 mission,
                 weekly_theme=weekly_theme,
-                db=db,
+                db=None,
                 user_id=user_id,
                 display_multiplier=grad_mult,
+                already_completed_override=mission.id in completed_mission_ids,
             )
             entries.append(MissionWeekSlotResponse(period_label=period_label, mission=payload))
         else:
-            logger.info(
+            logger.debug(
                 "get_mission_week_response slot_empty",
                 extra={"slot": slot_idx + 1, "period_label": period_label},
             )
             entries.append(MissionWeekSlotResponse(period_label=period_label, mission=None))
     missions_count = sum(1 for e in entries if e.mission is not None)
-    logger.info(
+    logger.debug(
         "get_mission_week_response",
         extra={
             "user_id": str(user_id) if user_id else None,

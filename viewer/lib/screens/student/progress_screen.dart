@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Todas as missões concluídas do usuário (GET /mission_usages/history).
 class ProgressScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
     }
   }

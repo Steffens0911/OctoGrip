@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
-import 'package:viewer/models/position.dart';
-import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/lesson_form_screen.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class LessonListScreen extends StatefulWidget {
   const LessonListScreen({super.key});
@@ -16,28 +15,19 @@ class LessonListScreen extends StatefulWidget {
 class _LessonListScreenState extends State<LessonListScreen> {
   final _api = ApiService();
   List<Lesson> _list = [];
-  List<Technique> _techniques = [];
-  List<Position> _positions = [];
   bool _loading = true;
   String? _error;
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getLessons(), _api.getTechniques(), _api.getPositions()]);
-      setState(() {
-        _list = results[0] as List<Lesson>;
-        _techniques = results[1] as List<Technique>;
-        _positions = results[2] as List<Position>;
+      final list = await _api.getLessons();
+      if (mounted) setState(() {
+        _list = list;
         _loading = false;
       });
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _loading = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -47,28 +37,18 @@ class _LessonListScreenState extends State<LessonListScreen> {
     _load();
   }
 
-  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
-
-  String _techniqueWithPosition(String techniqueId) {
-    final t = _techniques.where((x) => x.id == techniqueId).firstOrNull;
-    if (t == null) return techniqueId;
-    final from = _positionName(t.fromPositionId);
-    final to = _positionName(t.toPositionId);
-    return '${t.name} da posição $from → para posição $to';
-  }
-
   String _lessonTechniqueDisplay(Lesson l) {
     if (l.techniqueName != null && l.techniqueName!.isNotEmpty) {
       return l.positionName != null && l.positionName!.isNotEmpty
           ? '${l.techniqueName!} ${l.positionName}'
           : l.techniqueName!;
     }
-    return _techniqueWithPosition(l.techniqueId);
+    return l.techniqueId;
   }
 
   Future<void> _openForm([Lesson? l]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => LessonFormScreen(lesson: l)));
-    _load();
+    if (mounted) _load();
   }
 
   Future<void> _delete(Lesson l) async {
@@ -83,10 +63,10 @@ class _LessonListScreenState extends State<LessonListScreen> {
     if (ok != true) return;
     try {
       await _api.deleteLesson(l.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lição excluída')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 

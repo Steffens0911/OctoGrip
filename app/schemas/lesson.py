@@ -8,6 +8,7 @@ class LessonRead(BaseModel):
     """Schema de leitura para Lesson."""
 
     id: UUID
+    academy_id: UUID | None = None
     title: str
     slug: str
     video_url: str | None

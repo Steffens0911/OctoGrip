@@ -4,6 +4,7 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class AcademyFormScreen extends StatefulWidget {
   final Academy? academy;
@@ -42,7 +43,10 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
       return;
     }
     try {
-      final results = await Future.wait([_api.getTechniques(), _api.getLessons()]);
+      final results = await Future.wait([
+        _api.getTechniques(academyId: widget.academy!.id),
+        _api.getLessons(academyId: widget.academy!.id),
+      ]);
       if (mounted) setState(() {
         _techniques = results[0] as List<Technique>;
         _lessons = results[1] as List<Lesson>;
@@ -97,18 +101,8 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           Navigator.pop(context);
         }
       }
-    } on ApiException catch (e) {
-      setState(() {
-        _error = e.message;
-        _saving = false;
-      });
     } catch (e) {
-      setState(() {
-        _error = e.toString().contains('TimeoutException')
-            ? 'A requisição expirou (15 s). Verifique se a API está em ${_api.baseUrl}'
-            : 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 

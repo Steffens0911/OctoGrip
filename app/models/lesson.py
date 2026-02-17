@@ -10,12 +10,17 @@ from app.models.base import UUIDMixin
 
 
 class Lesson(Base, UUIDMixin):
-    """Aula vinculada a uma técnica (conteúdo de estudo)."""
+    """Aula vinculada a uma técnica (conteúdo de estudo). academy_id derivado da técnica."""
 
     __tablename__ = "lessons"
 
+    academy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("academies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     content: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -29,6 +34,11 @@ class Lesson(Base, UUIDMixin):
     technique: Mapped["Technique"] = relationship(
         "Technique",
         back_populates="lessons",
+    )
+    academy: Mapped["Academy | None"] = relationship(
+        "Academy",
+        foreign_keys=[academy_id],
+        lazy="selectin",
     )
     missions: Mapped[list["Mission"]] = relationship(
         "Mission",

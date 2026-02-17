@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Reportar dificuldade: escolher posição e opcional observação, POST /training_feedback.
 class ReportDifficultyScreen extends StatefulWidget {
   final String userId;
+  final String? academyId;
 
-  const ReportDifficultyScreen({super.key, required this.userId});
+  const ReportDifficultyScreen({super.key, required this.userId, this.academyId});
 
   @override
   State<ReportDifficultyScreen> createState() => _ReportDifficultyScreenState();
@@ -41,8 +43,15 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
       _loading = true;
       _error = null;
     });
+    if (widget.academyId == null || widget.academyId!.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'Você precisa estar vinculado a uma academia para reportar dificuldade.';
+      });
+      return;
+    }
     try {
-      final list = await _api.getPositions();
+      final list = await _api.getPositions(academyId: widget.academyId!);
       if (mounted) setState(() {
         _positions = list;
         _loading = false;
@@ -50,7 +59,7 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
     }
   }
@@ -77,7 +86,7 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
     }
   }

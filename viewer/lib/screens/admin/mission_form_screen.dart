@@ -4,6 +4,7 @@ import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class MissionFormScreen extends StatefulWidget {
   final Mission? mission;
@@ -55,15 +56,30 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
 
   Future<void> _load() async {
     try {
-      final results = await Future.wait([_api.getTechniques(), _api.getAcademies()]);
+      final academies = await _api.getAcademies();
+      if (!mounted) return;
       setState(() {
-        _techniques = results[0] as List<Technique>;
-        _academies = results[1] as List<Academy>;
+        _academies = academies;
         _loading = false;
         if (_techniqueId == null && widget.mission != null) _techniqueId = widget.mission!.techniqueId;
       });
+      if (_academyId != null) await _loadTechniques(_academyId!);
     } catch (_) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadTechniques(String academyId) async {
+    try {
+      final techniques = await _api.getTechniques(academyId: academyId);
+      if (mounted) setState(() {
+        _techniques = techniques;
+        if (_techniqueId != null && !techniques.any((t) => t.id == _techniqueId)) {
+          _techniqueId = null;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _techniques = []);
     }
   }
 
@@ -117,13 +133,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _saving = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 
@@ -142,8 +153,28 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
+                    value: _academyId,
+                    decoration: const InputDecoration(labelText: 'Academia (para escolher técnica)'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Global')),
+                      ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                    ],
+                    onChanged: (v) async {
+                      setState(() {
+                        _academyId = v;
+                        _techniques = [];
+                        _techniqueId = null;
+                      });
+                      if (v != null) await _loadTechniques(v);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
                     value: _techniqueId,
-                    decoration: const InputDecoration(labelText: 'Técnica'),
+                    decoration: InputDecoration(
+                      labelText: 'Técnica',
+                      hintText: _academyId == null ? 'Selecione academia primeiro' : null,
+                    ),
                     items: _techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
                     onChanged: (v) => setState(() => _techniqueId = v),
                   ),
@@ -179,16 +210,6 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                       hintText: '1',
                       helperText: 'Pontos ao concluir = multiplicador × faixa do usuário',
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _academyId,
-                    decoration: const InputDecoration(labelText: 'Academia (opcional)'),
-                    items: [
-                      const DropdownMenuItem(value: null, child: Text('Global')),
-                      ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
-                    ],
-                    onChanged: (v) => setState(() => _academyId = v),
                   ),
                   if (_error != null) ...[const SizedBox(height: 16), Text(_error!, style: const TextStyle(color: Colors.red))],
                   const SizedBox(height: 24),

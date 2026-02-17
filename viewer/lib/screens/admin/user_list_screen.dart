@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -21,14 +22,9 @@ class _UserListScreenState extends State<UserListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final list = await _api.getUsers();
-      setState(() { _list = list; _loading = false; });
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _loading = false;
-      });
+      if (mounted) setState(() { _list = list; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -40,7 +36,7 @@ class _UserListScreenState extends State<UserListScreen> {
 
   Future<void> _openForm([models.UserModel? user]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => UserFormScreen(user: user)));
-    _load();
+    if (mounted) _load();
   }
 
   Future<void> _delete(models.UserModel u) async {
@@ -55,10 +51,10 @@ class _UserListScreenState extends State<UserListScreen> {
     if (ok != true) return;
     try {
       await _api.deleteUser(u.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usuário excluído')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 
@@ -72,7 +68,7 @@ class _UserListScreenState extends State<UserListScreen> {
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.all(AppTheme.screenPadding(context)),
                 itemCount: _list.length,
                 itemBuilder: (context, i) {
                   final u = _list[i];

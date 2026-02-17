@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class UserFormScreen extends StatefulWidget {
   final models.UserModel? user;
@@ -49,13 +50,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
   Future<void> _loadAcademies() async {
     try {
       final list = await _api.getAcademies();
-      setState(() {
+      if (mounted) setState(() {
         _academies = list;
         _loadingAcademies = false;
         if (_academyId == null && widget.user?.academyId != null) _academyId = widget.user!.academyId;
       });
     } catch (_) {
-      setState(() => _loadingAcademies = false);
+      if (mounted) setState(() => _loadingAcademies = false);
     }
   }
 
@@ -101,13 +102,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
           Navigator.pop(context);
         }
       }
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _saving = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _saving = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
     }
   }
 

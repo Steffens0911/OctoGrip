@@ -5,14 +5,17 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.core.slug import ensure_unique_slug, make_slug
-from app.models import Technique
+from app.models import Position, Technique
 
 logger = logging.getLogger(__name__)
 
 
-def list_techniques(db: Session, limit: int = 200) -> list[Technique]:
-    """Lista técnicas ordenadas por nome."""
-    return db.query(Technique).order_by(Technique.name).limit(limit).all()
+def list_techniques(db: Session, academy_id: UUID | None = None, limit: int = 200) -> list[Technique]:
+    """Lista técnicas ordenadas por nome. Se academy_id informado, filtra por academia."""
+    q = db.query(Technique)
+    if academy_id is not None:
+        q = q.filter(Technique.academy_id == academy_id)
+    return q.order_by(Technique.name).limit(limit).all()
 
 
 def get_technique(db: Session, technique_id: UUID) -> Technique | None:
@@ -22,6 +25,7 @@ def get_technique(db: Session, technique_id: UUID) -> Technique | None:
 
 def create_technique(
     db: Session,
+    academy_id: UUID,
     name: str,
     from_position_id: UUID,
     to_position_id: UUID,
@@ -30,13 +34,20 @@ def create_technique(
     video_url: str | None = None,
     base_points: int | None = None,
 ) -> Technique:
-    """Cria uma técnica. Slug gerado automaticamente a partir do nome se omitido."""
+    """Cria uma técnica na academia. from_position e to_position devem pertencer à mesma academia."""
+    from_pos = db.query(Position).filter(Position.id == from_position_id).first()
+    to_pos = db.query(Position).filter(Position.id == to_position_id).first()
+    if not from_pos or from_pos.academy_id != academy_id:
+        raise ValueError("from_position_id deve ser uma posição desta academia.")
+    if not to_pos or to_pos.academy_id != academy_id:
+        raise ValueError("to_position_id deve ser uma posição desta academia.")
     if not slug or not str(slug).strip():
         base = make_slug(name, fallback="tecnica")
-        slug = ensure_unique_slug(db, Technique, "slug", base)
+        slug = ensure_unique_slug(db, Technique, "slug", base, academy_id=academy_id)
     else:
         slug = slug.strip()
     technique = Technique(
+        academy_id=academy_id,
         name=name.strip(),
         slug=slug,
         from_position_id=from_position_id,
@@ -78,8 +89,14 @@ def update_technique(
     if base_points is not None:
         technique.base_points = base_points
     if from_position_id is not None:
+        from_pos = db.query(Position).filter(Position.id == from_position_id).first()
+        if not from_pos or from_pos.academy_id != technique.academy_id:
+            raise ValueError("from_position_id deve ser uma posição desta academia.")
         technique.from_position_id = from_position_id
     if to_position_id is not None:
+        to_pos = db.query(Position).filter(Position.id == to_position_id).first()
+        if not to_pos or to_pos.academy_id != technique.academy_id:
+            raise ValueError("to_position_id deve ser uma posição desta academia.")
         technique.to_position_id = to_position_id
     db.commit()
     db.refresh(technique)

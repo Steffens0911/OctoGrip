@@ -5,6 +5,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
 /// Tela de visualização de uma lição (missão do dia ou biblioteca). Botão Concluir registra no backend.
@@ -179,7 +180,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      setState(() { _completing = false; _error = e.toString(); });
+      setState(() { _completing = false; _error = userFacingMessage(e); });
     }
   }
 
@@ -204,7 +205,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         await _completeLessonAsFallback();
         return;
       }
-      setState(() { _completing = false; _error = e.toString(); });
+      setState(() { _completing = false; _error = userFacingMessage(e); });
     }
   }
 
@@ -229,10 +230,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       }
       final msg = e.toString();
       final is409 = (e is ApiException && e.statusCode == 409) || msg.toLowerCase().contains('já foi concluída');
-      setState(() {
+      if (mounted) setState(() {
         _completing = false;
         if (is409) _alreadyCompleted = true;
-        _error = is409 ? null : msg;
+        _error = is409 ? null : userFacingMessage(e);
       });
     }
   }
@@ -266,7 +267,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       if (!mounted) return;
       setState(() {
         _completing = false;
-        _error = e.toString();
+        _error = userFacingMessage(e);
       });
     }
   }
@@ -321,10 +322,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       final msg = e.toString();
       final is409 = (e is ApiException && e.statusCode == 409) ||
           msg.toLowerCase().contains('já foi concluída');
-      setState(() {
+      if (mounted) setState(() {
         _completing = false;
         if (is409) _alreadyCompleted = true;
-        _error = is409 ? null : msg;
+        _error = is409 ? null : userFacingMessage(e);
       });
     }
   }
@@ -335,7 +336,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Lição')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

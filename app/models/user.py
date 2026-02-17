@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -16,6 +16,7 @@ class User(Base, UUIDMixin):
 
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    points_adjustment: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graduation: Mapped[str | None] = mapped_column(
         String(32),
         nullable=True,

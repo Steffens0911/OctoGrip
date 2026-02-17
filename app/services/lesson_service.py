@@ -76,6 +76,7 @@ def create_lesson(db: Session, data: LessonCreate) -> Lesson:
     else:
         slug = data.slug.strip()
     lesson = Lesson(
+        academy_id=technique.academy_id,
         technique_id=data.technique_id,
         title=data.title,
         slug=slug,
@@ -101,6 +102,7 @@ def update_lesson(db: Session, lesson_id: UUID, data: LessonUpdate) -> Lesson:
             logger.info("update_lesson technique_not_found", extra={"technique_id": str(payload["technique_id"])})
             raise TechniqueNotFoundError("Técnica não encontrada.")
         lesson.technique_id = payload["technique_id"]
+        lesson.academy_id = tech.academy_id
     for key in ("title", "slug", "video_url", "content", "order_index", "base_points"):
         if key in payload:
             setattr(lesson, key, payload[key])

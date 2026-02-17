@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 class TechniqueRead(BaseModel):
     id: UUID
+    academy_id: UUID
     name: str
     slug: str
     description: str | None
@@ -19,8 +20,9 @@ class TechniqueRead(BaseModel):
 
 
 class TechniqueCreate(BaseModel):
-    """Slug opcional (gerado automaticamente a partir do nome)."""
+    """academy_id obrigatório. Slug opcional (gerado automaticamente a partir do nome)."""
 
+    academy_id: UUID
     name: str = Field(..., min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)
     description: str | None = None

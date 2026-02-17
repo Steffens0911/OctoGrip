@@ -58,6 +58,7 @@ def update_user(
     name: str | None = None,
     graduation: str | None = None,
     academy_id: UUID | None = None,
+    points_adjustment: int | None = None,
 ) -> User | None:
     user = get_user(db, user_id)
     if not user:
@@ -68,6 +69,8 @@ def update_user(
         user.graduation = graduation.strip() if graduation and graduation.strip() else None
     if academy_id is not None:
         user.academy_id = academy_id
+    if points_adjustment is not None:
+        user.points_adjustment = points_adjustment
     db.commit()
     db.refresh(user)
     logger.info("update_user", extra={"user_id": str(user_id)})

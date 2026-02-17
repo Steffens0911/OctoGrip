@@ -5,6 +5,7 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/services/academy_service.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Lista e CRUD de academias (seção professor).
 class AcademiesScreen extends StatefulWidget {
@@ -33,13 +34,13 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     });
     try {
       final list = await _service.list();
-      setState(() {
+      if (mounted) setState(() {
         _list = list;
         _loading = false;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('AcademyServiceException: ', '');
+      if (mounted) setState(() {
+        _error = userFacingMessage(e);
         _loading = false;
       });
     }
@@ -70,7 +71,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(userFacingMessage(e))),
         );
       }
     }
@@ -82,7 +83,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     List<Technique> techniques = [];
     if (isEdit) {
       try {
-        techniques = await ApiService().getTechniques();
+        techniques = await ApiService().getTechniques(academyId: existing!.id);
       } catch (_) {}
     }
     String? selectedTechniqueId = existing?.weeklyTechniqueId;
@@ -155,7 +156,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(e.toString())),
+                      SnackBar(content: Text(userFacingMessage(e))),
                     );
                   }
                 }
@@ -245,7 +246,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView.builder(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppTheme.screenPadding(context)),
           itemCount: _list.length,
           itemBuilder: (context, index) {
             final a = _list[index];

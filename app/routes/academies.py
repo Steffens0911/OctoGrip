@@ -31,6 +31,7 @@ from app.services.academy_service import (
     get_academy_ranking,
     get_academy_weekly_report,
     list_academies,
+    reset_academy_missions,
     update_academy,
 )
 from app.services.collective_goal_service import (
@@ -141,6 +142,14 @@ def academy_delete(academy_id: UUID, db: Session = Depends(get_db)):
     if not delete_academy(db, academy_id):
         raise HTTPException(status_code=404, detail="Academia não encontrada.")
     return None
+
+
+@router.post("/{academy_id}/reset_missions")
+def academy_reset_missions(academy_id: UUID, db: Session = Depends(get_db)):
+    """Reinicia as missões da academia: limpa conclusões e execuções, preservando pontos em points_adjustment."""
+    if get_academy(db, academy_id) is None:
+        raise HTTPException(status_code=404, detail="Academia não encontrada.")
+    return reset_academy_missions(db, academy_id)
 
 
 @router.get("/{academy_id}/difficulties", response_model=DifficultiesResponse)

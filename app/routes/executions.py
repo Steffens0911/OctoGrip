@@ -45,7 +45,9 @@ def _execution_to_read(execution) -> ExecutionRead:
         confirmed_at=execution.confirmed_at,
         confirmed_by=execution.confirmed_by,
         executor_name=execution.user.name if execution.user else None,
+        executor_graduation=execution.user.graduation if execution.user else None,
         opponent_name=execution.opponent.name if execution.opponent else None,
+        opponent_graduation=execution.opponent.graduation if execution.opponent else None,
         technique_name=technique_name,
     )
 

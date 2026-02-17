@@ -37,6 +37,7 @@ class MissionRead(BaseModel):
 
     id: UUID
     technique_id: UUID
+    technique_name: str | None = None
     lesson_id: UUID | None = None
     slot_index: int | None = None
     start_date: date | None = None

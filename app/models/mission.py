@@ -80,3 +80,7 @@ class Mission(Base, UUIDMixin):
         back_populates="mission",
         lazy="selectin",
     )
+
+    @property
+    def technique_name(self) -> str | None:
+        return self.technique.name if self.technique else None

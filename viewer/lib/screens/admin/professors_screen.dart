@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/services/professor_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Lista e CRUD de professores (seção professor).
 class ProfessorsScreen extends StatefulWidget {
@@ -30,13 +31,13 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     });
     try {
       final list = await _service.list();
-      setState(() {
+      if (mounted) setState(() {
         _list = list;
         _loading = false;
       });
     } catch (e) {
-      setState(() {
-        _error = e.toString().replaceFirst('ProfessorServiceException: ', '');
+      if (mounted) setState(() {
+        _error = userFacingMessage(e);
         _loading = false;
       });
     }
@@ -67,7 +68,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(content: Text(userFacingMessage(e))),
         );
       }
     }
@@ -132,7 +133,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString())),
+                    SnackBar(content: Text(userFacingMessage(e))),
                   );
                 }
               }

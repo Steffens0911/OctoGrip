@@ -1,6 +1,7 @@
 class Mission {
   final String id;
   final String techniqueId;
+  final String? techniqueName;
   final String startDate;
   final String endDate;
   final String level;
@@ -12,6 +13,7 @@ class Mission {
   Mission({
     required this.id,
     required this.techniqueId,
+    this.techniqueName,
     required this.startDate,
     required this.endDate,
     required this.level,
@@ -25,6 +27,7 @@ class Mission {
     return Mission(
       id: json['id'] as String,
       techniqueId: json['technique_id'] as String,
+      techniqueName: json['technique_name'] as String?,
       startDate: json['start_date'] as String,
       endDate: json['end_date'] as String,
       level: json['level'] as String,

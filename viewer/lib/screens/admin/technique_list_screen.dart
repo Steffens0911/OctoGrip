@@ -4,6 +4,7 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
+import 'package:viewer/utils/error_message.dart';
 
 class TechniqueListScreen extends StatefulWidget {
   const TechniqueListScreen({super.key});
@@ -23,18 +24,13 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final results = await Future.wait([_api.getTechniques(), _api.getPositions()]);
-      setState(() {
+      if (mounted) setState(() {
         _list = results[0] as List<Technique>;
         _positions = results[1] as List<Position>;
         _loading = false;
       });
-    } on ApiException catch (e) {
-      setState(() { _error = e.message; _loading = false; });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
-        _loading = false;
-      });
+    } catch (e) {
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -48,7 +44,7 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
 
   Future<void> _openForm([Technique? t]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => TechniqueFormScreen(technique: t)));
-    _load();
+    if (mounted) _load();
   }
 
   Future<void> _delete(Technique t) async {
@@ -63,10 +59,10 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
     if (ok != true) return;
     try {
       await _api.deleteTechnique(t.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnica excluída')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 

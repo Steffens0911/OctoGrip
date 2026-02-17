@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
-from app.core.graduation import calculate_points_awarded
+from app.core.graduation import calculate_points_awarded, graduation_label
 from app.models import Academy, Lesson, Mission, TechniqueExecution, User
 
 logger = logging.getLogger(__name__)
@@ -292,7 +292,7 @@ def reject_execution(
 
 
 def total_points_for_user(db: Session, user_id: UUID) -> int:
-    """Soma dos points_awarded de execuções confirmadas + conclusões de missão (MissionUsage)."""
+    """Soma dos points_awarded de execuções confirmadas + conclusões de missão (MissionUsage) + points_adjustment."""
     from sqlalchemy import func
 
     from app.models import MissionUsage
@@ -310,7 +310,9 @@ def total_points_for_user(db: Session, user_id: UUID) -> int:
         .filter(MissionUsage.user_id == user_id)
         .scalar()
     )
-    return int(exec_points or 0) + int(mission_points or 0)
+    user = db.query(User).filter(User.id == user_id).first()
+    adjustment = (user.points_adjustment if user else 0) or 0
+    return int(exec_points or 0) + int(mission_points or 0) + adjustment
 
 
 def get_points_log(db: Session, user_id: UUID, limit: int = 100):
@@ -344,9 +346,14 @@ def get_points_log(db: Session, user_id: UUID, limit: int = 100):
         elif e.lesson and e.lesson.technique:
             technique_name = e.lesson.technique.name
         opponent_name = e.opponent.name if e.opponent else None
+        opponent_grad = e.opponent.graduation if e.opponent else None
         desc = f"Execução confirmada: {technique_name or 'técnica'}"
         if opponent_name:
-            desc += f" (em {opponent_name})"
+            faixa_label = graduation_label(opponent_grad)
+            desc += f" (em {opponent_name}"
+            if faixa_label:
+                desc += f" – faixa {faixa_label}"
+            desc += ")"
         rows.append(
             {
                 "date": dt.isoformat() if dt else None,

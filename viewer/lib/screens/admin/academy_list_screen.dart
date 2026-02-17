@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/academy_form_screen.dart';
 
@@ -25,18 +26,13 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
     });
     try {
       final list = await _api.getAcademies();
-      setState(() {
+      if (mounted) setState(() {
         _list = list;
         _loading = false;
       });
-    } on ApiException catch (e) {
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
-    } catch (_) {
-      setState(() {
-        _error = 'Erro de conexão. A API está rodando em ${_api.baseUrl}?';
+    } catch (e) {
+      if (mounted) setState(() {
+        _error = userFacingMessage(e);
         _loading = false;
       });
     }
@@ -89,10 +85,10 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
     if (ok != true) return;
     try {
       await _api.deleteAcademy(a.id);
-      _load();
+      if (mounted) _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Academia excluída')));
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 

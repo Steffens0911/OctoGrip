@@ -192,6 +192,22 @@ class AcademyService {
     };
   }
 
+  /// Reinicia as missões da academia: limpa conclusões/execuções, preservando pontos.
+  Future<Map<String, dynamic>> resetMissions(String academyId) async {
+    final response = await http.post(
+      Uri.parse('$_academiesUrl/$academyId/reset_missions'),
+      headers: {'Content-Type': 'application/json'},
+    );
+    if (response.statusCode == 404) {
+      throw AcademyServiceException('Academia não encontrada.');
+    }
+    if (response.statusCode != 200) {
+      throw AcademyServiceException(
+          'Falha ao reiniciar missões: ${response.statusCode}');
+    }
+    return json.decode(response.body) as Map<String, dynamic>;
+  }
+
   /// Relatório semanal. [year] e [week] opcionais (ISO); se omitidos, semana atual.
   Future<AcademyWeeklyReport?> getWeeklyReport(
     String academyId, {

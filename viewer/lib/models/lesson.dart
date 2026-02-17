@@ -1,5 +1,6 @@
 class Lesson {
   final String id;
+  final String? academyId;
   final String title;
   final String slug;
   final String? videoUrl;
@@ -12,6 +13,7 @@ class Lesson {
 
   Lesson({
     required this.id,
+    this.academyId,
     required this.title,
     required this.slug,
     this.videoUrl,
@@ -26,6 +28,7 @@ class Lesson {
   factory Lesson.fromJson(Map<String, dynamic> json) {
     return Lesson(
       id: json['id'] as String,
+      academyId: json['academy_id'] as String?,
       title: json['title'] as String,
       slug: json['slug'] as String,
       videoUrl: json['video_url'] as String?,
