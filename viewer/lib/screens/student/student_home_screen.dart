@@ -28,6 +28,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   MissionWeek? _missionWeek;
   int? _userPoints;
   Map<String, dynamic>? _collectiveGoal;
+  int _pendingConfirmationsCount = 0;
   bool _loading = true;
   String? _error;
 
@@ -76,6 +77,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _loadMissionWeek();
       _loadUserPoints();
       _loadCollectiveGoal();
+      _loadPendingConfirmationsWith(_selectedUser!.id);
     }
   }
 
@@ -93,6 +95,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _users = users;
         _selectedUser = selected;
         _loading = false;
+        if (selected == null) _pendingConfirmationsCount = 0;
       });
       if (selected != null) {
         final level = _levelFromGraduation(selected.graduation);
@@ -100,6 +103,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           _loadMissionWeekWith(selected.id, selected.academyId, level),
           _loadUserPointsWith(selected.id),
           _loadCollectiveGoalWith(selected.academyId),
+          _loadPendingConfirmationsWith(selected.id),
         ]);
         if (mounted) setState(() {});
       }
@@ -140,6 +144,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       if (mounted) setState(() => _collectiveGoal = res);
     } catch (_) {
       if (mounted) setState(() => _collectiveGoal = null);
+    }
+  }
+
+  Future<void> _loadPendingConfirmationsWith(String userId) async {
+    try {
+      final list = await _api.getPendingConfirmations(userId);
+      if (mounted) setState(() => _pendingConfirmationsCount = list.length);
+    } catch (_) {
+      if (mounted) setState(() => _pendingConfirmationsCount = 0);
     }
   }
 
@@ -229,7 +242,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           children: [
             const SizedBox(height: 8),
             Text(
-              'Olá',
+              _selectedUser != null
+                  ? 'Olá, ${_selectedUser!.name ?? _selectedUser!.email}'
+                  : 'Olá',
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
                     color: AppTheme.textPrimaryOf(context),
                   ),
@@ -349,6 +364,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   _selectedUser = u;
                   _missionWeek = null;
                   _userPoints = null;
+                  if (u == null) _pendingConfirmationsCount = 0;
                 });
                 if (u != null) {
                   final level = _levelFromGraduation(u.graduation);
@@ -356,6 +372,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _loadMissionWeekWith(u.id, u.academyId, level),
                     _loadUserPointsWith(u.id),
                     _loadCollectiveGoalWith(u.academyId),
+                    _loadPendingConfirmationsWith(u.id),
                   ]);
                   if (mounted) setState(() {});
                 }
@@ -524,7 +541,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  periodLabel,
+                  m.techniqueName.isNotEmpty ? m.techniqueName : periodLabel,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: AppTheme.primary,
                         fontWeight: FontWeight.w600,
@@ -594,6 +611,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           icon: Icons.how_to_reg,
           title: 'Confirmações pendentes',
           subtitle: 'Confirmar execuções em você',
+          showAlertBadge: _pendingConfirmationsCount > 0,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -602,7 +620,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 userName: _selectedUser?.name ?? _selectedUser?.email,
               ),
             ),
-          ),
+          ).then((_) => _loadPendingConfirmationsWith(userId)),
         ),
         _ShortcutTile(
           icon: Icons.send_outlined,
@@ -638,12 +656,14 @@ class _ShortcutTile extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final bool showAlertBadge;
   final VoidCallback onTap;
 
   const _ShortcutTile({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.showAlertBadge = false,
     required this.onTap,
   });
 
@@ -679,11 +699,28 @@ class _ShortcutTile extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppTheme.textPrimaryOf(context),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: AppTheme.textPrimaryOf(context),
+                                  ),
                             ),
+                          ),
+                          if (showAlertBadge) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.amber,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Icon(Icons.warning_amber_rounded, size: 16, color: Colors.amber.shade900),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 2),
                       Text(

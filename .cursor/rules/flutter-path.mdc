@@ -1,0 +1,16 @@
+---
+description: Flutter SDK path for this project
+alwaysApply: true
+---
+
+# Flutter SDK Path
+
+O Flutter está instalado em **C:\flutter** nesta máquina.
+
+Ao executar comandos Flutter neste projeto, use o caminho completo:
+- `C:\flutter\bin\flutter.bat` (Windows)
+
+Exemplo ao rodar o app:
+```
+C:\flutter\bin\flutter.bat run -d chrome
+```
