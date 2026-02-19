@@ -101,3 +101,8 @@ class Academy(Base, UUIDMixin):
         foreign_keys="Technique.academy_id",
         lazy="selectin",
     )
+    trophies: Mapped[list["Trophy"]] = relationship(
+        "Trophy",
+        back_populates="academy",
+        lazy="selectin",
+    )

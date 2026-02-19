@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
-from app.models import Academy, Lesson, Mission, TechniqueExecution, User
+from app.models import Academy, Lesson, Mission, Technique, TechniqueExecution, User
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,16 @@ def create_execution(
     *,
     mission_id: UUID | None = None,
     lesson_id: UUID | None = None,
+    technique_id: UUID | None = None,
+    academy_id: UUID | None = None,
 ) -> TechniqueExecution:
     """
-    Cria execução pendente de confirmação. Aceita mission_id ou lesson_id (exatamente um).
-    Valida: user e opponent da mesma academia; se mission_id, missão ativa no período;
-    se lesson_id, lição existe e (opcional) é a visível da academia.
+    Cria execução pendente de confirmação. Aceita exatamente um de mission_id, lesson_id ou technique_id.
+    Valida: user e opponent da mesma academia; se technique_id, técnica existe e pertence à academia.
     """
-    if (mission_id is None) == (lesson_id is None):
-        raise AppError("Informe exatamente um de mission_id ou lesson_id.", status_code=400)
+    filled = sum(1 for x in (mission_id, lesson_id, technique_id) if x is not None)
+    if filled != 1:
+        raise AppError("Informe exatamente um de mission_id, lesson_id ou technique_id.", status_code=400)
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -56,7 +58,29 @@ def create_execution(
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
 
-    if mission_id is not None:
+    if technique_id is not None:
+        if academy_id is None:
+            raise AppError("academy_id é obrigatório quando technique_id é informado.", status_code=400)
+        technique = db.query(Technique).filter(Technique.id == technique_id).first()
+        if not technique:
+            raise NotFoundError("Técnica não encontrada.")
+        if technique.academy_id != academy_id or user.academy_id != academy_id:
+            raise AppError("A técnica deve pertencer à academia do usuário.", status_code=400)
+        now = datetime.now(timezone.utc)
+        execution = TechniqueExecution(
+            user_id=user_id,
+            mission_id=None,
+            lesson_id=None,
+            technique_id=technique_id,
+            opponent_id=opponent_id,
+            usage_type=usage_type,
+            status="pending_confirmation",
+            outcome=None,
+            points_awarded=None,
+            confirmed_at=None,
+            confirmed_by=None,
+        )
+    elif mission_id is not None:
         mission = (
             db.query(Mission)
             .options(joinedload(Mission.technique))
@@ -100,6 +124,7 @@ def create_execution(
             user_id=user_id,
             mission_id=mission_id,
             lesson_id=None,
+            technique_id=None,
             opponent_id=opponent_id,
             usage_type=usage_type,
             status="pending_confirmation",
@@ -136,6 +161,7 @@ def create_execution(
             user_id=user_id,
             mission_id=None,
             lesson_id=lesson_id,
+            technique_id=None,
             opponent_id=opponent_id,
             usage_type=usage_type,
             status="pending_confirmation",
@@ -155,6 +181,21 @@ def create_execution(
     return execution
 
 
+def count_pending_confirmations(db: Session, opponent_id: UUID) -> int:
+    """Retorna o número de execuções pendentes de confirmação para o adversário (uma query)."""
+    from sqlalchemy import func
+
+    return (
+        db.query(func.count(TechniqueExecution.id))
+        .filter(
+            TechniqueExecution.opponent_id == opponent_id,
+            TechniqueExecution.status == "pending_confirmation",
+        )
+        .scalar()
+        or 0
+    )
+
+
 def list_pending_confirmations(db: Session, opponent_id: UUID):
     """Lista execuções onde opponent_id é o usuário e status = pending_confirmation."""
     return (
@@ -163,6 +204,7 @@ def list_pending_confirmations(db: Session, opponent_id: UUID):
             joinedload(TechniqueExecution.user),
             joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
             joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
+            joinedload(TechniqueExecution.technique),
             joinedload(TechniqueExecution.opponent),
         )
         .filter(
@@ -182,6 +224,7 @@ def list_my_executions(db: Session, user_id: UUID):
             joinedload(TechniqueExecution.user),
             joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
             joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
+            joinedload(TechniqueExecution.technique),
             joinedload(TechniqueExecution.opponent),
         )
         .filter(TechniqueExecution.user_id == user_id)
@@ -200,6 +243,7 @@ def get_execution(db: Session, execution_id: UUID) -> TechniqueExecution | None:
                 joinedload(Mission.lesson),
             ),
             joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
+            joinedload(TechniqueExecution.technique),
         )
         .filter(TechniqueExecution.id == execution_id)
         .first()
@@ -230,7 +274,9 @@ def confirm_execution(
 
     opponent = execution.opponent
     base_points = None
-    if execution.lesson_id and execution.lesson:
+    if execution.technique_id and execution.technique:
+        base_points = getattr(execution.technique, "base_points", None)
+    elif execution.lesson_id and execution.lesson:
         base_points = getattr(execution.lesson, "base_points", None)
     elif execution.mission_id and execution.mission:
         mission = execution.mission
@@ -329,6 +375,7 @@ def get_points_log(db: Session, user_id: UUID, limit: int = 100):
             joinedload(TechniqueExecution.opponent),
             joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
             joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
+            joinedload(TechniqueExecution.technique),
         )
         .filter(
             TechniqueExecution.user_id == user_id,
@@ -341,7 +388,9 @@ def get_points_log(db: Session, user_id: UUID, limit: int = 100):
     ):
         dt = e.confirmed_at or e.created_at
         technique_name = None
-        if e.mission and e.mission.technique:
+        if e.technique:
+            technique_name = e.technique.name
+        elif e.mission and e.mission.technique:
             technique_name = e.mission.technique.name
         elif e.lesson and e.lesson.technique:
             technique_name = e.lesson.technique.name

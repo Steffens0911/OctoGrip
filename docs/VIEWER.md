@@ -29,7 +29,7 @@ Acesse: **http://localhost:8080**
 
 - **Web:** `kApiBaseUrl` em `lib/config.dart` ou `--dart-define=API_BASE_URL=http://localhost:8000`
 - **Emulador Android:** use `http://10.0.2.2:8000`
-- **Dispositivo físico:** use o IP da máquina (ex.: `http://192.168.1.10:8000`)
+- **Dispositivo físico:** use o IP da máquina em `viewer/lib/config_stub.dart` (ex.: `http://192.168.0.14:8000`). Para todas as configurações (Android, cleartext, firewall, APK), veja [ANDROID_APK_LOCAL.md](ANDROID_APK_LOCAL.md).
 
 ---
 

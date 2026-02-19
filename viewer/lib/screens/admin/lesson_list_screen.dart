@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/lesson_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -14,20 +15,49 @@ class LessonListScreen extends StatefulWidget {
 
 class _LessonListScreenState extends State<LessonListScreen> {
   final _api = ApiService();
-  List<Lesson> _list = [];
+  final _searchController = TextEditingController();
+  List<Lesson> _allItems = [];
+  List<Lesson> _filteredItems = [];
+  List<Technique> _techniques = [];
+  String? _filterTechniqueId;
   bool _loading = true;
+  bool _loadingTechniques = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilters() {
+    var filtered = _allItems;
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((l) => l.title.toLowerCase().contains(query)).toList();
+    }
+    if (_filterTechniqueId != null) {
+      filtered = filtered.where((l) => l.techniqueId == _filterTechniqueId).toList();
+    }
+    setState(() => _filteredItems = filtered);
+  }
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final list = await _api.getLessons();
+      final results = await Future.wait([
+        _api.getLessons(),
+        _api.getTechniques(),
+      ]);
       if (mounted) setState(() {
-        _list = list;
+        _allItems = results[0] as List<Lesson>;
+        _techniques = results[1] as List<Technique>;
         _loading = false;
+        _loadingTechniques = false;
       });
+      _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingTechniques = false; });
     }
   }
 
@@ -76,14 +106,90 @@ class _LessonListScreenState extends State<LessonListScreen> {
       appBar: AppBar(title: const Text('Lições'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
       body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _list.isEmpty ? const Center(child: Text('Nenhuma lição. Toque em + para criar.'))
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _list.length,
-                itemBuilder: (context, i) {
-                  final l = _list[i];
+          : _allItems.isEmpty ? const Center(child: Text('Nenhuma lição. Toque em + para criar.'))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por título da lição',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _applyFilters();
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => _applyFilters(),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: _filterTechniqueId,
+                        decoration: const InputDecoration(
+                          labelText: 'Técnica',
+                          hintText: 'Todas',
+                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          isDense: true,
+                        ),
+                        items: [
+                          const DropdownMenuItem(value: null, child: Text('Todas')),
+                          ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                        ],
+                        onChanged: (v) {
+                          setState(() => _filterTechniqueId = v);
+                          _applyFilters();
+                        },
+                      ),
+                      if (_searchController.text.isNotEmpty || _filterTechniqueId != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => _filterTechniqueId = null);
+                                  _applyFilters();
+                                },
+                                child: const Text('Limpar filtros'),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: _filteredItems.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchController.text.isNotEmpty || _filterTechniqueId != null
+                                  ? 'Nenhuma lição encontrada.'
+                                  : 'Nenhuma lição. Toque em + para criar.',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, i) {
+                              final l = _filteredItems[i];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(

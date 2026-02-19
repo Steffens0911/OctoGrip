@@ -12,6 +12,7 @@ import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/models/trophy.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -156,6 +157,51 @@ class ApiService {
   Future<Map<String, dynamic>> getPointsLog(String userId, {int limit = 100}) async {
     final uri = Uri.parse('$baseUrl/users/$userId/points_log').replace(queryParameters: {'limit': limit.toString()});
     final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Galeria de troféus do usuário (troféus da academia com tier conquistado).
+  Future<List<TrophyWithEarned>> getTrophiesForUser(String userId) async {
+    final r = await _req(http.get(Uri.parse('$baseUrl/trophies/user/$userId')));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => TrophyWithEarned.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Lista troféus da academia (admin).
+  Future<List<Map<String, dynamic>>> getTrophies(String academyId) async {
+    final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  /// Cria troféu da academia (admin).
+  Future<Map<String, dynamic>> createTrophy({
+    required String academyId,
+    required String techniqueId,
+    required String name,
+    required String startDate,
+    required String endDate,
+    required int targetCount,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/trophies'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'academy_id': academyId,
+        'technique_id': techniqueId,
+        'name': name,
+        'start_date': startDate,
+        'end_date': endDate,
+        'target_count': targetCount,
+      }),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
@@ -539,6 +585,7 @@ class ApiService {
       'level': level,
       if (userId != null) 'user_id': userId,
       if (academyId != null) 'academy_id': academyId,
+      '_t': DateTime.now().millisecondsSinceEpoch.toString(),
     };
     var uri = Uri.parse('$baseUrl/mission_today/week').replace(queryParameters: params);
     final r = await _req(http.get(uri));
@@ -588,11 +635,13 @@ class ApiService {
   }
 
   // ---------- Executions (gamificação) ----------
-  /// Cria execução (informe missionId ou lessonId, não ambos).
+  /// Cria execução. Informe exatamente um de: missionId, lessonId, ou (techniqueId + academyId).
   Future<Map<String, dynamic>> postExecution({
     required String userId,
     String? missionId,
     String? lessonId,
+    String? techniqueId,
+    String? academyId,
     required String opponentId,
     String usageType = 'after_training',
   }) async {
@@ -603,6 +652,8 @@ class ApiService {
     };
     if (missionId != null) body['mission_id'] = missionId;
     if (lessonId != null) body['lesson_id'] = lessonId;
+    if (techniqueId != null) body['technique_id'] = techniqueId;
+    if (academyId != null) body['academy_id'] = academyId;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/executions'),
       headers: {'Content-Type': 'application/json'},
@@ -611,6 +662,16 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
+  }
+
+  /// Retorna apenas o número de confirmações pendentes (para badge na tela inicial).
+  Future<int> getPendingConfirmationsCount(String userId) async {
+    final uri = Uri.parse('$baseUrl/executions/pending_confirmations/count').replace(queryParameters: {'user_id': userId});
+    final r = await _req(http.get(uri));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data is Map ? data as Map<String, dynamic> : null;
+    return (map?['count'] as num?)?.toInt() ?? 0;
   }
 
   Future<List<Map<String, dynamic>>> getPendingConfirmations(String userId) async {

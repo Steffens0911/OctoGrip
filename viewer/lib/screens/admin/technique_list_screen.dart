@@ -15,20 +15,38 @@ class TechniqueListScreen extends StatefulWidget {
 
 class _TechniqueListScreenState extends State<TechniqueListScreen> {
   final _api = ApiService();
-  List<Technique> _list = [];
+  final _searchController = TextEditingController();
+  List<Technique> _allItems = [];
+  List<Technique> _filteredItems = [];
   List<Position> _positions = [];
   bool _loading = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilters() {
+    var filtered = _allItems;
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((t) => t.name.toLowerCase().contains(query)).toList();
+    }
+    setState(() => _filteredItems = filtered);
+  }
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
       final results = await Future.wait([_api.getTechniques(), _api.getPositions()]);
       if (mounted) setState(() {
-        _list = results[0] as List<Technique>;
+        _allItems = results[0] as List<Technique>;
         _positions = results[1] as List<Position>;
         _loading = false;
       });
+      _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
@@ -72,14 +90,71 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
       appBar: AppBar(title: const Text('Técnicas'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
       body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _list.isEmpty ? const Center(child: Text('Nenhuma técnica. Toque em + para criar.'))
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _list.length,
-                itemBuilder: (context, i) {
-                  final t = _list[i];
+          : _allItems.isEmpty ? const Center(child: Text('Nenhuma técnica. Toque em + para criar.'))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nome da técnica',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _applyFilters();
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => _applyFilters(),
+                      ),
+                      if (_searchController.text.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  _applyFilters();
+                                },
+                                child: const Text('Limpar'),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: _filteredItems.isEmpty
+                        ? Center(
+                            child: Text(
+                              _searchController.text.isNotEmpty
+                                  ? 'Nenhuma técnica encontrada.'
+                                  : 'Nenhuma técnica. Toque em + para criar.',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, i) {
+                              final t = _filteredItems[i];
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(

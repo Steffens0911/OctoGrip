@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -21,8 +22,12 @@ def mission_week(
     Retorna as 3 missões da semana (Missão 1, 2, 3) para listagem ao aluno.
     Cada entrada pode ter mission preenchida ou null.
     """
-    return get_mission_week_response(
+    payload = get_mission_week_response(
         db, level=level, user_id=user_id, academy_id=academy_id
+    )
+    return JSONResponse(
+        content=payload.model_dump(mode="json"),
+        headers={"Cache-Control": "no-store"},
     )
 
 

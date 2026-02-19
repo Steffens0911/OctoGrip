@@ -16,9 +16,34 @@ class MyExecutionsScreen extends StatefulWidget {
 
 class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
   final _api = ApiService();
-  List<Map<String, dynamic>> _list = [];
+  final _searchController = TextEditingController();
+  List<Map<String, dynamic>> _allItems = [];
+  List<Map<String, dynamic>> _filteredItems = [];
+  String? _filterStatus;
   bool _loading = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilters() {
+    var filtered = _allItems;
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((e) {
+        final techniqueName = (e['technique_name'] as String? ?? '').toLowerCase();
+        final opponentName = (e['opponent_name'] as String? ?? '').toLowerCase();
+        return techniqueName.contains(query) || opponentName.contains(query);
+      }).toList();
+    }
+    if (_filterStatus != null) {
+      filtered = filtered.where((e) => e['status'] == _filterStatus).toList();
+    }
+    setState(() => _filteredItems = filtered);
+  }
 
   @override
   void initState() {
@@ -30,7 +55,8 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final list = await _api.getMyExecutions(widget.userId);
-      if (mounted) setState(() { _list = list; _loading = false; });
+      if (mounted) setState(() { _allItems = list; _loading = false; });
+      _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
@@ -86,20 +112,127 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                     ),
                   ),
                 )
-              : _list.isEmpty
+              : _allItems.isEmpty
                   ? Center(
                       child: Text(
                         'Nenhuma solicitação de confirmação.',
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                     )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _list.length,
-                        itemBuilder: (context, i) {
-                          final e = _list[i];
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'Buscar por técnica ou adversário',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            _applyFilters();
+                                          },
+                                        )
+                                      : null,
+                                ),
+                                onChanged: (_) => _applyFilters(),
+                              ),
+                              const SizedBox(height: 12),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  FilterChip(
+                                    label: const Text('Todos'),
+                                    selected: _filterStatus == null,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() => _filterStatus = null);
+                                        _applyFilters();
+                                      }
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Pendente'),
+                                    selected: _filterStatus == 'pending_confirmation',
+                                    onSelected: (selected) {
+                                      setState(() => _filterStatus = selected ? 'pending_confirmation' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Confirmado'),
+                                    selected: _filterStatus == 'confirmed',
+                                    onSelected: (selected) {
+                                      setState(() => _filterStatus = selected ? 'confirmed' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Recusado'),
+                                    selected: _filterStatus == 'rejected',
+                                    onSelected: (selected) {
+                                      setState(() => _filterStatus = selected ? 'rejected' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Não aceitou'),
+                                    selected: _filterStatus == 'rejected_dont_remember',
+                                    onSelected: (selected) {
+                                      setState(() => _filterStatus = selected ? 'rejected_dont_remember' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                ],
+                              ),
+                              if (_searchController.text.isNotEmpty || _filterStatus != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _filterStatus = null);
+                                          _applyFilters();
+                                        },
+                                        child: const Text('Limpar filtros'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: RefreshIndicator(
+                            onRefresh: _load,
+                            child: _filteredItems.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      _searchController.text.isNotEmpty || _filterStatus != null
+                                          ? 'Nenhuma solicitação encontrada.'
+                                          : 'Nenhuma solicitação de confirmação.',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    itemCount: _filteredItems.length,
+                                    itemBuilder: (context, i) {
+                                      final e = _filteredItems[i];
                           final status = e['status'] as String?;
                           final techniqueName = e['technique_name'] as String? ?? 'técnica';
                           final opponentName = e['opponent_name'] as String? ?? 'Colega';
@@ -172,8 +305,11 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                             ),
                           );
                         },
-                      ),
-                    ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
     );
   }
 }

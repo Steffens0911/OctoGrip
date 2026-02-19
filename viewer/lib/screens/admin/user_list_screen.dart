@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
@@ -14,17 +15,65 @@ class UserListScreen extends StatefulWidget {
 
 class _UserListScreenState extends State<UserListScreen> {
   final _api = ApiService();
-  List<models.UserModel> _list = [];
+  final _searchController = TextEditingController();
+  List<models.UserModel> _allItems = [];
+  List<models.UserModel> _filteredItems = [];
+  List<Academy> _academies = [];
+  String? _filterAcademyId;
+  String? _filterGraduation;
   bool _loading = true;
+  bool _loadingAcademies = true;
   String? _error;
+
+  static const List<MapEntry<String, String>> _graduations = [
+    MapEntry('white', 'Branca'),
+    MapEntry('blue', 'Azul'),
+    MapEntry('purple', 'Roxa'),
+    MapEntry('brown', 'Marrom'),
+    MapEntry('black', 'Preta'),
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilters() {
+    var filtered = _allItems;
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filtered = filtered.where((u) {
+        final name = (u.name ?? '').toLowerCase();
+        final email = u.email.toLowerCase();
+        return name.contains(query) || email.contains(query);
+      }).toList();
+    }
+    if (_filterAcademyId != null) {
+      filtered = filtered.where((u) => u.academyId == _filterAcademyId).toList();
+    }
+    if (_filterGraduation != null) {
+      filtered = filtered.where((u) => u.graduation == _filterGraduation).toList();
+    }
+    setState(() => _filteredItems = filtered);
+  }
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final list = await _api.getUsers();
-      if (mounted) setState(() { _list = list; _loading = false; });
+      final results = await Future.wait([
+        _api.getUsers(),
+        _api.getAcademies(),
+      ]);
+      if (mounted) setState(() {
+        _allItems = results[0] as List<models.UserModel>;
+        _academies = results[1] as List<Academy>;
+        _loading = false;
+        _loadingAcademies = false;
+      });
+      _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingAcademies = false; });
     }
   }
 
@@ -60,32 +109,142 @@ class _UserListScreenState extends State<UserListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final hasFilters = _searchController.text.isNotEmpty || _filterAcademyId != null || _filterGraduation != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Usuários'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
+      appBar: AppBar(
+        title: const Text('Usuários'),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+      ),
       body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _list.isEmpty ? const Center(child: Text('Nenhum usuário. Toque em + para criar.'))
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView.builder(
-                padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-                itemCount: _list.length,
-                itemBuilder: (context, i) {
-                  final u = _list[i];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text(u.email),
-                      subtitle: Text(u.name ?? '—'),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
-                      ]),
-                      onTap: () => _openForm(u),
-                    ),
-                  );
-                },
-              ),
+          : _allItems.isEmpty ? const Center(child: Text('Nenhum usuário. Toque em + para criar.'))
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nome ou email',
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _applyFilters();
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (_) => _applyFilters(),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _filterAcademyId,
+                              decoration: const InputDecoration(
+                                labelText: 'Academia',
+                                hintText: 'Todas',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                isDense: true,
+                              ),
+                              items: [
+                                const DropdownMenuItem(value: null, child: Text('Todas')),
+                                ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                              ],
+                              onChanged: (v) {
+                                setState(() => _filterAcademyId = v);
+                                _applyFilters();
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _filterGraduation,
+                              decoration: const InputDecoration(
+                                labelText: 'Graduação',
+                                hintText: 'Todas',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                isDense: true,
+                              ),
+                              items: [
+                                const DropdownMenuItem(value: null, child: Text('Todas')),
+                                ..._graduations.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                              ],
+                              onChanged: (v) {
+                                setState(() => _filterGraduation = v);
+                                _applyFilters();
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (hasFilters)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() {
+                                    _filterAcademyId = null;
+                                    _filterGraduation = null;
+                                  });
+                                  _applyFilters();
+                                },
+                                child: const Text('Limpar filtros'),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: _filteredItems.isEmpty
+                        ? Center(
+                            child: Text(
+                              hasFilters ? 'Nenhum usuário encontrado.' : 'Nenhum usuário. Toque em + para criar.',
+                              style: TextStyle(color: AppTheme.textSecondary),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: EdgeInsets.symmetric(horizontal: AppTheme.screenPadding(context)),
+                            itemCount: _filteredItems.length,
+                            itemBuilder: (context, i) {
+                              final u = _filteredItems[i];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  title: Text(u.email),
+                                  subtitle: Text(u.name ?? '—'),
+                                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                    IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
+                                    IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
+                                  ]),
+                                  onTap: () => _openForm(u),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
     );

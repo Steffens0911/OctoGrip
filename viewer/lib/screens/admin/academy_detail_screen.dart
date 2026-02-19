@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_form_builder/flutter_form_builder.dart';
+import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/position.dart';
@@ -51,6 +53,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   AcademyWeeklyReport? _weeklyReport;
   bool _loadingExtra = true;
   String? _errorExtra;
+  List<Map<String, dynamic>> _trophies = [];
+  bool _loadingTrophies = true;
 
   @override
   void initState() {
@@ -68,6 +72,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _loadTechniques();
     _loadPositions();
     _loadRankingAndReport();
+    _loadTrophies();
   }
 
   @override
@@ -169,6 +174,143 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
+  }
+
+  Future<void> _loadTrophies() async {
+    setState(() => _loadingTrophies = true);
+    try {
+      final list = await _api.getTrophies(_academy.id);
+      if (mounted) setState(() {
+        _trophies = list;
+        _loadingTrophies = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingTrophies = false);
+    }
+  }
+
+  Future<void> _showCreateTrophyDialog() async {
+    if (_techniques.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cadastre técnicas antes de criar troféus.')),
+      );
+      return;
+    }
+    final formKey = GlobalKey<FormBuilderState>();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Criar troféu'),
+        content: SingleChildScrollView(
+          child: FormBuilder(
+            key: formKey,
+            initialValue: {
+              'name': '',
+              'techniqueId': _techniques.first.id,
+              'startDate': DateTime.now().toIso8601String().substring(0, 10),
+              'endDate': DateTime.now().add(const Duration(days: 30)).toIso8601String().substring(0, 10),
+              'targetCount': '10',
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FormBuilderTextField(
+                  name: 'name',
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do troféu',
+                    hintText: 'Ex: Arm Lock',
+                  ),
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(errorText: 'Nome é obrigatório'),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                FormBuilderDropdown<String>(
+                  name: 'techniqueId',
+                  decoration: const InputDecoration(labelText: 'Técnica'),
+                  items: _techniques
+                      .map((t) => DropdownMenuItem(value: t.id, child: Text(t.name)))
+                      .toList(),
+                  initialValue: _techniques.first.id,
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(errorText: 'Selecione uma técnica'),
+                  ]),
+                ),
+                const SizedBox(height: 12),
+                FormBuilderTextField(
+                  name: 'startDate',
+                  decoration: const InputDecoration(labelText: 'Data início (YYYY-MM-DD)'),
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(errorText: 'Data início é obrigatória'),
+                    FormBuilderValidators.match(r'^\d{4}-\d{2}-\d{2}$', errorText: 'Formato: YYYY-MM-DD'),
+                  ]),
+                ),
+                const SizedBox(height: 8),
+                FormBuilderTextField(
+                  name: 'endDate',
+                  decoration: const InputDecoration(labelText: 'Data fim (YYYY-MM-DD)'),
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(errorText: 'Data fim é obrigatória'),
+                    FormBuilderValidators.match(r'^\d{4}-\d{2}-\d{2}$', errorText: 'Formato: YYYY-MM-DD'),
+                  ]),
+                ),
+                const SizedBox(height: 8),
+                FormBuilderTextField(
+                  name: 'targetCount',
+                  decoration: const InputDecoration(labelText: 'Meta de execuções (ex: 10)'),
+                  keyboardType: TextInputType.number,
+                  validator: FormBuilderValidators.compose([
+                    FormBuilderValidators.required(errorText: 'Meta é obrigatória'),
+                    FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
+                    FormBuilderValidators.min(1, errorText: 'Meta deve ser pelo menos 1'),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () async {
+              if (formKey.currentState?.saveAndValidate() ?? false) {
+                final values = formKey.currentState!.value;
+                final name = values['name'] as String;
+                final techniqueId = values['techniqueId'] as String;
+                final startDate = values['startDate'] as String;
+                final endDate = values['endDate'] as String;
+                final targetCount = int.parse(values['targetCount'] as String);
+                
+                Navigator.pop(ctx);
+                try {
+                  await _api.createTrophy(
+                    academyId: _academy.id,
+                    techniqueId: techniqueId,
+                    name: name.trim(),
+                    startDate: startDate.trim(),
+                    endDate: endDate.trim(),
+                    targetCount: targetCount,
+                  );
+                  if (mounted) {
+                    _loadTrophies();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Troféu criado. Alunos podem conquistar ouro, prata ou bronze.')),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(userFacingMessage(e))),
+                    );
+                  }
+                }
+              }
+            },
+            child: const Text('Criar'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadRankingAndReport() async {
@@ -412,6 +554,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           await _loadRankingAndReport();
           _loadTechniques();
           _loadPositions();
+          _loadTrophies();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -554,6 +697,72 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                 IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openTechniqueForm(t)),
                                 IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deleteTechnique(t)),
                               ]),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _SectionTitle(title: 'Troféus'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Troféus desta academia (ouro/prata/bronze por execuções)',
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: _showCreateTrophyDialog,
+                            tooltip: 'Criar troféu',
+                          ),
+                        ],
+                      ),
+                      if (_loadingTrophies)
+                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+                      else if (_trophies.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Nenhum troféu. Crie um troféu vinculado a uma técnica, com período e meta de execuções.',
+                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                        )
+                      else
+                        ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _trophies.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, i) {
+                            final t = _trophies[i];
+                            final name = t['name'] as String? ?? '—';
+                            final techniqueName = t['technique_name'] as String? ?? '';
+                            final start = t['start_date'] as String? ?? '';
+                            final end = t['end_date'] as String? ?? '';
+                            final target = t['target_count'] as int? ?? 0;
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: Icon(Icons.emoji_events_outlined, color: AppTheme.primary, size: 24),
+                              title: Text(name),
+                              subtitle: Text(
+                                '${techniqueName.isNotEmpty ? techniqueName : 'Técnica'} · $start a $end · Meta: $target',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              ),
                             );
                           },
                         ),

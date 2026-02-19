@@ -58,6 +58,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selected = 0;
+  int _inicioRefreshKey = 0;
 
   static const _titles = ['Início', 'Painel', 'Administração'];
 
@@ -79,7 +80,7 @@ class _MainShellState extends State<MainShell> {
         ],
       ),
       body: _selected == 0
-          ? const StudentHomeScreen()
+          ? StudentHomeScreen(refreshTrigger: _inicioRefreshKey)
           : _selected == 1
               ? const AcademyPanelScreen()
               : const AdminSectionScreen(),
@@ -103,7 +104,10 @@ class _MainShellState extends State<MainShell> {
                   icon: Icons.home_rounded,
                   label: 'Início',
                   selected: _selected == 0,
-                  onTap: () => setState(() => _selected = 0),
+                  onTap: () => setState(() {
+                    _selected = 0;
+                    _inicioRefreshKey++;
+                  }),
                 ),
                 _NavItem(
                   icon: Icons.dashboard_rounded,

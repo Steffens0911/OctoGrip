@@ -64,3 +64,14 @@ class Technique(Base, UUIDMixin):
         back_populates="technique",
         lazy="selectin",
     )
+    trophies: Mapped[list["Trophy"]] = relationship(
+        "Trophy",
+        back_populates="technique",
+        lazy="selectin",
+    )
+    technique_executions_direct: Mapped[list["TechniqueExecution"]] = relationship(
+        "TechniqueExecution",
+        back_populates="technique",
+        foreign_keys="TechniqueExecution.technique_id",
+        lazy="selectin",
+    )

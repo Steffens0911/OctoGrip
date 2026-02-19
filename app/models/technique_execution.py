@@ -34,6 +34,11 @@ class TechniqueExecution(Base, UUIDMixin):
         nullable=True,
         index=True,
     )
+    technique_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("techniques.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     opponent_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
@@ -70,6 +75,10 @@ class TechniqueExecution(Base, UUIDMixin):
     lesson: Mapped["Lesson | None"] = relationship(
         "Lesson",
         back_populates="technique_executions",
+    )
+    technique: Mapped["Technique | None"] = relationship(
+        "Technique",
+        back_populates="technique_executions_direct",
     )
     opponent: Mapped["User"] = relationship(
         "User",

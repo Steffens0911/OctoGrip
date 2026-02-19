@@ -2,6 +2,7 @@ import logging
 from datetime import date, timedelta
 from uuid import UUID
 
+from sqlalchemy import or_, exists, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.graduation import points_for_graduation
@@ -140,26 +141,24 @@ def _mission_to_today_response(
     else:
         already_completed = False
         if db is not None and user_id is not None:
-            has_usage = (
-                db.query(MissionUsage)
-                .filter(
-                    MissionUsage.user_id == user_id,
-                    MissionUsage.mission_id == mission.id,
+            stmt = select(
+                or_(
+                    exists()
+                    .select_from(MissionUsage)
+                    .where(
+                        MissionUsage.user_id == user_id,
+                        MissionUsage.mission_id == mission.id,
+                    ),
+                    exists()
+                    .select_from(TechniqueExecution)
+                    .where(
+                        TechniqueExecution.user_id == user_id,
+                        TechniqueExecution.mission_id == mission.id,
+                        TechniqueExecution.status == "confirmed",
+                    ),
                 )
-                .first()
-                is not None
             )
-            has_confirmed_execution = (
-                db.query(TechniqueExecution)
-                .filter(
-                    TechniqueExecution.user_id == user_id,
-                    TechniqueExecution.mission_id == mission.id,
-                    TechniqueExecution.status == "confirmed",
-                )
-                .first()
-                is not None
-            )
-            already_completed = has_usage or has_confirmed_execution
+            already_completed = db.execute(stmt).scalar() or False
     mult = display_multiplier if display_multiplier is not None else (getattr(mission, "multiplier", 1) or 1)
     return MissionTodayResponse(
         mission_id=mission.id,

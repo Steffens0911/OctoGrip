@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
@@ -20,10 +21,40 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> {
   final _api = ApiService();
+  final _searchController = TextEditingController();
   List<Lesson> _featuredLessons = [];
   List<Lesson> _allLessons = [];
+  List<Lesson> _filteredFeaturedLessons = [];
+  List<Lesson> _filteredAllLessons = [];
+  List<Technique> _techniques = [];
+  String? _filterTechniqueId;
   bool _loading = true;
+  bool _loadingTechniques = true;
   String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _applyFilters() {
+    var filteredFeatured = _featuredLessons;
+    var filteredAll = _allLessons;
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      filteredFeatured = filteredFeatured.where((l) => l.title.toLowerCase().contains(query)).toList();
+      filteredAll = filteredAll.where((l) => l.title.toLowerCase().contains(query)).toList();
+    }
+    if (_filterTechniqueId != null) {
+      filteredFeatured = filteredFeatured.where((l) => l.techniqueId == _filterTechniqueId).toList();
+      filteredAll = filteredAll.where((l) => l.techniqueId == _filterTechniqueId).toList();
+    }
+    setState(() {
+      _filteredFeaturedLessons = filteredFeatured;
+      _filteredAllLessons = filteredAll;
+    });
+  }
 
   @override
   void initState() {
@@ -37,19 +68,23 @@ class _LibraryScreenState extends State<LibraryScreen> {
       _error = null;
     });
     try {
-      List<Lesson> featured = [];
-      if (widget.academyId != null) {
-        featured = await _api.getLessons(academyId: widget.academyId);
-      }
-      final all = await _api.getLessons();
+      final results = await Future.wait([
+        widget.academyId != null ? _api.getLessons(academyId: widget.academyId) : Future.value(<Lesson>[]),
+        _api.getLessons(),
+        _api.getTechniques(),
+      ]);
       if (mounted) setState(() {
-        _featuredLessons = featured;
-        _allLessons = all;
+        _featuredLessons = results[0] as List<Lesson>;
+        _allLessons = results[1] as List<Lesson>;
+        _techniques = results[2] as List<Technique>;
         _loading = false;
+        _loadingTechniques = false;
       });
+      _applyFilters();
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
+        _loadingTechniques = false;
         _error = userFacingMessage(e);
       });
     }
@@ -119,58 +154,137 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         style: TextStyle(color: AppTheme.textSecondary),
                       ),
                     )
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
+                  : Column(
                       children: [
-                        if (_featuredLessons.isNotEmpty) ...[
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'Lição em destaque',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ),
-                          ..._featuredLessons.map((lesson) => Card(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                child: ListTile(
-                                  leading: CircleAvatar(
-                                    backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                    child: const Icon(Icons.star, color: AppTheme.primary),
-                                  ),
-                                  title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  subtitle: _lessonSubtitle(lesson),
-                                  trailing: const Icon(Icons.chevron_right),
-                                  onTap: () => _openLesson(lesson),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'Buscar por título da lição',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            _applyFilters();
+                                          },
+                                        )
+                                      : null,
                                 ),
-                              )),
-                          const SizedBox(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'Todas as lições',
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: AppTheme.textSecondary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                          ),
-                        ],
-                        ..._allLessons.map((lesson) => Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.menu_book, color: AppTheme.primary),
-                                ),
-                                title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                subtitle: _lessonSubtitle(lesson),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => _openLesson(lesson),
+                                onChanged: (_) => _applyFilters(),
                               ),
-                            )),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: _filterTechniqueId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Técnica',
+                                  hintText: 'Todas',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text('Todas')),
+                                  ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _filterTechniqueId = v);
+                                  _applyFilters();
+                                },
+                              ),
+                              if (_searchController.text.isNotEmpty || _filterTechniqueId != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Mostrando ${_filteredFeaturedLessons.length + _filteredAllLessons.length} de ${_featuredLessons.length + _allLessons.length}',
+                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() => _filterTechniqueId = null);
+                                          _applyFilters();
+                                        },
+                                        child: const Text('Limpar filtros'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: _filteredFeaturedLessons.isEmpty && _filteredAllLessons.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    _searchController.text.isNotEmpty || _filterTechniqueId != null
+                                        ? 'Nenhuma lição encontrada.'
+                                        : 'Nenhuma lição cadastrada.',
+                                    style: TextStyle(color: AppTheme.textSecondary),
+                                  ),
+                                )
+                              : ListView(
+                                  padding: const EdgeInsets.all(16),
+                                  children: [
+                                    if (_filteredFeaturedLessons.isNotEmpty) ...[
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: Text(
+                                          'Lição em destaque',
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                color: AppTheme.primary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                      ..._filteredFeaturedLessons.map((lesson) => Card(
+                                            margin: const EdgeInsets.only(bottom: 12),
+                                            child: ListTile(
+                                              leading: CircleAvatar(
+                                                backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                                child: const Icon(Icons.star, color: AppTheme.primary),
+                                              ),
+                                              title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                              subtitle: _lessonSubtitle(lesson),
+                                              trailing: const Icon(Icons.chevron_right),
+                                              onTap: () => _openLesson(lesson),
+                                            ),
+                                          )),
+                                      const SizedBox(height: 16),
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: Text(
+                                          'Todas as lições',
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                color: AppTheme.textSecondary,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                    ..._filteredAllLessons.map((lesson) => Card(
+                                          margin: const EdgeInsets.only(bottom: 12),
+                                          child: ListTile(
+                                            leading: CircleAvatar(
+                                              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                              child: const Icon(Icons.menu_book, color: AppTheme.primary),
+                                            ),
+                                            title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                                            subtitle: _lessonSubtitle(lesson),
+                                            trailing: const Icon(Icons.chevron_right),
+                                            onTap: () => _openLesson(lesson),
+                                          ),
+                                        )),
+                                  ],
+                                ),
+                        ),
                       ],
                     ),
     );

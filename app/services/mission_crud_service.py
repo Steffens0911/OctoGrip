@@ -3,7 +3,7 @@ import logging
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
@@ -85,8 +85,13 @@ def list_missions(
     academy_id: UUID | None = None,
     limit: int = 100,
 ) -> list[Mission]:
-    """Lista missões, opcionalmente filtradas por academia."""
-    q = db.query(Mission).order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc()).limit(limit)
+    """Lista missões, opcionalmente filtradas por academia (eager load technique para technique_name)."""
+    q = (
+        db.query(Mission)
+        .options(joinedload(Mission.technique))
+        .order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc())
+        .limit(limit)
+    )
     if academy_id is not None:
         q = q.filter(Mission.academy_id == academy_id)
     return q.all()

@@ -9,12 +9,16 @@ import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
+import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
 /// Tela inicial da área do aluno: seletor de usuário (MVP), missões da semana e atalhos.
 class StudentHomeScreen extends StatefulWidget {
-  const StudentHomeScreen({super.key});
+  const StudentHomeScreen({super.key, this.refreshTrigger = 0});
+
+  /// Incrementado ao tocar na aba Início; em didUpdateWidget dispara _load() para atualizar missões.
+  final int refreshTrigger;
 
   @override
   State<StudentHomeScreen> createState() => _StudentHomeScreenState();
@@ -69,6 +73,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant StudentHomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshTrigger != widget.refreshTrigger) {
+      _load();
+    }
   }
 
   @override
@@ -149,8 +161,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadPendingConfirmationsWith(String userId) async {
     try {
-      final list = await _api.getPendingConfirmations(userId);
-      if (mounted) setState(() => _pendingConfirmationsCount = list.length);
+      final count = await _api.getPendingConfirmationsCount(userId);
+      if (mounted) setState(() => _pendingConfirmationsCount = count);
     } catch (_) {
       if (mounted) setState(() => _pendingConfirmationsCount = 0);
     }
@@ -643,6 +655,20 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               builder: (context) => ReportDifficultyScreen(
                 userId: userId,
                 academyId: _selectedUser?.academyId,
+              ),
+            ),
+          ),
+        ),
+        _ShortcutTile(
+          icon: Icons.emoji_events_outlined,
+          title: 'Galeria de troféus',
+          subtitle: 'Troféus conquistados (ouro, prata, bronze)',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TrophyGalleryScreen(
+                userId: userId,
+                userName: _selectedUser?.name ?? _selectedUser?.email,
               ),
             ),
           ),

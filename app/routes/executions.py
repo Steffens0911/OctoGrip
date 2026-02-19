@@ -16,6 +16,7 @@ from app.schemas.execution import (
 )
 from app.services.execution_service import (
     confirm_execution,
+    count_pending_confirmations,
     create_execution,
     list_my_executions,
     list_pending_confirmations,
@@ -27,7 +28,9 @@ router = APIRouter()
 
 def _execution_to_read(execution) -> ExecutionRead:
     technique_name = None
-    if execution.mission and execution.mission.technique:
+    if execution.technique:
+        technique_name = execution.technique.name
+    elif execution.mission and execution.mission.technique:
         technique_name = execution.mission.technique.name
     elif execution.lesson and execution.lesson.technique:
         technique_name = execution.lesson.technique.name
@@ -62,6 +65,8 @@ def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
         usage_type=body.usage_type,
         mission_id=body.mission_id,
         lesson_id=body.lesson_id,
+        technique_id=body.technique_id,
+        academy_id=body.academy_id,
     )
     opponent_name = execution.opponent.name if execution.opponent else "Adversário"
     return ExecutionCreateResponse(
@@ -69,6 +74,15 @@ def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
         status="pending_confirmation",
         message=f"Aguardando confirmação de {opponent_name}.",
     )
+
+
+@router.get("/pending_confirmations/count")
+def execution_pending_confirmations_count(
+    user_id: UUID = Query(..., description="ID do adversário (quem deve confirmar)"),
+    db: Session = Depends(get_db),
+):
+    """Retorna apenas o número de confirmações pendentes (para badge na tela inicial)."""
+    return {"count": count_pending_confirmations(db, opponent_id=user_id)}
 
 
 @router.get("/pending_confirmations", response_model=list[ExecutionRead])

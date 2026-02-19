@@ -6,18 +6,23 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class ExecutionCreate(BaseModel):
-    """Body do POST /executions. Informe exatamente um de mission_id ou lesson_id."""
+    """Body do POST /executions. Informe exatamente um de mission_id, lesson_id ou technique_id."""
 
     user_id: UUID
     mission_id: UUID | None = None
     lesson_id: UUID | None = None
+    technique_id: UUID | None = None
+    academy_id: UUID | None = None  # obrigatório quando technique_id é informado
     opponent_id: UUID
     usage_type: str = "after_training"  # before_training | after_training
 
     @model_validator(mode="after")
-    def check_mission_or_lesson(self):
-        if (self.mission_id is None) == (self.lesson_id is None):
-            raise ValueError("Informe exatamente um de mission_id ou lesson_id.")
+    def check_source(self):
+        filled = sum(1 for x in (self.mission_id, self.lesson_id, self.technique_id) if x is not None)
+        if filled != 1:
+            raise ValueError("Informe exatamente um de mission_id, lesson_id ou technique_id.")
+        if self.technique_id is not None and self.academy_id is None:
+            raise ValueError("Quando technique_id for informado, academy_id é obrigatório.")
         return self
 
 
