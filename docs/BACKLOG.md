@@ -231,6 +231,14 @@ Itens já implementados (engenharia).
 |------|--------|------|---------------------|
 | B-25 | DONE   | Logs estruturados | core/logging_config (formato timestamp \| level \| logger \| message \| key=value); logs em lesson, mission, lesson_complete, training_feedback, metrics |
 
+#### REF — Performance e escalabilidade
+
+| ID   | Status | Item | Critérios de aceite |
+|------|--------|------|---------------------|
+| P3 | DONE   | Backend assíncrono | Migração para asyncpg + async SQLAlchemy; todas as rotas e services convertidos para `async def`; `AsyncSession` e `await db.execute(select(...))`; pool de conexões configurável |
+| P4 | DONE   | Testes e CI/CD | 61 testes pytest com fixtures async; GitHub Actions com jobs de test, lint e docker build; cobertura de rotas principais (health, auth, users, academies, CRUD, executions) |
+| P5 | DONE   | Otimização de performance | Backend: correção de N+1 queries, agregação SQL, 6 índices compostos, paginação em list_users e get_points_log. Frontend: ListView.builder, debounce em busca, otimização de setState, paginação em listas grandes |
+
 ---
 
 ### App Flutter (bjj_app)
@@ -291,7 +299,7 @@ Itens já implementados (engenharia).
 | Área | Conteúdo |
 |------|----------|
 | **Roadmap** | Fase 1 (MVP) + Fase 1.5 (validação de hábito) + Fases 2–5 (product fit, B2B, profissional, escala) |
-| **Backend DONE** | B-01 a B-26 — Infra, modelos, CRUD Lesson, Mission, missão do dia, exceções, health, seed, lesson_complete, training_feedback, GET /positions, metrics/usage, logging estruturado |
+| **Backend DONE** | B-01 a B-26 — Infra, modelos, CRUD Lesson, Mission, missão do dia, exceções, health, seed, lesson_complete, training_feedback, GET /positions, metrics/usage, logging estruturado; P3 (async), P4 (testes + CI/CD) |
 | **Flutter DONE** | F-01 a F-19 — Estrutura, tema, Mission + cache, Home/Lesson, navegação, progresso, uso da missão, testes; integração: lesson_complete ao concluir, biblioteca de lições, reportar dificuldade, histórico de missões, área professor, métricas de uso |
 
 ---

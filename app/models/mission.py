@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 
-from sqlalchemy import Boolean, Date, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String
 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,9 @@ class Mission(Base, UUIDMixin):
     """
 
     __tablename__ = "missions"
+    __table_args__ = (
+        Index("idx_mission_academy_level_slot_active", "academy_id", "level", "slot_index", "is_active"),
+    )
 
     technique_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("techniques.id", ondelete="RESTRICT"),

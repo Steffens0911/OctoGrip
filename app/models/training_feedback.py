@@ -17,10 +17,12 @@ class TrainingFeedback(Base, UUIDMixin):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     position_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("positions.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     difficulty_level: Mapped[int] = mapped_column(
         Integer,

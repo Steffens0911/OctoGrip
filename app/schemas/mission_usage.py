@@ -2,11 +2,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MissionUsageItem(BaseModel):
     """Um item de uso para sync (payload do app)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     lesson_id: UUID
     opened_at: datetime
@@ -16,6 +18,8 @@ class MissionUsageItem(BaseModel):
 
 class MissionUsageSyncRequest(BaseModel):
     """Body do POST /mission_usages/sync. user_id vem do token."""
+
+    model_config = ConfigDict(extra="forbid")
 
     usages: list[MissionUsageItem]
 

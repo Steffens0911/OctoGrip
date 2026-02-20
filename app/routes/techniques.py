@@ -1,11 +1,12 @@
 """CRUD de técnicas (listagem por academia)."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.role_deps import require_read_access, require_write_access
+from app.core.exceptions import AppError, ConflictError, ForbiddenError, TechniqueNotFoundError
+from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.technique import TechniqueCreate, TechniqueRead, TechniqueUpdate
@@ -20,90 +21,101 @@ from app.services.technique_service import (
 router = APIRouter()
 
 
+def _resolve_academy_id(current_user: User, academy_id: UUID | None) -> UUID:
+    """Resolve academy_id: admin exige explícito, demais usam sua própria."""
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+        return academy_id
+    if current_user.role != "administrador":
+        if current_user.academy_id is None:
+            raise ForbiddenError("Você precisa estar vinculado a uma academia.")
+        return current_user.academy_id
+    raise AppError("academy_id é obrigatório para listar técnicas.")
+
+
 @router.get("", response_model=list[TechniqueRead])
-def techniques_list(
+async def techniques_list(
     academy_id: UUID | None = Query(None, description="Filtra por academia"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_read_access),
 ):
-    """Lista técnicas. academy_id obrigatório para listar (técnicas são por academia)."""
-    if academy_id is None:
-        raise HTTPException(status_code=400, detail="academy_id é obrigatório para listar técnicas.")
-    return list_techniques(db, academy_id=academy_id)
+    """Lista técnicas por academia."""
+    resolved = _resolve_academy_id(current_user, academy_id)
+    return await list_techniques(db, academy_id=resolved)
 
 
 @router.get("/{technique_id}", response_model=TechniqueRead)
-def technique_get(
+async def technique_get(
     technique_id: UUID,
-    academy_id: UUID = Query(..., description="Academia do contexto – retorna 404 se a técnica não for desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Retorna uma técnica por ID. Só retorna se pertencer à academia informada. Admin, gerente, professor ou supervisor."""
-    technique = get_technique(db, technique_id)
+    """Retorna uma técnica por ID."""
+    verify_academy_access(current_user, str(academy_id))
+    technique = await get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        raise TechniqueNotFoundError()
     return technique
 
 
 @router.post("", response_model=TechniqueRead, status_code=201)
-def technique_create(body: TechniqueCreate, db: Session = Depends(get_db)):
-    """Cria uma nova técnica na academia. As posições devem pertencer à mesma academia."""
-    try:
-        return create_technique(
-            db,
-            academy_id=body.academy_id,
-            name=body.name,
-            from_position_id=body.from_position_id,
-            to_position_id=body.to_position_id,
-            slug=body.slug or None,
-            description=body.description,
-            video_url=body.video_url or None,
-            base_points=body.base_points,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+async def technique_create(
+    body: TechniqueCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Cria uma nova técnica na academia."""
+    verify_academy_access(current_user, str(body.academy_id) if body.academy_id else None)
+    return await create_technique(
+        db,
+        academy_id=body.academy_id,
+        name=body.name,
+        from_position_id=body.from_position_id,
+        to_position_id=body.to_position_id,
+        slug=body.slug or None,
+        description=body.description,
+        video_url=body.video_url or None,
+        base_points=body.base_points,
+    )
 
 
 @router.put("/{technique_id}", response_model=TechniqueRead)
-def technique_update(
+async def technique_update(
     technique_id: UUID,
     body: TechniqueUpdate,
-    academy_id: UUID = Query(..., description="Academia do contexto – só permite editar técnicas desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Atualiza uma técnica (campos opcionais). Só permite se pertencer à academia informada. Admin, gerente ou professor."""
-    technique = get_technique(db, technique_id)
+    """Atualiza uma técnica."""
+    verify_academy_access(current_user, str(academy_id))
+    technique = await get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        raise TechniqueNotFoundError()
     payload = body.model_dump(exclude_unset=True)
-    try:
-        updated = update_technique(db, technique_id, **payload)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    updated = await update_technique(db, technique_id, **payload)
     if not updated:
-        raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        raise TechniqueNotFoundError()
     return updated
 
 
 @router.delete("/{technique_id}", status_code=204)
-def technique_delete(
+async def technique_delete(
     technique_id: UUID,
-    academy_id: UUID = Query(..., description="Academia do contexto – só permite excluir técnicas desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Remove uma técnica. Só permite se pertencer à academia informada. Admin, gerente ou professor."""
-    technique = get_technique(db, technique_id)
+    """Remove uma técnica."""
+    verify_academy_access(current_user, str(academy_id))
+    technique = await get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        raise TechniqueNotFoundError()
     try:
-        if not delete_technique(db, technique_id):
-            raise HTTPException(status_code=404, detail="Técnica não encontrada.")
+        if not await delete_technique(db, technique_id):
+            raise TechniqueNotFoundError()
         return None
     except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Não é possível excluir: existem lições ou missões vinculadas a esta técnica.",
-        )
+        await db.rollback()
+        raise ConflictError("Não é possível excluir: existem lições ou missões vinculadas a esta técnica.")

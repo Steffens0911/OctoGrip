@@ -1,11 +1,12 @@
 """CRUD de posições (listagem por academia, app e painel)."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.role_deps import require_read_access, require_write_access
+from app.core.exceptions import AppError, ConflictError, ForbiddenError, PositionNotFoundError
+from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.position import PositionCreate, PositionRead, PositionUpdate
@@ -20,65 +21,76 @@ from app.services.position_service import (
 router = APIRouter()
 
 
+def _resolve_academy_id(current_user: User, academy_id: UUID | None) -> UUID:
+    """Resolve academy_id: admin exige explícito, demais usam sua própria."""
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+        return academy_id
+    if current_user.role != "administrador":
+        if current_user.academy_id is None:
+            raise ForbiddenError("Você precisa estar vinculado a uma academia.")
+        return current_user.academy_id
+    raise AppError("academy_id é obrigatório para listar posições.")
+
+
 @router.get("", response_model=list[PositionRead])
-def positions_list(
+async def positions_list(
     academy_id: UUID | None = Query(None, description="Filtra por academia"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Lista posições. academy_id obrigatório para listar (posições são por academia). Admin, gerente, professor ou supervisor."""
-    if academy_id is None:
-        raise HTTPException(status_code=400, detail="academy_id é obrigatório para listar posições.")
-    return list_positions(db, academy_id=academy_id)
+    """Lista posições por academia."""
+    resolved = _resolve_academy_id(current_user, academy_id)
+    return await list_positions(db, academy_id=resolved)
 
 
 @router.get("/{position_id}", response_model=PositionRead)
-def position_get(
+async def position_get(
     position_id: UUID,
-    academy_id: UUID = Query(..., description="Academia do contexto – retorna 404 se a posição não for desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Retorna uma posição por ID. Só retorna se pertencer à academia informada. Admin, gerente, professor ou supervisor."""
-    position = get_position(db, position_id)
+    """Retorna uma posição por ID."""
+    verify_academy_access(current_user, str(academy_id))
+    position = await get_position(db, position_id)
     if not position or position.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Posição não encontrada.")
+        raise PositionNotFoundError()
     return position
 
 
 @router.post("", response_model=PositionRead, status_code=201)
-def position_create(
+async def position_create(
     body: PositionCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Cria uma nova posição na academia. Admin, gerente ou professor."""
+    """Cria uma nova posição na academia."""
+    verify_academy_access(current_user, str(body.academy_id) if body.academy_id else None)
     try:
-        return create_position(
+        return await create_position(
             db, academy_id=body.academy_id, name=body.name, slug=body.slug or None, description=body.description
         )
     except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Já existe uma posição com este nome ou slug. Escolha outro.",
-        )
+        await db.rollback()
+        raise ConflictError("Já existe uma posição com este nome ou slug. Escolha outro.")
 
 
 @router.put("/{position_id}", response_model=PositionRead)
-def position_update(
+async def position_update(
     position_id: UUID,
     body: PositionUpdate,
-    academy_id: UUID = Query(..., description="Academia do contexto – só permite editar posições desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Atualiza uma posição (campos opcionais). Só permite se pertencer à academia informada. Admin, gerente ou professor."""
-    position = get_position(db, position_id)
+    """Atualiza uma posição."""
+    verify_academy_access(current_user, str(academy_id))
+    position = await get_position(db, position_id)
     if not position or position.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Posição não encontrada.")
+        raise PositionNotFoundError()
     payload = body.model_dump(exclude_unset=True)
-    updated = update_position(
+    updated = await update_position(
         db,
         position_id,
         name=payload.get("name"),
@@ -89,23 +101,20 @@ def position_update(
 
 
 @router.delete("/{position_id}", status_code=204)
-def position_remove(
+async def position_remove(
     position_id: UUID,
-    academy_id: UUID = Query(..., description="Academia do contexto – só permite excluir posições desta academia"),
-    db: Session = Depends(get_db),
+    academy_id: UUID = Query(..., description="Academia do contexto"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Remove uma posição (falha se houver técnicas vinculadas). Só permite se pertencer à academia informada. Admin, gerente ou professor."""
-    position = get_position(db, position_id)
+    """Remove uma posição."""
+    position = await get_position(db, position_id)
     if not position or position.academy_id != academy_id:
-        raise HTTPException(status_code=404, detail="Posição não encontrada.")
+        raise PositionNotFoundError()
     try:
-        if not delete_position(db, position_id):
-            raise HTTPException(status_code=404, detail="Posição não encontrada.")
+        if not await delete_position(db, position_id):
+            raise PositionNotFoundError()
         return None
     except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=409,
-            detail="Não é possível excluir: existem técnicas vinculadas a esta posição.",
-        )
+        await db.rollback()
+        raise ConflictError("Não é possível excluir: existem técnicas vinculadas a esta posição.")

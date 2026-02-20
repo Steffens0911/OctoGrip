@@ -1,11 +1,13 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MissionCreate(BaseModel):
     """T-01: Criação de missão. Missão = lição (ou técnica) + período."""
+
+    model_config = ConfigDict(extra="forbid")
 
     technique_id: UUID
     lesson_id: UUID | None = None
@@ -19,6 +21,8 @@ class MissionCreate(BaseModel):
 
 class MissionUpdate(BaseModel):
     """Atualização parcial de missão (editar)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     technique_id: UUID | None = None
     lesson_id: UUID | None = None

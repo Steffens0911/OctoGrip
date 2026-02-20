@@ -8,9 +8,7 @@ import 'package:viewer/utils/form_utils.dart';
 
 /// Tela de login com e-mail e senha.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLoginSuccess});
-
-  final VoidCallback onLoginSuccess;
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -43,7 +41,6 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
       AuthService().setLoggedIn(result.token, result.user);
-      if (mounted) widget.onLoginSuccess();
     } catch (e) {
       if (mounted) {
         setState(() {

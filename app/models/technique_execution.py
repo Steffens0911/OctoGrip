@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +18,10 @@ class TechniqueExecution(Base, UUIDMixin):
     """
 
     __tablename__ = "technique_executions"
+    __table_args__ = (
+        Index("idx_technique_execution_user_mission_status", "user_id", "mission_id", "status"),
+        Index("idx_technique_execution_opponent_status", "opponent_id", "status"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),

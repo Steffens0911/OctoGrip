@@ -23,25 +23,25 @@ class Academy(Base, UUIDMixin):
         comment="A-03: tema semanal (legado); preferir weekly_technique_id.",
     )
     weekly_technique_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("techniques.id", ondelete="SET NULL"),
+        ForeignKey("techniques.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
         index=True,
         comment="Técnica slot 1 (seg-ter) ou missão única da semana se 2 e 3 forem null.",
     )
     weekly_technique_2_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("techniques.id", ondelete="SET NULL"),
+        ForeignKey("techniques.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
         index=True,
         comment="Técnica slot 2 (qua-qui).",
     )
     weekly_technique_3_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("techniques.id", ondelete="SET NULL"),
+        ForeignKey("techniques.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
         index=True,
         comment="Técnica slot 3 (sex-dom).",
     )
     visible_lesson_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("lessons.id", ondelete="SET NULL"),
+        ForeignKey("lessons.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
         index=True,
         comment="Lição em destaque visível para os alunos da academia.",

@@ -1,7 +1,7 @@
 """Schemas para Professor (CRUD seção professor)."""
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class ProfessorRead(BaseModel):
@@ -19,14 +19,18 @@ class ProfessorRead(BaseModel):
 class ProfessorCreate(BaseModel):
     """Criação de professor."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(..., min_length=1, max_length=255)
-    email: str = Field(..., min_length=1, max_length=255)
+    email: EmailStr = Field(..., description="E-mail do professor (deve ser válido)")
     academy_id: UUID | None = None
 
 
 class ProfessorUpdate(BaseModel):
     """Atualização parcial de professor."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(None, min_length=1, max_length=255)
-    email: str | None = Field(None, min_length=1, max_length=255)
+    email: EmailStr | None = Field(None, description="E-mail do professor (deve ser válido)")
     academy_id: UUID | None = None

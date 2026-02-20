@@ -13,6 +13,20 @@ class AppError(Exception):
         super().__init__(message)
 
 
+class AuthenticationError(AppError):
+    """Falha de autenticação (401)."""
+
+    def __init__(self, message: str = "Token de autenticação ausente ou inválido."):
+        super().__init__(message, status_code=401)
+
+
+class ForbiddenError(AppError):
+    """Acesso negado."""
+
+    def __init__(self, message: str = "Acesso negado."):
+        super().__init__(message, status_code=403)
+
+
 # --- Not Found (404) ---
 
 
@@ -48,6 +62,16 @@ class AcademyNotFoundError(NotFoundError):
         super().__init__(message)
 
 
+class MissionNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Missão não encontrada."):
+        super().__init__(message)
+
+
+class ProfessorNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Professor não encontrado."):
+        super().__init__(message)
+
+
 # --- Conflict (409) ---
 
 
@@ -55,4 +79,11 @@ class AlreadyCompletedError(AppError):
     """Lição já concluída por este usuário."""
 
     def __init__(self, message: str = "Esta lição já foi concluída por este usuário."):
+        super().__init__(message, status_code=409)
+
+
+class ConflictError(AppError):
+    """Recurso já existe ou operação conflitante."""
+
+    def __init__(self, message: str = "Recurso já existe."):
         super().__init__(message, status_code=409)

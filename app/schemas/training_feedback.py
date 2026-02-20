@@ -1,11 +1,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class TrainingFeedbackRequest(BaseModel):
     """Corpo da requisição para registrar feedback de treino. user_id vem do token."""
+
+    model_config = ConfigDict(extra="forbid")
 
     position_id: UUID
     observation: str | None = None

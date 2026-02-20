@@ -1,6 +1,6 @@
 """Conclusão por missão: POST /mission_complete (requer autenticação)."""
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.auth_deps import get_current_user
@@ -12,13 +12,13 @@ router = APIRouter()
 
 
 @router.post("", response_model=MissionCompleteResponse, status_code=201)
-def mission_complete(
+async def mission_complete(
     body: MissionCompleteRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Registra conclusão da missão pelo usuário logado. 409 se já concluiu."""
-    usage = complete_mission(
+    usage = await complete_mission(
         db, current_user.id, body.mission_id, usage_type=body.usage_type
     )
     assert usage.mission_id is not None

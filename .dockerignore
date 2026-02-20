@@ -1,12 +1,55 @@
+# Python
 __pycache__
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info
+dist/
+build/
+
+# Ambientes virtuais
 .env
 .venv
 venv
+env/
+
+# Git e CI
 .git
 .gitignore
+.gitattributes
+.github/
+agent-transcripts/
+
+# Documentação
 *.md
+docs/
+
+# Testes e cobertura
 .pytest_cache
 .coverage
 htmlcov
+.tox
+.nox
+tests/
+
+# IDE e Cursor
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*.sublime-*
+
+# Logs
+*.log
+logs/
+
+# Frontend (build separado)
 viewer/
+
+# OS
+.DS_Store
+Thumbs.db

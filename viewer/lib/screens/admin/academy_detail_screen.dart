@@ -8,7 +8,6 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
 import 'package:viewer/screens/admin/position_form_screen.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
-import 'package:viewer/services/academy_service.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -32,7 +31,6 @@ class AcademyDetailScreen extends StatefulWidget {
 }
 
 class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
-  final AcademyService _service = AcademyService();
   final ApiService _api = ApiService();
   late Academy _academy;
   List<Technique> _techniques = [];
@@ -341,9 +339,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       _errorExtra = null;
     });
     try {
-      final ranking = await _service.getRanking(_academy.id);
-      final difficulties = await _service.getDifficulties(_academy.id);
-      final report = await _service.getWeeklyReport(_academy.id);
+      final ranking = await _api.getAcademyRanking(_academy.id);
+      final difficulties = await _api.getAcademyDifficulties(_academy.id);
+      final report = await _api.getAcademyWeeklyReport(_academy.id);
       if (mounted) setState(() {
         _ranking = ranking;
         _difficulties = difficulties;
@@ -361,7 +359,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   Future<void> _saveTheme() async {
     setState(() => _savingTheme = true);
     try {
-      final updated = await _service.updateWeeklyMissions(
+      final updated = await _api.updateAcademyWeeklyMissions(
         _academy.id,
         weeklyTechniqueId: _weeklyTechniqueId,
         weeklyTechnique2Id: _weeklyTechnique2Id,
@@ -427,7 +425,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     if (ok != true) return;
     setState(() => _resetting = true);
     try {
-      final result = await _service.resetMissions(_academy.id);
+      final result = await _api.resetAcademyMissions(_academy.id);
       if (mounted) {
         setState(() => _resetting = false);
         final msg = result['message'] as String? ?? 'Missões reiniciadas. Pontuação preservada.';
@@ -467,7 +465,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     );
     if (ok != true) return;
     try {
-      await _service.delete(_academy.id);
+      await _api.deleteAcademy(_academy.id);
       if (mounted) widget.onDeleted();
     } catch (e) {
       if (mounted) {
@@ -526,12 +524,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           if (name.isEmpty) return;
                           Navigator.pop(ctx);
                           try {
-                            final updated = await _service.update(
+                            final updated = await _api.updateAcademy(
                               _academy.id,
                               name: name,
                               weeklyTechniqueId: techniqueId,
                             );
-                            if (updated != null && mounted) {
+                            if (mounted) {
                               setState(() {
                                 _academy = updated;
                                 _weeklyTechniqueId = updated.weeklyTechniqueId;

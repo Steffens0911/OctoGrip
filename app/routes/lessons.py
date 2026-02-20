@@ -1,9 +1,10 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.role_deps import require_read_access, require_write_access
+from app.core.exceptions import LessonNotFoundError
+from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas import LessonCreate, LessonRead, LessonUpdate
@@ -19,47 +20,58 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[LessonRead])
-def get_lessons(
+async def get_lessons(
     academy_id: UUID | None = Query(None, description="Se informado e academia tiver lição visível, retorna só ela."),
-    db: Session = Depends(get_db),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Lista aulas ordenadas por order_index. Com academy_id, retorna apenas a lição visível da academia (se houver). Admin, gerente, professor ou supervisor."""
-    return list_lessons(db, academy_id=academy_id)
+    """Lista aulas ordenadas por order_index com paginação."""
+    return await list_lessons(db, academy_id=academy_id, offset=offset, limit=limit)
 
 
 @router.get("/{lesson_id}", response_model=LessonRead)
-def get_lesson(lesson_id: UUID, db: Session = Depends(get_db)):
-    """Retorna uma aula por ID. 404 se não existir."""
-    return get_lesson_by_id(db, lesson_id)
+async def get_lesson(
+    lesson_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_read_access),
+):
+    """Retorna uma aula por ID."""
+    lesson = await get_lesson_by_id(db, lesson_id)
+    if not lesson:
+        raise LessonNotFoundError()
+    if lesson.academy_id:
+        verify_academy_access(current_user, str(lesson.academy_id))
+    return lesson
 
 
 @router.post("", response_model=LessonRead, status_code=201)
-def post_lesson(
+async def post_lesson(
     data: LessonCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Cria uma nova aula. 404 se technique_id não existir. Admin, gerente ou professor."""
-    return create_lesson(db, data)
+    """Cria uma nova aula."""
+    return await create_lesson(db, data)
 
 
 @router.put("/{lesson_id}", response_model=LessonRead)
-def put_lesson(
+async def put_lesson(
     lesson_id: UUID,
     data: LessonUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Atualiza uma aula (campos opcionais). 404 se lição ou técnica não existir. Admin, gerente ou professor."""
-    return update_lesson(db, lesson_id, data)
+    """Atualiza uma aula."""
+    return await update_lesson(db, lesson_id, data)
 
 
 @router.delete("/{lesson_id}", status_code=204)
-def remove_lesson(
+async def remove_lesson(
     lesson_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Remove uma aula. 404 se não existir. Admin, gerente ou professor."""
-    delete_lesson(db, lesson_id)
+    """Remove uma aula."""
+    await delete_lesson(db, lesson_id)

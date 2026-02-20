@@ -1,11 +1,13 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class LessonCompleteRequest(BaseModel):
     """Corpo da requisição para registrar conclusão de lição. user_id vem do token."""
+
+    model_config = ConfigDict(extra="forbid")
 
     lesson_id: UUID
 

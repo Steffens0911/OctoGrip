@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:provider/provider.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/academy/academy_panel_screen.dart';
@@ -13,7 +14,12 @@ import 'package:viewer/services/theme_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AuthService().init();
-  runApp(const ViewerApp());
+  runApp(
+    ChangeNotifierProvider<AuthService>.value(
+      value: AuthService(),
+      child: const ViewerApp(),
+    ),
+  );
 }
 
 class ViewerApp extends StatefulWidget {
@@ -63,47 +69,28 @@ class _ViewerAppState extends State<ViewerApp> {
   }
 }
 
-/// Gate: mostra LoginScreen ou MainShell conforme autenticação.
-class AuthGate extends StatefulWidget {
+/// Gate: mostra LoginScreen ou MainShell conforme autenticação via Provider.
+class AuthGate extends StatelessWidget {
   final void Function(BuildContext context) onThemeToggle;
 
   const AuthGate({super.key, required this.onThemeToggle});
 
   @override
-  State<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<AuthGate> {
-  void _onAuthChange() => setState(() {});
-
-  @override
-  void initState() {
-    super.initState();
-    AuthService().onSessionInvalidated = _onAuthChange;
-  }
-
-  @override
-  void dispose() {
-    AuthService().onSessionInvalidated = null;
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (AuthService().isLoggedIn) {
+    final auth = context.watch<AuthService>();
+    if (auth.isLoggedIn) {
       return MainShell(
-        onThemeToggle: widget.onThemeToggle,
+        onThemeToggle: onThemeToggle,
         onLogout: () async {
-          await AuthService().logout();
-          if (mounted) _onAuthChange();
+          await auth.logout();
         },
       );
     }
-    return LoginScreen(onLoginSuccess: _onAuthChange);
+    return const LoginScreen();
   }
 }
 
-/// Shell principal: navegação estilo Lovable.
+/// Shell principal: navegação estilo Lovable com Provider para estado de auth.
 class MainShell extends StatefulWidget {
   final void Function(BuildContext context) onThemeToggle;
   final VoidCallback onLogout;
@@ -118,62 +105,34 @@ class _MainShellState extends State<MainShell> {
   int _selected = 0;
   int _inicioRefreshKey = 0;
 
-  final _auth = AuthService();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      AuthService().restoreImpersonation();
+    });
+  }
 
-  List<String> get _availableTabs {
-    final role = _auth.currentUser?.role ?? 'aluno';
+  List<String> _availableTabs(AuthService auth) {
+    final role = auth.currentUser?.role ?? 'aluno';
     if (role == 'aluno') {
       return ['Início'];
     } else if (role == 'administrador') {
       return ['Início', 'Painel', 'Administração'];
     } else {
-      // professor, gerente_academia, supervisor
       return ['Início', 'Painel'];
     }
   }
 
-  int get _maxIndex => _availableTabs.length - 1;
-
-  String get _currentTitle {
-    if (_selected >= _availableTabs.length) {
-      return _availableTabs[0];
-    }
-    return _availableTabs[_selected];
-  }
-
-  Widget get _currentBody {
-    final role = _auth.currentUser?.role ?? 'aluno';
-    
+  Widget _currentBody(AuthService auth, List<String> tabs) {
     if (_selected == 0) {
       return StudentHomeScreen(refreshTrigger: _inicioRefreshKey);
     } else if (_selected == 1) {
-      if (role == 'administrador') {
-        return const AcademyPanelScreen();
-      } else {
-        return const AcademyPanelScreen();
-      }
+      return const AcademyPanelScreen();
     } else if (_selected == 2) {
       return const AdminSectionScreen();
     }
     return StudentHomeScreen(refreshTrigger: _inicioRefreshKey);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    AuthService().onImpersonationChange = () => setState(() { _inicioRefreshKey++; });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_selected > _maxIndex) {
-        setState(() => _selected = 0);
-      }
-      AuthService().restoreImpersonation();
-    });
-  }
-
-  @override
-  void dispose() {
-    AuthService().onImpersonationChange = null;
-    super.dispose();
   }
 
   void _showImpersonateDialog() {
@@ -226,16 +185,22 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final role = _auth.currentUser?.role ?? 'aluno';
-    final tabs = _availableTabs;
-    final isImpersonating = _auth.isImpersonating;
-    final effectiveUser = _auth.currentUser;
+    final auth = context.watch<AuthService>();
+    final tabs = _availableTabs(auth);
+    final isImpersonating = auth.isImpersonating;
+    final effectiveUser = auth.currentUser;
+
+    if (_selected >= tabs.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selected = 0);
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentTitle),
+        title: Text(_selected < tabs.length ? tabs[_selected] : tabs[0]),
         actions: [
-          if (_auth.isRealUserAdmin)
+          if (auth.isRealUserAdmin)
             IconButton(
               icon: const Icon(Icons.person_search_rounded),
               onPressed: _showImpersonateDialog,
@@ -289,7 +254,7 @@ class _MainShellState extends State<MainShell> {
                 ),
               ),
             ),
-          Expanded(child: _currentBody),
+          Expanded(child: _currentBody(auth, tabs)),
         ],
       ),
       bottomNavigationBar: Container(

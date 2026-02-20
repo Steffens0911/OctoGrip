@@ -4,16 +4,17 @@ import 'package:http/http.dart' as http;
 
 import 'package:viewer/config.dart';
 import 'package:viewer/models/academy.dart';
-import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/position.dart';
+import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/technique.dart';
+import 'package:viewer/models/trophy.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/user.dart';
-import 'package:viewer/models/trophy.dart';
+import 'package:viewer/services/auth_service.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -191,10 +192,20 @@ class ApiService {
 
   // ---------- Users ----------
   /// [asRealUser] true = não envia impersonation (para o seletor "Atuar como" carregar como admin e permitir voltar).
-  Future<List<UserModel>> getUsers({String? academyId, bool asRealUser = false}) async {
-    var uri = Uri.parse('$baseUrl/users');
+  Future<List<UserModel>> getUsers({String? academyId, bool asRealUser = false, int offset = 0, int limit = 50}) async {
+    var queryParams = <String, String>{};
     if (academyId != null && academyId.isNotEmpty) {
-      uri = uri.replace(queryParameters: {'academy_id': academyId});
+      queryParams['academy_id'] = academyId;
+    }
+    if (offset > 0) {
+      queryParams['offset'] = offset.toString();
+    }
+    if (limit != 50) {
+      queryParams['limit'] = limit.toString();
+    }
+    var uri = Uri.parse('$baseUrl/users');
+    if (queryParams.isNotEmpty) {
+      uri = uri.replace(queryParameters: queryParams);
     }
     final r = await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: asRealUser)));
     final decoded = jsonDecode(r.body);
@@ -321,9 +332,19 @@ class ApiService {
 
   // ---------- Lessons ----------
   /// Lista lições. Se [academyId] for informado e a academia tiver lição visível, retorna só ela.
-  Future<List<Lesson>> getLessons({String? academyId}) async {
-    final uri = academyId != null
-        ? Uri.parse('$baseUrl/lessons').replace(queryParameters: {'academy_id': academyId})
+  Future<List<Lesson>> getLessons({String? academyId, int offset = 0, int limit = 100}) async {
+    var queryParams = <String, String>{};
+    if (academyId != null) {
+      queryParams['academy_id'] = academyId;
+    }
+    if (offset > 0) {
+      queryParams['offset'] = offset.toString();
+    }
+    if (limit != 100) {
+      queryParams['limit'] = limit.toString();
+    }
+    final uri = queryParams.isNotEmpty
+        ? Uri.parse('$baseUrl/lessons').replace(queryParameters: queryParams)
         : Uri.parse('$baseUrl/lessons');
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
@@ -805,5 +826,192 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UsageMetrics.fromJson(data! as Map<String, dynamic>);
+  }
+
+  // ---------- Academy extras (ranking, dificuldades, relatório, reset, missões semanais) ----------
+
+  Future<Map<String, dynamic>> getAcademyRanking(
+    String academyId, {
+    int periodDays = 30,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/ranking')
+        .replace(queryParameters: {
+      'period_days': periodDays.toString(),
+      'limit': limit.toString(),
+    });
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    if (r.statusCode == 404) return {};
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    final entries = (map['entries'] as List<dynamic>?)
+            ?.map((e) =>
+                AcademyRankingEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return {
+      'academy_id': map['academy_id'],
+      'period_days': map['period_days'] as int,
+      'entries': entries,
+    };
+  }
+
+  Future<Map<String, dynamic>> getAcademyDifficulties(
+    String academyId, {
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/difficulties')
+        .replace(queryParameters: {'limit': limit.toString()});
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    if (r.statusCode == 404) return {};
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    final entries = (map['entries'] as List<dynamic>?)
+            ?.map((e) =>
+                AcademyDifficultyEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return {
+      'academy_id': map['academy_id'],
+      'entries': entries,
+    };
+  }
+
+  Future<Map<String, dynamic>> resetAcademyMissions(String academyId) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/reset_missions'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
+  }
+
+  Future<AcademyWeeklyReport?> getAcademyWeeklyReport(
+    String academyId, {
+    int? year,
+    int? week,
+  }) async {
+    final queryParams = <String, String>{};
+    if (year != null) queryParams['year'] = year.toString();
+    if (week != null) queryParams['week'] = week.toString();
+    final uri = Uri.parse('$baseUrl/academies/$academyId/report/weekly')
+        .replace(
+            queryParameters: queryParams.isNotEmpty ? queryParams : null);
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    if (r.statusCode == 404) return null;
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AcademyWeeklyReport.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<Academy?> updateAcademyWeeklyMissions(
+    String id, {
+    String? weeklyTechniqueId,
+    String? weeklyTechnique2Id,
+    String? weeklyTechnique3Id,
+    int? weeklyMultiplier1,
+    int? weeklyMultiplier2,
+    int? weeklyMultiplier3,
+  }) async {
+    final body = <String, dynamic>{
+      'weekly_technique_id': weeklyTechniqueId,
+      'weekly_technique_2_id': weeklyTechnique2Id,
+      'weekly_technique_3_id': weeklyTechnique3Id,
+    };
+    if (weeklyMultiplier1 != null && weeklyMultiplier1 >= 1) {
+      body['weekly_multiplier_1'] = weeklyMultiplier1;
+    }
+    if (weeklyMultiplier2 != null && weeklyMultiplier2 >= 1) {
+      body['weekly_multiplier_2'] = weeklyMultiplier2;
+    }
+    if (weeklyMultiplier3 != null && weeklyMultiplier3 >= 1) {
+      body['weekly_multiplier_3'] = weeklyMultiplier3;
+    }
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/academies/$id'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    if (r.statusCode == 404) return null;
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return Academy.fromJson(data! as Map<String, dynamic>);
+  }
+
+  // ---------- Professors ----------
+
+  Future<List<Professor>> getProfessors({String? academyId}) async {
+    var uri = Uri.parse('$baseUrl/professors');
+    if (academyId != null && academyId.isNotEmpty) {
+      uri = uri.replace(queryParameters: {'academy_id': academyId});
+    }
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final decoded = jsonDecode(r.body);
+    _throwIfNotOk(r, decoded is Map ? decoded : null);
+    final raw = decoded is List ? decoded : <dynamic>[];
+    return raw
+        .map((e) => Professor.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Professor> getProfessor(String id) async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/professors/$id'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return Professor.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<Professor> createProfessor({
+    required String name,
+    required String email,
+    String? academyId,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'email': email,
+      if (academyId != null) 'academy_id': academyId,
+    };
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/professors'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return Professor.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<Professor> updateProfessor(
+    String id, {
+    String? name,
+    String? email,
+    String? academyId,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (email != null) body['email'] = email;
+    if (academyId != null) body['academy_id'] = academyId;
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/professors/$id'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return Professor.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<void> deleteProfessor(String id) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/professors/$id'),
+      headers: await _headers(auth: true),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
   }
 }

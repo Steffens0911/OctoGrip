@@ -1,104 +1,112 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
-from app.core.role_deps import require_admin_or_academy_access
+from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
+from app.core.rate_limit import limiter
+from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-from app.services.user_service import create_user, delete_user, get_user, get_user_by_email, list_users, update_user
+from app.services.user_service import (
+    create_user,
+    delete_user,
+    get_user,
+    get_user_by_email,
+    get_user_or_raise,
+    list_users,
+    update_user,
+)
 from app.services.execution_service import get_points_log, total_points_for_user
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[UserRead])
-def users_list(
-    db: Session = Depends(get_db),
+async def users_list(
+    db: AsyncSession = Depends(get_db),
     academy_id: UUID | None = Query(None, description="Filtrar por academia (colegas da academia)"),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=200, description="Limite de resultados (máximo 200)"),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista usuários. Admin: opcional academy_id. Professor/gerente: própria academia. Aluno/outros: só se academy_id for o da própria academia (colegas)."""
+    """Lista usuários com paginação."""
     if current_user.role == "administrador":
-        return list_users(db, academy_id=academy_id)
+        return await list_users(db, academy_id=academy_id, offset=offset, limit=limit)
     if current_user.role in ("gerente_academia", "professor"):
         if current_user.academy_id is None:
             return []
-        return list_users(db, academy_id=current_user.academy_id)
-    # Aluno, supervisor ou outro: só pode listar colegas da própria academia
+        return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit)
     if current_user.academy_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Você não está vinculado a uma academia.",
-        )
+        raise ForbiddenError("Acesso negado. Você não está vinculado a uma academia.")
     if academy_id is None or academy_id != current_user.academy_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Você só pode listar usuários da sua academia.",
-        )
-    return list_users(db, academy_id=current_user.academy_id)
+        raise ForbiddenError("Acesso negado. Você só pode listar usuários da sua academia.")
+    return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit)
 
 
 @router.get("/{user_id}", response_model=UserRead)
-def user_get(
+async def user_get(
     user_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Obtém um usuário por ID. Professor/gerente só acessa usuários da própria academia."""
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    """Obtém um usuário por ID."""
+    user = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador" and user.academy_id != current_user.academy_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado. Você só pode acessar usuários da sua academia.")
+        raise ForbiddenError("Acesso negado. Você só pode acessar usuários da sua academia.")
     return user
 
 
 @router.get("/{user_id}/points")
-def user_points(user_id: UUID, db: Session = Depends(get_db)):
+async def user_points(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Total de pontos do usuário (execuções confirmadas)."""
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    return {"user_id": user_id, "points": total_points_for_user(db, user_id)}
+    user = await get_user_or_raise(db, user_id)
+    if current_user.role != "administrador":
+        verify_academy_access(current_user, str(user.academy_id) if user.academy_id else None)
+    return {"user_id": user_id, "points": await total_points_for_user(db, user_id)}
 
 
 @router.get("/{user_id}/points_log")
-def user_points_log(
+async def user_points_log(
     user_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     limit: int = Query(100, ge=1, le=500),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    current_user: User = Depends(get_current_user),
 ):
-    """Histórico de pontuação do usuário (execuções confirmadas e conclusões de missão)."""
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    return {"user_id": user_id, "entries": get_points_log(db, user_id, limit=limit)}
+    """Histórico de pontuação do usuário com paginação."""
+    user = await get_user_or_raise(db, user_id)
+    if current_user.role != "administrador":
+        verify_academy_access(current_user, str(user.academy_id) if user.academy_id else None)
+    return {"user_id": user_id, "entries": await get_points_log(db, user_id, limit=limit, offset=offset)}
 
 
 @router.post("", response_model=UserRead, status_code=201)
-def user_create(
+@limiter.limit("20/minute")
+async def user_create(
+    request: Request,
     body: UserCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Cria um usuário (email único). Admin escolhe academia; professor/gerente vincula à própria."""
-    existing = get_user_by_email(db, body.email)
+    """Cria um usuário (email único)."""
+    existing = await get_user_by_email(db, body.email)
     if existing:
-        raise HTTPException(status_code=409, detail="E-mail já cadastrado.")
+        raise ConflictError("E-mail já cadastrado.")
     if current_user.role == "administrador":
         academy_id = body.academy_id
     else:
         if current_user.academy_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Você precisa estar vinculado a uma academia para cadastrar usuários.",
-            )
+            raise ForbiddenError("Você precisa estar vinculado a uma academia para cadastrar usuários.")
         academy_id = current_user.academy_id
-    return create_user(
+    return await create_user(
         db,
         email=body.email.strip().lower(),
         name=body.name,
@@ -110,23 +118,21 @@ def user_create(
 
 
 @router.patch("/{user_id}", response_model=UserRead)
-def user_update(
+async def user_update(
     user_id: UUID,
     body: UserUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Atualiza um usuário. Professor/gerente só edita usuários da própria academia e não pode alterar academy_id."""
-    target = get_user(db, user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    """Atualiza um usuário."""
+    target = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador":
         if target.academy_id != current_user.academy_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado. Você só pode editar usuários da sua academia.")
+            raise ForbiddenError("Acesso negado. Você só pode editar usuários da sua academia.")
     payload = body.model_dump(exclude_unset=True)
     if current_user.role != "administrador":
         payload.pop("academy_id", None)
-    updated = update_user(
+    updated = await update_user(
         db,
         user_id,
         name=payload.get("name"),
@@ -137,31 +143,20 @@ def user_update(
         password=payload.get("password"),
     )
     if not updated:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+        raise UserNotFoundError()
     return updated
 
 
 @router.delete("/{user_id}", status_code=204)
-def user_delete(
+async def user_delete(
     user_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Exclui o usuário. Professor/gerente só pode excluir usuários da própria academia."""
-    target = get_user(db, user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    """Exclui o usuário."""
+    target = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador" and target.academy_id != current_user.academy_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado. Você só pode excluir usuários da sua academia.")
-    try:
-        if not delete_user(db, user_id):
-            raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-        return None
-    except HTTPException:
-        raise
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao excluir usuário: {e!s}",
-        )
+        raise ForbiddenError("Acesso negado. Você só pode excluir usuários da sua academia.")
+    if not await delete_user(db, user_id):
+        raise UserNotFoundError()
+    return None

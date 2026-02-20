@@ -4,7 +4,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
-import 'package:viewer/services/academy_service.dart';
+import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
@@ -17,7 +17,7 @@ class AcademyPanelScreen extends StatefulWidget {
 }
 
 class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
-  final AcademyService _service = AcademyService();
+  final ApiService _api = ApiService();
   List<Academy> _academies = [];
   bool _loading = true;
   String? _error;
@@ -34,7 +34,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       _error = null;
     });
     try {
-      final list = await _service.list();
+      final list = await _api.getAcademies();
       if (mounted) setState(() {
         _academies = list;
         _loading = false;
@@ -42,7 +42,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('AcademyServiceException: ', '');
+        _error = e.toString().replaceFirst(RegExp(r'^[A-Za-z]+Exception:?\s*'), '');
       });
     }
   }
@@ -62,6 +62,60 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       ),
     );
     _load();
+  }
+
+  int _getItemCount() {
+    int count = _academies.length;
+    if (AuthService().isManager() || AuthService().isProfessor()) {
+      count += 1; // Card "Usuários da academia"
+    }
+    return count;
+  }
+
+  Widget _buildListItem(BuildContext context, int index) {
+    final isManagerOrProfessor = AuthService().isManager() || AuthService().isProfessor();
+    
+    if (isManagerOrProfessor && index == 0) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.people_rounded, color: AppTheme.primary),
+          ),
+          title: const Text('Usuários da academia', style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('Cadastrar e gerenciar usuários da sua academia'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const UserListScreen()),
+          ),
+        ),
+      );
+    }
+    
+    final academyIndex = isManagerOrProfessor ? index - 1 : index;
+    final academy = _academies[academyIndex];
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+          child: const Icon(Icons.school, color: AppTheme.primary),
+        ),
+        title: Text(academy.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: (academy.weeklyTechniqueName != null && academy.weeklyTechniqueName!.isNotEmpty) ||
+                (academy.weeklyTheme != null && academy.weeklyTheme!.isNotEmpty)
+            ? Text(
+                'Missão do dia: ${academy.weeklyTechniqueName ?? academy.weeklyTheme}',
+                style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              )
+            : null,
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _openAcademy(academy),
+      ),
+    );
   }
 
   @override
@@ -108,49 +162,12 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView(
+                      child: ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        children: [
-                          if (AuthService().isManager() || AuthService().isProfessor())
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.people_rounded, color: AppTheme.primary),
-                                ),
-                                title: const Text('Usuários da academia', style: TextStyle(fontWeight: FontWeight.w600)),
-                                subtitle: const Text('Cadastrar e gerenciar usuários da sua academia'),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const UserListScreen()),
-                                ),
-                              ),
-                            ),
-                          ...List.generate(_academies.length, (i) {
-                            final a = _academies[i];
-                            return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                child: const Icon(Icons.school, color: AppTheme.primary),
-                              ),
-                              title: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                              subtitle: (a.weeklyTechniqueName != null && a.weeklyTechniqueName!.isNotEmpty) ||
-                                      (a.weeklyTheme != null && a.weeklyTheme!.isNotEmpty)
-                                  ? Text(
-                                      'Missão do dia: ${a.weeklyTechniqueName ?? a.weeklyTheme}',
-                                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                    )
-                                  : null,
-                              trailing: const Icon(Icons.chevron_right),
-                              onTap: () => _openAcademy(a),
-                            ),
-                          );
-                          }),
-                        ],
+                        itemCount: _getItemCount(),
+                        itemBuilder: (context, index) {
+                          return _buildListItem(context, index);
+                        },
                       ),
                     ),
       ),

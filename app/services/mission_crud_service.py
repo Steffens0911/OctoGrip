@@ -3,7 +3,9 @@ import logging
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select, delete as sa_delete
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
@@ -11,19 +13,20 @@ from app.models import Academy, Lesson, Mission, MissionUsage, Technique
 logger = logging.getLogger(__name__)
 
 
-def _first_lesson_id_for_technique(db: Session, technique_id: UUID) -> UUID | None:
+async def _first_lesson_id_for_technique(db: AsyncSession, technique_id: UUID) -> UUID | None:
     """Retorna o id da primeira lição da técnica (por order_index)."""
     first = (
-        db.query(Lesson)
-        .filter(Lesson.technique_id == technique_id)
-        .order_by(Lesson.order_index.asc())
-        .first()
-    )
+        await db.execute(
+            select(Lesson)
+            .where(Lesson.technique_id == technique_id)
+            .order_by(Lesson.order_index.asc())
+        )
+    ).scalars().first()
     return first.id if first else None
 
 
-def create_mission(
-    db: Session,
+async def create_mission(
+    db: AsyncSession,
     technique_id: UUID,
     level: str = "beginner",
     theme: str | None = None,
@@ -36,18 +39,18 @@ def create_mission(
     end_date: date | None = None,
 ) -> Mission:
     """Cria uma missão (técnica + slot da academia). Se lesson_id não for informado, usa a primeira lição da técnica."""
-    technique = db.query(Technique).filter(Technique.id == technique_id).first()
+    technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     if academy_id is not None:
-        academy = db.query(Academy).filter(Academy.id == academy_id).first()
+        academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
         if not academy:
             raise AcademyNotFoundError()
     level_n = (level or "beginner").lower().strip()
     if level_n not in ("beginner", "intermediate"):
         level_n = "beginner"
     if lesson_id is None:
-        lesson_id = _first_lesson_id_for_technique(db, technique_id)
+        lesson_id = await _first_lesson_id_for_technique(db, technique_id)
     mult = max(1, multiplier) if multiplier is not None else 1
     mission = Mission(
         technique_id=technique_id,
@@ -62,8 +65,8 @@ def create_mission(
         multiplier=mult,
     )
     db.add(mission)
-    db.commit()
-    db.refresh(mission)
+    await db.commit()
+    await db.refresh(mission)
     logger.info(
         "create_mission",
         extra={
@@ -75,30 +78,30 @@ def create_mission(
     return mission
 
 
-def get_mission(db: Session, mission_id: UUID) -> Mission | None:
+async def get_mission(db: AsyncSession, mission_id: UUID) -> Mission | None:
     """Retorna uma missão por ID."""
-    return db.query(Mission).filter(Mission.id == mission_id).first()
+    return (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
 
 
-def list_missions(
-    db: Session,
+async def list_missions(
+    db: AsyncSession,
     academy_id: UUID | None = None,
     limit: int = 100,
 ) -> list[Mission]:
     """Lista missões, opcionalmente filtradas por academia (eager load technique para technique_name)."""
-    q = (
-        db.query(Mission)
-        .options(joinedload(Mission.technique))
+    stmt = (
+        select(Mission)
+        .options(selectinload(Mission.technique))
         .order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc())
         .limit(limit)
     )
     if academy_id is not None:
-        q = q.filter(Mission.academy_id == academy_id)
-    return q.all()
+        stmt = stmt.where(Mission.academy_id == academy_id)
+    return (await db.execute(stmt)).unique().scalars().all()
 
 
-def update_mission(
-    db: Session,
+async def update_mission(
+    db: AsyncSession,
     mission_id: UUID,
     *,
     technique_id: UUID | None = None,
@@ -114,21 +117,22 @@ def update_mission(
     _set_academy_id_none: bool = False,
 ) -> Mission | None:
     """Atualiza uma missão (campos opcionais). Use _set_academy_id_none=True para limpar academia."""
-    mission = db.query(Mission).filter(Mission.id == mission_id).first()
+    mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission:
         return None
     if lesson_id is not None:
         mission.lesson_id = lesson_id
     if technique_id is not None and technique_id != mission.technique_id:
-        technique = db.query(Technique).filter(Technique.id == technique_id).first()
+        technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
         if not technique:
             return None
-        deleted = db.query(MissionUsage).filter(MissionUsage.mission_id == mission_id).delete()
+        result = await db.execute(sa_delete(MissionUsage).where(MissionUsage.mission_id == mission_id))
+        deleted = result.rowcount
         if deleted:
             logger.info("update_mission cleared_usage", extra={"mission_id": str(mission_id), "deleted": deleted})
         mission.technique_id = technique_id
         if lesson_id is None:
-            mission.lesson_id = _first_lesson_id_for_technique(db, technique_id)
+            mission.lesson_id = await _first_lesson_id_for_technique(db, technique_id)
     if start_date is not None:
         mission.start_date = start_date
     if end_date is not None:
@@ -147,66 +151,57 @@ def update_mission(
         mission.is_active = is_active
     if multiplier is not None and multiplier >= 1:
         mission.multiplier = multiplier
-    db.commit()
-    db.refresh(mission)
+    await db.commit()
+    await db.refresh(mission)
     logger.info("update_mission", extra={"mission_id": str(mission_id)})
     return mission
 
 
-def delete_mission(db: Session, mission_id: UUID) -> bool:
+async def delete_mission(db: AsyncSession, mission_id: UUID) -> bool:
     """Remove uma missão. Retorna True se removeu."""
-    mission = db.query(Mission).filter(Mission.id == mission_id).first()
+    mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission:
         return False
-    db.delete(mission)
-    db.commit()
+    await db.delete(mission)
+    await db.commit()
     logger.info("delete_mission", extra={"mission_id": str(mission_id)})
     return True
 
 
-def upsert_academy_week_missions(
-    db: Session,
+async def _upsert_slot_missions(
+    db: AsyncSession,
     academy_id: UUID,
-    technique_ids: tuple[UUID | None, UUID | None, UUID | None],
-    week_start: date | None = None,
-    week_end: date | None = None,
+    slot_idx: int,
+    tech_id: UUID,
+    mult: int,
 ) -> list[Mission]:
     """
-    Cria ou atualiza as 3 missões da academia por slot_index (0, 1, 2).
-    Sem datas: cada academia define suas missões pelos 3 slots.
+    Cria ou atualiza missões para um slot específico (beginner e intermediate).
+    Retorna lista de missões criadas/atualizadas.
     """
-    t1, t2, t3 = technique_ids
-    academy = db.query(Academy).filter(Academy.id == academy_id).first()
-    if not academy:
-        raise AcademyNotFoundError()
-
+    technique = (await db.execute(select(Technique).where(Technique.id == tech_id))).scalar_one_or_none()
+    if not technique:
+        raise TechniqueNotFoundError("Técnica não encontrada.")
+    
     result: list[Mission] = []
-    m1 = getattr(academy, "weekly_multiplier_1", 1) or 1
-    m2 = getattr(academy, "weekly_multiplier_2", 1) or 1
-    m3 = getattr(academy, "weekly_multiplier_3", 1) or 1
-
-    tech_slots = [(t1, m1), (t2, m2), (t3, m3)]
-    for slot_idx, (tech_id, mult) in enumerate(tech_slots):
-        if tech_id is None:
-            continue
-        technique = db.query(Technique).filter(Technique.id == tech_id).first()
-        if not technique:
-            raise TechniqueNotFoundError("Técnica não encontrada.")
+    try:
         for level in ("beginner", "intermediate"):
             existing = (
-                db.query(Mission)
-                .filter(
-                    Mission.academy_id == academy_id,
-                    Mission.level == level,
-                    Mission.slot_index == slot_idx,
+                await db.execute(
+                    select(Mission).where(
+                        Mission.academy_id == academy_id,
+                        Mission.level == level,
+                        Mission.slot_index == slot_idx,
+                    )
                 )
-                .first()
-            )
+            ).scalar_one_or_none()
+            
             if existing:
                 if existing.technique_id != tech_id:
+                    # Técnica mudou: desativar antiga e criar nova
                     existing.is_active = False
-                    db.commit()
-                    mission = create_mission(
+                    await db.commit()
+                    mission = await create_mission(
                         db,
                         technique_id=tech_id,
                         level=level,
@@ -221,12 +216,14 @@ def upsert_academy_week_missions(
                         extra={"old_mission_id": str(existing.id), "new_mission_id": str(mission.id)},
                     )
                 else:
+                    # Mesma técnica: apenas atualizar multiplicador
                     existing.multiplier = mult
-                    db.commit()
-                    db.refresh(existing)
+                    await db.commit()
+                    await db.refresh(existing)
                     result.append(existing)
             else:
-                mission = create_mission(
+                # Criar nova missão
+                mission = await create_mission(
                     db,
                     technique_id=tech_id,
                     level=level,
@@ -236,37 +233,100 @@ def upsert_academy_week_missions(
                     slot_index=slot_idx,
                 )
                 result.append(mission)
+    except Exception:
+        await db.rollback()
+        raise
+    
+    return result
 
-    if t1 is None and t2 is None and t3 is None:
-        for level in ("beginner", "intermediate"):
-            for slot_idx in (0, 1, 2):
-                old = (
-                    db.query(Mission)
-                    .filter(
-                        Mission.academy_id == academy_id,
-                        Mission.level == level,
-                        Mission.slot_index == slot_idx,
-                    )
-                    .first()
-                )
-                if old:
-                    db.delete(old)
-                    db.commit()
-    else:
-        for slot_idx, (tech_id, _) in enumerate(tech_slots):
-            if tech_id is not None:
-                continue
+
+async def _cleanup_empty_slots(
+    db: AsyncSession,
+    academy_id: UUID,
+    tech_slots: list[tuple[UUID | None, int]],
+) -> None:
+    """
+    Remove missões de slots vazios (onde tech_id é None).
+    Se todos os slots estão vazios, remove todas as missões.
+    """
+    t1, t2, t3 = tech_slots[0][0], tech_slots[1][0], tech_slots[2][0]
+    
+    try:
+        if t1 is None and t2 is None and t3 is None:
+            # Todos os slots vazios: remover todas as missões
             for level in ("beginner", "intermediate"):
-                old = (
-                    db.query(Mission)
-                    .filter(
-                        Mission.academy_id == academy_id,
-                        Mission.level == level,
-                        Mission.slot_index == slot_idx,
-                    )
-                    .first()
-                )
-                if old:
-                    db.delete(old)
-                    db.commit()
+                for slot_idx in (0, 1, 2):
+                    old = (
+                        await db.execute(
+                            select(Mission).where(
+                                Mission.academy_id == academy_id,
+                                Mission.level == level,
+                                Mission.slot_index == slot_idx,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if old:
+                        await db.delete(old)
+                        await db.commit()
+        else:
+            # Remover apenas slots específicos vazios
+            for slot_idx, (tech_id, _) in enumerate(tech_slots):
+                if tech_id is not None:
+                    continue
+                for level in ("beginner", "intermediate"):
+                    old = (
+                        await db.execute(
+                            select(Mission).where(
+                                Mission.academy_id == academy_id,
+                                Mission.level == level,
+                                Mission.slot_index == slot_idx,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if old:
+                        await db.delete(old)
+                        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+
+async def upsert_academy_week_missions(
+    db: AsyncSession,
+    academy_id: UUID,
+    technique_ids: tuple[UUID | None, UUID | None, UUID | None],
+    week_start: date | None = None,
+    week_end: date | None = None,
+) -> list[Mission]:
+    """
+    Cria ou atualiza as 3 missões da academia por slot_index (0, 1, 2).
+    Sem datas: cada academia define suas missões pelos 3 slots.
+    """
+    academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
+    if not academy:
+        raise AcademyNotFoundError()
+
+    t1, t2, t3 = technique_ids
+    m1 = getattr(academy, "weekly_multiplier_1", 1) or 1
+    m2 = getattr(academy, "weekly_multiplier_2", 1) or 1
+    m3 = getattr(academy, "weekly_multiplier_3", 1) or 1
+
+    tech_slots = [(t1, m1), (t2, m2), (t3, m3)]
+    result: list[Mission] = []
+    
+    try:
+        # Criar/atualizar missões para slots preenchidos
+        for slot_idx, (tech_id, mult) in enumerate(tech_slots):
+            if tech_id is None:
+                continue
+            slot_missions = await _upsert_slot_missions(db, academy_id, slot_idx, tech_id, mult)
+            result.extend(slot_missions)
+        
+        # Limpar slots vazios
+        await _cleanup_empty_slots(db, academy_id, tech_slots)
+        
+    except Exception:
+        await db.rollback()
+        raise
+    
     return result

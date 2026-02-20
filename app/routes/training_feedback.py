@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.auth_deps import get_current_user
@@ -11,13 +11,13 @@ router = APIRouter()
 
 
 @router.post("", response_model=TrainingFeedbackResponse, status_code=201)
-def training_feedback(
+async def training_feedback(
     body: TrainingFeedbackRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Registra posição em que o usuário logado teve dificuldade no treino (observação opcional)."""
-    feedback = create_feedback(
+    feedback = await create_feedback(
         db,
         user_id=current_user.id,
         position_id=body.position_id,

@@ -1,12 +1,14 @@
 """Schemas para autenticação (login e token)."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
     """Body do POST /auth/login."""
 
-    email: str = Field(..., min_length=1, max_length=255)
-    password: str = Field(..., min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr = Field(..., description="E-mail do usuário")
+    password: str = Field(..., min_length=1, description="Senha do usuário")
 
 
 class TokenResponse(BaseModel):

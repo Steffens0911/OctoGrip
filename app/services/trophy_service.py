@@ -3,14 +3,15 @@ import logging
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError
 from app.models import Academy, Technique, TechniqueExecution, Trophy, User
 
 logger = logging.getLogger(__name__)
 
-# Tiers: ouro = roxa+/prata = azul/bronze = branca (sem repetir adversário)
 GOLD_GRADUATIONS = ("purple", "brown", "black")
 SILVER_GRADUATIONS = ("blue",)
 BRONZE_GRADUATIONS = ("white",)
@@ -34,8 +35,8 @@ def _confirmed_at_date(execution: TechniqueExecution) -> date | None:
     return execution.confirmed_at.date()
 
 
-def create_trophy(
-    db: Session,
+async def create_trophy(
+    db: AsyncSession,
     academy_id: UUID,
     technique_id: UUID,
     name: str,
@@ -44,10 +45,18 @@ def create_trophy(
     target_count: int,
 ) -> Trophy:
     """Cria troféu da academia. Valida técnica da academia e datas coerentes."""
-    academy = db.query(Academy).filter(Academy.id == academy_id).first()
+    logger.debug(
+        "create_trophy",
+        extra={
+            "academy_id": str(academy_id),
+            "technique_id": str(technique_id),
+            "name": name,
+        },
+    )
+    academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         raise AcademyNotFoundError("Academia não encontrada.")
-    technique = db.query(Technique).filter(Technique.id == technique_id).first()
+    technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     if technique.academy_id != academy_id:
@@ -63,47 +72,58 @@ def create_trophy(
         target_count=target_count,
     )
     db.add(trophy)
-    db.commit()
-    db.refresh(trophy)
+    await db.commit()
+    await db.refresh(trophy)
+    logger.info(
+        "create_trophy",
+        extra={
+            "trophy_id": str(trophy.id),
+            "academy_id": str(academy_id),
+            "technique_id": str(technique_id),
+            "name": trophy.name,
+        },
+    )
     return trophy
 
 
-def list_trophies_by_academy(db: Session, academy_id: UUID) -> list[Trophy]:
+async def list_trophies_by_academy(db: AsyncSession, academy_id: UUID) -> list[Trophy]:
     """Lista troféus da academia ordenados por nome."""
     return (
-        db.query(Trophy)
-        .options(joinedload(Trophy.technique))
-        .filter(Trophy.academy_id == academy_id)
-        .order_by(Trophy.name)
-        .all()
-    )
+        await db.execute(
+            select(Trophy)
+            .options(selectinload(Trophy.technique))
+            .where(Trophy.academy_id == academy_id)
+            .order_by(Trophy.name)
+        )
+    ).unique().scalars().all()
 
 
-def _load_confirmed_executions_for_user(
-    db: Session, user_id: UUID
+async def _load_confirmed_executions_for_user(
+    db: AsyncSession, user_id: UUID
 ) -> list[TechniqueExecution]:
     """Carrega todas as execuções confirmadas do usuário uma única vez (para reuso na galeria)."""
     return (
-        db.query(TechniqueExecution)
-        .options(
-            joinedload(TechniqueExecution.opponent),
-            joinedload(TechniqueExecution.mission),
-            joinedload(TechniqueExecution.lesson),
+        await db.execute(
+            select(TechniqueExecution)
+            .options(
+                selectinload(TechniqueExecution.opponent),
+                selectinload(TechniqueExecution.mission),
+                selectinload(TechniqueExecution.lesson),
+            )
+            .where(
+                TechniqueExecution.user_id == user_id,
+                TechniqueExecution.status == "confirmed",
+                TechniqueExecution.confirmed_at.isnot(None),
+            )
         )
-        .filter(
-            TechniqueExecution.user_id == user_id,
-            TechniqueExecution.status == "confirmed",
-            TechniqueExecution.confirmed_at.isnot(None),
-        )
-        .all()
-    )
+    ).unique().scalars().all()
 
 
-def _executions_in_period_for_trophy(
-    db: Session, user_id: UUID, trophy: Trophy
+async def _executions_in_period_for_trophy(
+    db: AsyncSession, user_id: UUID, trophy: Trophy
 ) -> list[TechniqueExecution]:
     """Retorna execuções confirmadas do user na técnica e período do troféu (chamada única por user)."""
-    executions = _load_confirmed_executions_for_user(db, user_id)
+    executions = await _load_confirmed_executions_for_user(db, user_id)
     return _executions_in_period_from_list(executions, trophy)
 
 
@@ -164,8 +184,8 @@ def _tier_from_counts(counts: dict, target: int) -> str | None:
     return None
 
 
-def compute_trophy_counts(
-    db: Session,
+async def compute_trophy_counts(
+    db: AsyncSession,
     user_id: UUID,
     trophy: Trophy,
 ) -> dict:
@@ -175,35 +195,21 @@ def compute_trophy_counts(
     Prata: execuções em adversários azuis.
     Bronze: adversários brancos distintos.
     """
-    in_period = _executions_in_period_for_trophy(db, user_id, trophy)
-    gold_count = sum(
-        1
-        for e in in_period
-        if e.opponent
-        and e.opponent.graduation
-        and e.opponent.graduation.strip().lower() in GOLD_GRADUATIONS
+    logger.debug(
+        "compute_trophy_counts",
+        extra={"user_id": str(user_id), "trophy_id": str(trophy.id)},
     )
-    silver_count = sum(
-        1
-        for e in in_period
-        if e.opponent
-        and e.opponent.graduation
-        and e.opponent.graduation.strip().lower() in SILVER_GRADUATIONS
+    in_period = await _executions_in_period_for_trophy(db, user_id, trophy)
+    counts = _compute_counts_from_executions(in_period)
+    logger.debug(
+        "compute_trophy_counts result",
+        extra={"user_id": str(user_id), "trophy_id": str(trophy.id), "counts": counts},
     )
-    white_opponent_ids = set()
-    for e in in_period:
-        if (
-            e.opponent
-            and e.opponent.graduation
-            and e.opponent.graduation.strip().lower() in BRONZE_GRADUATIONS
-        ):
-            white_opponent_ids.add(e.opponent_id)
-    bronze_count = len(white_opponent_ids)
-    return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}
+    return counts
 
 
-def compute_user_trophy_tier(
-    db: Session,
+async def compute_user_trophy_tier(
+    db: AsyncSession,
     user_id: UUID,
     trophy: Trophy,
 ) -> str | None:
@@ -214,31 +220,51 @@ def compute_user_trophy_tier(
     Bronze: N execuções em adversários brancos com opponent_id distinto (não repetir adversário).
     Retorna o maior tier conquistado ou None.
     """
-    counts = compute_trophy_counts(db, user_id, trophy)
+    logger.debug(
+        "compute_user_trophy_tier",
+        extra={"user_id": str(user_id), "trophy_id": str(trophy.id), "target_count": trophy.target_count},
+    )
+    counts = await compute_trophy_counts(db, user_id, trophy)
     target = trophy.target_count
+    tier = None
     if counts["gold_count"] >= target:
-        return "gold"
-    if counts["silver_count"] >= target:
-        return "silver"
-    if counts["bronze_count"] >= target:
-        return "bronze"
-    return None
+        tier = "gold"
+    elif counts["silver_count"] >= target:
+        tier = "silver"
+    elif counts["bronze_count"] >= target:
+        tier = "bronze"
+    logger.debug(
+        "compute_user_trophy_tier result",
+        extra={"user_id": str(user_id), "trophy_id": str(trophy.id), "tier": tier},
+    )
+    return tier
 
 
-def list_user_trophies_with_earned(
-    db: Session,
+async def list_user_trophies_with_earned(
+    db: AsyncSession,
     user_id: UUID,
 ) -> list[dict]:
     """
     Lista troféus das academias do usuário com o tier conquistado (para galeria no perfil).
     Carrega execuções confirmadas uma única vez e reutiliza em memória (3 consultas no total).
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    logger.debug("list_user_trophies_with_earned", extra={"user_id": str(user_id)})
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user or not user.academy_id:
+        logger.debug("list_user_trophies_with_earned no_academy", extra={"user_id": str(user_id)})
         return []
 
-    trophies = list_trophies_by_academy(db, user.academy_id)
-    all_executions = _load_confirmed_executions_for_user(db, user_id)
+    trophies = await list_trophies_by_academy(db, user.academy_id)
+    all_executions = await _load_confirmed_executions_for_user(db, user_id)
+
+    logger.debug(
+        "list_user_trophies_with_earned loaded",
+        extra={
+            "user_id": str(user_id),
+            "trophies_count": len(trophies),
+            "executions_count": len(all_executions),
+        },
+    )
 
     result = []
     for t in trophies:
@@ -262,4 +288,8 @@ def list_user_trophies_with_earned(
                 "bronze_count": counts["bronze_count"],
             }
         )
+    logger.info(
+        "list_user_trophies_with_earned",
+        extra={"user_id": str(user_id), "trophies_count": len(result)},
+    )
     return result

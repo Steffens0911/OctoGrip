@@ -43,3 +43,25 @@
 | Conclusão de missão (antes/depois do treino) | [API.md](API.md) — POST /mission_complete; [VIEWER.md](VIEWER.md) — LessonViewScreen |
 | Missão do dia por academia | [ACADEMIAS.md](ACADEMIAS.md) — seção "Missão do dia por academia" |
 | Área do professor | [VIEWER.md](VIEWER.md) — Telas do professor; [FUNCIONALIDADES.md](../FUNCIONALIDADES.md) |
+
+---
+
+## Análise e Qualidade
+
+| Documento | Descrição |
+|-----------|-----------|
+| [AVALIACAO_ENTERPRISE.md](AVALIACAO_ENTERPRISE.md) | Avaliação segundo padrões enterprise: Segurança, Escalabilidade, Manutenibilidade, Performance, Clareza (0–10) |
+| [ANALISE_COMPLETA_PROJETO.md](ANALISE_COMPLETA_PROJETO.md) | Análise detalhada: problemas críticos, médios, melhorias e pontos positivos |
+| [RESUMO_EXECUTIVO.md](RESUMO_EXECUTIVO.md) | Resumo visual rápido do status do projeto (score 8.0/10) |
+| [CHECKLIST_DEPLOY.md](CHECKLIST_DEPLOY.md) | Checklist prático para usar antes do deploy em produção |
+| [BOAS_PRATICAS.md](BOAS_PRATICAS.md) | Análise de padrões do framework, tipagem e linter/formatter |
+| [FORMATACAO.md](FORMATACAO.md) | Guia de uso do Ruff para formatação e lint |
+| [SECURITY.md](SECURITY.md) | Políticas de segurança e práticas recomendadas |
+
+## Segurança Ofensiva
+
+| Documento | Descrição |
+|-----------|-----------|
+| [AUDITORIA_SEGURANCA_OFENSIVA.md](AUDITORIA_SEGURANCA_OFENSIVA.md) | Auditoria completa simulando ataque: vulnerabilidades encontradas, vetores de ataque testados |
+| [RESUMO_AUDITORIA_OFENSIVA.md](RESUMO_AUDITORIA_OFENSIVA.md) | Resumo executivo da auditoria ofensiva (score 7.5/10) |
+| [CORRECOES_SEGURANCA_OFENSIVA.md](CORRECOES_SEGURANCA_OFENSIVA.md) | Guia prático com código para corrigir vulnerabilidades encontradas |

@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: jjb
+          POSTGRES_PASSWORD: jjb_secret
+          POSTGRES_DB: jjb_db_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jjb -d jjb_db_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://jjb:jjb_secret@localhost:5432/jjb_db_test
+      JWT_SECRET: ci-test-secret-do-not-use-in-production
+      SEED_ON_STARTUP: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Run tests with coverage
+        run: pytest -v --tb=short --cov=app --cov-report=html --cov-report=term-missing --cov-fail-under=60
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+          retention-days: 30
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-test.txt
+
+      - name: Lint with ruff
+        run: ruff check app/ tests/
+
+      - name: Format check with ruff
+        run: ruff format --check app/ tests/
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -t jjb-api:${{ github.sha }} .
+
+      - name: Verify image
+        run: docker image inspect jjb-api:${{ github.sha }} > /dev/null

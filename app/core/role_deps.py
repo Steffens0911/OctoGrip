@@ -1,25 +1,35 @@
 """Dependências FastAPI para autorização baseada em roles."""
-from fastapi import Depends, HTTPException, status
+import logging
+
+from fastapi import Depends
 
 from app.core.auth_deps import get_current_user
+from app.core.exceptions import ForbiddenError
+from app.core.metrics import security_events_total
 from app.models import User
+
+logger = logging.getLogger(__name__)
+
+
+def _log_access_denied(user: User, required: str) -> None:
+    security_events_total.labels(event_type="access_denied").inc()
+    logger.warning(
+        "Acesso negado",
+        extra={
+            "user_id": str(user.id),
+            "user_role": user.role,
+            "required_access": required,
+            "academy_id": str(user.academy_id) if user.academy_id else None,
+        },
+    )
 
 
 def require_role(allowed_roles: list[str]):
-    """
-    Factory que retorna uma dependência que exige que o usuário tenha um dos roles permitidos.
-    
-    Uso:
-        @router.get("/admin")
-        def admin_route(user: User = Depends(require_role(["administrador"]))):
-            ...
-    """
+    """Factory que retorna dependência exigindo um dos roles permitidos."""
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Acesso negado. Roles permitidos: {', '.join(allowed_roles)}",
-            )
+            _log_access_denied(current_user, f"role in {allowed_roles}")
+            raise ForbiddenError(f"Acesso negado. Roles permitidos: {', '.join(allowed_roles)}")
         return current_user
     return role_checker
 
@@ -27,43 +37,32 @@ def require_role(allowed_roles: list[str]):
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Exige que o usuário seja administrador."""
     if current_user.role != "administrador":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores podem acessar este recurso.",
-        )
+        _log_access_denied(current_user, "administrador")
+        raise ForbiddenError("Acesso negado. Apenas administradores podem acessar este recurso.")
     return current_user
 
 
 def require_admin_or_manager(current_user: User = Depends(get_current_user)) -> User:
-    """Exige que o usuário seja administrador ou gerente_academia."""
+    """Exige administrador ou gerente_academia."""
     if current_user.role not in ("administrador", "gerente_academia"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores ou gerentes de academia podem acessar este recurso.",
-        )
+        _log_access_denied(current_user, "administrador|gerente_academia")
+        raise ForbiddenError("Acesso negado. Apenas administradores ou gerentes de academia.")
     return current_user
 
 
 def require_admin_or_professor(current_user: User = Depends(get_current_user)) -> User:
-    """Exige que o usuário seja administrador ou professor."""
+    """Exige administrador ou professor."""
     if current_user.role not in ("administrador", "professor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores ou professores podem acessar este recurso.",
-        )
+        _log_access_denied(current_user, "administrador|professor")
+        raise ForbiddenError("Acesso negado. Apenas administradores ou professores.")
     return current_user
 
 
 def require_admin_or_academy_access(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Exige que o usuário seja administrador, gerente_academia ou professor.
-    Usado para recursos relacionados à academia (técnicas, posições, lições, missões, etc).
-    """
+    """Exige administrador, gerente_academia ou professor."""
     if current_user.role not in ("administrador", "gerente_academia", "professor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores, gerentes de academia ou professores podem acessar este recurso.",
-        )
+        _log_access_denied(current_user, "administrador|gerente_academia|professor")
+        raise ForbiddenError("Acesso negado. Apenas administradores, gerentes de academia ou professores.")
     return current_user
 
 
@@ -71,48 +70,54 @@ def require_readonly_or_write(
     current_user: User = Depends(get_current_user),
     method: str = "GET",
 ) -> User:
-    """
-    Permite supervisor apenas leitura (GET), outros roles podem escrever.
-    Usado em rotas que supervisor pode ler mas não modificar.
-    """
+    """Supervisor só leitura (GET); demais roles podem escrever."""
     if current_user.role == "supervisor" and method.upper() not in ("GET", "HEAD", "OPTIONS"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Supervisores têm acesso apenas de leitura.",
-        )
-    # Para GET, supervisor pode acessar se tiver permissão de leitura
+        raise ForbiddenError("Acesso negado. Supervisores têm acesso apenas de leitura.")
     if current_user.role == "supervisor":
         return current_user
-    # Para outros métodos, verificar se tem acesso de escrita
     if current_user.role not in ("administrador", "gerente_academia", "professor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado.",
-        )
+        raise ForbiddenError("Acesso negado.")
     return current_user
 
 
 def require_read_access(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Permite acesso de leitura para supervisor, admin, gerente ou professor.
-    Usado em rotas GET que supervisor pode acessar.
-    """
+    """Leitura para supervisor, admin, gerente ou professor."""
     if current_user.role not in ("administrador", "gerente_academia", "professor", "supervisor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado.",
-        )
+        raise ForbiddenError("Acesso negado.")
     return current_user
 
 
 def require_write_access(current_user: User = Depends(get_current_user)) -> User:
-    """
-    Exige acesso de escrita: apenas admin, gerente ou professor.
-    Usado em rotas POST, PUT, DELETE.
-    """
+    """Escrita: apenas admin, gerente ou professor."""
     if current_user.role not in ("administrador", "gerente_academia", "professor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado. Apenas administradores, gerentes de academia ou professores podem modificar este recurso.",
-        )
+        raise ForbiddenError("Acesso negado. Apenas administradores, gerentes de academia ou professores.")
     return current_user
+
+
+def verify_academy_access(
+    current_user: User,
+    resource_academy_id: str | None,
+    allow_none: bool = False,
+) -> None:
+    """Verifica se o usuário tem acesso ao recurso da academia especificada."""
+    if current_user.role == "administrador":
+        return
+
+    if resource_academy_id is None:
+        if not allow_none:
+            raise ForbiddenError("Acesso negado. Recurso não vinculado a uma academia.")
+        return
+
+    if current_user.academy_id is None:
+        raise ForbiddenError("Acesso negado. Você não está vinculado a uma academia.")
+
+    if str(resource_academy_id) != str(current_user.academy_id):
+        logger.warning(
+            "Tentativa de acesso cross-academy",
+            extra={
+                "user_id": str(current_user.id),
+                "user_academy_id": str(current_user.academy_id),
+                "target_academy_id": str(resource_academy_id),
+            },
+        )
+        raise ForbiddenError("Acesso negado. Você só pode acessar recursos da sua academia.")

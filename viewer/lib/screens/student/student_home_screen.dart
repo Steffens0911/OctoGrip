@@ -86,10 +86,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _selectedUser != null) {
-      _loadMissionWeek();
-      _loadUserPoints();
-      _loadCollectiveGoal();
-      _loadPendingConfirmationsWith();
+      final currentUser = _selectedUser!;
+      final level = _levelFromGraduation(currentUser.graduation);
+      // Agrupar carregamentos para evitar múltiplos setState
+      Future.wait([
+        _loadMissionWeekWith(currentUser.academyId, level),
+        _loadUserPointsWith(currentUser.id),
+        _loadCollectiveGoalWith(currentUser.academyId),
+        _loadPendingConfirmationsWith(),
+      ]);
     }
   }
 
@@ -128,10 +133,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Future<void> _loadMissionWeekWith(String? academyId, String level) async {
     try {
       final week = await _api.getMissionWeek(academyId: academyId, level: level);
-      if (mounted) setState(() => _missionWeek = week);
+      if (mounted) {
+        setState(() {
+          _missionWeek = week;
+          if (_error != null && _error!.contains('missão')) {
+            _error = null; // Limpar erro de missão se carregou com sucesso
+          }
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() => _missionWeek = null);
-      if (!e.toString().contains('404') && mounted) setState(() => _error = userFacingMessage(e));
+      if (mounted) {
+        setState(() {
+          _missionWeek = null;
+          if (!e.toString().contains('404')) {
+            _error = userFacingMessage(e);
+          }
+        });
+      }
     }
   }
 
@@ -168,14 +186,20 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadMissionWeek() async {
     if (_selectedUser == null) return;
-    setState(() => _error = null);
+    final currentUser = _selectedUser!;
+    final level = _levelFromGraduation(currentUser.graduation);
+    // Otimização: agrupar múltiplos setState em um único
     try {
-      final level = _levelFromGraduation(_selectedUser!.graduation);
       final week = await _api.getMissionWeek(
-        academyId: _selectedUser!.academyId,
+        academyId: currentUser.academyId,
         level: level,
       );
-      if (mounted) setState(() => _missionWeek = week);
+      if (mounted) {
+        setState(() {
+          _missionWeek = week;
+          _error = null; // Limpar erro ao carregar com sucesso
+        });
+      }
     } catch (e) {
       if (mounted) setState(() => _missionWeek = null);
       if (e.toString().contains('404')) return;

@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CollectiveGoalRead(BaseModel):
@@ -20,6 +20,8 @@ class CollectiveGoalRead(BaseModel):
 
 
 class CollectiveGoalCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     academy_id: UUID | None = None
     technique_id: UUID
     target_count: int = Field(..., gt=0)

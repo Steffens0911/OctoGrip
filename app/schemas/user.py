@@ -1,7 +1,7 @@
 """Schemas para User (CRUD desenvolvedores)."""
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 class UserRead(BaseModel):
@@ -43,9 +43,25 @@ def _validate_role(v: str | None) -> str:
     return r
 
 
+def _validate_password_strength(password: str) -> str:
+    """Valida força da senha: mínimo 12 caracteres."""
+    if len(password) < 12:
+        raise ValueError("Senha deve ter pelo menos 12 caracteres.")
+    if len(password) > 128:
+        raise ValueError("Senha não pode ter mais de 128 caracteres.")
+    return password
+
+
 class UserCreate(BaseModel):
-    email: str = Field(..., min_length=1, max_length=255)
-    password: str | None = Field(None, min_length=6, description="Senha para login (opcional). Se não informada, usuário não poderá fazer login.")
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr = Field(..., description="E-mail do usuário (deve ser válido)")
+    password: str | None = Field(
+        None,
+        min_length=12,
+        max_length=128,
+        description="Senha para login (opcional, mínimo 12 caracteres). Se não informada, usuário não poderá fazer login.",
+    )
     name: str | None = Field(None, max_length=255)
     graduation: str | None = Field(None, min_length=1, max_length=32)
     role: str = Field(default="aluno", max_length=32)
@@ -63,6 +79,13 @@ class UserCreate(BaseModel):
     def role_valid(cls, v: str) -> str:
         return _validate_role(v)
 
+    @field_validator("password")
+    @classmethod
+    def password_valid(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        return _validate_password_strength(v)
+
     @model_validator(mode="after")
     def validate_role_graduation(self):
         """Valida que professor e aluno exigem graduation."""
@@ -73,19 +96,28 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(None, max_length=255)
     graduation: str | None = Field(None, max_length=32)
     role: str | None = Field(None, max_length=32)
     academy_id: UUID | None = None
     points_adjustment: int | None = None
-    password: str | None = Field(None, min_length=6, description="Nova senha para login. Se informada, substitui a senha atual. Deixe em branco para não alterar.")
+    password: str | None = Field(
+        None,
+        min_length=12,
+        max_length=128,
+        description="Nova senha para login (mínimo 12 caracteres). Se informada, substitui a senha atual. Deixe em branco para não alterar.",
+    )
 
     @field_validator("password")
     @classmethod
-    def password_empty_to_none(cls, v: str | None) -> str | None:
-        if v is not None and not v.strip():
+    def password_valid(cls, v: str | None) -> str | None:
+        if v is None:
             return None
-        return v
+        if not v.strip():
+            return None
+        return _validate_password_strength(v)
 
     @field_validator("graduation")
     @classmethod

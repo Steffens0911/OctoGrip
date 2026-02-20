@@ -9,7 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
-from app.core.security import hash_password
+from app.core.security import hash_password_sync
 from app.database import SessionLocal
 from app.models import (
     Academy,
@@ -27,11 +27,10 @@ def run_seed():
     db = SessionLocal()
     try:
         # Garante que aluno@jjb.com exista com senha (para login JWT em Docker).
-        from app.services.user_service import get_user_by_email
-        aluno = get_user_by_email(db, "aluno@jjb.com")
+        aluno = db.query(User).filter(User.email.ilike("aluno@jjb.com")).first()
         if aluno:
             if not aluno.password_hash:
-                aluno.password_hash = hash_password("senha123")
+                aluno.password_hash = hash_password_sync("senha123")
                 db.commit()
                 db.refresh(aluno)
                 logger.info("Senha definida para aluno@jjb.com (login: senha123)")
@@ -42,7 +41,7 @@ def run_seed():
                 email="aluno@jjb.com",
                 name="Aluno Teste",
                 academy_id=first_academy.id if first_academy else None,
-                password_hash=hash_password("senha123"),
+                password_hash=hash_password_sync("senha123"),
             )
             db.add(aluno)
             db.commit()
@@ -76,7 +75,7 @@ def run_seed():
             email="aluno@jjb.com",
             name="Aluno Teste",
             academy_id=academy.id,
-            password_hash=hash_password("senha123"),
+            password_hash=hash_password_sync("senha123"),
         )
         db.add(user)
         db.flush()

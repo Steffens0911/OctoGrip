@@ -3,7 +3,9 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import UserNotFoundError
 from app.models import Lesson, LessonProgress, MissionUsage, User
@@ -11,8 +13,8 @@ from app.models import Lesson, LessonProgress, MissionUsage, User
 logger = logging.getLogger(__name__)
 
 
-def sync_mission_usages(
-    db: Session,
+async def sync_mission_usages(
+    db: AsyncSession,
     user_id: UUID,
     usages: list[dict],
 ) -> int:
@@ -20,7 +22,7 @@ def sync_mission_usages(
     Insere registros de uso enviados pelo app (legado: lesson_id).
     Valida user e lesson; ignora duplicatas.
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
         logger.info("sync_mission_usages user_not_found", extra={"user_id": str(user_id)})
         raise UserNotFoundError("Usuário não encontrado.")
@@ -35,10 +37,37 @@ def sync_mission_usages(
                 lesson_id = UUID(lesson_id)
             except ValueError:
                 continue
-        lesson = db.query(Lesson).filter(Lesson.id == lesson_id).first()
+        lesson = (
+            await db.execute(
+                select(Lesson)
+                .options(selectinload(Lesson.technique))
+                .where(Lesson.id == lesson_id)
+            )
+        ).scalar_one_or_none()
         if not lesson:
             logger.debug("sync_mission_usages lesson_not_found", extra={"lesson_id": str(lesson_id)})
             continue
+        
+        # Validar isolamento de academy: não-admins só podem sincronizar lições da própria academy
+        if user.role != "administrador":
+            if user.academy_id is None:
+                logger.warning(
+                    "sync_mission_usages user_not_in_academy",
+                    extra={"user_id": str(user_id), "lesson_id": str(lesson_id)},
+                )
+                continue
+            lesson_academy_id = lesson.academy_id or (lesson.technique.academy_id if lesson.technique else None)
+            if lesson_academy_id is not None and lesson_academy_id != user.academy_id:
+                logger.warning(
+                    "sync_mission_usages cross_academy_attempt",
+                    extra={
+                        "user_id": str(user_id),
+                        "user_academy_id": str(user.academy_id),
+                        "lesson_id": str(lesson_id),
+                        "lesson_academy_id": str(lesson_academy_id),
+                    },
+                )
+                continue
 
         opened_at = _parse_dt(u.get("opened_at"))
         completed_at = _parse_dt(u.get("completed_at"))
@@ -47,14 +76,14 @@ def sync_mission_usages(
             usage_type = "after_training"
 
         existing = (
-            db.query(MissionUsage)
-            .filter(
-                MissionUsage.user_id == user_id,
-                MissionUsage.lesson_id == lesson_id,
-                MissionUsage.completed_at == completed_at,
+            await db.execute(
+                select(MissionUsage).where(
+                    MissionUsage.user_id == user_id,
+                    MissionUsage.lesson_id == lesson_id,
+                    MissionUsage.completed_at == completed_at,
+                )
             )
-            .first()
-        )
+        ).scalar_one_or_none()
         if existing:
             continue
 
@@ -70,7 +99,7 @@ def sync_mission_usages(
         synced += 1
 
     if synced > 0:
-        db.commit()
+        await db.commit()
     logger.info(
         "sync_mission_usages",
         extra={"user_id": str(user_id), "synced": synced, "total_sent": len(usages)},
@@ -92,7 +121,7 @@ def _parse_dt(value) -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_mission_history(db: Session, user_id: UUID, limit: int = 7) -> list[dict]:
+async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -> list[dict]:
     """
     Últimas N conclusões (por missão ou legado por lição).
     Retorna dict com lesson_id (opcional), lesson_title, completed_at, usage_type.
@@ -100,16 +129,17 @@ def get_mission_history(db: Session, user_id: UUID, limit: int = 7) -> list[dict
     from app.models import Mission
 
     usage_rows = (
-        db.query(MissionUsage)
-        .filter(MissionUsage.user_id == user_id)
-        .options(
-            joinedload(MissionUsage.mission).joinedload(Mission.technique),
-            joinedload(MissionUsage.lesson),
+        await db.execute(
+            select(MissionUsage)
+            .where(MissionUsage.user_id == user_id)
+            .options(
+                selectinload(MissionUsage.mission).selectinload(Mission.technique),
+                selectinload(MissionUsage.lesson),
+            )
+            .order_by(MissionUsage.completed_at.desc())
+            .limit(limit * 2)
         )
-        .order_by(MissionUsage.completed_at.desc())
-        .limit(limit * 2)
-        .all()
-    )
+    ).unique().scalars().all()
     items = []
     for r in usage_rows:
         if r.mission_id and r.mission and r.mission.technique:
@@ -129,15 +159,15 @@ def get_mission_history(db: Session, user_id: UUID, limit: int = 7) -> list[dict
 
     lesson_ids_in_usage = {r.lesson_id for r in usage_rows if r.lesson_id is not None}
 
-    progress_q = (
-        db.query(LessonProgress)
-        .filter(LessonProgress.user_id == user_id)
-        .options(joinedload(LessonProgress.lesson))
+    stmt = (
+        select(LessonProgress)
+        .where(LessonProgress.user_id == user_id)
+        .options(selectinload(LessonProgress.lesson))
         .order_by(LessonProgress.completed_at.desc())
     )
     if lesson_ids_in_usage:
-        progress_q = progress_q.filter(~LessonProgress.lesson_id.in_(lesson_ids_in_usage))
-    progress_rows = progress_q.limit(limit * 2).all()
+        stmt = stmt.where(~LessonProgress.lesson_id.in_(lesson_ids_in_usage))
+    progress_rows = (await db.execute(stmt.limit(limit * 2))).unique().scalars().all()
     for r in progress_rows:
         items.append({
             "lesson_id": r.lesson_id,

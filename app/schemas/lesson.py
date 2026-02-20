@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class LessonRead(BaseModel):
@@ -28,6 +28,8 @@ class LessonRead(BaseModel):
 class LessonCreate(BaseModel):
     """Schema para criar Lesson. Slug opcional (gerado automaticamente a partir do título)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     technique_id: UUID
     title: str
     slug: str | None = None
@@ -39,6 +41,8 @@ class LessonCreate(BaseModel):
 
 class LessonUpdate(BaseModel):
     """Schema para atualização parcial de Lesson."""
+
+    model_config = ConfigDict(extra="forbid")
 
     technique_id: UUID | None = None
     title: str | None = None

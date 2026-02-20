@@ -1,11 +1,10 @@
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_deps import get_current_user
+from app.core.exceptions import NotFoundError
 from app.database import get_db
-from app.core.auth_deps import get_current_user_optional
 from app.models import User
 from app.schemas.mission import MissionTodayResponse, MissionWeekResponse
 from app.services.mission_service import get_mission_today_response, get_mission_week_response
@@ -14,19 +13,17 @@ router = APIRouter()
 
 
 @router.get("/week", response_model=MissionWeekResponse)
-def mission_week(
-    db: Session = Depends(get_db),
+async def mission_week(
+    db: AsyncSession = Depends(get_db),
     level: str = "beginner",
-    user_id: UUID | None = None,
-    academy_id: UUID | None = None,
-    current_user: User | None = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Retorna as 3 missões da semana (Missão 1, 2, 3). Se enviar Authorization Bearer, usa o usuário do token.
+    Retorna as 3 missões da semana (Missão 1, 2, 3) para a academia do usuário autenticado.
+    Requer autenticação obrigatória.
     """
-    uid = current_user.id if current_user else user_id
-    payload = get_mission_week_response(
-        db, level=level, user_id=uid, academy_id=academy_id
+    payload = await get_mission_week_response(
+        db, level=level, user_id=current_user.id, academy_id=current_user.academy_id
     )
     return JSONResponse(
         content=payload.model_dump(mode="json"),
@@ -35,25 +32,23 @@ def mission_week(
 
 
 @router.get("", response_model=MissionTodayResponse)
-def mission_today(
-    db: Session = Depends(get_db),
+async def mission_today(
+    db: AsyncSession = Depends(get_db),
     level: str = "beginner",
-    user_id: UUID | None = None,
     review_after_days: int = 7,
-    academy_id: UUID | None = None,
-    current_user: User | None = Depends(get_current_user_optional),
+    current_user: User = Depends(get_current_user),
 ):
     """
-    Retorna a missão do dia por nível. Se enviar Authorization Bearer, usa o usuário do token para personalização.
+    Retorna a missão do dia por nível para a academia do usuário autenticado.
+    Requer autenticação obrigatória.
     """
-    uid = current_user.id if current_user else user_id
-    payload = get_mission_today_response(
+    payload = await get_mission_today_response(
         db,
         level=level,
-        user_id=uid,
+        user_id=current_user.id,
         review_after_days=review_after_days,
-        academy_id=academy_id,
+        academy_id=current_user.academy_id,
     )
     if not payload:
-        raise HTTPException(status_code=404, detail="Nenhuma missão disponível no momento.")
+        raise NotFoundError("Nenhuma missão disponível no momento.")
     return payload

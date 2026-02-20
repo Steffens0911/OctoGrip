@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
@@ -17,6 +19,7 @@ class UserListScreen extends StatefulWidget {
 class _UserListScreenState extends State<UserListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  Timer? _debounceTimer;
   List<models.UserModel> _allItems = [];
   List<models.UserModel> _filteredItems = [];
   List<Academy> _academies = [];
@@ -24,6 +27,10 @@ class _UserListScreenState extends State<UserListScreen> {
   String? _filterGraduation;
   bool _loading = true;
   bool _loadingAcademies = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 0;
+  static const int _pageSize = 50;
   String? _error;
 
   static const List<MapEntry<String, String>> _graduations = [
@@ -36,6 +43,7 @@ class _UserListScreenState extends State<UserListScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -141,7 +149,12 @@ class _UserListScreenState extends State<UserListScreen> {
                                 )
                               : null,
                         ),
-                        onChanged: (_) => _applyFilters(),
+                        onChanged: (_) {
+                          _debounceTimer?.cancel();
+                          _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                            _applyFilters();
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
                       Row(
@@ -228,8 +241,27 @@ class _UserListScreenState extends State<UserListScreen> {
                           )
                         : ListView.builder(
                             padding: EdgeInsets.symmetric(horizontal: AppTheme.screenPadding(context)),
-                            itemCount: _filteredItems.length,
+                            itemCount: _filteredItems.length + (_hasMore && !_isLoadingMore ? 1 : 0) + (_isLoadingMore ? 1 : 0),
                             itemBuilder: (context, i) {
+                              if (i == _filteredItems.length) {
+                                // Botão "Carregar mais" ou indicador de loading
+                                if (_isLoadingMore) {
+                                  return const Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Center(child: CircularProgressIndicator()),
+                                  );
+                                }
+                                if (_hasMore) {
+                                  return Padding(
+                                    padding: const EdgeInsets.all(16),
+                                    child: FilledButton(
+                                      onPressed: _loadMore,
+                                      child: const Text('Carregar mais'),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              }
                               final u = _filteredItems[i];
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 8),

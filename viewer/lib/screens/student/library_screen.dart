@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
@@ -22,6 +24,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  Timer? _debounceTimer;
   List<Lesson> _featuredLessons = [];
   List<Lesson> _allLessons = [];
   List<Lesson> _filteredFeaturedLessons = [];
@@ -30,10 +33,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
   String? _filterTechniqueId;
   bool _loading = true;
   bool _loadingTechniques = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _currentPage = 0;
+  static const int _pageSize = 50;
   String? _error;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -62,34 +70,65 @@ class _LibraryScreenState extends State<LibraryScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final results = await Future.wait([
-        widget.academyId != null ? _api.getLessons(academyId: widget.academyId) : Future.value(<Lesson>[]),
-        _api.getLessons(),
-        widget.academyId != null
-            ? _api.getTechniques(academyId: widget.academyId!)
-            : Future.value(<Technique>[]),
-      ]);
-      if (mounted) setState(() {
-        _featuredLessons = results[0] as List<Lesson>;
-        _allLessons = results[1] as List<Lesson>;
-        _techniques = results[2] as List<Technique>;
-        _loading = false;
-        _loadingTechniques = false;
-      });
-      _applyFilters();
-    } catch (e) {
-      if (mounted) setState(() {
-        _loading = false;
-        _loadingTechniques = false;
-        _error = userFacingMessage(e);
+  Future<void> _load({bool loadMore = false}) async {
+    if (loadMore && (_isLoadingMore || !_hasMore)) return;
+    
+    if (loadMore) {
+      setState(() => _isLoadingMore = true);
+    } else {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _currentPage = 0;
+        _allLessons = [];
+        _hasMore = true;
       });
     }
+    
+    try {
+      final page = loadMore ? _currentPage + 1 : 0;
+      final results = await Future.wait([
+        widget.academyId != null ? _api.getLessons(academyId: widget.academyId, offset: 0, limit: 100) : Future.value(<Lesson>[]),
+        _api.getLessons(offset: page * _pageSize, limit: _pageSize),
+        page == 0 && widget.academyId != null
+            ? _api.getTechniques(academyId: widget.academyId!)
+            : Future.value(_techniques),
+      ]);
+      
+      final newLessons = results[1] as List<Lesson>;
+      if (mounted) {
+        setState(() {
+          if (loadMore) {
+            _allLessons.addAll(newLessons);
+            _currentPage = page;
+            _hasMore = newLessons.length == _pageSize;
+          } else {
+            _featuredLessons = results[0] as List<Lesson>;
+            _allLessons = newLessons;
+            _techniques = results[2] as List<Technique>;
+            _currentPage = 0;
+            _hasMore = newLessons.length == _pageSize;
+          }
+          _loading = false;
+          _isLoadingMore = false;
+          _loadingTechniques = false;
+        });
+      }
+      _applyFilters();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _isLoadingMore = false;
+          _loadingTechniques = false;
+          _error = userFacingMessage(e);
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    await _load(loadMore: true);
   }
 
 
@@ -104,7 +143,121 @@ class _LibraryScreenState extends State<LibraryScreen> {
       parts.add(lesson.content!.length > 60 ? '${lesson.content!.substring(0, 60)}...' : lesson.content!);
     }
     if (parts.isEmpty) return null;
-    return Text(parts.join(' · '), style: TextStyle(fontSize: 12, color: AppTheme.textSecondary));
+    return Text(parts.join(' · '), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary));
+  }
+
+  int _getTotalItemCount() {
+    int count = 0;
+    if (_filteredFeaturedLessons.isNotEmpty) {
+      count += 1; // Header "Lição em destaque"
+      count += _filteredFeaturedLessons.length;
+      count += 1; // SizedBox
+      count += 1; // Header "Todas as lições"
+    }
+    count += _filteredAllLessons.length;
+    // Adicionar item para "Carregar mais" se não houver filtros ativos e houver mais itens
+    final hasActiveFilters = _searchController.text.isNotEmpty || _filterTechniqueId != null;
+    if (!hasActiveFilters && _hasMore && !_isLoadingMore) {
+      count += 1; // Botão "Carregar mais"
+    }
+    if (_isLoadingMore) {
+      count += 1; // Indicador de loading
+    }
+    return count;
+  }
+
+  Widget _buildListItem(BuildContext context, int index) {
+    int currentIndex = 0;
+    
+    if (_filteredFeaturedLessons.isNotEmpty) {
+      if (index == currentIndex) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            'Lição em destaque',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppTheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        );
+      }
+      currentIndex++;
+      
+      if (index < currentIndex + _filteredFeaturedLessons.length) {
+        final lesson = _filteredFeaturedLessons[index - currentIndex];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+              child: const Icon(Icons.star, color: AppTheme.primary),
+            ),
+            title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: _lessonSubtitle(lesson),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _openLesson(lesson),
+          ),
+        );
+      }
+      currentIndex += _filteredFeaturedLessons.length;
+      
+      if (index == currentIndex) {
+        return const SizedBox(height: 16);
+      }
+      currentIndex++;
+      
+      if (index == currentIndex) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            'Todas as lições',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        );
+      }
+      currentIndex++;
+    }
+    
+    // Verificar se é o botão "Carregar mais" ou indicador de loading
+    final hasActiveFilters = _searchController.text.isNotEmpty || _filterTechniqueId != null;
+    if (!hasActiveFilters) {
+      if (index == currentIndex + _filteredAllLessons.length) {
+        if (_isLoadingMore) {
+          return const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (_hasMore) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: FilledButton(
+              onPressed: _loadMore,
+              child: const Text('Carregar mais'),
+            ),
+          );
+        }
+      }
+    }
+    
+    final lesson = _filteredAllLessons[index - currentIndex];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+          child: const Icon(Icons.menu_book, color: AppTheme.primary),
+        ),
+        title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: _lessonSubtitle(lesson),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _openLesson(lesson),
+      ),
+    );
   }
 
   void _openLesson(Lesson lesson) {
@@ -177,7 +330,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                         )
                                       : null,
                                 ),
-                                onChanged: (_) => _applyFilters(),
+                                onChanged: (_) {
+                                  _debounceTimer?.cancel();
+                                  _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                                    _applyFilters();
+                                  });
+                                },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
@@ -229,62 +387,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                     _searchController.text.isNotEmpty || _filterTechniqueId != null
                                         ? 'Nenhuma lição encontrada.'
                                         : 'Nenhuma lição cadastrada.',
-                                    style: TextStyle(color: AppTheme.textSecondary),
+                                    style: const TextStyle(color: AppTheme.textSecondary),
                                   ),
                                 )
-                              : ListView(
+                              : ListView.builder(
                                   padding: const EdgeInsets.all(16),
-                                  children: [
-                                    if (_filteredFeaturedLessons.isNotEmpty) ...[
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 8),
-                                        child: Text(
-                                          'Lição em destaque',
-                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                color: AppTheme.primary,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                      ),
-                                      ..._filteredFeaturedLessons.map((lesson) => Card(
-                                            margin: const EdgeInsets.only(bottom: 12),
-                                            child: ListTile(
-                                              leading: CircleAvatar(
-                                                backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                                child: const Icon(Icons.star, color: AppTheme.primary),
-                                              ),
-                                              title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                              subtitle: _lessonSubtitle(lesson),
-                                              trailing: const Icon(Icons.chevron_right),
-                                              onTap: () => _openLesson(lesson),
-                                            ),
-                                          )),
-                                      const SizedBox(height: 16),
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 8),
-                                        child: Text(
-                                          'Todas as lições',
-                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                color: AppTheme.textSecondary,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                      ),
-                                    ],
-                                    ..._filteredAllLessons.map((lesson) => Card(
-                                          margin: const EdgeInsets.only(bottom: 12),
-                                          child: ListTile(
-                                            leading: CircleAvatar(
-                                              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                              child: const Icon(Icons.menu_book, color: AppTheme.primary),
-                                            ),
-                                            title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                            subtitle: _lessonSubtitle(lesson),
-                                            trailing: const Icon(Icons.chevron_right),
-                                            onTap: () => _openLesson(lesson),
-                                          ),
-                                        )),
-                                  ],
+                                  itemCount: _getTotalItemCount(),
+                                  itemBuilder: (context, index) {
+                                    return _buildListItem(context, index);
+                                  },
                                 ),
                         ),
                       ],

@@ -1,17 +1,20 @@
 """Rotas de troféus: criar, listar por academia, galeria do usuário."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_deps import get_current_user
+from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
+from app.models import User
 from app.schemas.trophy import TrophyCreate, TrophyRead, UserTrophyEarned
 from app.services.trophy_service import (
     create_trophy,
     list_trophies_by_academy,
     list_user_trophies_with_earned,
 )
-from app.services.user_service import get_user
+from app.services.user_service import get_user_or_raise
 
 router = APIRouter()
 
@@ -31,9 +34,14 @@ def _trophy_to_read(t):
 
 
 @router.post("", response_model=TrophyRead, status_code=201)
-def trophy_create(body: TrophyCreate, db: Session = Depends(get_db)):
-    """Cria troféu da academia (técnica, período, meta de execuções)."""
-    trophy = create_trophy(
+async def trophy_create(
+    body: TrophyCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Cria troféu da academia."""
+    verify_academy_access(current_user, str(body.academy_id) if body.academy_id else None)
+    trophy = await create_trophy(
         db,
         academy_id=body.academy_id,
         technique_id=body.technique_id,
@@ -46,19 +54,25 @@ def trophy_create(body: TrophyCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[TrophyRead])
-def trophy_list(
+async def trophy_list(
     academy_id: UUID = Query(..., description="ID da academia"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Lista troféus da academia."""
-    return [_trophy_to_read(t) for t in list_trophies_by_academy(db, academy_id)]
+    verify_academy_access(current_user, str(academy_id))
+    return [_trophy_to_read(t) for t in await list_trophies_by_academy(db, academy_id)]
 
 
 @router.get("/user/{user_id}", response_model=list[UserTrophyEarned])
-def trophy_user_gallery(user_id: UUID, db: Session = Depends(get_db)):
-    """Galeria de troféus do usuário: troféus da academia dele com tier conquistado (ouro/prata/bronze)."""
-    user = get_user(db, user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    items = list_user_trophies_with_earned(db, user_id)
+async def trophy_user_gallery(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Galeria de troféus do usuário."""
+    user = await get_user_or_raise(db, user_id)
+    if current_user.role != "administrador":
+        verify_academy_access(current_user, str(user.academy_id) if user.academy_id else None)
+    items = await list_user_trophies_with_earned(db, user_id)
     return [UserTrophyEarned(**x) for x in items]

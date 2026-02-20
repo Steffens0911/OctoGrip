@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 import uuid
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,6 +18,10 @@ class MissionUsage(Base, UUIDMixin):
     """
 
     __tablename__ = "mission_usages"
+    __table_args__ = (
+        Index("idx_mission_usage_user_mission", "user_id", "mission_id"),
+        Index("idx_mission_usage_user_completed", "user_id", "completed_at"),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -39,6 +43,7 @@ class MissionUsage(Base, UUIDMixin):
     usage_type: Mapped[str] = mapped_column(
         String(32),
         nullable=False,
+        index=True,
         comment="before_training | after_training",
     )
     points_awarded: Mapped[int | None] = mapped_column(Integer, nullable=True)

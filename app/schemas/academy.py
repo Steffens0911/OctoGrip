@@ -1,11 +1,13 @@
 """Schemas para Academia (A-03, A-04)."""
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AcademyCreate(BaseModel):
     """Criação de academia."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)
@@ -37,11 +39,15 @@ class AcademyRead(BaseModel):
 class AcademyUpdateWeeklyTheme(BaseModel):
     """Atualização do tema semanal (A-03: professor define)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     weekly_theme: str | None = Field(None, max_length=128)
 
 
 class AcademyUpdate(BaseModel):
     """Atualização parcial da academia (CRUD). Até 3 técnicas = 3 missões semanais (seg-ter, qua-qui, sex-dom)."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(None, min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)

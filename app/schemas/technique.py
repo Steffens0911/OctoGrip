@@ -1,7 +1,7 @@
 """Schema para Technique (listagem e CRUD)."""
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class TechniqueRead(BaseModel):
@@ -22,6 +22,8 @@ class TechniqueRead(BaseModel):
 class TechniqueCreate(BaseModel):
     """academy_id obrigatório. Slug opcional (gerado automaticamente a partir do nome)."""
 
+    model_config = ConfigDict(extra="forbid")
+
     academy_id: UUID
     name: str = Field(..., min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)
@@ -33,6 +35,8 @@ class TechniqueCreate(BaseModel):
 
 
 class TechniqueUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(None, max_length=255)
     slug: str | None = Field(None, max_length=255)
     description: str | None = None

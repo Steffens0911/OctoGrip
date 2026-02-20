@@ -1,17 +1,26 @@
 """Painel de administração — CRUDs: academias, usuários, lições, técnicas, posições, missões."""
 from fastapi import APIRouter, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.core.role_deps import require_admin
+from app.core.security import generate_csrf_token
 from app.models import User
 
 router = APIRouter()
 
 
 @router.get("", response_class=HTMLResponse)
-def admin_panel(current_user: User = Depends(require_admin)):
+async def admin_panel(current_user: User = Depends(require_admin)):
     """Página única do painel admin com todos os CRUDs. Apenas administradores."""
-    return _ADMIN_HTML
+    # Substituir placeholder CSRF_TOKEN no HTML
+    csrf_token = generate_csrf_token(current_user.id)
+    return _ADMIN_HTML.replace("CSRF_TOKEN_PLACEHOLDER", csrf_token)
+
+
+@router.get("/csrf-token", response_class=JSONResponse)
+async def get_csrf_token(current_user: User = Depends(require_admin)):
+    """Retorna um token CSRF para proteção de formulários. Apenas administradores."""
+    return {"csrf_token": generate_csrf_token(current_user.id)}
 
 
 _ADMIN_HTML = """<!DOCTYPE html>
@@ -104,6 +113,7 @@ _ADMIN_HTML = """<!DOCTYPE html>
   <script>
 (function() {
   const API = '';
+  let csrfToken = 'CSRF_TOKEN_PLACEHOLDER';
   function $(id) { return document.getElementById(id); }
   function sel(q) { return document.querySelector(q); }
   function all(q) { return document.querySelectorAll(q); }
@@ -111,11 +121,19 @@ _ADMIN_HTML = """<!DOCTYPE html>
   function showMsg(msgId, text, ok) { const el = $(msgId); el.textContent = text; el.className = 'msg ' + (ok ? 'ok' : 'err'); el.classList.remove('hidden'); }
   function hideMsg(msgId) { $(msgId).classList.add('hidden'); }
 
+  function getHeaders() {
+    const headers = { 'Content-Type': 'application/json' };
+    if (csrfToken && csrfToken !== 'CSRF_TOKEN_PLACEHOLDER') {
+      headers['X-CSRF-Token'] = csrfToken;
+    }
+    return headers;
+  }
+
   async function get(path) { const r = await fetch(API + path); return r.ok ? r.json() : Promise.reject(await r.json().catch(() => ({}))); }
-  async function post(path, body) { const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
-  async function patch(path, body) { const r = await fetch(API + path, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
-  async function put(path, body) { const r = await fetch(API + path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
-  async function del(path) { const r = await fetch(API + path, { method: 'DELETE' }); if (!r.ok) throw await r.json().catch(() => ({})); }
+  async function post(path, body) { const r = await fetch(API + path, { method: 'POST', headers: getHeaders(), body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
+  async function patch(path, body) { const r = await fetch(API + path, { method: 'PATCH', headers: getHeaders(), body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
+  async function put(path, body) { const r = await fetch(API + path, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(body) }); const data = await r.json().catch(() => ({})); if (!r.ok) throw data; return data; }
+  async function del(path) { const r = await fetch(API + path, { method: 'DELETE', headers: csrfToken && csrfToken !== 'CSRF_TOKEN_PLACEHOLDER' ? { 'X-CSRF-Token': csrfToken } : {} }); if (!r.ok) throw await r.json().catch(() => ({})); }
 
   all('.sidebar a[data-panel]').forEach(a => { a.addEventListener('click', e => { e.preventDefault(); all('.sidebar a').forEach(x => x.classList.remove('active')); a.classList.add('active'); all('.panel').forEach(p => p.classList.remove('active')); $('panel-' + a.dataset.panel).classList.add('active'); loadPanel(a.dataset.panel); }); });
 

@@ -1,11 +1,12 @@
 """Rotas de execuções de técnica (gamificação): criar, pendentes, confirmar. Requerem autenticação."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.core.auth_deps import get_current_user
+from app.core.rate_limit import limiter
+from app.database import get_db
 from app.models import User
 from app.schemas.execution import (
     ExecutionConfirmRequest,
@@ -58,13 +59,15 @@ def _execution_to_read(execution) -> ExecutionRead:
 
 
 @router.post("", response_model=ExecutionCreateResponse, status_code=201)
-def execution_create(
+@limiter.limit("30/minute")
+async def execution_create(
+    request: Request,
     body: ExecutionCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Registra que o usuário logado aplicou a técnica no adversário. Aguarda confirmação do adversário."""
-    execution = create_execution(
+    execution = await create_execution(
         db,
         user_id=current_user.id,
         opponent_id=body.opponent_id,
@@ -83,33 +86,35 @@ def execution_create(
 
 
 @router.get("/pending_confirmations/count")
-def execution_pending_confirmations_count(
-    db: Session = Depends(get_db),
+async def execution_pending_confirmations_count(
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Retorna o número de confirmações pendentes do usuário logado (ele é o adversário)."""
-    return {"count": count_pending_confirmations(db, opponent_id=current_user.id)}
+    return {"count": await count_pending_confirmations(db, opponent_id=current_user.id)}
 
 
 @router.get("/pending_confirmations", response_model=list[ExecutionRead])
-def execution_pending_confirmations(
-    db: Session = Depends(get_db),
+async def execution_pending_confirmations(
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista execuções pendentes de confirmação para o usuário logado (ele é o adversário)."""
-    executions = list_pending_confirmations(db, opponent_id=current_user.id)
+    """Lista execuções pendentes de confirmação para o usuário logado (ele é o adversário) com paginação."""
+    executions = await list_pending_confirmations(db, opponent_id=current_user.id, offset=offset, limit=limit)
     return [_execution_to_read(e) for e in executions]
 
 
 @router.post("/{execution_id}/confirm", response_model=ExecutionConfirmResponse)
-def execution_confirm(
+async def execution_confirm(
     execution_id: UUID,
     body: ExecutionConfirmRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Confirma a execução (apenas o adversário logado). outcome: attempted_correctly | executed_successfully."""
-    execution = confirm_execution(
+    execution = await confirm_execution(
         db,
         execution_id=execution_id,
         outcome=body.outcome,
@@ -127,14 +132,14 @@ def execution_confirm(
 
 
 @router.post("/{execution_id}/reject", response_model=ExecutionRejectResponse)
-def execution_reject(
+async def execution_reject(
     execution_id: UUID,
     body: ExecutionRejectRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Recusa a execução (apenas o adversário logado). reason=dont_remember notifica que não aceitou a posição."""
-    execution = reject_execution(
+    execution = await reject_execution(
         db,
         execution_id=execution_id,
         rejected_by_user_id=current_user.id,
@@ -144,10 +149,12 @@ def execution_reject(
 
 
 @router.get("/my_executions", response_model=list[ExecutionRead])
-def execution_my_executions(
-    db: Session = Depends(get_db),
+async def execution_my_executions(
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Lista execuções criadas pelo usuário logado (executor), todos os status."""
-    executions = list_my_executions(db, user_id=current_user.id)
+    """Lista execuções criadas pelo usuário logado (executor), todos os status, com paginação."""
+    executions = await list_my_executions(db, user_id=current_user.id, offset=offset, limit=limit)
     return [_execution_to_read(e) for e in executions]
