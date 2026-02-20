@@ -27,6 +27,11 @@ async def get_professor(db: AsyncSession, professor_id: UUID) -> Professor | Non
     return (await db.execute(select(Professor).where(Professor.id == professor_id))).scalar_one_or_none()
 
 
+async def get_professor_by_email(db: AsyncSession, email: str) -> Professor | None:
+    """Retorna um professor por e-mail (case-insensitive)."""
+    return (await db.execute(select(Professor).where(Professor.email.ilike(email.strip())))).scalar_one_or_none()
+
+
 async def create_professor(
     db: AsyncSession,
     name: str,
