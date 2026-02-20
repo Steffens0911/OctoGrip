@@ -4,10 +4,11 @@ Centraliza prefixos e tags; main.py só inclui este router.
 """
 from fastapi import APIRouter
 
-from app.routes import academies, admin, executions, health, lesson_complete, lessons, metrics, mission, mission_complete, mission_usages, missions, positions, professors, techniques, trophies, training_feedback, users
+from app.routes import academies, admin, auth, executions, health, lesson_complete, lessons, metrics, mission, mission_complete, mission_usages, missions, positions, professors, techniques, trophies, training_feedback, users
 
 api_router = APIRouter()
 
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(academies.router, prefix="/academies", tags=["academies"])
