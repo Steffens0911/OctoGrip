@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/academy_form_screen.dart';
@@ -225,7 +226,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                          trailing: Row(
+                                          trailing: AuthService().canEditResources() ? Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               IconButton(
@@ -237,7 +238,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                                                 onPressed: () => _delete(a),
                                               ),
                                             ],
-                                          ),
+                                          ) : null,
                                           onTap: () => _openDetail(a),
                                         ),
                                       );
@@ -247,10 +248,10 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                         ),
                       ],
                     ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
-      ),
+      ) : null,
     );
   }
 }

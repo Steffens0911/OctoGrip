@@ -3,6 +3,7 @@ class UserModel {
   final String email;
   final String? name;
   final String? graduation;
+  final String role;
   final String? academyId;
   final int pointsAdjustment;
 
@@ -11,6 +12,7 @@ class UserModel {
     required this.email,
     this.name,
     this.graduation,
+    this.role = 'aluno',
     this.academyId,
     this.pointsAdjustment = 0,
   });
@@ -21,6 +23,7 @@ class UserModel {
       email: json['email'] as String,
       name: json['name'] as String?,
       graduation: json['graduation'] as String?,
+      role: json['role'] as String? ?? 'aluno',
       academyId: json['academy_id'] as String?,
       pointsAdjustment: json['points_adjustment'] as int? ?? 0,
     );
@@ -31,6 +34,7 @@ class UserModel {
         'email': email,
         'name': name,
         'graduation': graduation,
+        'role': role,
         'academy_id': academyId,
         'points_adjustment': pointsAdjustment,
       };

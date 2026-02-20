@@ -5,9 +5,8 @@ from pydantic import BaseModel
 
 
 class LessonCompleteRequest(BaseModel):
-    """Corpo da requisição para registrar conclusão de lição."""
+    """Corpo da requisição para registrar conclusão de lição. user_id vem do token."""
 
-    user_id: UUID
     lesson_id: UUID
 
 

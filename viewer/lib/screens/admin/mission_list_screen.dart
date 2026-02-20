@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/mission_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -194,17 +195,17 @@ class _MissionListScreenState extends State<MissionListScreen> {
                     child: ListTile(
                       title: Text(_missionTitle(m)),
                       subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(m)),
-                      ]),
+                      ]) : null,
                       onTap: () => _openForm(m),
                     ),
                   );
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

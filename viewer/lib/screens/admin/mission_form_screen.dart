@@ -5,6 +5,7 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/utils/form_utils.dart';
 
 class MissionFormScreen extends StatefulWidget {
   final Mission? mission;
@@ -23,6 +24,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   List<Academy> _academies = [];
   final _startDateCtrl = TextEditingController();
   final _endDateCtrl = TextEditingController();
+  DateTime? _startDate;
+  DateTime? _endDate;
   String? _techniqueId;
   String? _academyId;
   String _level = 'beginner';
@@ -31,24 +34,49 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   bool _saving = false;
   String? _error;
 
+  Future<void> _pickDate({required bool isStart}) async {
+    final current = isStart ? _startDate : _endDate;
+    final firstDate = DateTime(2020);
+    final lastDate = DateTime(2100);
+    final picked = await showDatePicker(
+      context: context,
+      locale: const Locale('pt', 'BR'),
+      initialDate: current ?? DateTime.now(),
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+        _startDateCtrl.text = toBrDate(picked);
+      } else {
+        _endDate = picked;
+        _endDateCtrl.text = toBrDate(picked);
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
-    final startStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final end = now.add(const Duration(days: 6));
-    final endStr = '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
     if (widget.mission != null) {
       _techniqueId = widget.mission!.techniqueId;
       _academyId = widget.mission!.academyId;
-      _startDateCtrl.text = widget.mission!.startDate;
-      _endDateCtrl.text = widget.mission!.endDate;
+      _startDate = parseApiDate(widget.mission!.startDate) ?? now;
+      _endDate = parseApiDate(widget.mission!.endDate) ?? end;
+      _startDateCtrl.text = toBrDate(_startDate!);
+      _endDateCtrl.text = toBrDate(_endDate!);
       _level = widget.mission!.level;
       _themeCtrl.text = widget.mission!.theme ?? '';
       _multiplier = widget.mission!.multiplier;
     } else {
-      _startDateCtrl.text = startStr;
-      _endDateCtrl.text = endStr;
+      _startDate = now;
+      _endDate = end;
+      _startDateCtrl.text = toBrDate(now);
+      _endDateCtrl.text = toBrDate(end);
     }
     _multiplierCtrl.text = _multiplier.toString();
     _load();
@@ -97,12 +125,16 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       setState(() => _error = 'Selecione uma técnica');
       return;
     }
-    final startDate = _startDateCtrl.text.trim();
-    final endDate = _endDateCtrl.text.trim();
-    if (startDate.isEmpty || endDate.isEmpty) {
-      setState(() => _error = 'Preencha início e fim');
+    if (_startDate == null || _endDate == null) {
+      setState(() => _error = 'Selecione as datas de início e fim');
       return;
     }
+    if (_endDate!.isBefore(_startDate!)) {
+      setState(() => _error = 'A data fim deve ser igual ou posterior à data início');
+      return;
+    }
+    final startDate = toApiDate(_startDate!);
+    final endDate = toApiDate(_endDate!);
     final mult = int.tryParse(_multiplierCtrl.text.trim());
     final multVal = (mult != null && mult >= 1) ? mult : 1;
     setState(() { _saving = true; _error = null; });
@@ -181,12 +213,24 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _startDateCtrl,
-                    decoration: const InputDecoration(labelText: 'Início (YYYY-MM-DD)'),
+                    readOnly: true,
+                    onTap: () => _pickDate(isStart: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Início',
+                      hintText: 'dd/MM/aaaa',
+                      suffixIcon: Icon(Icons.calendar_today_outlined),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _endDateCtrl,
-                    decoration: const InputDecoration(labelText: 'Fim (YYYY-MM-DD)'),
+                    readOnly: true,
+                    onTap: () => _pickDate(isStart: false),
+                    decoration: const InputDecoration(
+                      labelText: 'Fim',
+                      hintText: 'dd/MM/aaaa',
+                      suffixIcon: Icon(Icons.calendar_today_outlined),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(

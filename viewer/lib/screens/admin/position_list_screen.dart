@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/position_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -77,17 +78,17 @@ class _PositionListScreenState extends State<PositionListScreen> {
                     child: ListTile(
                       title: Text(p.name),
                       subtitle: Text(p.description ?? ''),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(p)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(p)),
-                      ]),
+                      ]) : null,
                       onTap: () => _openForm(p),
                     ),
                   );
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

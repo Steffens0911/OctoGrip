@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/services/professor_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/utils/form_utils.dart';
 
 /// Lista e CRUD de professores (seção professor).
 class ProfessorsScreen extends StatefulWidget {
@@ -119,6 +120,13 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
               if (name.isEmpty || email.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   const SnackBar(content: Text('Preencha nome e e-mail.')),
+                );
+                return;
+              }
+              final emailErr = validateEmail(email);
+              if (emailErr != null) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(emailErr)),
                 );
                 return;
               }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/widgets/role_guard.dart';
 
 /// Tela principal da seção Administração — estilo Lovable.
 class AdminSectionScreen extends StatelessWidget {
@@ -9,7 +10,9 @@ class AdminSectionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    return RoleGuard(
+      allowedRoles: ['administrador'],
+      child: SingleChildScrollView(
       padding: EdgeInsets.all(AppTheme.screenPadding(context)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -55,6 +58,7 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

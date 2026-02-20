@@ -73,7 +73,6 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
     });
     try {
       await _api.postTrainingFeedback(
-        userId: widget.userId,
         positionId: _selectedPosition!.id,
         observation: _observationController.text.trim().isEmpty ? null : _observationController.text.trim(),
       );

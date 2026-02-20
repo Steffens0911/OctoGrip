@@ -5,9 +5,8 @@ from pydantic import BaseModel
 
 
 class TrainingFeedbackRequest(BaseModel):
-    """Corpo da requisição para registrar feedback de treino."""
+    """Corpo da requisição para registrar feedback de treino. user_id vem do token."""
 
-    user_id: UUID
     position_id: UUID
     observation: str | None = None
 

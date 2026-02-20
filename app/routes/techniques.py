@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.role_deps import require_read_access, require_write_access
 from app.database import get_db
+from app.models import User
 from app.schemas.technique import TechniqueCreate, TechniqueRead, TechniqueUpdate
 from app.services.technique_service import (
     create_technique,
@@ -34,8 +36,9 @@ def technique_get(
     technique_id: UUID,
     academy_id: UUID = Query(..., description="Academia do contexto – retorna 404 se a técnica não for desta academia"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access),
 ):
-    """Retorna uma técnica por ID. Só retorna se pertencer à academia informada."""
+    """Retorna uma técnica por ID. Só retorna se pertencer à academia informada. Admin, gerente, professor ou supervisor."""
     technique = get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
         raise HTTPException(status_code=404, detail="Técnica não encontrada.")
@@ -67,8 +70,9 @@ def technique_update(
     body: TechniqueUpdate,
     academy_id: UUID = Query(..., description="Academia do contexto – só permite editar técnicas desta academia"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
 ):
-    """Atualiza uma técnica (campos opcionais). Só permite se pertencer à academia informada."""
+    """Atualiza uma técnica (campos opcionais). Só permite se pertencer à academia informada. Admin, gerente ou professor."""
     technique = get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
         raise HTTPException(status_code=404, detail="Técnica não encontrada.")
@@ -87,8 +91,9 @@ def technique_delete(
     technique_id: UUID,
     academy_id: UUID = Query(..., description="Academia do contexto – só permite excluir técnicas desta academia"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
 ):
-    """Remove uma técnica. Só permite se pertencer à academia informada."""
+    """Remove uma técnica. Só permite se pertencer à academia informada. Admin, gerente ou professor."""
     technique = get_technique(db, technique_id)
     if not technique or technique.academy_id != academy_id:
         raise HTTPException(status_code=404, detail="Técnica não encontrada.")

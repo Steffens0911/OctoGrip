@@ -6,9 +6,8 @@ from pydantic import BaseModel
 
 
 class MissionCompleteRequest(BaseModel):
-    """Body do POST /mission_complete."""
+    """Body do POST /mission_complete. user_id vem do token (autenticação)."""
 
-    user_id: UUID
     mission_id: UUID
     usage_type: str = "after_training"  # before_training | after_training
 

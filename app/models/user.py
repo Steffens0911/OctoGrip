@@ -15,6 +15,7 @@ class User(Base, UUIDMixin):
     __tablename__ = "users"
 
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="Hash bcrypt da senha para login.")
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     points_adjustment: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     graduation: Mapped[str | None] = mapped_column(
@@ -22,6 +23,13 @@ class User(Base, UUIDMixin):
         nullable=True,
         index=True,
         comment="Faixa: white, blue, purple, brown, black.",
+    )
+    role: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="aluno",
+        index=True,
+        comment="Role: aluno, professor, gerente_academia, administrador, supervisor",
     )
     academy_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("academies.id", ondelete="SET NULL"),

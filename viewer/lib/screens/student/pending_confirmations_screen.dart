@@ -52,7 +52,7 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final list = await _api.getPendingConfirmations(widget.userId);
+      final list = await _api.getPendingConfirmations();
       if (mounted) setState(() { _allItems = list; _loading = false; });
       _applyFilters();
     } catch (e) {
@@ -65,7 +65,6 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
       await _api.postExecutionConfirm(
         executionId: executionId,
         outcome: outcome,
-        userId: widget.userId,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +95,6 @@ class _PendingConfirmationsScreenState extends State<PendingConfirmationsScreen>
     try {
       await _api.postExecutionReject(
         executionId: executionId,
-        userId: widget.userId,
         reason: 'dont_remember',
       );
       if (!mounted) return;

@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.auth_deps import get_current_user_optional
+from app.models import User
 from app.schemas.mission import MissionTodayResponse, MissionWeekResponse
 from app.services.mission_service import get_mission_today_response, get_mission_week_response
 
@@ -17,13 +19,14 @@ def mission_week(
     level: str = "beginner",
     user_id: UUID | None = None,
     academy_id: UUID | None = None,
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """
-    Retorna as 3 missões da semana (Missão 1, 2, 3) para listagem ao aluno.
-    Cada entrada pode ter mission preenchida ou null.
+    Retorna as 3 missões da semana (Missão 1, 2, 3). Se enviar Authorization Bearer, usa o usuário do token.
     """
+    uid = current_user.id if current_user else user_id
     payload = get_mission_week_response(
-        db, level=level, user_id=user_id, academy_id=academy_id
+        db, level=level, user_id=uid, academy_id=academy_id
     )
     return JSONResponse(
         content=payload.model_dump(mode="json"),
@@ -38,16 +41,16 @@ def mission_today(
     user_id: UUID | None = None,
     review_after_days: int = 7,
     academy_id: UUID | None = None,
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """
-    Retorna a missão do dia por nível (beginner/intermediate).
-    A-02: academy_id (ou do user) usa missão da academia; senão, missão global.
-    PF-03/PF-04: user_id prioriza revisão e posição difícil.
+    Retorna a missão do dia por nível. Se enviar Authorization Bearer, usa o usuário do token para personalização.
     """
+    uid = current_user.id if current_user else user_id
     payload = get_mission_today_response(
         db,
         level=level,
-        user_id=user_id,
+        user_id=uid,
         review_after_days=review_after_days,
         academy_id=academy_id,
     )

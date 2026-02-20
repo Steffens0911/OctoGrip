@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -160,17 +161,17 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
                     child: ListTile(
                       title: Text(t.name),
                       subtitle: Text('da posição ${_positionName(t.fromPositionId)} → para posição ${_positionName(t.toPositionId)}'),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(t)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(t)),
-                      ]),
+                      ]) : null,
                       onTap: () => _openForm(t),
                     ),
                   );
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

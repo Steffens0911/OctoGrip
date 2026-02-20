@@ -4,8 +4,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.role_deps import require_admin_or_academy_access
 from app.database import get_db
-from app.models import Professor
+from app.models import Professor, User
 from app.schemas.professor import ProfessorCreate, ProfessorRead, ProfessorUpdate
 from app.services.professor_service import (
     create_professor,
@@ -22,14 +23,19 @@ router = APIRouter()
 def professors_list(
     academy_id: UUID | None = Query(None, description="Filtrar por academia"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Lista professores (opcionalmente por academia)."""
+    """Lista professores (opcionalmente por academia). Admin, gerente ou professor."""
     return list_professors(db, academy_id=academy_id)
 
 
 @router.get("/{professor_id}", response_model=ProfessorRead)
-def professor_get(professor_id: UUID, db: Session = Depends(get_db)):
-    """Retorna um professor por ID."""
+def professor_get(
+    professor_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Retorna um professor por ID. Admin, gerente ou professor."""
     professor = get_professor(db, professor_id)
     if not professor:
         raise HTTPException(status_code=404, detail="Professor não encontrado.")
@@ -37,8 +43,12 @@ def professor_get(professor_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=ProfessorRead, status_code=201)
-def professor_create(body: ProfessorCreate, db: Session = Depends(get_db)):
-    """Cria um professor (e-mail único)."""
+def professor_create(
+    body: ProfessorCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Cria um professor (e-mail único). Admin, gerente ou professor."""
     existing = db.query(Professor).filter(Professor.email == body.email).first()
     if existing:
         raise HTTPException(status_code=409, detail="E-mail já cadastrado.")
@@ -55,8 +65,9 @@ def professor_update(
     professor_id: UUID,
     body: ProfessorUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Atualiza um professor."""
+    """Atualiza um professor. Admin, gerente ou professor."""
     payload = body.model_dump(exclude_unset=True)
     updated = update_professor(
         db,
@@ -71,8 +82,12 @@ def professor_update(
 
 
 @router.delete("/{professor_id}", status_code=204)
-def professor_delete(professor_id: UUID, db: Session = Depends(get_db)):
-    """Remove um professor."""
+def professor_delete(
+    professor_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Remove um professor. Admin, gerente ou professor."""
     if not delete_professor(db, professor_id):
         raise HTTPException(status_code=404, detail="Professor não encontrado.")
     return None

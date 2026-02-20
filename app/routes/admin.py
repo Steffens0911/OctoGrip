@@ -1,13 +1,16 @@
 """Painel de administração — CRUDs: academias, usuários, lições, técnicas, posições, missões."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
+
+from app.core.role_deps import require_admin
+from app.models import User
 
 router = APIRouter()
 
 
 @router.get("", response_class=HTMLResponse)
-def admin_panel():
-    """Página única do painel admin com todos os CRUDs."""
+def admin_panel(current_user: User = Depends(require_admin)):
+    """Página única do painel admin com todos os CRUDs. Apenas administradores."""
     return _ADMIN_HTML
 
 

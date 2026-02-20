@@ -10,7 +10,9 @@ import 'package:viewer/screens/admin/position_form_screen.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
 import 'package:viewer/services/academy_service.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/utils/form_utils.dart';
 
 /// Detalhe da academia: missão do dia (técnica), ranking, dificuldades, relatório semanal.
 class AcademyDetailScreen extends StatefulWidget {
@@ -207,8 +209,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
             initialValue: {
               'name': '',
               'techniqueId': _techniques.first.id,
-              'startDate': DateTime.now().toIso8601String().substring(0, 10),
-              'endDate': DateTime.now().add(const Duration(days: 30)).toIso8601String().substring(0, 10),
+              'startDate': DateTime.now(),
+              'endDate': DateTime.now().add(const Duration(days: 30)),
               'targetCount': '10',
             },
             child: Column(
@@ -237,21 +239,33 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ]),
                 ),
                 const SizedBox(height: 12),
-                FormBuilderTextField(
+                FormBuilderDateTimePicker(
                   name: 'startDate',
-                  decoration: const InputDecoration(labelText: 'Data início (YYYY-MM-DD)'),
+                  inputType: InputType.date,
+                  format: brDateFormat,
+                  locale: const Locale('pt', 'BR'),
+                  decoration: const InputDecoration(
+                    labelText: 'Data início',
+                    hintText: 'dd/MM/aaaa',
+                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                  ),
                   validator: FormBuilderValidators.compose([
                     FormBuilderValidators.required(errorText: 'Data início é obrigatória'),
-                    FormBuilderValidators.match(r'^\d{4}-\d{2}-\d{2}$', errorText: 'Formato: YYYY-MM-DD'),
                   ]),
                 ),
                 const SizedBox(height: 8),
-                FormBuilderTextField(
+                FormBuilderDateTimePicker(
                   name: 'endDate',
-                  decoration: const InputDecoration(labelText: 'Data fim (YYYY-MM-DD)'),
+                  inputType: InputType.date,
+                  format: brDateFormat,
+                  locale: const Locale('pt', 'BR'),
+                  decoration: const InputDecoration(
+                    labelText: 'Data fim',
+                    hintText: 'dd/MM/aaaa',
+                    suffixIcon: Icon(Icons.calendar_today_outlined),
+                  ),
                   validator: FormBuilderValidators.compose([
                     FormBuilderValidators.required(errorText: 'Data fim é obrigatória'),
-                    FormBuilderValidators.match(r'^\d{4}-\d{2}-\d{2}$', errorText: 'Formato: YYYY-MM-DD'),
                   ]),
                 ),
                 const SizedBox(height: 8),
@@ -277,9 +291,17 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 final values = formKey.currentState!.value;
                 final name = values['name'] as String;
                 final techniqueId = values['techniqueId'] as String;
-                final startDate = values['startDate'] as String;
-                final endDate = values['endDate'] as String;
+                final startDateValue = values['startDate'] as DateTime;
+                final endDateValue = values['endDate'] as DateTime;
+                if (endDateValue.isBefore(startDateValue)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('A data fim deve ser igual ou posterior à data início.')),
+                  );
+                  return;
+                }
                 final targetCount = int.parse(values['targetCount'] as String);
+                final startDate = toApiDate(startDateValue);
+                final endDate = toApiDate(endDateValue);
                 
                 Navigator.pop(ctx);
                 try {
@@ -287,8 +309,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     academyId: _academy.id,
                     techniqueId: techniqueId,
                     name: name.trim(),
-                    startDate: startDate.trim(),
-                    endDate: endDate.trim(),
+                    startDate: startDate,
+                    endDate: endDate,
                     targetCount: targetCount,
                   );
                   if (mounted) {
@@ -630,10 +652,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                               contentPadding: EdgeInsets.zero,
                               title: Text(p.name),
                               subtitle: p.description != null && p.description!.isNotEmpty ? Text(p.description!, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
-                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                              trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                                 IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openPositionForm(p)),
                                 IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deletePosition(p)),
-                              ]),
+                              ]) : null,
                             );
                           },
                         ),
@@ -659,11 +681,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () => _openTechniqueForm(),
-                            tooltip: 'Nova técnica',
-                          ),
+                          if (AuthService().canEditResources())
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: () => _openTechniqueForm(),
+                              tooltip: 'Nova técnica',
+                            ),
                         ],
                       ),
                       if (_loadingTechniques)
@@ -693,10 +716,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                              trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                                 IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openTechniqueForm(t)),
                                 IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deleteTechnique(t)),
-                              ]),
+                              ]) : null,
                             );
                           },
                         ),
@@ -722,11 +745,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: _showCreateTrophyDialog,
-                            tooltip: 'Criar troféu',
-                          ),
+                          if (AuthService().canEditResources())
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: _showCreateTrophyDialog,
+                              tooltip: 'Criar troféu',
+                            ),
                         ],
                       ),
                       if (_loadingTrophies)

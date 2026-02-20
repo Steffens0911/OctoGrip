@@ -1,10 +1,12 @@
-"""Rotas de execuções de técnica (gamificação): criar, pendentes, confirmar."""
+"""Rotas de execuções de técnica (gamificação): criar, pendentes, confirmar. Requerem autenticação."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.auth_deps import get_current_user
+from app.models import User
 from app.schemas.execution import (
     ExecutionConfirmRequest,
     ExecutionConfirmResponse,
@@ -56,11 +58,15 @@ def _execution_to_read(execution) -> ExecutionRead:
 
 
 @router.post("", response_model=ExecutionCreateResponse, status_code=201)
-def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
-    """Registra que o usuário aplicou a técnica no adversário. Aguarda confirmação do adversário."""
+def execution_create(
+    body: ExecutionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Registra que o usuário logado aplicou a técnica no adversário. Aguarda confirmação do adversário."""
     execution = create_execution(
         db,
-        user_id=body.user_id,
+        user_id=current_user.id,
         opponent_id=body.opponent_id,
         usage_type=body.usage_type,
         mission_id=body.mission_id,
@@ -78,20 +84,20 @@ def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
 
 @router.get("/pending_confirmations/count")
 def execution_pending_confirmations_count(
-    user_id: UUID = Query(..., description="ID do adversário (quem deve confirmar)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Retorna apenas o número de confirmações pendentes (para badge na tela inicial)."""
-    return {"count": count_pending_confirmations(db, opponent_id=user_id)}
+    """Retorna o número de confirmações pendentes do usuário logado (ele é o adversário)."""
+    return {"count": count_pending_confirmations(db, opponent_id=current_user.id)}
 
 
 @router.get("/pending_confirmations", response_model=list[ExecutionRead])
 def execution_pending_confirmations(
-    user_id: UUID = Query(..., description="ID do adversário (quem deve confirmar)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Lista execuções pendentes de confirmação para o usuário (ele é o adversário)."""
-    executions = list_pending_confirmations(db, opponent_id=user_id)
+    """Lista execuções pendentes de confirmação para o usuário logado (ele é o adversário)."""
+    executions = list_pending_confirmations(db, opponent_id=current_user.id)
     return [_execution_to_read(e) for e in executions]
 
 
@@ -100,13 +106,14 @@ def execution_confirm(
     execution_id: UUID,
     body: ExecutionConfirmRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Confirma a execução (apenas o adversário). outcome: attempted_correctly | executed_successfully."""
+    """Confirma a execução (apenas o adversário logado). outcome: attempted_correctly | executed_successfully."""
     execution = confirm_execution(
         db,
         execution_id=execution_id,
         outcome=body.outcome,
-        confirmed_by_user_id=body.user_id,
+        confirmed_by_user_id=current_user.id,
     )
     if not execution.points_awarded:
         execution.points_awarded = 0
@@ -124,12 +131,13 @@ def execution_reject(
     execution_id: UUID,
     body: ExecutionRejectRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Recusa a execução (apenas o adversário). reason=dont_remember notifica que não aceitou a posição."""
+    """Recusa a execução (apenas o adversário logado). reason=dont_remember notifica que não aceitou a posição."""
     execution = reject_execution(
         db,
         execution_id=execution_id,
-        rejected_by_user_id=body.user_id,
+        rejected_by_user_id=current_user.id,
         reason=body.reason,
     )
     return ExecutionRejectResponse(id=execution.id, status=execution.status)
@@ -137,9 +145,9 @@ def execution_reject(
 
 @router.get("/my_executions", response_model=list[ExecutionRead])
 def execution_my_executions(
-    user_id: UUID = Query(..., description="ID do executor (quem aplicou a técnica)"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    """Lista execuções criadas pelo usuário (executor), todos os status."""
-    executions = list_my_executions(db, user_id=user_id)
+    """Lista execuções criadas pelo usuário logado (executor), todos os status."""
+    executions = list_my_executions(db, user_id=current_user.id)
     return [_execution_to_read(e) for e in executions]

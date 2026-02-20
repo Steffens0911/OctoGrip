@@ -33,7 +33,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
       _error = null;
     });
     try {
-      final list = await _api.getMissionUsagesHistory(widget.userId, limit: 500);
+      final list = await _api.getMissionUsagesHistory(limit: 500);
       if (mounted) setState(() {
         _items = list;
         _loading = false;

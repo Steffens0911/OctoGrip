@@ -54,7 +54,7 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final list = await _api.getMyExecutions(widget.userId);
+      final list = await _api.getMyExecutions();
       if (mounted) setState(() { _allItems = list; _loading = false; });
       _applyFilters();
     } catch (e) {

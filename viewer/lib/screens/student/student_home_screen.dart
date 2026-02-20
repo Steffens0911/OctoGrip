@@ -11,9 +11,10 @@ import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
-/// Tela inicial da área do aluno: seletor de usuário (MVP), missões da semana e atalhos.
+/// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
   const StudentHomeScreen({super.key, this.refreshTrigger = 0});
 
@@ -27,7 +28,6 @@ class StudentHomeScreen extends StatefulWidget {
 class _StudentHomeScreenState extends State<StudentHomeScreen>
     with WidgetsBindingObserver {
   final _api = ApiService();
-  List<UserModel> _users = [];
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
   int? _userPoints;
@@ -89,36 +89,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _loadMissionWeek();
       _loadUserPoints();
       _loadCollectiveGoal();
-      _loadPendingConfirmationsWith(_selectedUser!.id);
+      _loadPendingConfirmationsWith();
     }
   }
 
   Future<void> _load() async {
+    final currentUser = AuthService().currentUser;
     setState(() {
       _loading = true;
       _error = null;
       _missionWeek = null;
+      _selectedUser = currentUser;
     });
-    try {
-      final users = await _api.getUsers();
-      if (!mounted) return;
-      final selected = users.isNotEmpty ? users.first : null;
+    if (currentUser == null) {
       setState(() {
-        _users = users;
-        _selectedUser = selected;
         _loading = false;
-        if (selected == null) _pendingConfirmationsCount = 0;
+        _pendingConfirmationsCount = 0;
       });
-      if (selected != null) {
-        final level = _levelFromGraduation(selected.graduation);
-        await Future.wait([
-          _loadMissionWeekWith(selected.id, selected.academyId, level),
-          _loadUserPointsWith(selected.id),
-          _loadCollectiveGoalWith(selected.academyId),
-          _loadPendingConfirmationsWith(selected.id),
-        ]);
-        if (mounted) setState(() {});
-      }
+      return;
+    }
+    try {
+      final level = _levelFromGraduation(currentUser.graduation);
+      await Future.wait([
+        _loadMissionWeekWith(currentUser.academyId, level),
+        _loadUserPointsWith(currentUser.id),
+        _loadCollectiveGoalWith(currentUser.academyId),
+        _loadPendingConfirmationsWith(),
+      ]);
+      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
@@ -127,9 +125,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  Future<void> _loadMissionWeekWith(String userId, String? academyId, String level) async {
+  Future<void> _loadMissionWeekWith(String? academyId, String level) async {
     try {
-      final week = await _api.getMissionWeek(userId: userId, academyId: academyId, level: level);
+      final week = await _api.getMissionWeek(academyId: academyId, level: level);
       if (mounted) setState(() => _missionWeek = week);
     } catch (e) {
       if (mounted) setState(() => _missionWeek = null);
@@ -159,9 +157,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  Future<void> _loadPendingConfirmationsWith(String userId) async {
+  Future<void> _loadPendingConfirmationsWith() async {
     try {
-      final count = await _api.getPendingConfirmationsCount(userId);
+      final count = await _api.getPendingConfirmationsCount();
       if (mounted) setState(() => _pendingConfirmationsCount = count);
     } catch (_) {
       if (mounted) setState(() => _pendingConfirmationsCount = 0);
@@ -174,7 +172,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     try {
       final level = _levelFromGraduation(_selectedUser!.graduation);
       final week = await _api.getMissionWeek(
-        userId: _selectedUser!.id,
         academyId: _selectedUser!.academyId,
         level: level,
       );
@@ -224,10 +221,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _users.isEmpty) {
+    if (_loading && _selectedUser == null) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
     }
-    if (_error != null && _users.isEmpty) {
+    if (_error != null && _selectedUser == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -269,7 +266,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   ),
             ),
             const SizedBox(height: 24),
-            _buildUserSelector(),
+            _buildUserCard(),
             const SizedBox(height: 20),
             if (_collectiveGoal != null) _buildCollectiveGoalCard(),
             if (_collectiveGoal != null) const SizedBox(height: 16),
@@ -331,67 +328,30 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildUserSelector() {
+  Widget _buildUserCard() {
+    final u = _selectedUser;
+    if (u == null) return const SizedBox.shrink();
+    final displayName = u.name ?? u.email;
+    final faixa = _faixaLabel(u.graduation);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.border),
+        border: Border.all(color: AppTheme.borderOf(context)),
       ),
-      child: Padding(
-        padding: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Usuário (MVP)', style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context))),
-                Text(
-                  'Pontos: ${_userPoints ?? '—'}',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            DropdownButtonFormField<UserModel>(
-              value: _selectedUser,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              ),
-              items: _users
-                  .map((u) {
-                    final displayName = u.name ?? u.email;
-                    final faixa = _faixaLabel(u.graduation);
-                    return DropdownMenuItem(
-                      value: u,
-                      child: Text(faixa.isNotEmpty ? '$displayName – $faixa' : displayName),
-                    );
-                  })
-                  .toList(),
-              onChanged: (u) async {
-                setState(() {
-                  _selectedUser = u;
-                  _missionWeek = null;
-                  _userPoints = null;
-                  if (u == null) _pendingConfirmationsCount = 0;
-                });
-                if (u != null) {
-                  final level = _levelFromGraduation(u.graduation);
-                  await Future.wait([
-                    _loadMissionWeekWith(u.id, u.academyId, level),
-                    _loadUserPointsWith(u.id),
-                    _loadCollectiveGoalWith(u.academyId),
-                    _loadPendingConfirmationsWith(u.id),
-                  ]);
-                  if (mounted) setState(() {});
-                }
-              },
-            ),
-          ],
-        ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            faixa.isNotEmpty ? '$displayName – $faixa' : displayName,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppTheme.textPrimaryOf(context)),
+          ),
+          Text(
+            'Pontos: ${_userPoints ?? '—'}',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary),
+          ),
+        ],
       ),
     );
   }
@@ -632,7 +592,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 userName: _selectedUser?.name ?? _selectedUser?.email,
               ),
             ),
-          ).then((_) => _loadPendingConfirmationsWith(userId)),
+          ).then((_) => _loadPendingConfirmationsWith()),
         ),
         _ShortcutTile(
           icon: Icons.send_outlined,

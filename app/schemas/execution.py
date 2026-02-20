@@ -6,9 +6,8 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class ExecutionCreate(BaseModel):
-    """Body do POST /executions. Informe exatamente um de mission_id, lesson_id ou technique_id."""
+    """Body do POST /executions. user_id vem do token. Informe exatamente um de mission_id, lesson_id ou technique_id."""
 
-    user_id: UUID
     mission_id: UUID | None = None
     lesson_id: UUID | None = None
     technique_id: UUID | None = None
@@ -61,10 +60,9 @@ class ExecutionCreateResponse(BaseModel):
 
 
 class ExecutionConfirmRequest(BaseModel):
-    """Body do POST /executions/{id}/confirm."""
+    """Body do POST /executions/{id}/confirm. Quem confirma vem do token (adversário)."""
 
     outcome: str = Field(..., description="attempted_correctly | executed_successfully")
-    user_id: UUID = Field(..., description="Quem confirma (deve ser o adversário)")
 
 
 class ExecutionConfirmResponse(BaseModel):
@@ -78,9 +76,8 @@ class ExecutionConfirmResponse(BaseModel):
 
 
 class ExecutionRejectRequest(BaseModel):
-    """Body do POST /executions/{id}/reject."""
+    """Body do POST /executions/{id}/reject. Quem recusa vem do token (adversário)."""
 
-    user_id: UUID = Field(..., description="Quem recusa (deve ser o adversário)")
     reason: str | None = Field(None, description="dont_remember = adversário não aceitou a posição")
 
 

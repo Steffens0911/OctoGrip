@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/lesson_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -195,17 +196,17 @@ class _LessonListScreenState extends State<LessonListScreen> {
                     child: ListTile(
                       title: Text(l.title),
                       subtitle: Text('${_lessonTechniqueDisplay(l)} · ordem ${l.orderIndex}'),
-                      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(l)),
                         IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(l)),
-                      ]),
+                      ]) : null,
                       onTap: () => _openForm(l),
                     ),
                   );
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

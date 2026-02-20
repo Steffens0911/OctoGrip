@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:viewer/config.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
@@ -35,6 +36,57 @@ class ApiService {
 
   Future<http.Response> _req(Future<http.Response> f) => f.timeout(_timeout);
 
+  /// Garante que o token foi carregado do storage (importante no web após refresh).
+  Future<void> _ensureAuth() async => await AuthService().ensureLoaded();
+
+  /// [realUserOnly] true = não envia X-Impersonate-User (para o admin conseguir listar usuários e voltar da simulação).
+  Future<Map<String, String>> _headers({bool auth = false, bool realUserOnly = false}) async {
+    if (auth) await _ensureAuth();
+    final h = <String, String>{};
+    if (auth) {
+      final bearer = AuthService().authHeader;
+      if (bearer != null) h['Authorization'] = bearer;
+      if (!realUserOnly) {
+        final impersonate = AuthService().impersonatedUserId;
+        if (impersonate != null) h['X-Impersonate-User'] = impersonate;
+      }
+    }
+    return h;
+  }
+
+  Future<Map<String, String>> _jsonHeaders({bool auth = false, bool realUserOnly = false}) async {
+    final h = await _headers(auth: auth, realUserOnly: realUserOnly);
+    h['Content-Type'] = 'application/json';
+    return h;
+  }
+
+  // ---------- Auth ----------
+  /// Login. Retorna (token, user). Lança ApiException em erro.
+  Future<({String token, UserModel user})> login(String email, String password) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/auth/login'),
+      headers: await _jsonHeaders(),
+      body: jsonEncode({'email': email, 'password': password}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    final token = map['access_token'] as String;
+    final user = await getAuthMe(token);
+    return (token: token, user: user);
+  }
+
+  /// Retorna o usuário logado (requer token).
+  Future<UserModel> getAuthMe([String? token]) async {
+    final h = token != null
+        ? <String, String>{'Authorization': 'Bearer $token'}
+        : await _jsonHeaders(auth: true);
+    final r = await _req(http.get(Uri.parse('$baseUrl/auth/me'), headers: h));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
   Future<dynamic> _decodeResponse(http.Response r) async {
     final body = r.body;
     if (body.isEmpty) return null;
@@ -43,6 +95,9 @@ class ApiService {
 
   void _throwIfNotOk(http.Response r, [dynamic data]) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
+    if (r.statusCode == 401) {
+      AuthService().logout(notifyInvalidated: true);
+    }
     String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
     if (data is Map && data['detail'] != null) {
       final d = data['detail'];
@@ -56,7 +111,7 @@ class ApiService {
 
   // ---------- Academies ----------
   Future<List<Academy>> getAcademies() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/academies'), headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -64,14 +119,14 @@ class ApiService {
   }
 
   Future<Academy> getAcademy(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$id')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>?> getCollectiveGoalCurrent(String academyId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     if (data == null) return null;
@@ -81,7 +136,7 @@ class ApiService {
   Future<Academy> createAcademy({required String name, String? slug}) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/academies'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'name': name, 'slug': slug}),
     ));
     final data = await _decodeResponse(r);
@@ -92,7 +147,7 @@ class ApiService {
   Future<Academy> updateAcademyTheme(String id, String? weeklyTheme) async {
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/academies/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'weekly_theme': weeklyTheme}),
     ));
     final data = await _decodeResponse(r);
@@ -120,7 +175,7 @@ class ApiService {
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/academies/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -129,18 +184,19 @@ class ApiService {
   }
 
   Future<void> deleteAcademy(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id')));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
   }
 
   // ---------- Users ----------
-  Future<List<UserModel>> getUsers({String? academyId}) async {
+  /// [asRealUser] true = não envia impersonation (para o seletor "Atuar como" carregar como admin e permitir voltar).
+  Future<List<UserModel>> getUsers({String? academyId, bool asRealUser = false}) async {
     var uri = Uri.parse('$baseUrl/users');
     if (academyId != null && academyId.isNotEmpty) {
       uri = uri.replace(queryParameters: {'academy_id': academyId});
     }
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: asRealUser)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -148,7 +204,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUserPoints(String userId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$userId/points')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/users/$userId/points'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
@@ -156,7 +212,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getPointsLog(String userId, {int limit = 100}) async {
     final uri = Uri.parse('$baseUrl/users/$userId/points_log').replace(queryParameters: {'limit': limit.toString()});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
@@ -174,7 +230,7 @@ class ApiService {
   /// Lista troféus da academia (admin).
   Future<List<Map<String, dynamic>>> getTrophies(String academyId) async {
     final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -192,7 +248,7 @@ class ApiService {
   }) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
         'academy_id': academyId,
         'technique_id': techniqueId,
@@ -208,7 +264,7 @@ class ApiService {
   }
 
   Future<UserModel> getUser(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$id')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/users/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UserModel.fromJson(data! as Map<String, dynamic>);
@@ -218,6 +274,8 @@ class ApiService {
     required String email,
     String? name,
     String? graduation,
+    String? role,
+    String? password,
     String? academyId,
   }) async {
     final body = <String, dynamic>{
@@ -226,9 +284,11 @@ class ApiService {
       'academy_id': academyId,
     };
     if (graduation != null) body['graduation'] = graduation;
+    if (role != null) body['role'] = role;
+    if (password != null && password.isNotEmpty) body['password'] = password;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/users'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -236,15 +296,17 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<UserModel> updateUser(String id, {String? name, String? graduation, String? academyId, int? pointsAdjustment}) async {
+  Future<UserModel> updateUser(String id, {String? name, String? graduation, String? role, String? password, String? academyId, int? pointsAdjustment}) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (graduation != null) body['graduation'] = graduation;
+    if (role != null) body['role'] = role;
+    if (password != null && password.isNotEmpty) body['password'] = password;
     if (academyId != null) body['academy_id'] = academyId;
     if (pointsAdjustment != null) body['points_adjustment'] = pointsAdjustment;
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/users/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -253,7 +315,7 @@ class ApiService {
   }
 
   Future<void> deleteUser(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/users/$id')));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/users/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
@@ -263,7 +325,7 @@ class ApiService {
     final uri = academyId != null
         ? Uri.parse('$baseUrl/lessons').replace(queryParameters: {'academy_id': academyId})
         : Uri.parse('$baseUrl/lessons');
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -271,7 +333,7 @@ class ApiService {
   }
 
   Future<Lesson> getLesson(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/lessons/$id')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/lessons/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Lesson.fromJson(data! as Map<String, dynamic>);
@@ -295,7 +357,7 @@ class ApiService {
     if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
     final r = await _req(http.post(
       Uri.parse('$baseUrl/lessons'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -321,7 +383,7 @@ class ApiService {
     if (orderIndex != null) body['order_index'] = orderIndex;
     final r = await _req(http.put(
       Uri.parse('$baseUrl/lessons/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -330,7 +392,7 @@ class ApiService {
   }
 
   Future<void> deleteLesson(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id')));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
@@ -338,7 +400,7 @@ class ApiService {
   /// Lista técnicas da academia. [academyId] obrigatório.
   Future<List<Technique>> getTechniques({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -347,7 +409,7 @@ class ApiService {
 
   Future<Technique> getTechnique(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Technique.fromJson(data! as Map<String, dynamic>);
@@ -373,7 +435,7 @@ class ApiService {
     if (videoUrl != null && videoUrl.trim().isNotEmpty) body['video_url'] = videoUrl.trim();
     final r = await _req(http.post(
       Uri.parse('$baseUrl/techniques'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -401,7 +463,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -411,7 +473,7 @@ class ApiService {
 
   Future<void> deleteTechnique(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.delete(uri));
+    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
@@ -419,7 +481,7 @@ class ApiService {
   /// Lista posições da academia. [academyId] obrigatório.
   Future<List<Position>> getPositions({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/positions').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -428,7 +490,7 @@ class ApiService {
 
   Future<Position> getPosition(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Position.fromJson(data! as Map<String, dynamic>);
@@ -445,7 +507,7 @@ class ApiService {
     if (description != null) body['description'] = description;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/positions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -467,7 +529,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
       uri,
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -477,13 +539,13 @@ class ApiService {
 
   Future<void> deletePosition(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.delete(uri));
+    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
   // ---------- Missions ----------
   Future<List<Mission>> getMissions() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/missions'), headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -491,7 +553,7 @@ class ApiService {
   }
 
   Future<Mission> getMission(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions/$id')));
+    final r = await _req(http.get(Uri.parse('$baseUrl/missions/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Mission.fromJson(data! as Map<String, dynamic>);
@@ -508,7 +570,7 @@ class ApiService {
   }) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/missions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
         'technique_id': techniqueId,
         'start_date': startDate,
@@ -544,7 +606,7 @@ class ApiService {
     if (multiplier != null) body['multiplier'] = multiplier;
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/missions/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -553,22 +615,20 @@ class ApiService {
   }
 
   Future<void> deleteMission(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id')));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
   // ---------- Área do aluno (missão do dia, conclusão, histórico, feedback, métricas) ----------
   Future<MissionToday> getMissionToday({
     String level = 'beginner',
-    String? userId,
     String? academyId,
   }) async {
     var uri = Uri.parse('$baseUrl/mission_today').replace(queryParameters: {
       'level': level,
-      if (userId != null) 'user_id': userId,
       if (academyId != null) 'academy_id': academyId,
     });
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return MissionToday.fromJson(data! as Map<String, dynamic>);
@@ -578,58 +638,48 @@ class ApiService {
   /// [level] mapeado da faixa do usuário: beginner (white/blue) ou intermediate (purple/brown/black).
   Future<MissionWeek> getMissionWeek({
     String level = 'beginner',
-    String? userId,
     String? academyId,
   }) async {
     final params = <String, String>{
       'level': level,
-      if (userId != null) 'user_id': userId,
       if (academyId != null) 'academy_id': academyId,
       '_t': DateTime.now().millisecondsSinceEpoch.toString(),
     };
     var uri = Uri.parse('$baseUrl/mission_today/week').replace(queryParameters: params);
-    final r = await _req(http.get(uri));
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return MissionWeek.fromJson(data! as Map<String, dynamic>);
   }
 
-  /// Indica se a lição já foi concluída pelo usuário (para botão desabilitado ao abrir).
-  Future<bool> getLessonCompleteStatus({required String userId, required String lessonId}) async {
-    final uri = Uri.parse('$baseUrl/lesson_complete/status').replace(queryParameters: {
-      'user_id': userId,
-      'lesson_id': lessonId,
-    });
-    final r = await _req(http.get(uri));
+  /// Indica se a lição já foi concluída pelo usuário logado (para botão desabilitado ao abrir).
+  Future<bool> getLessonCompleteStatus({required String lessonId}) async {
+    final uri = Uri.parse('$baseUrl/lesson_complete/status').replace(queryParameters: {'lesson_id': lessonId});
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
     return map['completed'] as bool? ?? false;
   }
 
-  Future<void> postLessonComplete({required String userId, required String lessonId}) async {
+  Future<void> postLessonComplete({required String lessonId}) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/lesson_complete'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'user_id': userId, 'lesson_id': lessonId}),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'lesson_id': lessonId}),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
   /// Conclusão por missão (missão do dia). usageType: before_training | after_training.
   Future<void> postMissionComplete({
-    required String userId,
     required String missionId,
     String usageType = 'after_training',
   }) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/mission_complete'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'user_id': userId,
-        'mission_id': missionId,
-        'usage_type': usageType,
-      }),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'mission_id': missionId, 'usage_type': usageType}),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
@@ -637,7 +687,6 @@ class ApiService {
   // ---------- Executions (gamificação) ----------
   /// Cria execução. Informe exatamente um de: missionId, lessonId, ou (techniqueId + academyId).
   Future<Map<String, dynamic>> postExecution({
-    required String userId,
     String? missionId,
     String? lessonId,
     String? techniqueId,
@@ -646,7 +695,6 @@ class ApiService {
     String usageType = 'after_training',
   }) async {
     final body = <String, dynamic>{
-      'user_id': userId,
       'opponent_id': opponentId,
       'usage_type': usageType,
     };
@@ -656,7 +704,7 @@ class ApiService {
     if (academyId != null) body['academy_id'] = academyId;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/executions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -664,19 +712,23 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
-  /// Retorna apenas o número de confirmações pendentes (para badge na tela inicial).
-  Future<int> getPendingConfirmationsCount(String userId) async {
-    final uri = Uri.parse('$baseUrl/executions/pending_confirmations/count').replace(queryParameters: {'user_id': userId});
-    final r = await _req(http.get(uri));
+  /// Retorna apenas o número de confirmações pendentes do usuário logado (para badge na tela inicial).
+  Future<int> getPendingConfirmationsCount() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/executions/pending_confirmations/count'),
+      headers: await _headers(auth: true),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data is Map ? data as Map<String, dynamic> : null;
     return (map?['count'] as num?)?.toInt() ?? 0;
   }
 
-  Future<List<Map<String, dynamic>>> getPendingConfirmations(String userId) async {
-    final uri = Uri.parse('$baseUrl/executions/pending_confirmations').replace(queryParameters: {'user_id': userId});
-    final r = await _req(http.get(uri));
+  Future<List<Map<String, dynamic>>> getPendingConfirmations() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/executions/pending_confirmations'),
+      headers: await _headers(auth: true),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = data is List ? data : <dynamic>[];
@@ -686,12 +738,11 @@ class ApiService {
   Future<Map<String, dynamic>> postExecutionConfirm({
     required String executionId,
     required String outcome,
-    required String userId,
   }) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/executions/$executionId/confirm'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'outcome': outcome, 'user_id': userId}),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'outcome': outcome}),
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -700,14 +751,13 @@ class ApiService {
 
   Future<Map<String, dynamic>> postExecutionReject({
     required String executionId,
-    required String userId,
     String? reason,
   }) async {
-    final body = <String, dynamic>{'user_id': userId};
+    final body = <String, dynamic>{};
     if (reason != null && reason.isNotEmpty) body['reason'] = reason;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/executions/$executionId/reject'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
@@ -715,21 +765,20 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> getMyExecutions(String userId) async {
-    final uri = Uri.parse('$baseUrl/executions/my_executions').replace(queryParameters: {'user_id': userId});
-    final r = await _req(http.get(uri));
+  Future<List<Map<String, dynamic>>> getMyExecutions() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/executions/my_executions'),
+      headers: await _headers(auth: true),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = data is List ? data : <dynamic>[];
     return list.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  Future<List<MissionHistoryItem>> getMissionUsagesHistory(String userId, {int limit = 7}) async {
-    final uri = Uri.parse('$baseUrl/mission_usages/history').replace(queryParameters: {
-      'user_id': userId,
-      'limit': limit.toString(),
-    });
-    final r = await _req(http.get(uri));
+  Future<List<MissionHistoryItem>> getMissionUsagesHistory({int limit = 7}) async {
+    final uri = Uri.parse('$baseUrl/mission_usages/history').replace(queryParameters: {'limit': limit.toString()});
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
@@ -738,15 +787,14 @@ class ApiService {
   }
 
   Future<void> postTrainingFeedback({
-    required String userId,
     required String positionId,
     String? observation,
   }) async {
-    final body = <String, dynamic>{'user_id': userId, 'position_id': positionId};
+    final body = <String, dynamic>{'position_id': positionId};
     if (observation != null && observation.isNotEmpty) body['observation'] = observation;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/training_feedback'),
-      headers: {'Content-Type': 'application/json'},
+      headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));

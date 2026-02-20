@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:viewer/config.dart';
 import 'package:viewer/models/professor.dart';
+import 'package:viewer/services/auth_service.dart';
 
 class ProfessorServiceException implements Exception {
   final String message;
@@ -17,11 +18,29 @@ class ProfessorService {
 
   String get _professorsUrl => '$_base/professors';
 
+  Map<String, String> _getHeaders({bool auth = false}) {
+    final headers = <String, String>{};
+    if (auth) {
+      final bearer = AuthService().authHeader;
+      if (bearer != null) headers['Authorization'] = bearer;
+      final impersonate = AuthService().impersonatedUserId;
+      if (impersonate != null) headers['X-Impersonate-User'] = impersonate;
+    }
+    return headers;
+  }
+
+  Map<String, String> _getJsonHeaders({bool auth = false}) {
+    final headers = _getHeaders(auth: auth);
+    headers['Content-Type'] = 'application/json';
+    return headers;
+  }
+
   Future<List<Professor>> list({String? academyId}) async {
+    await AuthService().ensureLoaded();
     final uri = academyId != null
         ? Uri.parse('$_professorsUrl?academy_id=$academyId')
         : Uri.parse(_professorsUrl);
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: _getHeaders(auth: true));
     if (response.statusCode != 200) {
       throw ProfessorServiceException(
           'Falha ao listar professores: ${response.statusCode}');
@@ -31,7 +50,8 @@ class ProfessorService {
   }
 
   Future<Professor?> get(String id) async {
-    final response = await http.get(Uri.parse('$_professorsUrl/$id'));
+    await AuthService().ensureLoaded();
+    final response = await http.get(Uri.parse('$_professorsUrl/$id'), headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
       throw ProfessorServiceException(
@@ -46,6 +66,7 @@ class ProfessorService {
     required String email,
     String? academyId,
   }) async {
+    await AuthService().ensureLoaded();
     final body = <String, dynamic>{
       'name': name,
       'email': email,
@@ -53,7 +74,7 @@ class ProfessorService {
     };
     final response = await http.post(
       Uri.parse(_professorsUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
       body: json.encode(body),
     );
     if (response.statusCode == 409) {
@@ -73,6 +94,7 @@ class ProfessorService {
     String? email,
     String? academyId,
   }) async {
+    await AuthService().ensureLoaded();
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (email != null) body['email'] = email;
@@ -80,7 +102,7 @@ class ProfessorService {
     if (body.isEmpty) return get(id);
     final response = await http.patch(
       Uri.parse('$_professorsUrl/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
       body: json.encode(body),
     );
     if (response.statusCode == 404) return null;
@@ -96,7 +118,8 @@ class ProfessorService {
   }
 
   Future<bool> delete(String id) async {
-    final response = await http.delete(Uri.parse('$_professorsUrl/$id'));
+    await AuthService().ensureLoaded();
+    final response = await http.delete(Uri.parse('$_professorsUrl/$id'), headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return false;
     if (response.statusCode != 204) {
       throw ProfessorServiceException(

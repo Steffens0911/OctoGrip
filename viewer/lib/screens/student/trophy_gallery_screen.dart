@@ -203,7 +203,6 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     if (opponentId == null || !mounted) return;
     try {
       final res = await _api.postExecution(
-        userId: widget.userId,
         techniqueId: t.techniqueId,
         academyId: academyId,
         opponentId: opponentId,

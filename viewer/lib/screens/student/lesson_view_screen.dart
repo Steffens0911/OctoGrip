@@ -41,12 +41,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
   }
 
   Future<void> _fetchPendingExecution() async {
-    final userId = widget.data.userId;
     final missionId = widget.data.missionId;
     final lessonId = widget.data.lessonId;
-    if (userId.isEmpty) return;
     try {
-      final list = await _api.getMyExecutions(userId);
+      final list = await _api.getMyExecutions();
       final pending = list.any((e) {
         if ((e['status'] as String?) != 'pending_confirmation') return false;
         if (missionId != null && (e['mission_id'] as String?) == missionId) return true;
@@ -63,10 +61,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     final lessonId = widget.data.lessonId;
     if (lessonId == null) return;
     try {
-      final completed = await _api.getLessonCompleteStatus(
-        userId: widget.data.userId,
-        lessonId: lessonId,
-      );
+      final completed = await _api.getLessonCompleteStatus(lessonId: lessonId);
       if (mounted) setState(() => _alreadyCompleted = completed);
     } catch (_) {
       // Ignora erro; botão continua habilitado
@@ -167,7 +162,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     setState(() { _completing = true; _error = null; });
     try {
       final res = await _api.postExecution(
-        userId: widget.data.userId,
         lessonId: lessonId,
         opponentId: opponentId,
         usageType: usageType,
@@ -188,7 +182,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     setState(() { _completing = true; _error = null; });
     try {
       final res = await _api.postExecution(
-        userId: widget.data.userId,
         missionId: missionId,
         opponentId: opponentId,
         usageType: usageType,
@@ -213,7 +206,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     setState(() { _completing = true; _error = null; });
     try {
       await _api.postMissionComplete(
-        userId: widget.data.userId,
         missionId: missionId,
         usageType: usageType,
       );
@@ -251,10 +243,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     final lessonId = widget.data.lessonId;
     if (lessonId == null) return;
     try {
-      await _api.postLessonComplete(
-        userId: widget.data.userId,
-        lessonId: lessonId,
-      );
+      await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -308,10 +297,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       _error = null;
     });
     try {
-      await _api.postLessonComplete(
-        userId: widget.data.userId,
-        lessonId: lessonId,
-      );
+      await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Lição concluída!'), backgroundColor: AppTheme.primary),

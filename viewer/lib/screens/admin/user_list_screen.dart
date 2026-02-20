@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -60,9 +61,10 @@ class _UserListScreenState extends State<UserListScreen> {
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
+    final isAdmin = AuthService().isAdmin();
     try {
       final results = await Future.wait([
-        _api.getUsers(),
+        isAdmin ? _api.getUsers() : _api.getUsers(academyId: AuthService().currentUser?.academyId),
         _api.getAcademies(),
       ]);
       if (mounted) setState(() {
@@ -144,26 +146,27 @@ class _UserListScreenState extends State<UserListScreen> {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          Expanded(
-                            child: DropdownButtonFormField<String>(
-                              value: _filterAcademyId,
-                              decoration: const InputDecoration(
-                                labelText: 'Academia',
-                                hintText: 'Todas',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                                isDense: true,
+                          if (AuthService().isAdmin())
+                            Expanded(
+                              child: DropdownButtonFormField<String>(
+                                value: _filterAcademyId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Academia',
+                                  hintText: 'Todas',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text('Todas')),
+                                  ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _filterAcademyId = v);
+                                  _applyFilters();
+                                },
                               ),
-                              items: [
-                                const DropdownMenuItem(value: null, child: Text('Todas')),
-                                ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
-                              ],
-                              onChanged: (v) {
-                                setState(() => _filterAcademyId = v);
-                                _applyFilters();
-                              },
                             ),
-                          ),
-                          const SizedBox(width: 12),
+                          if (AuthService().isAdmin()) const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _filterGraduation,
@@ -233,10 +236,10 @@ class _UserListScreenState extends State<UserListScreen> {
                                 child: ListTile(
                                   title: Text(u.email),
                                   subtitle: Text(u.name ?? '—'),
-                                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                                     IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
                                     IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
-                                  ]),
+                                  ]) : null,
                                   onTap: () => _openForm(u),
                                 ),
                               );
@@ -246,7 +249,7 @@ class _UserListScreenState extends State<UserListScreen> {
                 ),
               ],
             ),
-      floatingActionButton: FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)),
+      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

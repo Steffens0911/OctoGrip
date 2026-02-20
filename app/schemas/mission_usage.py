@@ -15,9 +15,8 @@ class MissionUsageItem(BaseModel):
 
 
 class MissionUsageSyncRequest(BaseModel):
-    """Body do POST /mission_usages/sync."""
+    """Body do POST /mission_usages/sync. user_id vem do token."""
 
-    user_id: UUID
     usages: list[MissionUsageItem]
 
 

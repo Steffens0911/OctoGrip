@@ -1,12 +1,15 @@
 """
 Seed expandido com dados iniciais para testar a API (S-04: 10+ lições; PF-01: missão por nível).
 Popula BD para que ranking, dificuldades, relatório semanal e listas não fiquem em branco.
-Rodar: python -m app.scripts.seed
-Com Docker: docker compose exec api python -m app.scripts.seed
+Roda automaticamente no startup da API (Docker). Também: docker compose exec api python -m app.scripts.seed
 """
+import logging
 import sys
 from datetime import date, datetime, timedelta, timezone
 
+logger = logging.getLogger(__name__)
+
+from app.core.security import hash_password
 from app.database import SessionLocal
 from app.models import (
     Academy,
@@ -23,9 +26,31 @@ from app.models import (
 def run_seed():
     db = SessionLocal()
     try:
+        # Garante que aluno@jjb.com exista com senha (para login JWT em Docker).
+        from app.services.user_service import get_user_by_email
+        aluno = get_user_by_email(db, "aluno@jjb.com")
+        if aluno:
+            if not aluno.password_hash:
+                aluno.password_hash = hash_password("senha123")
+                db.commit()
+                db.refresh(aluno)
+                logger.info("Senha definida para aluno@jjb.com (login: senha123)")
+        else:
+            # Cria aluno@jjb.com se não existir (DB pode ter outros usuários de outro seed)
+            first_academy = db.query(Academy).first()
+            aluno = User(
+                email="aluno@jjb.com",
+                name="Aluno Teste",
+                academy_id=first_academy.id if first_academy else None,
+                password_hash=hash_password("senha123"),
+            )
+            db.add(aluno)
+            db.commit()
+            db.refresh(aluno)
+            logger.info("Criado aluno@jjb.com (login: senha123)")
+
         if db.query(User).first():
-            print("Seed já aplicado (existe usuário). Nada a fazer.")
-            return
+            return  # Seed já aplicado; evita reimprimir mensagens em startup automático
 
         # A-03: tema semanal já definido para o professor ver
         academy = Academy(
@@ -46,10 +71,12 @@ def run_seed():
         db.flush()
 
         # Vários usuários na primeira academia (para ranking com múltiplos nomes)
+        # Senha padrão para login (JWT): aluno@jjb.com / senha123
         user = User(
             email="aluno@jjb.com",
             name="Aluno Teste",
             academy_id=academy.id,
+            password_hash=hash_password("senha123"),
         )
         db.add(user)
         db.flush()
@@ -253,13 +280,17 @@ def run_seed():
         print(f"  lesson_id:    {lessons[0].id} (primeira lição)")
         print(f"  mission_id:   {mission_beginner.id} (missão do dia, GET /mission_today)")
         print()
+        print("Login (JWT):")
+        print("  POST /auth/login  body: {\"email\": \"aluno@jjb.com\", \"password\": \"senha123\"}")
+        print("  Use o access_token no header: Authorization: Bearer <token>")
+        print()
         print("Endpoints para testar:")
         print("  GET  /mission_today")
-        print("  POST /mission_complete (body: user_id, mission_id)")
+        print("  POST /mission_complete (body: mission_id, usage_type; requer Authorization)")
         print("  GET  /lessons")
         print("  GET  /academies, /academies/{id}/ranking, /difficulties, /report/weekly")
-        print("  POST /lesson_complete   (body: user_id, lesson_id)")
-        print("  POST /training_feedback (body: user_id, position_id, observation?)")
+        print("  POST /lesson_complete   (body: lesson_id; requer Authorization)")
+        print("  POST /training_feedback (body: position_id, observation?; requer Authorization)")
     except Exception as e:
         db.rollback()
         print(f"Erro no seed: {e}", file=sys.stderr)

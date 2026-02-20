@@ -71,7 +71,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       final results = await Future.wait([
         widget.academyId != null ? _api.getLessons(academyId: widget.academyId) : Future.value(<Lesson>[]),
         _api.getLessons(),
-        _api.getTechniques(),
+        widget.academyId != null
+            ? _api.getTechniques(academyId: widget.academyId!)
+            : Future.value(<Technique>[]),
       ]);
       if (mounted) setState(() {
         _featuredLessons = results[0] as List<Lesson>;

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:viewer/config.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/services/auth_service.dart';
 
 class AcademyServiceException implements Exception {
   final String message;
@@ -17,8 +18,26 @@ class AcademyService {
 
   String get _academiesUrl => '$_base/academies';
 
+  Map<String, String> _getHeaders({bool auth = false}) {
+    final headers = <String, String>{};
+    if (auth) {
+      final bearer = AuthService().authHeader;
+      if (bearer != null) headers['Authorization'] = bearer;
+      final impersonate = AuthService().impersonatedUserId;
+      if (impersonate != null) headers['X-Impersonate-User'] = impersonate;
+    }
+    return headers;
+  }
+
+  Map<String, String> _getJsonHeaders({bool auth = false}) {
+    final headers = _getHeaders(auth: auth);
+    headers['Content-Type'] = 'application/json';
+    return headers;
+  }
+
   Future<List<Academy>> list() async {
-    final response = await http.get(Uri.parse(_academiesUrl));
+    await AuthService().ensureLoaded();
+    final response = await http.get(Uri.parse(_academiesUrl), headers: _getHeaders(auth: true));
     if (response.statusCode != 200) {
       throw AcademyServiceException(
           'Falha ao listar academias: ${response.statusCode}');
@@ -30,7 +49,8 @@ class AcademyService {
   }
 
   Future<Academy?> get(String id) async {
-    final response = await http.get(Uri.parse('$_academiesUrl/$id'));
+    await AuthService().ensureLoaded();
+    final response = await http.get(Uri.parse('$_academiesUrl/$id'), headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
       throw AcademyServiceException(
@@ -44,13 +64,14 @@ class AcademyService {
     required String name,
     String? slug,
   }) async {
+    await AuthService().ensureLoaded();
     final body = <String, dynamic>{
       'name': name,
       if (slug != null && slug.trim().isNotEmpty) 'slug': slug.trim(),
     };
     final response = await http.post(
       Uri.parse(_academiesUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
       body: json.encode(body),
     );
     if (response.statusCode != 201) {
@@ -70,6 +91,7 @@ class AcademyService {
     String? weeklyTechnique2Id,
     String? weeklyTechnique3Id,
   }) async {
+    await AuthService().ensureLoaded();
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
@@ -80,7 +102,7 @@ class AcademyService {
     if (body.isEmpty) return get(id);
     final response = await http.patch(
       Uri.parse('$_academiesUrl/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
       body: json.encode(body),
     );
     if (response.statusCode == 404) return null;
@@ -102,6 +124,7 @@ class AcademyService {
     int? weeklyMultiplier2,
     int? weeklyMultiplier3,
   }) async {
+    await AuthService().ensureLoaded();
     final body = <String, dynamic>{
       'weekly_technique_id': weeklyTechniqueId,
       'weekly_technique_2_id': weeklyTechnique2Id,
@@ -118,7 +141,7 @@ class AcademyService {
     }
     final response = await http.patch(
       Uri.parse('$_academiesUrl/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
       body: json.encode(body),
     );
     if (response.statusCode == 404) return null;
@@ -131,7 +154,8 @@ class AcademyService {
   }
 
   Future<bool> delete(String id) async {
-    final response = await http.delete(Uri.parse('$_academiesUrl/$id'));
+    await AuthService().ensureLoaded();
+    final response = await http.delete(Uri.parse('$_academiesUrl/$id'), headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return false;
     if (response.statusCode != 204) {
       throw AcademyServiceException(
@@ -146,12 +170,13 @@ class AcademyService {
     int periodDays = 30,
     int limit = 50,
   }) async {
+    await AuthService().ensureLoaded();
     final uri = Uri.parse('$_academiesUrl/$academyId/ranking')
         .replace(queryParameters: {
       'period_days': periodDays.toString(),
       'limit': limit.toString(),
     });
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return {};
     if (response.statusCode != 200) {
       throw AcademyServiceException(
@@ -173,9 +198,10 @@ class AcademyService {
     String academyId, {
     int limit = 50,
   }) async {
+    await AuthService().ensureLoaded();
     final uri = Uri.parse('$_academiesUrl/$academyId/difficulties')
         .replace(queryParameters: {'limit': limit.toString()});
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return {};
     if (response.statusCode != 200) {
       throw AcademyServiceException(
@@ -194,9 +220,10 @@ class AcademyService {
 
   /// Reinicia as missões da academia: limpa conclusões/execuções, preservando pontos.
   Future<Map<String, dynamic>> resetMissions(String academyId) async {
+    await AuthService().ensureLoaded();
     final response = await http.post(
       Uri.parse('$_academiesUrl/$academyId/reset_missions'),
-      headers: {'Content-Type': 'application/json'},
+      headers: _getJsonHeaders(auth: true),
     );
     if (response.statusCode == 404) {
       throw AcademyServiceException('Academia não encontrada.');
@@ -214,12 +241,13 @@ class AcademyService {
     int? year,
     int? week,
   }) async {
+    await AuthService().ensureLoaded();
     final queryParams = <String, String>{};
     if (year != null) queryParams['year'] = year.toString();
     if (week != null) queryParams['week'] = week.toString();
     final uri = Uri.parse('$_academiesUrl/$academyId/report/weekly')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
       throw AcademyServiceException(

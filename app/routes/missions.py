@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
+from app.core.role_deps import require_admin_or_academy_access, require_read_access, require_write_access
 from app.database import get_db
+from app.models import User
 from app.schemas.mission import MissionCreate, MissionRead, MissionUpdate
 from app.services.mission_crud_service import (
     create_mission,
@@ -23,8 +25,9 @@ def missions_list(
     academy_id: UUID | None = None,
     limit: int = 100,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access),
 ):
-    """Lista missões (opcionalmente por academia)."""
+    """Lista missões (opcionalmente por academia). Admin, gerente, professor ou supervisor."""
     return list_missions(db, academy_id=academy_id, limit=limit)
 
 
@@ -35,8 +38,12 @@ def missions_panel():
 
 
 @router.get("/{mission_id}", response_model=MissionRead)
-def missions_get(mission_id: UUID, db: Session = Depends(get_db)):
-    """Retorna uma missão por ID."""
+def missions_get(
+    mission_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access),
+):
+    """Retorna uma missão por ID. Admin, gerente, professor ou supervisor."""
     mission = get_mission(db, mission_id)
     if not mission:
         raise HTTPException(status_code=404, detail="Missão não encontrada.")
@@ -44,8 +51,12 @@ def missions_get(mission_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=MissionRead, status_code=201)
-def missions_create(body: MissionCreate, db: Session = Depends(get_db)):
-    """T-01: Cria uma missão (técnica + período)."""
+def missions_create(
+    body: MissionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """T-01: Cria uma missão (técnica + período). Admin, gerente ou professor."""
     mission = create_mission(
         db,
         technique_id=body.technique_id,
@@ -65,8 +76,9 @@ def missions_update(
     mission_id: UUID,
     body: MissionUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
 ):
-    """Atualiza uma missão (envie só os campos que quiser alterar). academy_id: null = missão global."""
+    """Atualiza uma missão (envie só os campos que quiser alterar). academy_id: null = missão global. Admin, gerente ou professor."""
     payload = body.model_dump(exclude_unset=True)
     academy_id = payload.pop("academy_id", None)
     set_academy_none = "academy_id" in body.model_dump(exclude_unset=True) and body.academy_id is None
@@ -83,8 +95,12 @@ def missions_update(
 
 
 @router.delete("/{mission_id}", status_code=204)
-def missions_delete(mission_id: UUID, db: Session = Depends(get_db)):
-    """Remove uma missão."""
+def missions_delete(
+    mission_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Remove uma missão. Admin, gerente ou professor."""
     if not delete_mission(db, mission_id):
         raise HTTPException(status_code=404, detail="Missão não encontrada.")
     return None
