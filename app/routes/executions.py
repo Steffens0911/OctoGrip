@@ -2,7 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.execution import (
@@ -56,9 +56,8 @@ def _execution_to_read(execution) -> ExecutionRead:
 
 
 @router.post("", response_model=ExecutionCreateResponse, status_code=201)
-def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
-    """Registra que o usuário aplicou a técnica no adversário. Aguarda confirmação do adversário."""
-    execution = create_execution(
+async def execution_create(body: ExecutionCreate, db: AsyncSession = Depends(get_db)):
+    execution = await create_execution(
         db,
         user_id=body.user_id,
         opponent_id=body.opponent_id,
@@ -77,32 +76,29 @@ def execution_create(body: ExecutionCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/pending_confirmations/count")
-def execution_pending_confirmations_count(
+async def execution_pending_confirmations_count(
     user_id: UUID = Query(..., description="ID do adversário (quem deve confirmar)"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Retorna apenas o número de confirmações pendentes (para badge na tela inicial)."""
-    return {"count": count_pending_confirmations(db, opponent_id=user_id)}
+    return {"count": await count_pending_confirmations(db, opponent_id=user_id)}
 
 
 @router.get("/pending_confirmations", response_model=list[ExecutionRead])
-def execution_pending_confirmations(
+async def execution_pending_confirmations(
     user_id: UUID = Query(..., description="ID do adversário (quem deve confirmar)"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Lista execuções pendentes de confirmação para o usuário (ele é o adversário)."""
-    executions = list_pending_confirmations(db, opponent_id=user_id)
+    executions = await list_pending_confirmations(db, opponent_id=user_id)
     return [_execution_to_read(e) for e in executions]
 
 
 @router.post("/{execution_id}/confirm", response_model=ExecutionConfirmResponse)
-def execution_confirm(
+async def execution_confirm(
     execution_id: UUID,
     body: ExecutionConfirmRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Confirma a execução (apenas o adversário). outcome: attempted_correctly | executed_successfully."""
-    execution = confirm_execution(
+    execution = await confirm_execution(
         db,
         execution_id=execution_id,
         outcome=body.outcome,
@@ -120,13 +116,12 @@ def execution_confirm(
 
 
 @router.post("/{execution_id}/reject", response_model=ExecutionRejectResponse)
-def execution_reject(
+async def execution_reject(
     execution_id: UUID,
     body: ExecutionRejectRequest,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Recusa a execução (apenas o adversário). reason=dont_remember notifica que não aceitou a posição."""
-    execution = reject_execution(
+    execution = await reject_execution(
         db,
         execution_id=execution_id,
         rejected_by_user_id=body.user_id,
@@ -136,10 +131,9 @@ def execution_reject(
 
 
 @router.get("/my_executions", response_model=list[ExecutionRead])
-def execution_my_executions(
+async def execution_my_executions(
     user_id: UUID = Query(..., description="ID do executor (quem aplicou a técnica)"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Lista execuções criadas pelo usuário (executor), todos os status."""
-    executions = list_my_executions(db, user_id=user_id)
+    executions = await list_my_executions(db, user_id=user_id)
     return [_execution_to_read(e) for e in executions]

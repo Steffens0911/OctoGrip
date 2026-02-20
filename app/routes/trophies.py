@@ -2,7 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.trophy import TrophyCreate, TrophyRead, UserTrophyEarned
@@ -31,9 +31,9 @@ def _trophy_to_read(t):
 
 
 @router.post("", response_model=TrophyRead, status_code=201)
-def trophy_create(body: TrophyCreate, db: Session = Depends(get_db)):
+async def trophy_create(body: TrophyCreate, db: AsyncSession = Depends(get_db)):
     """Cria troféu da academia (técnica, período, meta de execuções)."""
-    trophy = create_trophy(
+    trophy = await create_trophy(
         db,
         academy_id=body.academy_id,
         technique_id=body.technique_id,
@@ -46,19 +46,19 @@ def trophy_create(body: TrophyCreate, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[TrophyRead])
-def trophy_list(
+async def trophy_list(
     academy_id: UUID = Query(..., description="ID da academia"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     """Lista troféus da academia."""
-    return [_trophy_to_read(t) for t in list_trophies_by_academy(db, academy_id)]
+    return [_trophy_to_read(t) for t in await list_trophies_by_academy(db, academy_id)]
 
 
 @router.get("/user/{user_id}", response_model=list[UserTrophyEarned])
-def trophy_user_gallery(user_id: UUID, db: Session = Depends(get_db)):
+async def trophy_user_gallery(user_id: UUID, db: AsyncSession = Depends(get_db)):
     """Galeria de troféus do usuário: troféus da academia dele com tier conquistado (ouro/prata/bronze)."""
-    user = get_user(db, user_id)
+    user = await get_user(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado.")
-    items = list_user_trophies_with_earned(db, user_id)
+    items = await list_user_trophies_with_earned(db, user_id)
     return [UserTrophyEarned(**x) for x in items]

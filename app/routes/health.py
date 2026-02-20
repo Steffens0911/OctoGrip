@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.database import get_db
@@ -14,10 +14,10 @@ def health():
 
 
 @router.get("/db")
-def health_db(db: Session = Depends(get_db)):
+async def health_db(db: AsyncSession = Depends(get_db)):
     """Health check com verificação de conexão ao PostgreSQL."""
     try:
-        db.execute(text("SELECT 1"))
+        await db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as e:
         return {"status": "error", "database": str(e)}

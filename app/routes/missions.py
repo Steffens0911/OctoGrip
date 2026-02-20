@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.schemas.mission import MissionCreate, MissionRead, MissionUpdate
@@ -19,13 +19,12 @@ router = APIRouter()
 
 
 @router.get("", response_model=list[MissionRead])
-def missions_list(
+async def missions_list(
     academy_id: UUID | None = None,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Lista missões (opcionalmente por academia)."""
-    return list_missions(db, academy_id=academy_id, limit=limit)
+    return await list_missions(db, academy_id=academy_id, limit=limit)
 
 
 @router.get("/panel", response_class=HTMLResponse)
@@ -35,18 +34,16 @@ def missions_panel():
 
 
 @router.get("/{mission_id}", response_model=MissionRead)
-def missions_get(mission_id: UUID, db: Session = Depends(get_db)):
-    """Retorna uma missão por ID."""
-    mission = get_mission(db, mission_id)
+async def missions_get(mission_id: UUID, db: AsyncSession = Depends(get_db)):
+    mission = await get_mission(db, mission_id)
     if not mission:
         raise HTTPException(status_code=404, detail="Missão não encontrada.")
     return mission
 
 
 @router.post("", response_model=MissionRead, status_code=201)
-def missions_create(body: MissionCreate, db: Session = Depends(get_db)):
-    """T-01: Cria uma missão (técnica + período)."""
-    mission = create_mission(
+async def missions_create(body: MissionCreate, db: AsyncSession = Depends(get_db)):
+    mission = await create_mission(
         db,
         technique_id=body.technique_id,
         start_date=body.start_date,
@@ -61,16 +58,15 @@ def missions_create(body: MissionCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/{mission_id}", response_model=MissionRead)
-def missions_update(
+async def missions_update(
     mission_id: UUID,
     body: MissionUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
-    """Atualiza uma missão (envie só os campos que quiser alterar). academy_id: null = missão global."""
     payload = body.model_dump(exclude_unset=True)
     academy_id = payload.pop("academy_id", None)
     set_academy_none = "academy_id" in body.model_dump(exclude_unset=True) and body.academy_id is None
-    mission = update_mission(
+    mission = await update_mission(
         db,
         mission_id,
         _set_academy_id_none=set_academy_none,
@@ -83,9 +79,8 @@ def missions_update(
 
 
 @router.delete("/{mission_id}", status_code=204)
-def missions_delete(mission_id: UUID, db: Session = Depends(get_db)):
-    """Remove uma missão."""
-    if not delete_mission(db, mission_id):
+async def missions_delete(mission_id: UUID, db: AsyncSession = Depends(get_db)):
+    if not await delete_mission(db, mission_id):
         raise HTTPException(status_code=404, detail="Missão não encontrada.")
     return None
 
