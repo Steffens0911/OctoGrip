@@ -1,33 +1,38 @@
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
 from app.core.exceptions import AppError
 from app.core.logging_config import setup_logging
+from app.core.rate_limit import limiter
 from app.database import engine
-from app.models import Base  # importa todos os models via __init__ (registro para create_all)
+from app.models import Base  # noqa: F401 — registra models para migrações
 from app.routes.router import api_router
 from app.run_migrations import run_migrations
+from app.scripts.seed import run_seed
+
+logger = logging.getLogger(__name__)
 
 
-def register_exception_handlers(app: FastAPI) -> None:
+def register_exception_handlers(application: FastAPI) -> None:
     """Mapeia exceções de domínio e erros não tratados para respostas HTTP (com CORS)."""
 
-    @app.exception_handler(AppError)
-    def app_error_handler(request, exc: AppError):
+    @application.exception_handler(AppError)
+    def app_error_handler(request: Request, exc: AppError):
         return JSONResponse(
             status_code=exc.status_code,
             content={"detail": exc.message},
         )
 
-    @app.exception_handler(Exception)
-    def unhandled_exception_handler(request, exc: Exception):
-        """Qualquer exceção não tratada vira 500 com JSON; evita resposta sem CORS."""
-        import logging
-        logging.getLogger(__name__).exception("Exceção não tratada: %s", exc)
+    @application.exception_handler(Exception)
+    def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception("Exceção não tratada: %s", exc)
         return JSONResponse(
             status_code=500,
             content={"detail": str(exc) or "Erro interno do servidor."},
@@ -36,10 +41,13 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Cria tabelas e aplica migrações SQL ao subir a API."""
+    """Aplica migrações e (opcionalmente) roda seed ao subir a API."""
     setup_logging(level=settings.LOG_LEVEL)
-    Base.metadata.create_all(bind=engine)
     run_migrations(engine)
+    if settings.SEED_ON_STARTUP:
+        run_seed()
+    else:
+        logger.info("Seed desabilitado (SEED_ON_STARTUP=false).")
     yield
 
 
@@ -50,11 +58,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: permitir viewer (8080) e qualquer origem em desenvolvimento
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],

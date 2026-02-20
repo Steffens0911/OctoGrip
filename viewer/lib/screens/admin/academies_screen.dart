@@ -3,7 +3,6 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
-import 'package:viewer/services/academy_service.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
@@ -16,7 +15,7 @@ class AcademiesScreen extends StatefulWidget {
 }
 
 class _AcademiesScreenState extends State<AcademiesScreen> {
-  final AcademyService _service = AcademyService();
+  final ApiService _api = ApiService();
   List<Academy> _list = [];
   bool _loading = true;
   String? _error;
@@ -33,7 +32,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
       _error = null;
     });
     try {
-      final list = await _service.list();
+      final list = await _api.getAcademies();
       if (mounted) setState(() {
         _list = list;
         _loading = false;
@@ -66,7 +65,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     );
     if (ok != true) return;
     try {
-      await _service.delete(a.id);
+      await _api.deleteAcademy(a.id);
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
@@ -83,7 +82,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     List<Technique> techniques = [];
     if (isEdit) {
       try {
-        techniques = await ApiService().getTechniques(academyId: existing!.id);
+        techniques = await _api.getTechniques(academyId: existing!.id);
       } catch (_) {}
     }
     String? selectedTechniqueId = existing?.weeklyTechniqueId;
@@ -144,13 +143,13 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                 Navigator.pop(ctx);
                 try {
                   if (isEdit) {
-                    await _service.update(
+                    await _api.updateAcademy(
                       existing!.id,
                       name: name,
                       weeklyTechniqueId: selectedTechniqueId,
                     );
                   } else {
-                    await _service.create(name: name);
+                    await _api.createAcademy(name: name);
                   }
                   if (mounted) _load();
                 } catch (e) {

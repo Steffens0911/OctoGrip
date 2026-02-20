@@ -3,7 +3,8 @@ import re
 from typing import TypeVar
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 M = TypeVar("M")
 
@@ -16,8 +17,8 @@ def make_slug(text: str, fallback: str = "item") -> str:
     return slug or fallback
 
 
-def ensure_unique_slug(
-    db: Session,
+async def ensure_unique_slug(
+    db: AsyncSession,
     model_class: type[M],
     slug_attr: str,
     base_slug: str,
@@ -29,10 +30,11 @@ def ensure_unique_slug(
     slug = base_slug
     n = 2
     while True:
-        q = db.query(model_class).filter(getattr(model_class, slug_attr) == slug)
+        stmt = select(model_class).where(getattr(model_class, slug_attr) == slug)
         if academy_id is not None:
-            q = q.filter(getattr(model_class, academy_attr) == academy_id)
-        if q.first() is None:
+            stmt = stmt.where(getattr(model_class, academy_attr) == academy_id)
+        result = (await db.execute(stmt)).scalar_one_or_none()
+        if result is None:
             break
         slug = f"{base_slug}-{n}"
         n += 1

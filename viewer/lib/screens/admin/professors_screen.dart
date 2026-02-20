@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/professor.dart';
-import 'package:viewer/services/professor_service.dart';
+import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/utils/form_utils.dart';
 
 /// Lista e CRUD de professores (seção professor).
 class ProfessorsScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class ProfessorsScreen extends StatefulWidget {
 }
 
 class _ProfessorsScreenState extends State<ProfessorsScreen> {
-  final ProfessorService _service = ProfessorService();
+  final ApiService _api = ApiService();
   List<Professor> _list = [];
   bool _loading = true;
   String? _error;
@@ -30,7 +31,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
       _error = null;
     });
     try {
-      final list = await _service.list();
+      final list = await _api.getProfessors();
       if (mounted) setState(() {
         _list = list;
         _loading = false;
@@ -63,7 +64,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     );
     if (ok != true) return;
     try {
-      await _service.delete(p.id);
+      await _api.deleteProfessor(p.id);
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
@@ -122,12 +123,19 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
                 );
                 return;
               }
+              final emailErr = validateEmail(email);
+              if (emailErr != null) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(emailErr)),
+                );
+                return;
+              }
               Navigator.pop(ctx);
               try {
                 if (isEdit) {
-                  await _service.update(existing!.id, name: name, email: email);
+                  await _api.updateProfessor(existing!.id, name: name, email: email);
                 } else {
-                  await _service.create(name: name, email: email);
+                  await _api.createProfessor(name: name, email: email);
                 }
                 if (mounted) _load();
               } catch (e) {
