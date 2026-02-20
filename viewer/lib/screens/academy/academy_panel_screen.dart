@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
-import 'package:viewer/services/academy_service.dart';
+import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/widgets/role_guard.dart';
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {
@@ -14,7 +17,7 @@ class AcademyPanelScreen extends StatefulWidget {
 }
 
 class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
-  final AcademyService _service = AcademyService();
+  final ApiService _api = ApiService();
   List<Academy> _academies = [];
   bool _loading = true;
   String? _error;
@@ -31,7 +34,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       _error = null;
     });
     try {
-      final list = await _service.list();
+      final list = await _api.getAcademies();
       if (mounted) setState(() {
         _academies = list;
         _loading = false;
@@ -39,7 +42,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     } catch (e) {
       if (mounted) setState(() {
         _loading = false;
-        _error = e.toString().replaceFirst('AcademyServiceException: ', '');
+        _error = e.toString().replaceFirst(RegExp(r'^[A-Za-z]+Exception:?\s*'), '');
       });
     }
   }
@@ -63,8 +66,10 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _loading
+    return RoleGuard(
+      allowedRoles: ['administrador', 'gerente_academia', 'professor', 'supervisor'],
+      child: Scaffold(
+        body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -93,7 +98,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Text(
-                          'Nenhuma academia cadastrada. Cadastre em Administração → Academias.',
+                          AuthService().isAdmin()
+                              ? 'Nenhuma academia cadastrada. Cadastre em Administração → Academias.'
+                              : 'Nenhuma academia vinculada ao seu usuário. Peça ao administrador para vincular sua conta a uma academia.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppTheme.textSecondary),
                         ),
@@ -101,12 +108,29 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
-                      child: ListView.builder(
+                      child: ListView(
                         padding: const EdgeInsets.all(16),
-                        itemCount: _academies.length,
-                        itemBuilder: (context, i) {
-                          final a = _academies[i];
-                          return Card(
+                        children: [
+                          if (AuthService().isManager() || AuthService().isProfessor())
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.people_rounded, color: AppTheme.primary),
+                                ),
+                                title: const Text('Usuários da academia', style: TextStyle(fontWeight: FontWeight.w600)),
+                                subtitle: const Text('Cadastrar e gerenciar usuários da sua academia'),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(builder: (context) => const UserListScreen()),
+                                ),
+                              ),
+                            ),
+                          ...List.generate(_academies.length, (i) {
+                            final a = _academies[i];
+                            return Card(
                             margin: const EdgeInsets.only(bottom: 12),
                             child: ListTile(
                               leading: CircleAvatar(
@@ -125,9 +149,11 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                               onTap: () => _openAcademy(a),
                             ),
                           );
-                        },
+                          }),
+                        ],
                       ),
                     ),
+      ),
     );
   }
 }

@@ -3,7 +3,8 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import UserNotFoundError
 from app.core.graduation import points_for_graduation
@@ -12,8 +13,8 @@ from app.models import Mission, MissionUsage, User
 logger = logging.getLogger(__name__)
 
 
-def complete_mission(
-    db: Session,
+async def complete_mission(
+    db: AsyncSession,
     user_id: UUID,
     mission_id: UUID,
     *,
@@ -23,25 +24,25 @@ def complete_mission(
     Registra conclusão da missão pelo usuário (conclusão por missão).
     Um usuário pode concluir a mesma missão apenas uma vez (409 se já concluiu).
     """
-    user = db.query(User).filter(User.id == user_id).first()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
         logger.info("complete_mission user_not_found", extra={"user_id": str(user_id)})
         raise UserNotFoundError("Usuário não encontrado.")
 
-    mission = db.query(Mission).filter(Mission.id == mission_id).first()
+    mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission:
         from app.core.exceptions import NotFoundError
 
         raise NotFoundError("Missão não encontrada.")
 
     existing = (
-        db.query(MissionUsage)
-        .filter(
-            MissionUsage.user_id == user_id,
-            MissionUsage.mission_id == mission_id,
+        await db.execute(
+            select(MissionUsage).where(
+                MissionUsage.user_id == user_id,
+                MissionUsage.mission_id == mission_id,
+            )
         )
-        .first()
-    )
+    ).scalar_one_or_none()
     if existing:
         from app.core.exceptions import AlreadyCompletedError
 
@@ -53,7 +54,6 @@ def complete_mission(
 
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
-    # Pontos = faixa do aluno: ×1 branca, ×2 azul, ×3 roxa (marrom=4, preta=5)
     points_awarded = points_for_graduation(user.graduation)
     now = datetime.now(timezone.utc)
     usage = MissionUsage(
@@ -66,7 +66,7 @@ def complete_mission(
         points_awarded=points_awarded,
     )
     db.add(usage)
-    db.commit()
-    db.refresh(usage)
+    await db.commit()
+    await db.refresh(usage)
     logger.info("complete_mission", extra={"user_id": str(user_id), "mission_id": str(mission_id)})
     return usage

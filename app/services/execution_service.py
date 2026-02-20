@@ -3,11 +3,13 @@ import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
-from app.models import Academy, Lesson, Mission, Technique, TechniqueExecution, User
+from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution, User
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +27,8 @@ def _mission_active_today(mission: Mission) -> bool:
     )
 
 
-def create_execution(
-    db: Session,
+async def create_execution(
+    db: AsyncSession,
     user_id: UUID,
     opponent_id: UUID,
     usage_type: str = "after_training",
@@ -44,10 +46,10 @@ def create_execution(
     if filled != 1:
         raise AppError("Informe exatamente um de mission_id, lesson_id ou technique_id.", status_code=400)
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     if not user:
         raise UserNotFoundError("Usuário não encontrado.")
-    opponent = db.query(User).filter(User.id == opponent_id).first()
+    opponent = (await db.execute(select(User).where(User.id == opponent_id))).scalar_one_or_none()
     if not opponent:
         raise UserNotFoundError("Adversário não encontrado.")
     if user.academy_id is None or opponent.academy_id != user.academy_id:
@@ -61,7 +63,7 @@ def create_execution(
     if technique_id is not None:
         if academy_id is None:
             raise AppError("academy_id é obrigatório quando technique_id é informado.", status_code=400)
-        technique = db.query(Technique).filter(Technique.id == technique_id).first()
+        technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
         if not technique:
             raise NotFoundError("Técnica não encontrada.")
         if technique.academy_id != academy_id or user.academy_id != academy_id:
@@ -82,38 +84,39 @@ def create_execution(
         )
     elif mission_id is not None:
         mission = (
-            db.query(Mission)
-            .options(joinedload(Mission.technique))
-            .filter(Mission.id == mission_id)
-            .first()
-        )
+            await db.execute(
+                select(Mission)
+                .options(selectinload(Mission.technique))
+                .where(Mission.id == mission_id)
+            )
+        ).unique().scalars().first()
         if not mission:
             raise NotFoundError("Missão não encontrada.")
         if not _mission_active_today(mission):
             raise AppError("Missão não está ativa no período atual.", status_code=400)
         existing_confirmed = (
-            db.query(TechniqueExecution)
-            .filter(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.mission_id == mission_id,
-                TechniqueExecution.status == "confirmed",
+            await db.execute(
+                select(TechniqueExecution).where(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.mission_id == mission_id,
+                    TechniqueExecution.status == "confirmed",
+                )
             )
-            .first()
-        )
+        ).scalar_one_or_none()
         if existing_confirmed:
             raise AppError(
                 "Você já concluiu esta posição; poderá concluir novamente quando a academia atualizar as missões.",
                 status_code=400,
             )
         existing_pending = (
-            db.query(TechniqueExecution)
-            .filter(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.mission_id == mission_id,
-                TechniqueExecution.status == "pending_confirmation",
+            await db.execute(
+                select(TechniqueExecution).where(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.mission_id == mission_id,
+                    TechniqueExecution.status == "pending_confirmation",
+                )
             )
-            .first()
-        )
+        ).scalar_one_or_none()
         if existing_pending:
             raise AppError(
                 "Já existe uma solicitação aguardando aceite do oponente para esta missão.",
@@ -135,22 +138,23 @@ def create_execution(
         )
     else:
         lesson = (
-            db.query(Lesson)
-            .options(joinedload(Lesson.technique))
-            .filter(Lesson.id == lesson_id)
-            .first()
-        )
+            await db.execute(
+                select(Lesson)
+                .options(selectinload(Lesson.technique))
+                .where(Lesson.id == lesson_id)
+            )
+        ).unique().scalars().first()
         if not lesson:
             raise NotFoundError("Lição não encontrada.")
         existing_pending_lesson = (
-            db.query(TechniqueExecution)
-            .filter(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.lesson_id == lesson_id,
-                TechniqueExecution.status == "pending_confirmation",
+            await db.execute(
+                select(TechniqueExecution).where(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.lesson_id == lesson_id,
+                    TechniqueExecution.status == "pending_confirmation",
+                )
             )
-            .first()
-        )
+        ).scalar_one_or_none()
         if existing_pending_lesson:
             raise AppError(
                 "Já existe uma solicitação aguardando aceite do oponente para esta lição.",
@@ -172,8 +176,8 @@ def create_execution(
         )
 
     db.add(execution)
-    db.commit()
-    db.refresh(execution)
+    await db.commit()
+    await db.refresh(execution)
     logger.info(
         "create_execution",
         extra={"execution_id": str(execution.id), "user_id": str(user_id), "opponent_id": str(opponent_id)},
@@ -181,77 +185,74 @@ def create_execution(
     return execution
 
 
-def count_pending_confirmations(db: Session, opponent_id: UUID) -> int:
+async def count_pending_confirmations(db: AsyncSession, opponent_id: UUID) -> int:
     """Retorna o número de execuções pendentes de confirmação para o adversário (uma query)."""
-    from sqlalchemy import func
-
-    return (
-        db.query(func.count(TechniqueExecution.id))
-        .filter(
+    result = await db.scalar(
+        select(func.count(TechniqueExecution.id)).where(
             TechniqueExecution.opponent_id == opponent_id,
             TechniqueExecution.status == "pending_confirmation",
         )
-        .scalar()
-        or 0
     )
+    return result or 0
 
 
-def list_pending_confirmations(db: Session, opponent_id: UUID):
+async def list_pending_confirmations(db: AsyncSession, opponent_id: UUID):
     """Lista execuções onde opponent_id é o usuário e status = pending_confirmation."""
     return (
-        db.query(TechniqueExecution)
-        .options(
-            joinedload(TechniqueExecution.user),
-            joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
-            joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
-            joinedload(TechniqueExecution.technique),
-            joinedload(TechniqueExecution.opponent),
+        await db.execute(
+            select(TechniqueExecution)
+            .options(
+                selectinload(TechniqueExecution.user),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.technique),
+                selectinload(TechniqueExecution.lesson).selectinload(Lesson.technique),
+                selectinload(TechniqueExecution.technique),
+                selectinload(TechniqueExecution.opponent),
+            )
+            .where(
+                TechniqueExecution.opponent_id == opponent_id,
+                TechniqueExecution.status == "pending_confirmation",
+            )
+            .order_by(TechniqueExecution.created_at.desc())
         )
-        .filter(
-            TechniqueExecution.opponent_id == opponent_id,
-            TechniqueExecution.status == "pending_confirmation",
-        )
-        .order_by(TechniqueExecution.created_at.desc())
-        .all()
-    )
+    ).unique().scalars().all()
 
 
-def list_my_executions(db: Session, user_id: UUID):
+async def list_my_executions(db: AsyncSession, user_id: UUID):
     """Lista execuções criadas pelo usuário (executor), todos os status."""
     return (
-        db.query(TechniqueExecution)
-        .options(
-            joinedload(TechniqueExecution.user),
-            joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
-            joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
-            joinedload(TechniqueExecution.technique),
-            joinedload(TechniqueExecution.opponent),
+        await db.execute(
+            select(TechniqueExecution)
+            .options(
+                selectinload(TechniqueExecution.user),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.technique),
+                selectinload(TechniqueExecution.lesson).selectinload(Lesson.technique),
+                selectinload(TechniqueExecution.technique),
+                selectinload(TechniqueExecution.opponent),
+            )
+            .where(TechniqueExecution.user_id == user_id)
+            .order_by(TechniqueExecution.created_at.desc())
         )
-        .filter(TechniqueExecution.user_id == user_id)
-        .order_by(TechniqueExecution.created_at.desc())
-        .all()
-    )
+    ).unique().scalars().all()
 
 
-def get_execution(db: Session, execution_id: UUID) -> TechniqueExecution | None:
+async def get_execution(db: AsyncSession, execution_id: UUID) -> TechniqueExecution | None:
     return (
-        db.query(TechniqueExecution)
-        .options(
-            joinedload(TechniqueExecution.opponent),
-            joinedload(TechniqueExecution.mission).options(
-                joinedload(Mission.technique),
-                joinedload(Mission.lesson),
-            ),
-            joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
-            joinedload(TechniqueExecution.technique),
+        await db.execute(
+            select(TechniqueExecution)
+            .options(
+                selectinload(TechniqueExecution.opponent),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.technique),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.lesson),
+                selectinload(TechniqueExecution.lesson).selectinload(Lesson.technique),
+                selectinload(TechniqueExecution.technique),
+            )
+            .where(TechniqueExecution.id == execution_id)
         )
-        .filter(TechniqueExecution.id == execution_id)
-        .first()
-    )
+    ).unique().scalars().first()
 
 
-def confirm_execution(
-    db: Session,
+async def confirm_execution(
+    db: AsyncSession,
     execution_id: UUID,
     outcome: str,
     confirmed_by_user_id: UUID,
@@ -259,17 +260,14 @@ def confirm_execution(
     """
     Confirma a execução (apenas o adversário). Calcula pontos e atualiza status.
     """
-    execution = get_execution(db, execution_id)
+    execution = await get_execution(db, execution_id)
     if not execution:
         raise NotFoundError("Execução não encontrada.")
     if execution.status != "pending_confirmation":
-        from app.core.exceptions import AppError
         raise AppError("Esta execução já foi confirmada ou recusada.", status_code=400)
     if execution.opponent_id != confirmed_by_user_id:
-        from app.core.exceptions import AppError
         raise AppError("Apenas o adversário pode confirmar esta execução.", status_code=403)
     if outcome not in ("attempted_correctly", "executed_successfully"):
-        from app.core.exceptions import AppError
         raise AppError("Outcome deve ser attempted_correctly ou executed_successfully.", status_code=400)
 
     opponent = execution.opponent
@@ -283,7 +281,7 @@ def confirm_execution(
         if mission.academy_id is not None and mission.slot_index is not None:
             slot_idx = mission.slot_index
             if 0 <= slot_idx <= 2:
-                academy = db.query(Academy).filter(Academy.id == mission.academy_id).first()
+                academy = (await db.execute(select(Academy).where(Academy.id == mission.academy_id))).scalar_one_or_none()
                 if academy:
                     mults = (
                         academy.weekly_multiplier_1,
@@ -307,8 +305,8 @@ def confirm_execution(
     execution.points_awarded = points
     execution.confirmed_at = now
     execution.confirmed_by = confirmed_by_user_id
-    db.commit()
-    db.refresh(execution)
+    await db.commit()
+    await db.refresh(execution)
     logger.info(
         "confirm_execution",
         extra={"execution_id": str(execution_id), "outcome": outcome, "points": points},
@@ -316,15 +314,15 @@ def confirm_execution(
     return execution
 
 
-def reject_execution(
-    db: Session,
+async def reject_execution(
+    db: AsyncSession,
     execution_id: UUID,
     rejected_by_user_id: UUID,
     *,
     reason: str | None = None,
 ) -> TechniqueExecution:
     """Recusa a execução (apenas o adversário). reason='dont_remember' → status rejected_dont_remember."""
-    execution = get_execution(db, execution_id)
+    execution = await get_execution(db, execution_id)
     if not execution:
         raise NotFoundError("Execução não encontrada.")
     if execution.status != "pending_confirmation":
@@ -332,60 +330,55 @@ def reject_execution(
     if execution.opponent_id != rejected_by_user_id:
         raise AppError("Apenas o adversário pode recusar esta execução.", status_code=403)
     execution.status = "rejected_dont_remember" if reason == "dont_remember" else "rejected"
-    db.commit()
-    db.refresh(execution)
+    await db.commit()
+    await db.refresh(execution)
     return execution
 
 
-def total_points_for_user(db: Session, user_id: UUID) -> int:
+async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
     """Soma dos points_awarded de execuções confirmadas + conclusões de missão (MissionUsage) + points_adjustment."""
-    from sqlalchemy import func
-
-    from app.models import MissionUsage
-
-    exec_points = (
-        db.query(func.coalesce(func.sum(TechniqueExecution.points_awarded), 0))
-        .filter(
+    exec_points = await db.scalar(
+        select(func.coalesce(func.sum(TechniqueExecution.points_awarded), 0)).where(
             TechniqueExecution.user_id == user_id,
             TechniqueExecution.status == "confirmed",
         )
-        .scalar()
     )
-    mission_points = (
-        db.query(func.coalesce(func.sum(MissionUsage.points_awarded), 0))
-        .filter(MissionUsage.user_id == user_id)
-        .scalar()
+    mission_points = await db.scalar(
+        select(func.coalesce(func.sum(MissionUsage.points_awarded), 0)).where(
+            MissionUsage.user_id == user_id,
+        )
     )
-    user = db.query(User).filter(User.id == user_id).first()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     adjustment = (user.points_adjustment if user else 0) or 0
     return int(exec_points or 0) + int(mission_points or 0) + adjustment
 
 
-def get_points_log(db: Session, user_id: UUID, limit: int = 100):
+async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100):
     """
     Retorna histórico de pontuação do usuário: execuções confirmadas e mission_usages,
     ordenados por data (mais recente primeiro). Cada item: date, points, source, description.
     """
-    from app.models import Mission, MissionUsage
+    exec_rows = (
+        await db.execute(
+            select(TechniqueExecution)
+            .options(
+                selectinload(TechniqueExecution.opponent),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.technique),
+                selectinload(TechniqueExecution.lesson).selectinload(Lesson.technique),
+                selectinload(TechniqueExecution.technique),
+            )
+            .where(
+                TechniqueExecution.user_id == user_id,
+                TechniqueExecution.status == "confirmed",
+                TechniqueExecution.points_awarded.isnot(None),
+            )
+            .order_by(TechniqueExecution.confirmed_at.desc().nullslast())
+            .limit(limit)
+        )
+    ).unique().scalars().all()
 
     rows = []
-    for e in (
-        db.query(TechniqueExecution)
-        .options(
-            joinedload(TechniqueExecution.opponent),
-            joinedload(TechniqueExecution.mission).joinedload(Mission.technique),
-            joinedload(TechniqueExecution.lesson).joinedload(Lesson.technique),
-            joinedload(TechniqueExecution.technique),
-        )
-        .filter(
-            TechniqueExecution.user_id == user_id,
-            TechniqueExecution.status == "confirmed",
-            TechniqueExecution.points_awarded.isnot(None),
-        )
-        .order_by(TechniqueExecution.confirmed_at.desc().nullslast())
-        .limit(limit)
-        .all()
-    ):
+    for e in exec_rows:
         dt = e.confirmed_at or e.created_at
         technique_name = None
         if e.technique:
@@ -411,13 +404,16 @@ def get_points_log(db: Session, user_id: UUID, limit: int = 100):
                 "description": desc,
             }
         )
-    for u in (
-        db.query(MissionUsage)
-        .filter(MissionUsage.user_id == user_id, MissionUsage.points_awarded.isnot(None))
-        .order_by(MissionUsage.completed_at.desc())
-        .limit(limit)
-        .all()
-    ):
+
+    usage_rows = (
+        await db.execute(
+            select(MissionUsage)
+            .where(MissionUsage.user_id == user_id, MissionUsage.points_awarded.isnot(None))
+            .order_by(MissionUsage.completed_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    for u in usage_rows:
         rows.append(
             {
                 "date": u.completed_at.isoformat() if u.completed_at else None,

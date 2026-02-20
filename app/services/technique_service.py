@@ -2,7 +2,8 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Position, Technique
@@ -10,21 +11,21 @@ from app.models import Position, Technique
 logger = logging.getLogger(__name__)
 
 
-def list_techniques(db: Session, academy_id: UUID | None = None, limit: int = 200) -> list[Technique]:
+async def list_techniques(db: AsyncSession, academy_id: UUID | None = None, limit: int = 200) -> list[Technique]:
     """Lista técnicas ordenadas por nome. Se academy_id informado, filtra por academia."""
-    q = db.query(Technique)
+    stmt = select(Technique)
     if academy_id is not None:
-        q = q.filter(Technique.academy_id == academy_id)
-    return q.order_by(Technique.name).limit(limit).all()
+        stmt = stmt.where(Technique.academy_id == academy_id)
+    return (await db.execute(stmt.order_by(Technique.name).limit(limit))).scalars().all()
 
 
-def get_technique(db: Session, technique_id: UUID) -> Technique | None:
+async def get_technique(db: AsyncSession, technique_id: UUID) -> Technique | None:
     """Retorna uma técnica por ID."""
-    return db.query(Technique).filter(Technique.id == technique_id).first()
+    return (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
 
 
-def create_technique(
-    db: Session,
+async def create_technique(
+    db: AsyncSession,
     academy_id: UUID,
     name: str,
     from_position_id: UUID,
@@ -35,15 +36,15 @@ def create_technique(
     base_points: int | None = None,
 ) -> Technique:
     """Cria uma técnica na academia. from_position e to_position devem pertencer à mesma academia."""
-    from_pos = db.query(Position).filter(Position.id == from_position_id).first()
-    to_pos = db.query(Position).filter(Position.id == to_position_id).first()
+    from_pos = (await db.execute(select(Position).where(Position.id == from_position_id))).scalar_one_or_none()
+    to_pos = (await db.execute(select(Position).where(Position.id == to_position_id))).scalar_one_or_none()
     if not from_pos or from_pos.academy_id != academy_id:
         raise ValueError("from_position_id deve ser uma posição desta academia.")
     if not to_pos or to_pos.academy_id != academy_id:
         raise ValueError("to_position_id deve ser uma posição desta academia.")
     if not slug or not str(slug).strip():
         base = make_slug(name, fallback="tecnica")
-        slug = ensure_unique_slug(db, Technique, "slug", base, academy_id=academy_id)
+        slug = await ensure_unique_slug(db, Technique, "slug", base, academy_id=academy_id)
     else:
         slug = slug.strip()
     technique = Technique(
@@ -57,14 +58,14 @@ def create_technique(
         base_points=base_points,
     )
     db.add(technique)
-    db.commit()
-    db.refresh(technique)
+    await db.commit()
+    await db.refresh(technique)
     logger.info("create_technique", extra={"technique_id": str(technique.id), "technique_name": technique.name})
     return technique
 
 
-def update_technique(
-    db: Session,
+async def update_technique(
+    db: AsyncSession,
     technique_id: UUID,
     name: str | None = None,
     slug: str | None = None,
@@ -75,7 +76,7 @@ def update_technique(
     to_position_id: UUID | None = None,
 ) -> Technique | None:
     """Atualiza uma técnica. Retorna None se não existir."""
-    technique = get_technique(db, technique_id)
+    technique = await get_technique(db, technique_id)
     if not technique:
         return None
     if name is not None:
@@ -89,27 +90,27 @@ def update_technique(
     if base_points is not None:
         technique.base_points = base_points
     if from_position_id is not None:
-        from_pos = db.query(Position).filter(Position.id == from_position_id).first()
+        from_pos = (await db.execute(select(Position).where(Position.id == from_position_id))).scalar_one_or_none()
         if not from_pos or from_pos.academy_id != technique.academy_id:
             raise ValueError("from_position_id deve ser uma posição desta academia.")
         technique.from_position_id = from_position_id
     if to_position_id is not None:
-        to_pos = db.query(Position).filter(Position.id == to_position_id).first()
+        to_pos = (await db.execute(select(Position).where(Position.id == to_position_id))).scalar_one_or_none()
         if not to_pos or to_pos.academy_id != technique.academy_id:
             raise ValueError("to_position_id deve ser uma posição desta academia.")
         technique.to_position_id = to_position_id
-    db.commit()
-    db.refresh(technique)
+    await db.commit()
+    await db.refresh(technique)
     logger.info("update_technique", extra={"technique_id": str(technique_id)})
     return technique
 
 
-def delete_technique(db: Session, technique_id: UUID) -> bool:
+async def delete_technique(db: AsyncSession, technique_id: UUID) -> bool:
     """Remove uma técnica. Retorna True se removeu, False se não existir."""
-    technique = get_technique(db, technique_id)
+    technique = await get_technique(db, technique_id)
     if not technique:
         return False
-    db.delete(technique)
-    db.commit()
+    await db.delete(technique)
+    await db.commit()
     logger.info("delete_technique", extra={"technique_id": str(technique_id)})
     return True

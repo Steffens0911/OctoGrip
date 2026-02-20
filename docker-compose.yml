@@ -23,6 +23,9 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      CORS_ORIGINS: ${CORS_ORIGINS:-["*"]}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
     depends_on:
       postgres:
         condition: service_healthy

@@ -2,14 +2,15 @@
 from datetime import date, datetime, time, timedelta
 from uuid import UUID
 
-from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import CollectiveGoal, Mission, TechniqueExecution, User
 
 
-def create_goal(
-    db: Session,
+async def create_goal(
+    db: AsyncSession,
     academy_id: UUID | None,
     technique_id: UUID,
     target_count: int,
@@ -24,50 +25,51 @@ def create_goal(
         end_date=end_date,
     )
     db.add(goal)
-    db.commit()
-    db.refresh(goal)
+    await db.commit()
+    await db.refresh(goal)
     return goal
 
 
-def list_goals_for_academy(
-    db: Session,
+async def list_goals_for_academy(
+    db: AsyncSession,
     academy_id: UUID,
     start_date: date | None = None,
     end_date: date | None = None,
 ):
-    q = (
-        db.query(CollectiveGoal)
-        .options(joinedload(CollectiveGoal.technique))
-        .filter(CollectiveGoal.academy_id == academy_id)
+    stmt = (
+        select(CollectiveGoal)
+        .options(selectinload(CollectiveGoal.technique))
+        .where(CollectiveGoal.academy_id == academy_id)
     )
     if start_date is not None:
-        q = q.filter(CollectiveGoal.end_date >= start_date)
+        stmt = stmt.where(CollectiveGoal.end_date >= start_date)
     if end_date is not None:
-        q = q.filter(CollectiveGoal.start_date <= end_date)
-    return q.order_by(CollectiveGoal.start_date.desc()).all()
+        stmt = stmt.where(CollectiveGoal.start_date <= end_date)
+    return (await db.execute(stmt.order_by(CollectiveGoal.start_date.desc()))).unique().scalars().all()
 
 
-def get_current_goal_for_academy(
-    db: Session,
+async def get_current_goal_for_academy(
+    db: AsyncSession,
     academy_id: UUID,
     today: date | None = None,
 ) -> CollectiveGoal | None:
     day = today or date.today()
     return (
-        db.query(CollectiveGoal)
-        .options(joinedload(CollectiveGoal.technique))
-        .filter(
-            CollectiveGoal.academy_id == academy_id,
-            CollectiveGoal.start_date <= day,
-            CollectiveGoal.end_date >= day,
+        await db.execute(
+            select(CollectiveGoal)
+            .options(selectinload(CollectiveGoal.technique))
+            .where(
+                CollectiveGoal.academy_id == academy_id,
+                CollectiveGoal.start_date <= day,
+                CollectiveGoal.end_date >= day,
+            )
+            .order_by(CollectiveGoal.created_at.desc())
         )
-        .order_by(CollectiveGoal.created_at.desc())
-        .first()
-    )
+    ).unique().scalars().first()
 
 
-def count_executions_for_goal(
-    db: Session,
+async def count_executions_for_goal(
+    db: AsyncSession,
     goal: CollectiveGoal,
 ) -> int:
     """
@@ -76,10 +78,10 @@ def count_executions_for_goal(
     """
     start_dt = datetime.combine(goal.start_date, time.min)
     end_next = datetime.combine(goal.end_date, time.min) + timedelta(days=1)
-    q = (
-        db.query(func.count(TechniqueExecution.id))
+    stmt = (
+        select(func.count(TechniqueExecution.id))
         .join(Mission, TechniqueExecution.mission_id == Mission.id)
-        .filter(
+        .where(
             TechniqueExecution.status == "confirmed",
             Mission.technique_id == goal.technique_id,
             TechniqueExecution.created_at >= start_dt,
@@ -87,8 +89,8 @@ def count_executions_for_goal(
         )
     )
     if goal.academy_id is not None:
-        q = q.join(User, TechniqueExecution.user_id == User.id).filter(
+        stmt = stmt.join(User, TechniqueExecution.user_id == User.id).where(
             User.academy_id == goal.academy_id,
         )
-    result = q.scalar()
+    result = await db.scalar(stmt)
     return int(result) if result is not None else 0
