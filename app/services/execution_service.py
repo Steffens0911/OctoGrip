@@ -478,6 +478,52 @@ async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
     return int(exec_points or 0) + int(mission_points or 0) + adjustment
 
 
+async def batch_total_points_for_users(
+    db: AsyncSession, user_ids: list[UUID]
+) -> dict[UUID, int]:
+    """Retorna mapa user_id -> total de pontos para vários usuários (1+N evitado na tela de pontos)."""
+    if not user_ids:
+        return {}
+    exec_rows = (
+        await db.execute(
+            select(
+                TechniqueExecution.user_id,
+                func.coalesce(func.sum(TechniqueExecution.points_awarded), 0).label("pts"),
+            )
+            .where(
+                TechniqueExecution.user_id.in_(user_ids),
+                TechniqueExecution.status == "confirmed",
+            )
+            .group_by(TechniqueExecution.user_id)
+        )
+    ).all()
+    mission_rows = (
+        await db.execute(
+            select(
+                MissionUsage.user_id,
+                func.coalesce(func.sum(MissionUsage.points_awarded), 0).label("pts"),
+            )
+            .where(MissionUsage.user_id.in_(user_ids))
+            .group_by(MissionUsage.user_id)
+        )
+    ).all()
+    user_rows = (
+        await db.execute(
+            select(User.id, func.coalesce(User.points_adjustment, 0).label("adj")).where(
+                User.id.in_(user_ids)
+            )
+        )
+    ).all()
+    result = {uid: 0 for uid in user_ids}
+    for uid, pts in exec_rows:
+        result[uid] = result.get(uid, 0) + int(pts or 0)
+    for uid, pts in mission_rows:
+        result[uid] = result.get(uid, 0) + int(pts or 0)
+    for uid, adj in user_rows:
+        result[uid] = result.get(uid, 0) + int(adj or 0)
+    return result
+
+
 async def _get_execution_points_rows(
     db: AsyncSession,
     user_id: UUID,

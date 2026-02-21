@@ -24,6 +24,14 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Cache in-memory com TTL para reduzir requisições repetidas (troca de telas, abas).
+class _CacheEntry {
+  final String body;
+  final int statusCode;
+  final int expiresAtMs;
+  _CacheEntry(this.body, this.statusCode, this.expiresAtMs);
+}
+
 class ApiService {
   static final ApiService _instance = ApiService._();
   factory ApiService() => _instance;
@@ -31,11 +39,59 @@ class ApiService {
   late final String baseUrl;
   static const _timeout = Duration(seconds: 15);
 
+  final Map<String, _CacheEntry> _getCache = {};
+  static const int _cacheTtlShort = 30; // mission_today, week, pending count
+  static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, positions, users
+  static const int _cacheTtlLong = 90; // dados mais estáveis
+
   ApiService._() {
     baseUrl = kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
   }
 
+  String _cacheKey(String method, Uri uri) => '$method:${uri.toString()}';
+
+  String? _getCached(String key, int ttlSeconds) {
+    final entry = _getCache[key];
+    if (entry == null) return null;
+    if (DateTime.now().millisecondsSinceEpoch > entry.expiresAtMs) {
+      _getCache.remove(key);
+      return null;
+    }
+    return entry.statusCode >= 200 && entry.statusCode < 300 ? entry.body : null;
+  }
+
+  void _setCache(String key, String body, int statusCode, int ttlSeconds) {
+    if (statusCode < 200 || statusCode >= 300) return;
+    final expiresAtMs = DateTime.now().millisecondsSinceEpoch + (ttlSeconds * 1000);
+    _getCache[key] = _CacheEntry(body, statusCode, expiresAtMs);
+  }
+
+  /// Invalida cache por prefixo (ex: "GET:$baseUrl/academies") ou todo o cache.
+  void invalidateCache([String? prefix]) {
+    if (prefix == null || prefix.isEmpty) {
+      _getCache.clear();
+      return;
+    }
+    _getCache.removeWhere((k, _) => k.startsWith(prefix));
+  }
+
   Future<http.Response> _req(Future<http.Response> f) => f.timeout(_timeout);
+
+  /// GET com cache. [ttlSeconds] 0 = sem cache. Retorna body (string); em cache hit não chama a rede.
+  Future<http.Response> _getWithCache(Uri uri, int ttlSeconds) async {
+    final key = _cacheKey('GET', uri);
+    if (ttlSeconds > 0) {
+      final cached = _getCached(key, ttlSeconds);
+      if (cached != null) {
+        return http.Response(cached, 200, headers: {'content-type': 'application/json'});
+      }
+    }
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
+      _setCache(key, r.body, r.statusCode, ttlSeconds);
+    }
+    return r;
+  }
 
   /// Garante que o token foi carregado do storage (importante no web após refresh).
   Future<void> _ensureAuth() async => await AuthService().ensureLoaded();
@@ -112,7 +168,7 @@ class ApiService {
 
   // ---------- Academies ----------
   Future<List<Academy>> getAcademies() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies'), headers: await _headers(auth: true)));
+    final r = await _getWithCache(Uri.parse('$baseUrl/academies'), _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -120,14 +176,14 @@ class ApiService {
   }
 
   Future<Academy> getAcademy(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
+    final r = await _getWithCache(Uri.parse('$baseUrl/academies/$id'), _cacheTtlMedium);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>?> getCollectiveGoalCurrent(String academyId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current'), headers: await _headers(auth: true)));
+    final r = await _getWithCache(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current'), _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     if (data == null) return null;
@@ -142,6 +198,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/academies');
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -181,6 +238,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/academies');
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -188,6 +246,7 @@ class ApiService {
     final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/academies');
   }
 
   // ---------- Users ----------
@@ -207,7 +266,9 @@ class ApiService {
     if (queryParams.isNotEmpty) {
       uri = uri.replace(queryParameters: queryParams);
     }
-    final r = await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: asRealUser)));
+    final r = asRealUser
+        ? await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)))
+        : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -219,6 +280,19 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
+  }
+
+  /// Pontos de todos os usuários da academia em uma requisição (evita N+1 na tela de pontos).
+  Future<Map<String, int>> getAcademyUserPoints(String academyId) async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/academies/$academyId/user_points'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    final byUser = map['points_by_user'] as Map<String, dynamic>? ?? {};
+    return byUser.map((k, v) => MapEntry(k, (v as num).toInt()));
   }
 
   Future<Map<String, dynamic>> getPointsLog(String userId, {int limit = 100}) async {
@@ -322,6 +396,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/users');
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -346,7 +421,7 @@ class ApiService {
     final uri = queryParams.isNotEmpty
         ? Uri.parse('$baseUrl/lessons').replace(queryParameters: queryParams)
         : Uri.parse('$baseUrl/lessons');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -421,7 +496,7 @@ class ApiService {
   /// Lista técnicas da academia. [academyId] obrigatório.
   Future<List<Technique>> getTechniques({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -502,7 +577,7 @@ class ApiService {
   /// Lista posições da academia. [academyId] obrigatório.
   Future<List<Position>> getPositions({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/positions').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -649,7 +724,7 @@ class ApiService {
       'level': level,
       if (academyId != null) 'academy_id': academyId,
     });
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return MissionToday.fromJson(data! as Map<String, dynamic>);
@@ -664,10 +739,9 @@ class ApiService {
     final params = <String, String>{
       'level': level,
       if (academyId != null) 'academy_id': academyId,
-      '_t': DateTime.now().millisecondsSinceEpoch.toString(),
     };
     var uri = Uri.parse('$baseUrl/mission_today/week').replace(queryParameters: params);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return MissionWeek.fromJson(data! as Map<String, dynamic>);
@@ -690,6 +764,8 @@ class ApiService {
       body: jsonEncode({'lesson_id': lessonId}),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/mission_today');
+    invalidateCache('GET:$baseUrl/executions');
   }
 
   /// Conclusão por missão (missão do dia). usageType: before_training | after_training.
@@ -703,6 +779,8 @@ class ApiService {
       body: jsonEncode({'mission_id': missionId, 'usage_type': usageType}),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/mission_today');
+    invalidateCache('GET:$baseUrl/executions');
   }
 
   // ---------- Executions (gamificação) ----------
@@ -730,15 +808,17 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today');
+    invalidateCache('GET:$baseUrl/executions');
     return data! as Map<String, dynamic>;
   }
 
   /// Retorna apenas o número de confirmações pendentes do usuário logado (para badge na tela inicial).
   Future<int> getPendingConfirmationsCount() async {
-    final r = await _req(http.get(
+    final r = await _getWithCache(
       Uri.parse('$baseUrl/executions/pending_confirmations/count'),
-      headers: await _headers(auth: true),
-    ));
+      _cacheTtlShort,
+    );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data is Map ? data as Map<String, dynamic> : null;
@@ -767,6 +847,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/executions');
     return data! as Map<String, dynamic>;
   }
 
@@ -783,6 +864,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/executions');
     return data! as Map<String, dynamic>;
   }
 

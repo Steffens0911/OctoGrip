@@ -46,12 +46,6 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final users = await _api.getUsers(academyId: widget.academyId);
-      final pointsFutures = users.map((u) async {
-        final data = await _api.getUserPoints(u.id);
-        return MapEntry(u.id, data['points'] as int? ?? 0);
-      });
-      final pointsEntries = await Future.wait(pointsFutures);
-      final points = Map<String, int>.fromEntries(pointsEntries);
       for (final u in users) {
         _adjustmentControllers[u.id] = TextEditingController(
           text: (u.pointsAdjustment).toString(),
@@ -59,9 +53,12 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
       }
       if (mounted) setState(() {
         _users = users;
-        _points.clear();
-        _points.addAll(points);
         _loading = false;
+      });
+      final pointsByUser = await _api.getAcademyUserPoints(widget.academyId);
+      if (mounted) setState(() {
+        _points.clear();
+        _points.addAll(pointsByUser);
       });
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });

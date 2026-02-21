@@ -68,22 +68,48 @@ class _UserListScreenState extends State<UserListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _currentPage = 0; _hasMore = true; });
     final isAdmin = AuthService().isAdmin();
     try {
       final results = await Future.wait([
-        isAdmin ? _api.getUsers() : _api.getUsers(academyId: AuthService().currentUser?.academyId),
+        isAdmin
+            ? _api.getUsers(offset: 0, limit: _pageSize)
+            : _api.getUsers(academyId: AuthService().currentUser?.academyId, offset: 0, limit: _pageSize),
         _api.getAcademies(),
       ]);
+      final list = results[0] as List<models.UserModel>;
       if (mounted) setState(() {
-        _allItems = results[0] as List<models.UserModel>;
+        _allItems = list;
         _academies = results[1] as List<Academy>;
         _loading = false;
         _loadingAcademies = false;
+        _hasMore = list.length >= _pageSize;
       });
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingAcademies = false; });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    final isAdmin = AuthService().isAdmin();
+    try {
+      final nextOffset = (_currentPage + 1) * _pageSize;
+      final list = isAdmin
+          ? await _api.getUsers(offset: nextOffset, limit: _pageSize)
+          : await _api.getUsers(academyId: AuthService().currentUser?.academyId, offset: nextOffset, limit: _pageSize);
+      if (mounted) setState(() {
+        _allItems = [..._allItems, ...list];
+        _currentPage++;
+        _hasMore = list.length >= _pageSize;
+        _isLoadingMore = false;
+      });
+      _applyFilters();
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 

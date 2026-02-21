@@ -104,6 +104,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selected = 0;
   int _inicioRefreshKey = 0;
+  String? _lastEffectiveUserId;
 
   @override
   void initState() {
@@ -189,6 +190,15 @@ class _MainShellState extends State<MainShell> {
     final tabs = _availableTabs(auth);
     final isImpersonating = auth.isImpersonating;
     final effectiveUser = auth.currentUser;
+    final effectiveId = effectiveUser?.id;
+    if (effectiveId != _lastEffectiveUserId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() {
+          _lastEffectiveUserId = effectiveId;
+          _inicioRefreshKey++;
+        });
+      });
+    }
 
     if (_selected >= tabs.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -278,10 +288,7 @@ class _MainShellState extends State<MainShell> {
                     icon: Icons.home_rounded,
                     label: 'Início',
                     selected: _selected == 0,
-                    onTap: () => setState(() {
-                      _selected = 0;
-                      _inicioRefreshKey++;
-                    }),
+                    onTap: () => setState(() => _selected = 0),
                   ),
                 if (tabs.contains('Painel'))
                   _NavItem(

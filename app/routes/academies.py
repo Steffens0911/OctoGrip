@@ -37,6 +37,8 @@ from app.services.academy_service import (
     reset_academy_missions,
     update_academy,
 )
+from app.services.execution_service import batch_total_points_for_users
+from app.services.user_service import list_users
 from app.services.collective_goal_service import (
     count_executions_for_goal,
     create_goal,
@@ -135,6 +137,24 @@ async def academy_get(
         raise ForbiddenError("Acesso negado. Você só pode acessar a academia à qual está vinculado.")
     academy = await _load_academy_with_relations(db, academy_id)
     return _academy_to_read(academy)
+
+
+@router.get("/{academy_id}/user_points")
+async def academy_user_points(
+    academy_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Retorna pontos de todos os usuários da academia (evita 1+N requisições na tela de pontos)."""
+    if current_user.role != "administrador" and current_user.academy_id != academy_id:
+        raise ForbiddenError("Acesso negado. Você só pode acessar a academia à qual está vinculado.")
+    users = await list_users(db, academy_id=academy_id, limit=500, offset=0)
+    user_ids = [u.id for u in users]
+    points_map = await batch_total_points_for_users(db, user_ids)
+    return {
+        "academy_id": str(academy_id),
+        "points_by_user": {str(uid): pts for uid, pts in points_map.items()},
+    }
 
 
 @router.patch("/{academy_id}", response_model=AcademyRead)

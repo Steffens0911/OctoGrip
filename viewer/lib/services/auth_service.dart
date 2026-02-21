@@ -79,6 +79,7 @@ class AuthService extends ChangeNotifier {
     _token = null;
     _currentUser = null;
     await _clearStorage();
+    ApiService().invalidateCache();
     notifyListeners();
   }
 
