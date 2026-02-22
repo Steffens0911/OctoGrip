@@ -141,6 +141,7 @@ async def user_update(
         academy_id=payload.get("academy_id"),
         points_adjustment=payload.get("points_adjustment"),
         password=payload.get("password"),
+        gallery_visible=payload.get("gallery_visible"),
     )
     if not updated:
         raise UserNotFoundError()

@@ -8,6 +8,7 @@ import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
+import 'package:viewer/screens/student/classmates_gallery_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -657,6 +658,21 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           ),
         ),
+        if (_selectedUser?.academyId != null && _selectedUser!.academyId!.isNotEmpty)
+          _ShortcutTile(
+            icon: Icons.people_outline,
+            title: 'Galeria dos colegas',
+            subtitle: 'Troféus e medalhas dos colegas da academia',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ClassmatesGalleryScreen(
+                  academyId: _selectedUser!.academyId!,
+                  currentUserId: userId,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

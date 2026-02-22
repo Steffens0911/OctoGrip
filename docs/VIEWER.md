@@ -72,6 +72,11 @@ Acesse: **http://localhost:8080**
 - Seção "Últimas missões concluídas" com `GET /mission_usages/history`.
 - Data exibida **sem horário** (ex.: 12/02/2025).
 
+### Galeria de troféus e medalhas
+
+- **TrophyGalleryScreen:** lista em cards com filtros (tier, tipo medalha/troféu), switch "Galeria visível para outros", "Indicar adversário". Consome `GET /trophies/user/{user_id}`.
+- **Estante (TrophyShelfPage):** na galeria, ícone da AppBar **"Ver como estante"** abre a visão gamificada: prateleiras, troféus com estado bloqueado/ouro (glow), toque abre modal de detalhes. Mesma API; 403 quando galeria privada. Detalhes em [TROPHY_SHELF.md](TROPHY_SHELF.md).
+
 ### ReportDifficultyScreen
 
 - `GET /positions` para escolher posição.
@@ -110,9 +115,14 @@ viewer/lib/
 ├── main.dart                 # App e shell com drawer
 ├── config.dart               # URL base da API
 ├── app_theme.dart            # Tema verde #58CC02
-├── models/                   # Mission, MissionToday, MissionWeek, Academy, User, Lesson, etc.
+├── features/
+│   └── trophy_shelf/        # Estante gamificada (ver TROPHY_SHELF.md)
+│       ├── domain/shelf_trophy.dart
+│       ├── presentation/trophy_shelf_page.dart + widgets/
+│       └── utils/shelf_layout_config.dart
+├── models/                   # Mission, MissionToday, MissionWeek, Academy, User, Lesson, Trophy, etc.
 ├── services/
-│   ├── api_service.dart      # Cliente HTTP (getMissionToday, getMissionWeek, postMissionComplete, etc.)
+│   ├── api_service.dart      # Cliente HTTP (getMissionToday, getTrophiesForUser, etc.)
 │   ├── academy_service.dart  # Operações de academia
 │   └── professor_service.dart
 └── screens/
@@ -120,13 +130,13 @@ viewer/lib/
     ├── student/              # Telas do aluno
     │   ├── student_home_screen.dart
     │   ├── lesson_view_screen.dart
-    │   ├── lesson_view_data.dart
     │   ├── library_screen.dart
     │   ├── progress_screen.dart
+    │   ├── trophy_gallery_screen.dart   # Galeria lista + atalho para estante
     │   └── report_difficulty_screen.dart
     ├── admin/                # Telas de administração
     │   ├── academy_detail_screen.dart
-    │   ├── mission_list_screen.dart
+    │   ├── user_list_screen.dart       # Ação "Ver galeria" por usuário
     │   └── ...
     └── academy/              # Painel de academia
 ```
@@ -161,3 +171,5 @@ Principais métodos em `ApiService`:
 | `getPositions`                 | GET /positions               |
 | `postTrainingFeedback`         | POST /training_feedback      |
 | `getUsageMetrics`              | GET /metrics/usage           |
+| `getTrophiesForUser(userId)`   | GET /trophies/user/{user_id} |
+| `patchMeGalleryVisible(bool)`  | PATCH /auth/me (galeria visível) |

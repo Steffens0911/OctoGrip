@@ -243,3 +243,32 @@ async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_hea
 
     r = await client.get(f"/trophies/user/{other_user.id}", headers=admin_headers)
     assert r.status_code == 200
+
+
+async def test_galeria_privada_retorna_403(client, aluno_headers, admin_headers, db, academy, trophy):
+    """Quando o dono da galeria tem gallery_visible=False, outro usuário recebe 403."""
+    from app.models import User
+    from app.core.security import hash_password, create_access_token
+
+    other_user = User(
+        email=f"outro-{uuid4().hex[:8]}@test.com",
+        name="Outro Aluno",
+        role="aluno",
+        graduation="white",
+        academy_id=academy.id,
+        password_hash=hash_password("senha123"),
+        gallery_visible=False,
+    )
+    db.add(other_user)
+    await db.commit()
+    await db.refresh(other_user)
+
+    r = await client.get(f"/trophies/user/{other_user.id}", headers=aluno_headers)
+    assert r.status_code == 403
+    detail = r.json().get("detail") or ""
+    if isinstance(detail, list):
+        detail = " ".join(str(x) for x in detail)
+    assert "privada" in str(detail).lower()
+
+    r_admin = await client.get(f"/trophies/user/{other_user.id}", headers=admin_headers)
+    assert r_admin.status_code == 403

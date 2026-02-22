@@ -144,6 +144,18 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
+  /// Atualiza preferência "galeria visível para outros" do usuário autenticado.
+  Future<UserModel> patchMeGalleryVisible(bool visible) async {
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/auth/me'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'gallery_visible': visible}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
   Future<dynamic> _decodeResponse(http.Response r) async {
     final body = r.body;
     if (body.isEmpty) return null;
@@ -305,7 +317,10 @@ class ApiService {
 
   /// Galeria de troféus do usuário (troféus da academia com tier conquistado).
   Future<List<TrophyWithEarned>> getTrophiesForUser(String userId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/trophies/user/$userId')));
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/trophies/user/$userId'),
+      headers: await _headers(auth: true),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -322,7 +337,7 @@ class ApiService {
     return raw.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  /// Cria troféu da academia (admin).
+  /// Cria troféu ou medalha da academia (admin).
   Future<Map<String, dynamic>> createTrophy({
     required String academyId,
     required String techniqueId,
@@ -330,18 +345,23 @@ class ApiService {
     required String startDate,
     required String endDate,
     required int targetCount,
+    required String awardKind,
+    int? minDurationDays,
   }) async {
+    final body = <String, dynamic>{
+      'academy_id': academyId,
+      'technique_id': techniqueId,
+      'name': name,
+      'start_date': startDate,
+      'end_date': endDate,
+      'target_count': targetCount,
+      'award_kind': awardKind,
+    };
+    if (minDurationDays != null) body['min_duration_days'] = minDurationDays;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
       headers: await _jsonHeaders(auth: true),
-      body: jsonEncode({
-        'academy_id': academyId,
-        'technique_id': techniqueId,
-        'name': name,
-        'start_date': startDate,
-        'end_date': endDate,
-        'target_count': targetCount,
-      }),
+      body: jsonEncode(body),
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);

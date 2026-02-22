@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
+from app.core.exceptions import ForbiddenError
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
@@ -29,6 +30,8 @@ def _trophy_to_read(t):
         start_date=t.start_date,
         end_date=t.end_date,
         target_count=t.target_count,
+        award_kind=getattr(t, "award_kind", "trophy"),
+        min_duration_days=getattr(t, "min_duration_days", None),
         created_at=t.created_at,
     )
 
@@ -39,7 +42,7 @@ async def trophy_create(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Cria troféu da academia."""
+    """Cria troféu ou medalha da academia."""
     verify_academy_access(current_user, str(body.academy_id) if body.academy_id else None)
     trophy = await create_trophy(
         db,
@@ -49,6 +52,8 @@ async def trophy_create(
         start_date=body.start_date,
         end_date=body.end_date,
         target_count=body.target_count,
+        award_kind=body.award_kind,
+        min_duration_days=body.min_duration_days,
     )
     return _trophy_to_read(trophy)
 
@@ -70,9 +75,13 @@ async def trophy_user_gallery(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Galeria de troféus do usuário."""
+    """Galeria de troféus do usuário. Própria galeria: todos os itens. Galeria de outro: só conquistados e só se gallery_visible."""
     user = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador":
         verify_academy_access(current_user, str(user.academy_id) if user.academy_id else None)
     items = await list_user_trophies_with_earned(db, user_id)
+    if current_user.id != user_id:
+        if not user.gallery_visible:
+            raise ForbiddenError("Esta galeria está privada.")
+        items = [x for x in items if x.get("earned_tier") is not None]
     return [UserTrophyEarned(**x) for x in items]

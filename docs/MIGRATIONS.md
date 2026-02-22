@@ -35,6 +35,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 020 | mission_multiplier_academy_multipliers_points | `missions.multiplier`; `academies.weekly_multiplier_1/2/3`; `mission_usages.points_awarded` |
 | 021 | mission_slot_index | `missions.slot_index` (0,1,2); `start_date`/`end_date` opcionais |
 | 022 | user_points_adjustment | `users.points_adjustment` (ajuste manual de pontos por admin) |
+| 033 | user_gallery_visible | `users.gallery_visible` (galeria de troféus visível ou privada para outros) |
 
 ---
 
@@ -62,3 +63,4 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_pos
 - **Migrations 017-019:** pontuação base em lição/técnica; lição visível por academia; execução por lição (sem missão), com `mission_id` ou `lesson_id`.
 - **Migration 020:** multiplicador por missão; multiplicadores por slot semanal da academia; pontos em MissionUsage ao concluir missão (multiplicador × faixa).
 - **Migration 021:** missões da academia identificadas por `slot_index` (0, 1, 2); sem dependência de datas. Cada academia cria suas 3 missões; `start_date`/`end_date` opcionais (legado).
+- **Migration 033:** preferência do usuário para exibir ou ocultar a galeria de troféus para outros; quando visível, outros veem apenas itens já conquistados.

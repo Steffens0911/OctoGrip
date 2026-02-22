@@ -7,6 +7,7 @@ import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
+import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/utils/error_message.dart';
 
 class UserListScreen extends StatefulWidget {
@@ -294,10 +295,28 @@ class _UserListScreenState extends State<UserListScreen> {
                                 child: ListTile(
                                   title: Text(u.email),
                                   subtitle: Text(u.name ?? '—'),
-                                  trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                    IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
-                                    IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
-                                  ]) : null,
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.emoji_events_outlined),
+                                        tooltip: 'Ver galeria de troféus',
+                                        onPressed: () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => TrophyShelfPage(
+                                              userId: u.id,
+                                              userName: u.name ?? u.email,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      if (AuthService().canEditResources()) ...[
+                                        IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
+                                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
+                                      ],
+                                    ],
+                                  ),
                                   onTap: () => _openForm(u),
                                 ),
                               );

@@ -192,143 +192,193 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   Future<void> _showCreateTrophyDialog() async {
     if (_techniques.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cadastre técnicas antes de criar troféus.')),
+        const SnackBar(content: Text('Cadastre técnicas antes de criar premiações.')),
       );
       return;
     }
     final formKey = GlobalKey<FormBuilderState>();
+    String awardKind = 'trophy';
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Criar troféu'),
-        content: SingleChildScrollView(
-          child: FormBuilder(
-            key: formKey,
-            initialValue: {
-              'name': '',
-              'techniqueId': _techniques.first.id,
-              'startDate': DateTime.now(),
-              'endDate': DateTime.now().add(const Duration(days: 30)),
-              'targetCount': '10',
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                FormBuilderTextField(
-                  name: 'name',
-                  decoration: const InputDecoration(
-                    labelText: 'Nome do troféu',
-                    hintText: 'Ex: Arm Lock',
-                  ),
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Nome é obrigatório'),
-                  ]),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Criar premiação'),
+            content: SingleChildScrollView(
+              child: FormBuilder(
+                key: formKey,
+                initialValue: {
+                  'name': '',
+                  'techniqueId': _techniques.first.id,
+                  'awardKind': 'trophy',
+                  'minDurationDays': '30',
+                  'startDate': DateTime.now(),
+                  'endDate': DateTime.now().add(const Duration(days: 30)),
+                  'targetCount': '10',
+                },
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FormBuilderDropdown<String>(
+                      name: 'awardKind',
+                      decoration: const InputDecoration(labelText: 'Tipo de premiação'),
+                      items: const [
+                        DropdownMenuItem(value: 'medal', child: Text('Medalha (ordinária)')),
+                        DropdownMenuItem(value: 'trophy', child: Text('Troféu (especial, longo prazo)')),
+                      ],
+                      onChanged: (v) {
+                        awardKind = v ?? 'trophy';
+                        setDialogState(() {});
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    if (awardKind == 'trophy')
+                      FormBuilderTextField(
+                        name: 'minDurationDays',
+                        decoration: const InputDecoration(
+                          labelText: 'Duração mínima (dias)',
+                          hintText: 'Ex: 30 (1 mês)',
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: FormBuilderValidators.compose([
+                          FormBuilderValidators.required(errorText: 'Informe a duração mínima em dias'),
+                          FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
+                          FormBuilderValidators.min(1, errorText: 'Mínimo 1 dia'),
+                        ]),
+                      ),
+                    if (awardKind == 'trophy') const SizedBox(height: 12),
+                    FormBuilderTextField(
+                      name: 'name',
+                      decoration: const InputDecoration(
+                        labelText: 'Nome',
+                        hintText: 'Ex: Arm Lock',
+                      ),
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(errorText: 'Nome é obrigatório'),
+                      ]),
+                    ),
+                    const SizedBox(height: 12),
+                    FormBuilderDropdown<String>(
+                      name: 'techniqueId',
+                      decoration: const InputDecoration(labelText: 'Técnica'),
+                      items: _techniques
+                          .map((t) => DropdownMenuItem(value: t.id, child: Text(t.name)))
+                          .toList(),
+                      initialValue: _techniques.first.id,
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(errorText: 'Selecione uma técnica'),
+                      ]),
+                    ),
+                    const SizedBox(height: 12),
+                    FormBuilderDateTimePicker(
+                      name: 'startDate',
+                      inputType: InputType.date,
+                      format: brDateFormat,
+                      locale: const Locale('pt', 'BR'),
+                      decoration: const InputDecoration(
+                        labelText: 'Data início',
+                        hintText: 'dd/MM/aaaa',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                      ),
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(errorText: 'Data início é obrigatória'),
+                      ]),
+                    ),
+                    const SizedBox(height: 8),
+                    FormBuilderDateTimePicker(
+                      name: 'endDate',
+                      inputType: InputType.date,
+                      format: brDateFormat,
+                      locale: const Locale('pt', 'BR'),
+                      decoration: const InputDecoration(
+                        labelText: 'Data fim',
+                        hintText: 'dd/MM/aaaa',
+                        suffixIcon: Icon(Icons.calendar_today_outlined),
+                      ),
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(errorText: 'Data fim é obrigatória'),
+                      ]),
+                    ),
+                    const SizedBox(height: 8),
+                    FormBuilderTextField(
+                      name: 'targetCount',
+                      decoration: const InputDecoration(labelText: 'Meta de execuções (ex: 10)'),
+                      keyboardType: TextInputType.number,
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.required(errorText: 'Meta é obrigatória'),
+                        FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
+                        FormBuilderValidators.min(1, errorText: 'Meta deve ser pelo menos 1'),
+                      ]),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                FormBuilderDropdown<String>(
-                  name: 'techniqueId',
-                  decoration: const InputDecoration(labelText: 'Técnica'),
-                  items: _techniques
-                      .map((t) => DropdownMenuItem(value: t.id, child: Text(t.name)))
-                      .toList(),
-                  initialValue: _techniques.first.id,
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Selecione uma técnica'),
-                  ]),
-                ),
-                const SizedBox(height: 12),
-                FormBuilderDateTimePicker(
-                  name: 'startDate',
-                  inputType: InputType.date,
-                  format: brDateFormat,
-                  locale: const Locale('pt', 'BR'),
-                  decoration: const InputDecoration(
-                    labelText: 'Data início',
-                    hintText: 'dd/MM/aaaa',
-                    suffixIcon: Icon(Icons.calendar_today_outlined),
-                  ),
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Data início é obrigatória'),
-                  ]),
-                ),
-                const SizedBox(height: 8),
-                FormBuilderDateTimePicker(
-                  name: 'endDate',
-                  inputType: InputType.date,
-                  format: brDateFormat,
-                  locale: const Locale('pt', 'BR'),
-                  decoration: const InputDecoration(
-                    labelText: 'Data fim',
-                    hintText: 'dd/MM/aaaa',
-                    suffixIcon: Icon(Icons.calendar_today_outlined),
-                  ),
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Data fim é obrigatória'),
-                  ]),
-                ),
-                const SizedBox(height: 8),
-                FormBuilderTextField(
-                  name: 'targetCount',
-                  decoration: const InputDecoration(labelText: 'Meta de execuções (ex: 10)'),
-                  keyboardType: TextInputType.number,
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Meta é obrigatória'),
-                    FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
-                    FormBuilderValidators.min(1, errorText: 'Meta deve ser pelo menos 1'),
-                  ]),
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
-          FilledButton(
-            onPressed: () async {
-              if (formKey.currentState?.saveAndValidate() ?? false) {
-                final values = formKey.currentState!.value;
-                final name = values['name'] as String;
-                final techniqueId = values['techniqueId'] as String;
-                final startDateValue = values['startDate'] as DateTime;
-                final endDateValue = values['endDate'] as DateTime;
-                if (endDateValue.isBefore(startDateValue)) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('A data fim deve ser igual ou posterior à data início.')),
-                  );
-                  return;
-                }
-                final targetCount = int.parse(values['targetCount'] as String);
-                final startDate = toApiDate(startDateValue);
-                final endDate = toApiDate(endDateValue);
-                
-                Navigator.pop(ctx);
-                try {
-                  await _api.createTrophy(
-                    academyId: _academy.id,
-                    techniqueId: techniqueId,
-                    name: name.trim(),
-                    startDate: startDate,
-                    endDate: endDate,
-                    targetCount: targetCount,
-                  );
-                  if (mounted) {
-                    _loadTrophies();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Troféu criado. Alunos podem conquistar ouro, prata ou bronze.')),
-                    );
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+              FilledButton(
+                onPressed: () async {
+                  final currentAwardKind = formKey.currentState?.value['awardKind'] as String? ?? awardKind;
+                  if (formKey.currentState?.saveAndValidate() ?? false) {
+                    final values = formKey.currentState!.value;
+                    final name = values['name'] as String;
+                    final techniqueId = values['techniqueId'] as String;
+                    final startDateValue = values['startDate'] as DateTime;
+                    final endDateValue = values['endDate'] as DateTime;
+                    if (endDateValue.isBefore(startDateValue)) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('A data fim deve ser igual ou posterior à data início.')),
+                      );
+                      return;
+                    }
+                    final kind = values['awardKind'] as String? ?? 'trophy';
+                    int? minDurationDays;
+                    if (kind == 'trophy') {
+                      minDurationDays = int.tryParse((values['minDurationDays'] as String?) ?? '30') ?? 30;
+                      final durationDays = endDateValue.difference(startDateValue).inDays;
+                      if (durationDays < minDurationDays) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Troféu exige duração mínima de $minDurationDays dias. Período informado: $durationDays dias.')),
+                        );
+                        return;
+                      }
+                    }
+                    final targetCount = int.parse(values['targetCount'] as String);
+                    final startDate = toApiDate(startDateValue);
+                    final endDate = toApiDate(endDateValue);
+
+                    Navigator.pop(ctx);
+                    try {
+                      await _api.createTrophy(
+                        academyId: _academy.id,
+                        techniqueId: techniqueId,
+                        name: name.trim(),
+                        startDate: startDate,
+                        endDate: endDate,
+                        targetCount: targetCount,
+                        awardKind: kind,
+                        minDurationDays: kind == 'trophy' ? minDurationDays : null,
+                      );
+                      if (mounted) {
+                        _loadTrophies();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Premiação criada. Alunos podem conquistar ouro, prata ou bronze.')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(userFacingMessage(e))),
+                        );
+                      }
+                    }
                   }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(userFacingMessage(e))),
-                    );
-                  }
-                }
-              }
-            },
-            child: const Text('Criar'),
-          ),
-        ],
+                },
+                child: const Text('Criar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

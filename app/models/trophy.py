@@ -33,6 +33,8 @@ class Trophy(Base, UUIDMixin):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     target_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    award_kind: Mapped[str] = mapped_column(String(32), nullable=False, default="trophy", index=True)
+    min_duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     academy: Mapped["Academy"] = relationship(
         "Academy",

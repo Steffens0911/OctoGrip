@@ -12,6 +12,7 @@ class UserRead(BaseModel):
     role: str = "aluno"
     academy_id: UUID | None = None
     points_adjustment: int = 0
+    gallery_visible: bool = True
 
     class Config:
         from_attributes = True
@@ -103,6 +104,7 @@ class UserUpdate(BaseModel):
     role: str | None = Field(None, max_length=32)
     academy_id: UUID | None = None
     points_adjustment: int | None = None
+    gallery_visible: bool | None = None
     password: str | None = Field(
         None,
         min_length=12,
@@ -146,3 +148,13 @@ class UserUpdate(BaseModel):
                     raise ValueError(f"role '{self.role}' exige graduation")
         # Se role não está sendo atualizado mas graduation está, não há problema
         return self
+
+
+class MeUpdate(BaseModel):
+    """Atualização do perfil do usuário autenticado (apenas campos permitidos para o próprio usuário)."""
+    model_config = ConfigDict(extra="forbid")
+
+    gallery_visible: bool | None = Field(
+        None,
+        description="Se true, outros usuários podem ver a galeria de troféus (apenas conquistados).",
+    )

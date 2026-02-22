@@ -81,8 +81,8 @@ def require_readonly_or_write(
 
 
 def require_read_access(current_user: User = Depends(get_current_user)) -> User:
-    """Leitura para supervisor, admin, gerente ou professor."""
-    if current_user.role not in ("administrador", "gerente_academia", "professor", "supervisor"):
+    """Leitura para admin, gerente, professor, supervisor ou aluno (ex.: posições para Reportar dificuldade)."""
+    if current_user.role not in ("administrador", "gerente_academia", "professor", "supervisor", "aluno"):
         raise ForbiddenError("Acesso negado.")
     return current_user
 

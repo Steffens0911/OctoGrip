@@ -14,8 +14,8 @@ from app.core.security import verify_password, create_access_token
 from app.database import get_db
 from app.models import User
 from app.schemas.auth import LoginRequest, TokenResponse
-from app.schemas.user import UserRead
-from app.services.user_service import get_user_by_email
+from app.schemas.user import MeUpdate, UserRead
+from app.services.user_service import get_user_by_email, update_user
 
 logger = logging.getLogger(__name__)
 
@@ -98,3 +98,21 @@ async def login(
 async def me(current_user: User = Depends(get_current_user)):
     """Retorna o usuário autenticado."""
     return current_user
+
+
+@router.patch("/me", response_model=UserRead)
+async def patch_me(
+    body: MeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Atualiza preferências do usuário autenticado (ex.: galeria visível para outros)."""
+    payload = body.model_dump(exclude_unset=True)
+    if not payload:
+        return current_user
+    updated = await update_user(
+        db,
+        current_user.id,
+        gallery_visible=payload.get("gallery_visible"),
+    )
+    return updated if updated else current_user

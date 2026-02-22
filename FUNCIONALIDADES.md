@@ -158,6 +158,7 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 ### Outras telas do app
 
 - **Biblioteca de lições** (aba Lições): lista GET /lessons; toque abre a lição como LessonScreen (e envia POST /lesson_complete ao concluir).
+- **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
 - **Reportar dificuldade** (Perfil): GET /positions, escolha da posição e observação opcional; POST /training_feedback.
 - **Histórico de missões** (Progresso): seção "Últimas missões concluídas" com GET /mission_usages/history.
 - **Métricas de uso** (Perfil): GET /metrics/usage com totais e % antes/depois do treino.
@@ -174,4 +175,4 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 | Área | O que está pronto |
 |------|-------------------|
 | **Backend** | API REST, modelos, missão do dia, 3 missões semanais, conclusão de lição/missão (com usage_type), lesson_complete/status, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (3 técnicas semanais, tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
-| **App** | Tela inicial com 3 missões semanais, lição (botão concluído desabilitado quando já feito), diálogo antes/depois do treino ao concluir missão, biblioteca de lições, progresso com histórico (data sem horário), reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (3 missões semanais, tema, ranking, dificuldades, relatório semanal) |
+| **App** | Tela inicial com 3 missões semanais, lição (botão concluído desabilitado quando já feito), diálogo antes/depois do treino ao concluir missão, biblioteca de lições, **galeria de troféus/medalhas** (lista + estante gamificada), progresso com histórico (data sem horário), reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (3 missões semanais, tema, ranking, dificuldades, relatório semanal) |

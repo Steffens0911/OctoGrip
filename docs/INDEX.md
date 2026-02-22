@@ -30,6 +30,7 @@
 | Documento | Descrição |
 |-----------|-----------|
 | [docs/VIEWER.md](VIEWER.md) | App Flutter: telas, modelos, serviços, navegação |
+| [docs/TROPHY_SHELF.md](TROPHY_SHELF.md) | Estante de troféus gamificada: arquitetura, widgets, API, layout, acessibilidade |
 | [docs/ANDROID_APK_LOCAL.md](ANDROID_APK_LOCAL.md) | Configurações para APK no celular e teste local (IP, cleartext, firewall) |
 | [viewer/README.md](../viewer/README.md) | Como rodar o viewer, URL da API |
 

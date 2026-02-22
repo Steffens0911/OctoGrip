@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import Boolean, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -35,6 +35,12 @@ class User(Base, UUIDMixin):
         ForeignKey("academies.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
+    )
+    gallery_visible: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        comment="Se true, outros usuários podem ver a galeria de troféus (apenas conquistados).",
     )
 
     academy: Mapped["Academy | None"] = relationship(

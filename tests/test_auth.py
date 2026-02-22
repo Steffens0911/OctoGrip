@@ -45,3 +45,15 @@ async def test_me_com_token(client, admin_user, admin_headers):
 async def test_me_token_invalido(client):
     r = await client.get("/auth/me", headers={"Authorization": "Bearer tokeninvalido"})
     assert r.status_code == 401
+
+
+async def test_patch_me_gallery_visible(client, admin_headers, admin_user):
+    """PATCH /auth/me atualiza gallery_visible do usuário autenticado."""
+    r = await client.patch("/auth/me", headers=admin_headers, json={"gallery_visible": False})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["gallery_visible"] is False
+    r2 = await client.get("/auth/me", headers=admin_headers)
+    assert r2.json()["gallery_visible"] is False
+    r3 = await client.patch("/auth/me", headers=admin_headers, json={"gallery_visible": True})
+    assert r3.json()["gallery_visible"] is True

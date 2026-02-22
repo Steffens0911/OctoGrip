@@ -461,11 +461,12 @@ async def reject_execution(
 
 
 async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
-    """Soma dos points_awarded de execuções confirmadas + conclusões de missão (MissionUsage) + points_adjustment."""
+    """Soma dos points_awarded de execuções confirmadas (apenas posições da semana, mission_id) + conclusões de missão (MissionUsage) + points_adjustment."""
     exec_points = await db.scalar(
         select(func.coalesce(func.sum(TechniqueExecution.points_awarded), 0)).where(
             TechniqueExecution.user_id == user_id,
             TechniqueExecution.status == "confirmed",
+            TechniqueExecution.mission_id.isnot(None),
         )
     )
     mission_points = await db.scalar(
@@ -481,7 +482,7 @@ async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
 async def batch_total_points_for_users(
     db: AsyncSession, user_ids: list[UUID]
 ) -> dict[UUID, int]:
-    """Retorna mapa user_id -> total de pontos para vários usuários (1+N evitado na tela de pontos)."""
+    """Retorna mapa user_id -> total de pontos (apenas posições da semana: execuções com mission_id + MissionUsage + adjustment)."""
     if not user_ids:
         return {}
     exec_rows = (
@@ -493,6 +494,7 @@ async def batch_total_points_for_users(
             .where(
                 TechniqueExecution.user_id.in_(user_ids),
                 TechniqueExecution.status == "confirmed",
+                TechniqueExecution.mission_id.isnot(None),
             )
             .group_by(TechniqueExecution.user_id)
         )
@@ -634,8 +636,8 @@ def _format_execution_entry(
 
 async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offset: int = 0):
     """
-    Retorna histórico de pontuação usando UNION ALL em SQL para combinar
-    execuções e mission_usages em uma única query ordenada, eliminando merge em Python.
+    Retorna histórico de pontuação (apenas posições da semana: execuções com mission_id + MissionUsage)
+    usando UNION ALL em SQL, ordenado por data.
     """
     from sqlalchemy import literal, union_all, text
 
@@ -654,6 +656,7 @@ async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offs
             TechniqueExecution.user_id == user_id,
             TechniqueExecution.status == "confirmed",
             TechniqueExecution.points_awarded.isnot(None),
+            TechniqueExecution.mission_id.isnot(None),
         )
     )
 

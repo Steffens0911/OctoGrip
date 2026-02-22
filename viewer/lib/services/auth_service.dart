@@ -126,6 +126,23 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Atualiza o usuário atual (me) a partir da API. Após PATCH /auth/me, use para refletir gallery_visible etc.
+  Future<void> refreshMe() async {
+    if (_token == null) return;
+    try {
+      final user = await ApiService().getAuthMe();
+      if (_impersonatedUserId != null) {
+        _effectiveUser = user;
+      } else {
+        _currentUser = user;
+        await _saveToStorage(_token!, user);
+      }
+      notifyListeners();
+    } catch (_) {
+      rethrow;
+    }
+  }
+
   // ---------- Helpers de Role ----------
 
   bool isAdmin() => currentUser?.role == 'administrador';

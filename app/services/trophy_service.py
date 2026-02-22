@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError
-from app.models import Academy, Technique, TechniqueExecution, Trophy, User
+from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,24 @@ def _confirmed_at_date(execution: TechniqueExecution) -> date | None:
     return execution.confirmed_at.date()
 
 
+def _mission_usages_count_in_period_for_technique(
+    usages: list[MissionUsage],
+    technique_id: UUID,
+    start_date: date,
+    end_date: date,
+) -> int:
+    """Conta MissionUsage do usuário cuja missão tem a mesma técnica e completed_at no período."""
+    count = 0
+    for u in usages:
+        if not u.mission or u.mission.technique_id != technique_id:
+            continue
+        d = u.completed_at.date() if u.completed_at else None
+        if d is None or d < start_date or d > end_date:
+            continue
+        count += 1
+    return count
+
+
 async def create_trophy(
     db: AsyncSession,
     academy_id: UUID,
@@ -43,14 +61,17 @@ async def create_trophy(
     start_date: date,
     end_date: date,
     target_count: int,
+    award_kind: str = "trophy",
+    min_duration_days: int | None = None,
 ) -> Trophy:
-    """Cria troféu da academia. Valida técnica da academia e datas coerentes."""
+    """Cria troféu ou medalha da academia. Valida técnica, datas e duração mínima para troféu."""
     logger.debug(
         "create_trophy",
         extra={
             "academy_id": str(academy_id),
             "technique_id": str(technique_id),
             "name": name,
+            "award_kind": award_kind,
         },
     )
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
@@ -63,6 +84,14 @@ async def create_trophy(
         raise AppError("A técnica deve pertencer à academia.", status_code=400)
     if start_date > end_date:
         raise AppError("start_date deve ser anterior ou igual a end_date.", status_code=400)
+    if award_kind == "trophy":
+        min_days = min_duration_days if min_duration_days is not None else 30
+        duration_days = (end_date - start_date).days
+        if duration_days < min_days:
+            raise AppError(
+                f"Troféu exige duração mínima de {min_days} dias. Período informado: {duration_days} dias.",
+                status_code=400,
+            )
     trophy = Trophy(
         academy_id=academy_id,
         technique_id=technique_id,
@@ -70,6 +99,8 @@ async def create_trophy(
         start_date=start_date,
         end_date=end_date,
         target_count=target_count,
+        award_kind=award_kind,
+        min_duration_days=min_duration_days if award_kind == "trophy" else None,
     )
     db.add(trophy)
     await db.commit()
@@ -256,6 +287,13 @@ async def list_user_trophies_with_earned(
 
     trophies = await list_trophies_by_academy(db, user.academy_id)
     all_executions = await _load_confirmed_executions_for_user(db, user_id)
+    all_mission_usages = (
+        await db.execute(
+            select(MissionUsage)
+            .options(selectinload(MissionUsage.mission))
+            .where(MissionUsage.user_id == user_id)
+        )
+    ).unique().scalars().all()
 
     logger.debug(
         "list_user_trophies_with_earned loaded",
@@ -263,14 +301,24 @@ async def list_user_trophies_with_earned(
             "user_id": str(user_id),
             "trophies_count": len(trophies),
             "executions_count": len(all_executions),
+            "mission_usages_count": len(all_mission_usages),
         },
     )
 
     result = []
+    today = date.today()
     for t in trophies:
         in_period = _executions_in_period_from_list(all_executions, t)
         counts = _compute_counts_from_executions(in_period)
+        # Conclusões da missão da semana (MissionUsage) com mesma técnica contam como bronze
+        extra_bronze = _mission_usages_count_in_period_for_technique(
+            all_mission_usages, t.technique_id, t.start_date, t.end_date
+        )
+        counts["bronze_count"] += extra_bronze
         tier = _tier_from_counts(counts, t.target_count)
+        # Não exibir para o usuário se fora do prazo e não foi conquistado
+        if t.end_date < today and tier is None:
+            continue
         technique_name = t.technique.name if t.technique else None
         result.append(
             {
@@ -282,6 +330,8 @@ async def list_user_trophies_with_earned(
                 "start_date": t.start_date.isoformat(),
                 "end_date": t.end_date.isoformat(),
                 "target_count": t.target_count,
+                "award_kind": getattr(t, "award_kind", "trophy"),
+                "min_duration_days": getattr(t, "min_duration_days", None),
                 "earned_tier": tier,
                 "gold_count": counts["gold_count"],
                 "silver_count": counts["silver_count"],

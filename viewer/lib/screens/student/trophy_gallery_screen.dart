@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/models/user.dart';
-import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/api_service.dart' show ApiException, ApiService;
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
-/// Galeria de troféus do usuário: troféus da academia com tier conquistado (ouro/prata/bronze) ou "A conquistar".
+/// Galeria de troféus e medalhas do usuário: premiações da academia com tier conquistado (ouro/prata/bronze) ou "A conquistar".
 class TrophyGalleryScreen extends StatefulWidget {
   final String userId;
   final String? userName;
@@ -24,8 +26,20 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
   List<TrophyWithEarned> _allItems = [];
   List<TrophyWithEarned> _filteredItems = [];
   String? _filterTier; // null=Todos, 'to_conquer'=A conquistar, 'bronze','silver','gold'
+  String? _filterAwardKind; // null=Todos, 'medal', 'trophy'
   bool _loading = true;
   String? _error;
+  bool _galleryVisible = true;
+
+  bool get _isOwnGallery =>
+      AuthService().currentUser?.id == widget.userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _galleryVisible = AuthService().currentUser?.galleryVisible ?? true;
+    _load();
+  }
 
   @override
   void dispose() {
@@ -50,13 +64,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
         filtered = filtered.where((t) => t.earnedTier == _filterTier).toList();
       }
     }
+    if (_filterAwardKind != null) {
+      filtered = filtered.where((t) => t.awardKind == _filterAwardKind).toList();
+    }
     setState(() => _filteredItems = filtered);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
   }
 
   Future<void> _load() async {
@@ -69,7 +80,27 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       });
       _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) {
+        final msg = e is ApiException && e.statusCode == 403
+            ? 'Esta galeria está privada.'
+            : userFacingMessage(e);
+        setState(() { _error = msg; _loading = false; });
+      }
+    }
+  }
+
+  Future<void> _onGalleryVisibleChanged(bool value) async {
+    setState(() => _galleryVisible = value);
+    try {
+      await _api.patchMeGalleryVisible(value);
+      await AuthService().refreshMe();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _galleryVisible = !value);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userFacingMessage(e))),
+        );
+      }
     }
   }
 
@@ -273,7 +304,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Galeria de troféus'),
+            const Text('Galeria de troféus e medalhas'),
             if (widget.userName != null && widget.userName!.isNotEmpty)
               Text(
                 widget.userName!,
@@ -285,6 +316,21 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.view_agenda_outlined),
+            tooltip: 'Ver como estante',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => TrophyShelfPage(
+                  userId: widget.userId,
+                  userName: widget.userName,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -298,13 +344,19 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                         Text(
                           _error!,
                           textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.red.shade700),
+                          style: TextStyle(
+                            color: _error == 'Esta galeria está privada.'
+                                ? AppTheme.textSecondaryOf(context)
+                                : Colors.red.shade700,
+                          ),
                         ),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: _load,
-                          child: const Text('Tentar novamente'),
-                        ),
+                        if (_error != 'Esta galeria está privada') ...[
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: _load,
+                            child: const Text('Tentar novamente'),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -312,7 +364,9 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
               : _allItems.isEmpty
                   ? Center(
                       child: Text(
-                        'Nenhum troféu cadastrado na sua academia.',
+                        _isOwnGallery
+                            ? 'Nenhum troféu cadastrado na sua academia.'
+                            : 'Nenhuma premiação conquistada.',
                         style: TextStyle(color: AppTheme.textSecondary),
                         textAlign: TextAlign.center,
                       ),
@@ -323,10 +377,31 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             children: [
+                              if (_isOwnGallery)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          'Galeria visível para outros',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: AppTheme.textSecondaryOf(context),
+                                          ),
+                                        ),
+                                      ),
+                                      Switch(
+                                        value: _galleryVisible,
+                                        onChanged: _onGalleryVisibleChanged,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               TextField(
                                 controller: _searchController,
                                 decoration: InputDecoration(
-                                  hintText: 'Buscar por nome do troféu ou técnica',
+                                  hintText: 'Buscar por nome ou técnica',
                                   prefixIcon: const Icon(Icons.search),
                                   suffixIcon: _searchController.text.isNotEmpty
                                       ? IconButton(
@@ -347,6 +422,39 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                 children: [
                                   FilterChip(
                                     label: const Text('Todos'),
+                                    selected: _filterAwardKind == null,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() => _filterAwardKind = null);
+                                        _applyFilters();
+                                      }
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Medalhas'),
+                                    selected: _filterAwardKind == 'medal',
+                                    onSelected: (selected) {
+                                      setState(() => _filterAwardKind = selected ? 'medal' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                  FilterChip(
+                                    label: const Text('Troféus'),
+                                    selected: _filterAwardKind == 'trophy',
+                                    onSelected: (selected) {
+                                      setState(() => _filterAwardKind = selected ? 'trophy' : null);
+                                      _applyFilters();
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  FilterChip(
+                                    label: const Text('Todos os tiers'),
                                     selected: _filterTier == null,
                                     onSelected: (selected) {
                                       if (selected) {
@@ -355,14 +463,15 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       }
                                     },
                                   ),
-                                  FilterChip(
-                                    label: const Text('A conquistar'),
-                                    selected: _filterTier == 'to_conquer',
-                                    onSelected: (selected) {
-                                      setState(() => _filterTier = selected ? 'to_conquer' : null);
-                                      _applyFilters();
-                                    },
-                                  ),
+                                  if (_isOwnGallery)
+                                    FilterChip(
+                                      label: const Text('A conquistar'),
+                                      selected: _filterTier == 'to_conquer',
+                                      onSelected: (selected) {
+                                        setState(() => _filterTier = selected ? 'to_conquer' : null);
+                                        _applyFilters();
+                                      },
+                                    ),
                                   FilterChip(
                                     label: const Text('Bronze'),
                                     selected: _filterTier == 'bronze',
@@ -389,7 +498,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                   ),
                                 ],
                               ),
-                              if (_searchController.text.isNotEmpty || _filterTier != null)
+                              if (_searchController.text.isNotEmpty || _filterTier != null || _filterAwardKind != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Row(
@@ -403,7 +512,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       TextButton(
                                         onPressed: () {
                                           _searchController.clear();
-                                          setState(() => _filterTier = null);
+                                          setState(() {
+                                            _filterTier = null;
+                                            _filterAwardKind = null;
+                                          });
                                           _applyFilters();
                                         },
                                         child: const Text('Limpar filtros'),
@@ -420,9 +532,9 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                             child: _filteredItems.isEmpty
                                 ? Center(
                                     child: Text(
-                                      _searchController.text.isNotEmpty || _filterTier != null
-                                          ? 'Nenhum troféu encontrado.'
-                                          : 'Nenhum troféu cadastrado na sua academia.',
+                                      _searchController.text.isNotEmpty || _filterTier != null || _filterAwardKind != null
+                                          ? 'Nenhuma premiação encontrada.'
+                                          : 'Nenhuma premiação cadastrada na sua academia.',
                                       style: TextStyle(color: AppTheme.textSecondary),
                                       textAlign: TextAlign.center,
                                     ),
@@ -461,12 +573,37 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text(
-                                              t.name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: AppTheme.textPrimaryOf(context),
-                                              ),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    t.name,
+                                                    style: TextStyle(
+                                                      fontWeight: FontWeight.w600,
+                                                      color: AppTheme.textPrimaryOf(context),
+                                                    ),
+                                                  ),
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: t.isTrophy
+                                                        ? Theme.of(context).colorScheme.primaryContainer
+                                                        : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                  ),
+                                                  child: Text(
+                                                    t.awardKindLabel,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w500,
+                                                      color: t.isTrophy
+                                                          ? Theme.of(context).colorScheme.onPrimaryContainer
+                                                          : Theme.of(context).colorScheme.onSurfaceVariant,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                             if (t.techniqueName != null && t.techniqueName!.isNotEmpty)
                                               Text(
@@ -514,7 +651,9 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       )),
                                     ];
                                   }(),
-                                  if (t.academyId != null && t.academyId!.isNotEmpty) ...[
+                                  if (_isOwnGallery &&
+                                      t.academyId != null &&
+                                      t.academyId!.isNotEmpty) ...[
                                     const SizedBox(height: 12),
                                     SizedBox(
                                       width: double.infinity,

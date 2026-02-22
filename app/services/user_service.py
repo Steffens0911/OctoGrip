@@ -95,6 +95,7 @@ async def update_user(
     points_adjustment: int | None = None,
     role: str | None = None,
     password: str | None = None,
+    gallery_visible: bool | None = None,
 ) -> User | None:
     user = await get_user(db, user_id)
     if not user:
@@ -109,6 +110,8 @@ async def update_user(
         user.academy_id = academy_id
     if points_adjustment is not None:
         user.points_adjustment = points_adjustment
+    if gallery_visible is not None:
+        user.gallery_visible = gallery_visible
     if password is not None and password.strip():
         user.password_hash = await hash_password(password.strip())
     await db.commit()

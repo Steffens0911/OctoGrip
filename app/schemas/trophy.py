@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+AwardKind = Literal["medal", "trophy"]
+
 
 class TrophyCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -15,6 +17,8 @@ class TrophyCreate(BaseModel):
     start_date: date
     end_date: date
     target_count: int = Field(..., gt=0)
+    award_kind: AwardKind = Field(default="trophy", description="medal=ordinária, trophy=especial")
+    min_duration_days: int | None = Field(default=None, description="Obrigatório para trophy (ex: 30)")
 
 
 class TrophyRead(BaseModel):
@@ -26,6 +30,8 @@ class TrophyRead(BaseModel):
     start_date: date
     end_date: date
     target_count: int
+    award_kind: str = "trophy"
+    min_duration_days: int | None = None
     created_at: datetime | None = None
 
     class Config:
@@ -36,7 +42,7 @@ TrophyTier = Literal["bronze", "silver", "gold"]
 
 
 class UserTrophyEarned(BaseModel):
-    """Item da galeria: troféu com tier conquistado (ou nenhum)."""
+    """Item da galeria: troféu ou medalha com tier conquistado (ou nenhum)."""
     trophy_id: UUID
     technique_id: UUID
     academy_id: UUID | None = None
@@ -45,6 +51,8 @@ class UserTrophyEarned(BaseModel):
     start_date: date
     end_date: date
     target_count: int
+    award_kind: str = "trophy"
+    min_duration_days: int | None = None
     earned_tier: TrophyTier | None = None
     gold_count: int = 0
     silver_count: int = 0

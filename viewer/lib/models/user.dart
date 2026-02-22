@@ -6,6 +6,7 @@ class UserModel {
   final String role;
   final String? academyId;
   final int pointsAdjustment;
+  final bool galleryVisible;
 
   UserModel({
     required this.id,
@@ -15,6 +16,7 @@ class UserModel {
     this.role = 'aluno',
     this.academyId,
     this.pointsAdjustment = 0,
+    this.galleryVisible = true,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class UserModel {
       role: json['role'] as String? ?? 'aluno',
       academyId: json['academy_id'] as String?,
       pointsAdjustment: json['points_adjustment'] as int? ?? 0,
+      galleryVisible: json['gallery_visible'] as bool? ?? true,
     );
   }
 
@@ -37,5 +40,6 @@ class UserModel {
         'role': role,
         'academy_id': academyId,
         'points_adjustment': pointsAdjustment,
+        'gallery_visible': galleryVisible,
       };
 }
