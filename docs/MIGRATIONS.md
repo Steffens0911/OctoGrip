@@ -36,6 +36,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 021 | mission_slot_index | `missions.slot_index` (0,1,2); `start_date`/`end_date` opcionais |
 | 022 | user_points_adjustment | `users.points_adjustment` (ajuste manual de pontos por admin) |
 | 033 | user_gallery_visible | `users.gallery_visible` (galeria de troféus visível ou privada para outros) |
+| 034 | user_last_login_at | `users.last_login_at` (timestamp do último login bem-sucedido, usado em relatórios de engajamento) |
 
 ---
 
@@ -64,3 +65,4 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_pos
 - **Migration 020:** multiplicador por missão; multiplicadores por slot semanal da academia; pontos em MissionUsage ao concluir missão (multiplicador × faixa).
 - **Migration 021:** missões da academia identificadas por `slot_index` (0, 1, 2); sem dependência de datas. Cada academia cria suas 3 missões; `start_date`/`end_date` opcionais (legado).
 - **Migration 033:** preferência do usuário para exibir ou ocultar a galeria de troféus para outros; quando visível, outros veem apenas itens já conquistados.
+- **Migration 034:** adiciona `users.last_login_at` para registrar o último login bem-sucedido. Relatórios de engajamento e alunos ativos usam este campo para definir quem é considerado "ativo" em uma janela de tempo.

@@ -227,3 +227,61 @@ async def test_metricas_uso_sem_dados(client):
     assert data["total_completions"] >= 0
     assert data["completions_last_7_days"] >= 0
     assert data["unique_users_completed"] >= 0
+
+
+async def test_metricas_uso_por_academia(client, db, academy, aluno_user):
+    """Métricas por academy_id retornam estrutura igual ao global e respeitam filtro."""
+    from app.models import Lesson, LessonProgress, Technique, Position, MissionUsage
+    from datetime import datetime, timezone
+
+    # Criar técnica/posição/lesson vinculadas à academia do aluno
+    p1 = Position(academy_id=academy.id, name="Guarda A", slug=f"guarda-a-{uuid4().hex[:6]}")
+    p2 = Position(academy_id=academy.id, name="Montada A", slug=f"montada-a-{uuid4().hex[:6]}")
+    db.add_all([p1, p2])
+    await db.commit()
+    await db.refresh(p1)
+    await db.refresh(p2)
+
+    technique = Technique(
+        academy_id=academy.id,
+        name="Técnica Métricas Academia",
+        slug=f"tecnica-academia-{uuid4().hex[:6]}",
+        from_position_id=p1.id,
+        to_position_id=p2.id,
+    )
+    db.add(technique)
+    await db.commit()
+    await db.refresh(technique)
+
+    lesson = Lesson(
+        technique_id=technique.id,
+        title="Lição Métricas Academia",
+        slug=f"metricas-academia-{uuid4().hex[:6]}",
+        order_index=0,
+    )
+    db.add(lesson)
+    await db.commit()
+    await db.refresh(lesson)
+
+    now = datetime.now(timezone.utc)
+
+    # Criar progressos e usos apenas para essa academia/usuário
+    db.add(LessonProgress(user_id=aluno_user.id, lesson_id=lesson.id, completed_at=now))
+    db.add(
+        MissionUsage(
+            user_id=aluno_user.id,
+            lesson_id=lesson.id,
+            usage_type="after_training",
+            opened_at=now,
+            completed_at=now,
+        )
+    )
+    await db.commit()
+
+    # Chamar endpoint filtrado por academy_id
+    r = await client.get(f"/metrics/usage/by_academy?academy_id={academy.id}")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_completions"] >= 1
+    assert data["before_training_count"] >= 0
+    assert data["after_training_count"] >= 1

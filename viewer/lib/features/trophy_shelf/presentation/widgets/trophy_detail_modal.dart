@@ -43,7 +43,7 @@ class TrophyDetailModal extends StatelessWidget {
     }
   }
 
-  static Color _tierColor(String? tier) {
+  static Color _tierColor(BuildContext context, String? tier) {
     switch (tier) {
       case 'gold':
         return const Color(0xFFD97706);
@@ -52,7 +52,7 @@ class TrophyDetailModal extends StatelessWidget {
       case 'bronze':
         return const Color(0xFF92400E);
       default:
-        return AppTheme.textMuted;
+        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 
@@ -95,12 +95,12 @@ class TrophyDetailModal extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: _tierColor(t.earnedTier).withValues(alpha: 0.2),
+                  color: _tierColor(context, t.earnedTier).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   t.earnedTier != null ? Icons.emoji_events : Icons.workspace_premium_outlined,
-                  color: _tierColor(t.earnedTier),
+                  color: _tierColor(context, t.earnedTier),
                   size: 32,
                 ),
               ),
@@ -113,20 +113,20 @@ class TrophyDetailModal extends StatelessWidget {
                       t.name,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimaryOf(context),
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     if (t.techniqueName != null && t.techniqueName!.isNotEmpty)
                       Text(
                         t.techniqueName!,
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.textSecondaryOf(context),
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                     Text(
                       t.tierLabel,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: _tierColor(t.earnedTier),
+                        color: _tierColor(context, t.earnedTier),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -184,7 +184,7 @@ class TrophyDetailModal extends StatelessWidget {
         goldText,
         style: style.copyWith(
           fontWeight: FontWeight.w600,
-          color: _tierColor('gold'),
+          color: _tierColor(context, 'gold'),
         ),
       ));
     } else {

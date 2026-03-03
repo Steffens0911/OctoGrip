@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
@@ -54,42 +55,43 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Icon(
+      body: GameBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Icon(
                       Icons.sports_martial_arts_rounded,
                       size: 64,
-                      color: AppTheme.primary,
-                    ),
-                    const SizedBox(height: 24),
-                    Text(
+                        color: AppTheme.primary,
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
                       'JJB Viewer',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: AppTheme.textPrimaryOf(context),
                           ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
                       'Faça login para continuar',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textMutedOf(context),
                           ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    TextFormField(
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
@@ -103,10 +105,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (v == null || v.trim().isEmpty) return 'Informe o e-mail';
                         return validateEmail(v);
                       },
-                      enabled: !_loading,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
+                        enabled: !_loading,
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
                       controller: _passwordController,
                       obscureText: true,
                       textInputAction: TextInputAction.done,
@@ -120,9 +122,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (v == null || v.isEmpty) return 'Informe a senha';
                         return null;
                       },
-                      enabled: !_loading,
-                    ),
-                    if (_error != null) ...[
+                        enabled: !_loading,
+                      ),
+                      if (_error != null) ...[
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -143,9 +145,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                    ],
-                    const SizedBox(height: 24),
-                    FilledButton(
+                      ],
+                      const SizedBox(height: 24),
+                      FilledButton(
                       onPressed: _loading ? null : () {
                         if (_formKey.currentState?.validate() ?? false) _login();
                       },
@@ -160,8 +162,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
                           : const Text('Entrar'),
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -169,13 +169,15 @@ class _TrophyItemState extends State<TrophyItem>
             ),
             const SizedBox(height: 4),
             Text(
-              t.name,
+              '${t.awardKindLabel} · ${t.name}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.white.withValues(alpha: 0.95),
+                color: Theme.of(context).brightness == Brightness.light
+                    ? Colors.white
+                    : Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.w500,
               ),
             ),

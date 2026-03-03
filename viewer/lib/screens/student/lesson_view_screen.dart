@@ -71,8 +71,13 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
   Future<void> _complete() async {
     final d = widget.data;
     if (d.missionId != null) {
-      final usageType = await _showUsageTypeDialog();
-      if (usageType == null || !mounted) return;
+      final usageTypeUi = await _showUsageTypeDialog();
+      if (usageTypeUi == null || !mounted) return;
+      final usageType = usageTypeUi == 'planned'
+          ? 'after_training'
+          : usageTypeUi == 'natural'
+              ? 'before_training'
+              : usageTypeUi;
       if (d.academyId != null && d.academyId!.isNotEmpty) {
         final opponentId = await _showOpponentDialog(d.academyId!);
         if (opponentId != null && mounted) {
@@ -85,8 +90,13 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       }
     } else if (d.lessonId != null) {
       if (d.academyId != null && d.academyId!.isNotEmpty) {
-        final usageType = await _showUsageTypeDialog();
-        if (usageType == null || !mounted) return;
+        final usageTypeUi = await _showUsageTypeDialog();
+        if (usageTypeUi == null || !mounted) return;
+        final usageType = usageTypeUi == 'planned'
+            ? 'after_training'
+            : usageTypeUi == 'natural'
+                ? 'before_training'
+                : usageTypeUi;
         final opponentId = await _showOpponentDialog(d.academyId!);
         if (opponentId != null && mounted) {
           await _completeLessonWithOpponent(d.lessonId!, usageType, opponentId);
@@ -267,9 +277,8 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       barrierDismissible: false,
       builder: (ctx) => PointerInterceptor(
         child: AlertDialog(
-          title: const Text('Quando você visualizou?'),
           content: const Text(
-            'Em que momento você assistiu ou revisou esta técnica?',
+            'A execução foi premeditada focando no troféu/medalha ou posição do dia?',
           ),
           actions: [
             TextButton(
@@ -277,12 +286,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, 'before_training'),
-              child: const Text('Antes do treino'),
+              onPressed: () => Navigator.pop(ctx, 'planned'),
+              child: const Text('Sim'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(ctx, 'after_training'),
-              child: const Text('Depois do treino'),
+              onPressed: () => Navigator.pop(ctx, 'natural'),
+              child: const Text('Não, aconteceu naturalmente'),
             ),
           ],
         ),

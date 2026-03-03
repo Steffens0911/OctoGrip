@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -41,6 +42,12 @@ class User(Base, UUIDMixin):
         nullable=False,
         default=True,
         comment="Se true, outros usuários podem ver a galeria de troféus (apenas conquistados).",
+    )
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+        comment="Data/hora do último login bem-sucedido.",
     )
 
     academy: Mapped["Academy | None"] = relationship(

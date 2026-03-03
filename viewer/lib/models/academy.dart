@@ -2,6 +2,8 @@ class Academy {
   final String id;
   final String name;
   final String? slug;
+  final String? logoUrl;
+  final String? scheduleImageUrl;
   final String? weeklyTheme;
   final String? weeklyTechniqueId;
   final String? weeklyTechniqueName;
@@ -19,6 +21,8 @@ class Academy {
     required this.id,
     required this.name,
     this.slug,
+    this.logoUrl,
+    this.scheduleImageUrl,
     this.weeklyTheme,
     this.weeklyTechniqueId,
     this.weeklyTechniqueName,
@@ -38,6 +42,8 @@ class Academy {
       id: json['id'] as String,
       name: json['name'] as String,
       slug: json['slug'] as String?,
+      logoUrl: json['logo_url'] as String?,
+      scheduleImageUrl: json['schedule_image_url'] as String?,
       weeklyTheme: json['weekly_theme'] as String?,
       weeklyTechniqueId: json['weekly_technique_id'] as String?,
       weeklyTechniqueName: json['weekly_technique_name'] as String?,
@@ -57,6 +63,8 @@ class Academy {
         'id': id,
         'name': name,
         'slug': slug,
+        'logo_url': logoUrl,
+        'schedule_image_url': scheduleImageUrl,
         'weekly_theme': weeklyTheme,
         'weekly_technique_id': weeklyTechniqueId,
         'weekly_technique_2_id': weeklyTechnique2Id,

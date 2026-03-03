@@ -21,7 +21,8 @@ Documentação completa dos endpoints da API REST.
 10. [Histórico de missões](#histórico-de-missões)
 11. [Feedback de treino](#feedback-de-treino)
 12. [Métricas](#métricas)
-13. [Exceções HTTP](#exceções-http)
+13. [Relatórios](#relatórios)
+14. [Exceções HTTP](#exceções-http)
 
 ---
 
@@ -328,8 +329,100 @@ Métricas de uso (conclusões de lição e missão).
   "total_completions": 0,
   "completions_last_7_days": 0,
   "unique_users_completed": 0,
+  "before_training_count": 0,
+  "after_training_count": 0,
   "before_training_percent": 0.0
 }
+```
+
+---
+
+## Relatórios
+
+Base: `/reports`.
+
+### GET /reports/engagement
+
+Relatório de **engajamento por período**: porcentagem de alunos ativos na semana e no mês.
+
+- **Aluno ativo** = usuário com `role = "aluno"` que fez **pelo menos 1 login** (`last_login_at`) no período.
+- **Semana** = janela móvel dos últimos 7 dias em relação a `reference_date` (incluindo o dia).
+- **Mês** = do 1º dia do mês até `reference_date`.
+
+**Query params:**
+
+| Parâmetro      | Tipo | Obrigatório | Descrição                                                                 |
+|----------------|------|------------|---------------------------------------------------------------------------|
+| reference_date | date | sim        | Data de referência (YYYY-MM-DD).                                         |
+| academy_id     | UUID | não        | Se informado, limita à academia; se omitido, considera todas (visão global). |
+
+**Resposta (200):**
+```json
+{
+  "academy_id": "uuid-or-null",
+  "weekly": {
+    "start_date": "2026-02-20",
+    "end_date": "2026-02-26",
+    "total_students": 120,
+    "active_students": 45,
+    "active_rate": 37.5
+  },
+  "monthly": {
+    "start_date": "2026-02-01",
+    "end_date": "2026-02-26",
+    "total_students": 120,
+    "active_students": 80,
+    "active_rate": 66.7
+  }
+}
+```
+
+### GET /reports/active_students
+
+Relatório **detalhado de alunos ativos** em uma janela móvel de 7 dias.
+
+- Usa a mesma definição de **aluno ativo** acima (login em até 7 dias).
+- Sempre considera a janela `[reference_date - 6, reference_date]`.
+
+**Query params:**
+
+| Parâmetro      | Tipo | Obrigatório | Descrição                                                                 |
+|----------------|------|------------|---------------------------------------------------------------------------|
+| reference_date | date | sim        | Data de referência (YYYY-MM-DD).                                         |
+| academy_id     | UUID | não        | Se informado, limita à academia; se omitido, considera todas (visão global). |
+
+**Resposta (200):**
+```json
+{
+  "academy_id": "uuid-or-null",
+  "start_date": "2026-02-20",
+  "end_date": "2026-02-26",
+  "total_students": 120,
+  "active_students": 45,
+  "active_rate": 37.5,
+  "students": [
+    {
+      "id": "uuid",
+      "name": "Aluno 1",
+      "email": "aluno1@jjb.com",
+      "graduation": "white",
+      "academy_id": "uuid",
+      "academy_name": "Red Lions",
+      "last_login_at": "2026-02-25T19:13:45.123456+00:00"
+    }
+  ]
+}
+```
+
+### GET /reports/active_students/csv
+
+Mesma informação de `/reports/active_students`, porém exportada em **CSV**, para uso em Excel/Sheets.
+
+- Content-Type: `text/csv`
+- Cabeçalho:
+
+```text
+id,name,email,graduation,academy_id,academy_name,last_login_at
 ```
 
 ---

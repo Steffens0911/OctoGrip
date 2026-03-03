@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
+from starlette.staticfiles import StaticFiles
+from pathlib import Path
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
@@ -152,6 +154,12 @@ app.add_middleware(
 
 register_exception_handlers(app)
 app.include_router(api_router)
+
+# Arquivos estáticos (ex.: logos/brasões de academias)
+_BASE_DIR = Path(__file__).resolve().parent.parent
+_MEDIA_ROOT = _BASE_DIR / "app_media"
+_MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=str(_MEDIA_ROOT)), name="media")
 
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)

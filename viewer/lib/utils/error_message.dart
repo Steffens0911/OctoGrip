@@ -12,7 +12,7 @@ String userFacingMessage(Object e) {
       s.contains('connection') ||
       s.contains('connection refused') ||
       s.contains('network')) {
-    return 'Falha de conexão. Verifique a rede e tente novamente.';
+    return 'Falha de conexão. Verifique se a API está em execução (porta 8000) e se o app está na mesma rede ou no emulador.';
   }
   final raw = e.toString().trim();
   if (raw.isEmpty) return 'Algo deu errado. Tente novamente.';

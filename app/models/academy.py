@@ -17,6 +17,16 @@ class Academy(Base, UUIDMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     slug: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True, index=True)
+    logo_url: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        comment="URL do brasão/logo exibido no topo do app para alunos da academia.",
+    )
+    schedule_image_url: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        comment="URL de uma imagem com o quadro de horários da academia (home do aluno).",
+    )
     weekly_theme: Mapped[str | None] = mapped_column(
         String(128),
         nullable=True,
@@ -103,6 +113,11 @@ class Academy(Base, UUIDMixin):
     )
     trophies: Mapped[list["Trophy"]] = relationship(
         "Trophy",
+        back_populates="academy",
+        lazy="selectin",
+    )
+    partners: Mapped[list["Partner"]] = relationship(
+        "Partner",
         back_populates="academy",
         lazy="selectin",
     )

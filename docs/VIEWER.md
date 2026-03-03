@@ -35,10 +35,10 @@ Acesse: **http://localhost:8080**
 
 ## Navegação
 
-| Menu      | Descrição                                              |
-|-----------|--------------------------------------------------------|
-| **Início** | Tela inicial do aluno (3 missões semanais) ou painel admin |
-| **Administração** | CRUD de Academias, Usuários, Lições, Técnicas, Posições, Missões |
+| Menu      | Descrição                                                                 |
+|-----------|---------------------------------------------------------------------------|
+| **Início** | Tela inicial do aluno (3 missões semanais) ou painel admin               |
+| **Administração** | CRUD de Academias, Usuários, Lições, Técnicas, Posições, Missões + Relatórios |
 
 ---
 
@@ -96,6 +96,32 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 - **Ranking:** últimos 30 dias.
 - **Dificuldades reportadas:** posições mais marcadas.
 - **Relatório semanal:** período, total de conclusões, ativos, ranking.
+- **Execuções focadas em troféu/medalha/posição:** usa `/metrics/usage/by_academy` para mostrar premeditadas vs naturais.
+
+### ExecutionReportsScreen (Relatórios de execuções)
+
+- Acesso via **Administração → Relatórios de execuções**.
+- Mostra visão **global** e por **academia** de execuções premeditadas vs naturais:
+  - Global: chama `GET /metrics/usage`.
+  - Por academia: chama `GET /metrics/usage/by_academy`.
+- Divide entre:
+  - **Premeditadas**: foco em troféu/medalha/posição.
+  - **Naturais**: aconteceram sem foco explícito.
+
+### EngagementReportsScreen (Relatórios de engajamento)
+
+- Acesso via **Administração → Relatórios de engajamento**.
+- Permite escolher uma **data de referência** e, opcionalmente, **filtrar por academia**.
+- Usa:
+  - `GET /reports/engagement` — resumo de engajamento **semanal** e **mensal**.
+  - `GET /reports/active_students` — lista de alunos ativos na janela de 7 dias (apenas backend; CSV via `/reports/active_students/csv`).
+- Definição usada na tela:
+  - **Aluno ativo** = fez pelo menos **1 login** no app nos **últimos 7 dias** em relação à data de referência.
+- Componentes principais:
+  - **Visão global** (todas as academias): cards com:
+    - Semana: `% de alunos ativos`, `ativos / total`, intervalo de datas.
+    - Mês: `% de alunos ativos`, `ativos / total`, intervalo de datas.
+  - **Filtro por academia**: dropdown com academias; ao selecionar, aparece card “Visão da academia X” com os mesmos dados.
 
 ### MissionListScreen / MissionFormScreen
 

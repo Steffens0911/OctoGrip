@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/screens/academy/academy_panel_screen.dart';
 import 'package:viewer/screens/admin/admin_section_screen.dart';
 import 'package:viewer/screens/auth/login_screen.dart';
@@ -31,6 +33,7 @@ class ViewerApp extends StatefulWidget {
 
 class _ViewerAppState extends State<ViewerApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  ThemeStyle _themeStyle = ThemeStyle.game;
 
   @override
   void initState() {
@@ -38,20 +41,28 @@ class _ViewerAppState extends State<ViewerApp> {
     ThemeService.load().then((mode) {
       if (mounted) setState(() => _themeMode = mode);
     });
+    ThemeService.loadStyle().then((style) {
+      if (mounted) setState(() => _themeStyle = style);
+    });
   }
 
-  void _cycleTheme(BuildContext context) {
-    final resolved = Theme.of(context).brightness;
-    setState(() => _themeMode = ThemeService.next(_themeMode, resolved));
-    ThemeService.save(_themeMode);
+  /// Alterna entre temas claro/escuro/sistema usando ThemeService.
+  /// Usa o brilho atual da plataforma quando o modo é "system" para alternar
+  /// de fato entre claro e escuro.
+  Future<void> _cycleTheme(BuildContext context) async {
+    final resolvedBrightness = MediaQuery.platformBrightnessOf(context);
+    setState(() {
+      _themeMode = ThemeService.next(_themeMode, resolvedBrightness);
+    });
+    await ThemeService.save(_themeMode);
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'JJB Viewer',
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: _themeStyle == ThemeStyle.game ? AppTheme.light : AppTheme.premiumLight,
+      darkTheme: _themeStyle == ThemeStyle.game ? AppTheme.dark : AppTheme.premiumDark,
       themeMode: _themeMode,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [
@@ -141,41 +152,36 @@ class _MainShellState extends State<MainShell> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Atuar como'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: FutureBuilder<List<UserModel>>(
-            future: ApiService().getUsers(asRealUser: true),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: double.infinity, maxHeight: 400),
+          child: FutureBuilder<({List<UserModel> users, List<Academy> academies})>(
+            future: () async {
+              final users = await ApiService().getUsers(asRealUser: true);
+              List<Academy> academies = [];
+              try {
+                academies = await ApiService().getAcademies();
+              } catch (_) {}
+              return (users: users, academies: academies);
+            }(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
               }
               if (snapshot.hasError) {
-                return Text('Erro ao carregar usuários: ${snapshot.error}');
+                return Text('Erro ao carregar: ${snapshot.error}');
               }
-              final users = snapshot.data ?? [];
-              return SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      title: const Text('Sair da simulação'),
-                      leading: const Icon(Icons.person_off_outlined),
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        await AuthService().setImpersonating(null);
-                      },
-                    ),
-                    const Divider(),
-                    ...users.map((u) => ListTile(
-                      title: Text(u.name ?? u.email),
-                      subtitle: Text(u.email),
-                      onTap: () async {
-                        Navigator.pop(ctx);
-                        await AuthService().setImpersonating(u.id);
-                      },
-                    )),
-                  ],
-                ),
+              final data = snapshot.data!;
+              return _ImpersonateDialogContent(
+                users: data.users,
+                academies: data.academies,
+                onSelect: (userId) async {
+                  Navigator.pop(ctx);
+                  await AuthService().setImpersonating(userId);
+                },
+                onExitSimulation: () async {
+                  Navigator.pop(ctx);
+                  await AuthService().setImpersonating(null);
+                },
               );
             },
           ),
@@ -232,47 +238,49 @@ class _MainShellState extends State<MainShell> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          if (isImpersonating && effectiveUser != null)
-            Material(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    children: [
-                      Icon(Icons.person_rounded, color: Theme.of(context).colorScheme.onPrimaryContainer, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Atuando como: ${effectiveUser.name ?? effectiveUser.email} (${effectiveUser.email})',
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                            fontSize: 13,
+      body: GameBackground(
+        child: Column(
+          children: [
+            if (isImpersonating && effectiveUser != null)
+              Material(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Atuando como: ${effectiveUser.name ?? effectiveUser.email} (${effectiveUser.email})',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      TextButton(
-                        onPressed: () => AuthService().setImpersonating(null),
-                        child: const Text('Sair da simulação'),
-                      ),
-                    ],
+                        TextButton(
+                          onPressed: () => AuthService().setImpersonating(null),
+                          child: const Text('Sair da simulação'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          Expanded(child: _currentBody(auth, tabs)),
-        ],
+            Expanded(child: _currentBody(auth, tabs)),
+          ],
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -328,6 +336,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
+    final onSurfaceVariant = colorScheme.onSurfaceVariant;
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -338,7 +349,7 @@ class _NavItem extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: selected ? AppTheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+              color: selected ? primary.withValues(alpha: 0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -347,7 +358,7 @@ class _NavItem extends StatelessWidget {
                 Icon(
                   icon,
                   size: 24,
-                  color: selected ? AppTheme.primary : AppTheme.textMutedOf(context),
+                  color: selected ? primary : onSurfaceVariant,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -355,13 +366,108 @@ class _NavItem extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? AppTheme.primary : AppTheme.textMutedOf(context),
+                    color: selected ? primary : onSurfaceVariant,
                   ),
                 ),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ImpersonateDialogContent extends StatefulWidget {
+  final List<UserModel> users;
+  final List<Academy> academies;
+  final void Function(String userId) onSelect;
+  final VoidCallback onExitSimulation;
+
+  const _ImpersonateDialogContent({
+    required this.users,
+    required this.academies,
+    required this.onSelect,
+    required this.onExitSimulation,
+  });
+
+  @override
+  State<_ImpersonateDialogContent> createState() => _ImpersonateDialogContentState();
+}
+
+class _ImpersonateDialogContentState extends State<_ImpersonateDialogContent> {
+  String _filterText = '';
+  String? _selectedAcademyId;
+
+  List<UserModel> get _filteredUsers {
+    var list = widget.users;
+    if (_selectedAcademyId != null && _selectedAcademyId!.isNotEmpty) {
+      list = list.where((u) => u.academyId == _selectedAcademyId).toList();
+    }
+    final query = _filterText.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      list = list.where((u) {
+        final name = (u.name ?? '').toLowerCase();
+        final email = u.email.toLowerCase();
+        return name.contains(query) || email.contains(query);
+      }).toList();
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredUsers;
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ListTile(
+            title: const Text('Sair da simulação'),
+            leading: const Icon(Icons.person_off_outlined),
+            onTap: widget.onExitSimulation,
+          ),
+          const Divider(),
+          TextField(
+            decoration: const InputDecoration(
+              hintText: 'Buscar por nome ou e-mail',
+              border: OutlineInputBorder(),
+              isDense: true,
+              prefixIcon: Icon(Icons.search, size: 20),
+            ),
+            onChanged: (v) => setState(() => _filterText = v),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String?>(
+            value: _selectedAcademyId,
+            decoration: const InputDecoration(
+              labelText: 'Academia',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem<String?>(value: null, child: Text('Todas')),
+              ...widget.academies.map((a) => DropdownMenuItem<String?>(value: a.id, child: Text(a.name))),
+            ],
+            onChanged: (v) => setState(() => _selectedAcademyId = v),
+          ),
+          const SizedBox(height: 12),
+          if (filtered.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Nenhum usuário encontrado.',
+                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+              ),
+            )
+          else
+            ...filtered.map((u) => ListTile(
+                  title: Text(u.name ?? u.email),
+                  subtitle: Text(u.email),
+                  onTap: () => widget.onSelect(u.id),
+                )),
+        ],
       ),
     );
   }

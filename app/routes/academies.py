@@ -1,14 +1,20 @@
 """Rotas de Academia (A-03 tema semanal, A-04 ranking)."""
+import json
+import urllib.parse
+import urllib.request
 from uuid import UUID
+from pathlib import Path
+from typing import Final
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, ForbiddenError
-from app.core.role_deps import require_admin, require_admin_or_academy_access, verify_academy_access
+from app.core.auth_deps import get_current_user
+from app.core.role_deps import require_admin, require_admin_or_academy_access, require_read_access, verify_academy_access
 from app.database import get_db
 from app.models import Academy, CollectiveGoal, User
 from app.schemas.academy import (
@@ -46,6 +52,12 @@ from app.services.collective_goal_service import (
     list_goals_for_academy,
 )
 
+# Mesmo diretório base de app.main: raiz do projeto (/app) dentro do container.
+_BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
+_MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
+_ACADEMY_LOGOS_DIR: Final[Path] = _MEDIA_ROOT / "academy_logos"
+_ACADEMY_LOGOS_DIR.mkdir(parents=True, exist_ok=True)
+
 router = APIRouter()
 
 
@@ -54,6 +66,8 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         id=a.id,
         name=a.name,
         slug=a.slug,
+        logo_url=a.logo_url,
+        schedule_image_url=a.schedule_image_url,
         weekly_theme=a.weekly_theme,
         weekly_technique_id=a.weekly_technique_id,
         weekly_technique_name=a.weekly_technique.name if a.weekly_technique else None,
@@ -84,6 +98,42 @@ async def _load_academy_with_relations(db: AsyncSession, academy_id: UUID) -> Ac
     if not academy:
         raise AcademyNotFoundError()
     return academy
+
+
+def _fetch_instagram_thumbnail(url: str) -> str | None:
+    """Chama Instagram oEmbed e retorna thumbnail_url. Retorna None em caso de erro."""
+    try:
+        if "instagram.com" not in url.lower():
+            return None
+        if not url.startswith("http"):
+            url = "https://" + url.lstrip("/")
+        oembed_url = f"https://api.instagram.com/oembed?url={urllib.parse.quote(url, safe='')}"
+        req = urllib.request.Request(oembed_url, headers={"User-Agent": "AppBaby/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+            return data.get("thumbnail_url")
+    except Exception:
+        return None
+
+
+@router.get("/schedule_display_url")
+async def schedule_display_url(
+    url: str = Query(..., description="URL da imagem ou post do Instagram"),
+    current_user: User = Depends(require_read_access),
+):
+    """Retorna URL de imagem para exibição: se for post do Instagram, devolve thumbnail_url do oEmbed; senão devolve a própria URL."""
+    if not url or not url.strip():
+        return {"display_url": None, "original_url": None}
+    url = url.strip()
+    if "instagram.com" in url.lower():
+        import asyncio
+        thumb = await asyncio.to_thread(_fetch_instagram_thumbnail, url)
+        if thumb:
+            return {"display_url": thumb, "original_url": url}
+        return {"display_url": None, "original_url": url}
+    if not url.startswith("http"):
+        url = "https://" + url.lstrip("/")
+    return {"display_url": url, "original_url": url}
 
 
 @router.get("", response_model=list[AcademyRead])
@@ -130,11 +180,19 @@ async def academy_create(
 async def academy_get(
     academy_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_or_academy_access),
+    current_user: User = Depends(get_current_user),
 ):
-    """Retorna uma academia por ID."""
-    if current_user.role != "administrador" and current_user.academy_id != academy_id:
-        raise ForbiddenError("Acesso negado. Você só pode acessar a academia à qual está vinculado.")
+    """Retorna uma academia por ID. Aluno só pode acessar a própria academia (ex.: brasão na home)."""
+    if current_user.role == "administrador":
+        pass
+    elif current_user.role in ("gerente_academia", "professor", "supervisor"):
+        if current_user.academy_id != academy_id:
+            raise ForbiddenError("Acesso negado. Você só pode acessar a academia à qual está vinculado.")
+    elif current_user.role == "aluno":
+        if current_user.academy_id != academy_id:
+            raise ForbiddenError("Acesso negado. Você só pode acessar a sua academia.")
+    else:
+        raise ForbiddenError("Acesso negado.")
     academy = await _load_academy_with_relations(db, academy_id)
     return _academy_to_read(academy)
 
@@ -162,9 +220,12 @@ async def academy_update(
     academy_id: UUID,
     body: AcademyUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Atualiza academia. Apenas administradores."""
+    """Atualiza academia. Admin ou gestor/professor da própria academia.
+    Gestores e professores podem atualizar a própria academia (incl. schedule_image_url, logo_url);
+    exige current_user.academy_id == academy_id."""
+    verify_academy_access(current_user, str(academy_id))
     updates = body.model_dump(exclude_unset=True)
     academy = await update_academy(db, academy_id, **updates)
     if not academy:
@@ -198,6 +259,57 @@ async def academy_reset_missions_route(
         raise AcademyNotFoundError()
     verify_academy_access(current_user, str(academy_id))
     return await reset_academy_missions(db, academy_id)
+
+
+@router.post("/{academy_id}/logo", response_model=AcademyRead)
+async def academy_upload_logo(
+    academy_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Faz upload do brasão/logo da academia e atualiza o logo_url."""
+    academy = await get_academy(db, academy_id)
+    if academy is None:
+        raise AcademyNotFoundError()
+    verify_academy_access(current_user, str(academy_id))
+
+    data = await file.read()
+    allowed = ("image/png", "image/jpeg", "image/jpg", "image/webp")
+    content_type = (file.content_type or "").strip().lower()
+    if content_type not in allowed:
+        name = (file.filename or "").lower()
+        if name.endswith(".png"):
+            content_type = "image/png"
+        elif name.endswith(".jpg") or name.endswith(".jpeg"):
+            content_type = "image/jpeg"
+        elif name.endswith(".webp"):
+            content_type = "image/webp"
+    if content_type not in allowed and len(data) >= 12:
+        # Inferir pelo magic bytes (nome sem extensão é comum no web)
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            content_type = "image/png"
+        elif data[:2] == b"\xff\xd8":
+            content_type = "image/jpeg"
+        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            content_type = "image/webp"
+    if content_type not in allowed:
+        raise ForbiddenError("Tipo de arquivo não suportado. Envie PNG, JPEG ou WEBP.")
+
+    extension = ".png"
+    if content_type in ("image/jpeg", "image/jpg"):
+        extension = ".jpg"
+    elif content_type == "image/webp":
+        extension = ".webp"
+
+    filename = f"academy-{academy_id}{extension}"
+    dest = _ACADEMY_LOGOS_DIR / filename
+    dest.write_bytes(data)
+
+    academy.logo_url = f"/media/academy_logos/{filename}"
+    await db.commit()
+    await db.refresh(academy)
+    return _academy_to_read(academy)
 
 
 @router.get("/{academy_id}/difficulties", response_model=DifficultiesResponse)

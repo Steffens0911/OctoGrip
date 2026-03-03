@@ -1,6 +1,7 @@
 """Autenticação: login e token JWT com account lockout."""
 import logging
 import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -85,10 +86,20 @@ async def login(
         raise AppError("E-mail ou senha inválidos.", status_code=401)
 
     _clear_failed_attempts(body.email)
+
+    # Atualiza last_login_at para métricas de engajamento
+    user.last_login_at = datetime.now(timezone.utc)
+    await db.commit()
+
     security_events_total.labels(event_type="login_success").inc()
     logger.info(
         "Login bem-sucedido",
-        extra={"user_id": str(user.id), "email": body.email, "client_ip": client_ip, "role": user.role},
+        extra={
+            "user_id": str(user.id),
+            "email": body.email,
+            "client_ip": client_ip,
+            "role": user.role,
+        },
     )
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)

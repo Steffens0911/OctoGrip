@@ -31,8 +31,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=builder /root/.local /home/app/.local
 RUN chown -R app:app /home/app/.local
 
-# Copiar código (ownership para app)
+# Copiar código (ownership para app) e garantir permissão de escrita em /app/app_media
 COPY --chown=app:app . .
+RUN mkdir -p /app/app_media && chown -R app:app /app
 
 USER app
 

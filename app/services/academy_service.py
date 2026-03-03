@@ -187,6 +187,10 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
             academy.name = value.strip()
         elif key == "slug":
             academy.slug = value.strip() if value and value.strip() else None
+        elif key == "logo_url":
+            academy.logo_url = value.strip() if value and value.strip() else None
+        elif key == "schedule_image_url":
+            academy.schedule_image_url = value.strip() if value and value.strip() else None
         elif key == "weekly_theme":
             academy.weekly_theme = value
         elif key in technique_keys:

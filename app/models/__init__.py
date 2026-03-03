@@ -14,6 +14,7 @@ from app.models.mission_usage import MissionUsage
 from app.models.technique_execution import TechniqueExecution
 from app.models.collective_goal import CollectiveGoal
 from app.models.trophy import Trophy
+from app.models.partner import Partner
 
 __all__ = [
     "Base",
@@ -31,4 +32,5 @@ __all__ = [
     "TechniqueExecution",
     "CollectiveGoal",
     "Trophy",
+    "Partner",
 ]

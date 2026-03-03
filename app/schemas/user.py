@@ -45,11 +45,9 @@ def _validate_role(v: str | None) -> str:
 
 
 def _validate_password_strength(password: str) -> str:
-    """Valida força da senha: mínimo 12 caracteres."""
-    if len(password) < 12:
-        raise ValueError("Senha deve ter pelo menos 12 caracteres.")
-    if len(password) > 128:
-        raise ValueError("Senha não pode ter mais de 128 caracteres.")
+    """Valida senha: exige apenas que não seja vazia."""
+    if len(password) < 1:
+        raise ValueError("Senha deve ter pelo menos 1 caractere.")
     return password
 
 
@@ -59,9 +57,8 @@ class UserCreate(BaseModel):
     email: EmailStr = Field(..., description="E-mail do usuário (deve ser válido)")
     password: str | None = Field(
         None,
-        min_length=12,
-        max_length=128,
-        description="Senha para login (opcional, mínimo 12 caracteres). Se não informada, usuário não poderá fazer login.",
+        min_length=1,
+        description="Senha para login (opcional, mínimo 1 caractere). Se não informada, usuário não poderá fazer login.",
     )
     name: str | None = Field(None, max_length=255)
     graduation: str | None = Field(None, min_length=1, max_length=32)
@@ -107,9 +104,8 @@ class UserUpdate(BaseModel):
     gallery_visible: bool | None = None
     password: str | None = Field(
         None,
-        min_length=12,
-        max_length=128,
-        description="Nova senha para login (mínimo 12 caracteres). Se informada, substitui a senha atual. Deixe em branco para não alterar.",
+        min_length=1,
+        description="Nova senha para login. Se informada, substitui a senha atual. Deixe em branco para não alterar.",
     )
 
     @field_validator("password")

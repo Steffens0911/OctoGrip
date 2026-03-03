@@ -5,7 +5,11 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
+import 'package:viewer/models/usage_metrics.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:viewer/screens/admin/academy_active_students_screen.dart';
 import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
+import 'package:viewer/screens/admin/partner_list_screen.dart';
 import 'package:viewer/screens/admin/position_form_screen.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -55,6 +59,13 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   String? _errorExtra;
   List<Map<String, dynamic>> _trophies = [];
   bool _loadingTrophies = true;
+  UsageMetrics? _usageMetrics;
+  bool _loadingUsageMetrics = false;
+  String? _errorUsageMetrics;
+  late final TextEditingController _logoUrlController;
+  bool _uploadingLogo = false;
+  late final TextEditingController _scheduleImageUrlController;
+  bool _savingScheduleImageUrl = false;
 
   @override
   void initState() {
@@ -69,10 +80,14 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
+    _logoUrlController = TextEditingController(text: _academy.logoUrl ?? '');
+    _scheduleImageUrlController =
+        TextEditingController(text: _academy.scheduleImageUrl ?? '');
     _loadTechniques();
     _loadPositions();
     _loadRankingAndReport();
     _loadTrophies();
+    _loadUsageMetrics();
   }
 
   @override
@@ -80,6 +95,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult1Controller.dispose();
     _mult2Controller.dispose();
     _mult3Controller.dispose();
+    _logoUrlController.dispose();
+    _scheduleImageUrlController.dispose();
     super.dispose();
   }
 
@@ -406,6 +423,111 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     }
   }
 
+  Future<void> _loadUsageMetrics() async {
+    setState(() {
+      _loadingUsageMetrics = true;
+      _errorUsageMetrics = null;
+    });
+    try {
+      final metrics = await _api.getMetricsUsageForAcademy(_academy.id);
+      if (!mounted) return;
+      setState(() {
+        _usageMetrics = metrics;
+        _loadingUsageMetrics = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorUsageMetrics = userFacingMessage(e);
+        _loadingUsageMetrics = false;
+      });
+    }
+  }
+
+  Future<void> _pickAndUploadLogo() async {
+    setState(() {
+      _uploadingLogo = true;
+    });
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        setState(() {
+          _uploadingLogo = false;
+        });
+        return;
+      }
+      final file = result.files.first;
+      if (file.bytes == null) {
+        setState(() {
+          _uploadingLogo = false;
+        });
+        return;
+      }
+      final updated = await _api.uploadAcademyLogo(
+        _academy.id,
+        file.bytes!,
+        file.name,
+      );
+      if (!mounted) return;
+      setState(() {
+        _academy = updated;
+        _logoUrlController.text = updated.logoUrl ?? '';
+        _scheduleImageUrlController.text =
+            updated.scheduleImageUrl ?? _scheduleImageUrlController.text;
+        _uploadingLogo = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Brasão da academia atualizado.'),
+          backgroundColor: AppTheme.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingLogo = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingMessage(e))),
+      );
+    }
+  }
+
+  Future<void> _saveScheduleImageUrl() async {
+    setState(() {
+      _savingScheduleImageUrl = true;
+    });
+    try {
+      final url = _scheduleImageUrlController.text.trim();
+      final updated = await _api.updateAcademy(
+        _academy.id,
+        scheduleImageUrl: url.isEmpty ? null : url,
+      );
+      if (!mounted) return;
+      setState(() {
+        _academy = updated;
+        _savingScheduleImageUrl = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Imagem de horários atualizada.'),
+          backgroundColor: AppTheme.primary,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _savingScheduleImageUrl = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingMessage(e))),
+      );
+    }
+  }
+
   Future<void> _saveTheme() async {
     setState(() => _savingTheme = true);
     try {
@@ -430,6 +552,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           _mult1Controller.text = _weeklyMultiplier1.toString();
           _mult2Controller.text = _weeklyMultiplier2.toString();
           _mult3Controller.text = _weeklyMultiplier3.toString();
+          _logoUrlController.text = updated.logoUrl ?? '';
           _savingTheme = false;
         });
         widget.onUpdated();
@@ -653,196 +776,247 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              _SectionTitle(title: 'Posições'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Posições desta academia',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: () => _openPositionForm(),
-                            tooltip: 'Nova posição',
-                          ),
-                        ],
-                      ),
-                      if (_loadingPositions)
-                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
-                      else if (_positions.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'Nenhuma posição. Adicione posições para criar técnicas.',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _positions.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final p = _positions[i];
-                            return ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(p.name),
-                              subtitle: p.description != null && p.description!.isNotEmpty ? Text(p.description!, maxLines: 1, overflow: TextOverflow.ellipsis) : null,
-                              trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openPositionForm(p)),
-                                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deletePosition(p)),
-                              ]) : null,
-                            );
-                          },
+              if (AuthService().isAdmin() || AuthService().isManager() || AuthService().isSupervisor())
+                Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                      child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
+                    ),
+                    title: const Text('Alunos ativos (últimos 7 dias)', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Ver quem está usando o app recentemente nesta academia'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AcademyActiveStudentsScreen(
+                          academy: _academy,
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: Card(
+                  child: ExpansionTile(
+                    title: Text(
+                      'Posições e técnicas',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    initiallyExpanded: false,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    childrenPadding: EdgeInsets.zero,
+                    children: [
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Column(
+                            children: [
+                              ExpansionTile(
+                                title: const Text('Posições'),
+                                childrenPadding: const EdgeInsets.all(16),
+                                initiallyExpanded: false,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Posições desta academia',
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                              color: AppTheme.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline),
+                                        onPressed: () => _openPositionForm(),
+                                        tooltip: 'Nova posição',
+                                      ),
+                                    ],
+                                  ),
+                                  if (_loadingPositions)
+                                    const Padding(
+                                        padding: EdgeInsets.all(16),
+                                        child: Center(child: CircularProgressIndicator()))
+                                  else if (_positions.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Text(
+                                        'Nenhuma posição. Adicione posições para criar técnicas.',
+                                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                      ),
+                                    )
+                                  else
+                                    ListView.separated(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      itemCount: _positions.length,
+                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      itemBuilder: (context, i) {
+                                        final p = _positions[i];
+                                        return ListTile(
+                                          dense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                          title: Text(p.name),
+                                          subtitle: p.description != null && p.description!.isNotEmpty
+                                              ? Text(p.description!,
+                                                  maxLines: 1, overflow: TextOverflow.ellipsis)
+                                              : null,
+                                          trailing: AuthService().canEditResources()
+                                              ? Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    IconButton(
+                                                        icon: const Icon(Icons.edit,
+                                                            size: 20, color: AppTheme.primary),
+                                                        onPressed: () => _openPositionForm(p)),
+                                                    IconButton(
+                                                        icon: const Icon(Icons.delete_outline,
+                                                            size: 20, color: Colors.red),
+                                                        onPressed: () => _deletePosition(p)),
+                                                  ],
+                                                )
+                                              : null,
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
+                              const Divider(height: 1),
+                              ExpansionTile(
+                                title: const Text('Técnicas'),
+                                childrenPadding: const EdgeInsets.all(16),
+                                initiallyExpanded: false,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Técnicas desta academia',
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                              color: AppTheme.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      if (AuthService().canEditResources())
+                                        IconButton(
+                                          icon: const Icon(Icons.add_circle_outline),
+                                          onPressed: () => _openTechniqueForm(),
+                                          tooltip: 'Nova técnica',
+                                        ),
+                                    ],
+                                  ),
+                                  if (_loadingTechniques)
+                                    const Padding(
+                                        padding: EdgeInsets.all(16),
+                                        child: Center(child: CircularProgressIndicator()))
+                                  else if (_techniques.isEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.all(16),
+                                      child: Text(
+                                        'Nenhuma técnica. Adicione posições primeiro, depois crie técnicas.',
+                                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                      ),
+                                    )
+                                  else
+                                    ListView.separated(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      itemCount: _techniques.length,
+                                      separatorBuilder: (_, __) => const Divider(height: 1),
+                                      itemBuilder: (context, i) {
+                                        final t = _techniques[i];
+                                        return ListTile(
+                                          dense: true,
+                                          contentPadding: EdgeInsets.zero,
+                                          title: Text(t.name),
+                                          subtitle: Text(
+                                            '${_positionName(t.fromPositionId)} → ${_positionName(t.toPositionId)}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          trailing: AuthService().canEditResources()
+                                              ? Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    IconButton(
+                                                        icon: const Icon(Icons.edit,
+                                                            size: 20, color: AppTheme.primary),
+                                                        onPressed: () => _openTechniqueForm(t)),
+                                                    IconButton(
+                                                        icon: const Icon(Icons.delete_outline,
+                                                            size: 20, color: Colors.red),
+                                                        onPressed: () => _deleteTechnique(t)),
+                                                  ],
+                                                )
+                                              : null,
+                                        );
+                                      },
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              _SectionTitle(title: 'Técnicas'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: Card(
+                  child: ExpansionTile(
+                    title: Text(
+                      'Troféus e missões semanais',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    initiallyExpanded: false,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    childrenPadding: EdgeInsets.zero,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Técnicas desta academia',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          if (AuthService().canEditResources())
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: () => _openTechniqueForm(),
-                              tooltip: 'Nova técnica',
-                            ),
-                        ],
-                      ),
-                      if (_loadingTechniques)
-                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
-                      else if (_techniques.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'Nenhuma técnica. Adicione posições primeiro, depois crie técnicas.',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _techniques.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final t = _techniques[i];
-                            return ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(t.name),
-                              subtitle: Text(
-                                '${_positionName(t.fromPositionId)} → ${_positionName(t.toPositionId)}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                      Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Column(
+                            children: [
+                              ExpansionTile(
+                                title: const Text('Troféus'),
+                                childrenPadding: const EdgeInsets.all(16),
+                                initiallyExpanded: true,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                children: _buildTrophiesSectionChildren(),
                               ),
-                              trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                IconButton(icon: const Icon(Icons.edit, size: 20, color: AppTheme.primary), onPressed: () => _openTechniqueForm(t)),
-                                IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red), onPressed: () => _deleteTechnique(t)),
-                              ]) : null,
-                            );
-                          },
+                              const Divider(height: 1),
+                              ExpansionTile(
+                                title: const Text('Missões semanais'),
+                                childrenPadding: const EdgeInsets.all(16),
+                                initiallyExpanded: false,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                children: _buildWeeklyMissionsFormChildren(),
+                              ),
+                            ],
+                          ),
                         ),
+                      ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              _SectionTitle(title: 'Troféus'),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Troféus desta academia (ouro/prata/bronze por execuções)',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: AppTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          if (AuthService().canEditResources())
-                            IconButton(
-                              icon: const Icon(Icons.add_circle_outline),
-                              onPressed: _showCreateTrophyDialog,
-                              tooltip: 'Criar troféu',
-                            ),
-                        ],
-                      ),
-                      if (_loadingTrophies)
-                        const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
-                      else if (_trophies.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            'Nenhum troféu. Crie um troféu vinculado a uma técnica, com período e meta de execuções.',
-                            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                          ),
-                        )
-                      else
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _trophies.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final t = _trophies[i];
-                            final name = t['name'] as String? ?? '—';
-                            final techniqueName = t['technique_name'] as String? ?? '';
-                            final start = t['start_date'] as String? ?? '';
-                            final end = t['end_date'] as String? ?? '';
-                            final target = t['target_count'] as int? ?? 0;
-                            return ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              leading: Icon(Icons.emoji_events_outlined, color: AppTheme.primary, size: 24),
-                              title: Text(name),
-                              subtitle: Text(
-                                '${techniqueName.isNotEmpty ? techniqueName : 'Técnica'} · $start a $end · Meta: $target',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -850,359 +1024,549 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Missões semanais (3 técnicas)',
+                        'Brasão / logo da academia',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               color: AppTheme.textPrimary,
                               fontWeight: FontWeight.bold,
                             ),
                       ),
                       const SizedBox(height: 8),
-                      Text(
-                        'As técnicas selecionadas aparecem como missões no painel do aluno enquanto estiverem configuradas.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                      ),
-                      const SizedBox(height: 12),
-                      if (_loadingTechniques)
-                        const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-                      else ...[
-                        DropdownButtonFormField<String>(
-                          value: _weeklyTechniqueId,
-                          decoration: const InputDecoration(
-                            labelText: 'Missão 1',
-                            border: OutlineInputBorder(),
+                      if (_academy.logoUrl != null &&
+                          _academy.logoUrl!.isNotEmpty) ...[
+                        Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.network(
+                              _academy.logoUrl!,
+                              height: 72,
+                              fit: BoxFit.contain,
+                            ),
                           ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-                          ],
-                          onChanged: (v) => setState(() => _weeklyTechniqueId = v),
                         ),
                         const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: _weeklyTechnique2Id,
-                          decoration: const InputDecoration(
-                            labelText: 'Missão 2',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-                          ],
-                          onChanged: (v) => setState(() => _weeklyTechnique2Id = v),
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          value: _weeklyTechnique3Id,
-                          decoration: const InputDecoration(
-                            labelText: 'Missão 3',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: [
-                            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
-                          ],
-                          onChanged: (v) => setState(() => _weeklyTechnique3Id = v),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Pontuação base (por slot)',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: AppTheme.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final narrow = AppTheme.isNarrow(context);
-                            final fields = [
-                              TextFormField(
-                                controller: _mult1Controller,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Missão 1',
-                                  border: OutlineInputBorder(),
-                                ),
-                                onChanged: (v) {
-                                  final n = int.tryParse(v);
-                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier1 = n);
-                                },
-                              ),
-                              TextFormField(
-                                controller: _mult2Controller,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Missão 2',
-                                  border: OutlineInputBorder(),
-                                ),
-                                onChanged: (v) {
-                                  final n = int.tryParse(v);
-                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier2 = n);
-                                },
-                              ),
-                              TextFormField(
-                                controller: _mult3Controller,
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  labelText: 'Missão 3',
-                                  border: OutlineInputBorder(),
-                                ),
-                                onChanged: (v) {
-                                  final n = int.tryParse(v);
-                                  if (n != null && n >= 1) setState(() => _weeklyMultiplier3 = n);
-                                },
-                              ),
-                            ];
-                            if (narrow) {
-                              return Column(
-                                children: fields
-                                    .map((f) => Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
-                                          child: f,
-                                        ))
-                                    .toList(),
-                              );
-                            }
-                            return Row(
-                              children: [
-                                Expanded(child: fields[0]),
-                                const SizedBox(width: 12),
-                                Expanded(child: fields[1]),
-                                const SizedBox(width: 12),
-                                Expanded(child: fields[2]),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
-                          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-                        ),
                       ],
-                      const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final narrow = AppTheme.isNarrow(context);
-                          final saveBtn = FilledButton.icon(
-                            onPressed: _savingTheme ? null : _saveTheme,
-                            icon: _savingTheme
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _logoUrlController,
+                              readOnly: true,
+                              decoration: const InputDecoration(
+                                labelText: 'URL atual do brasão',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          FilledButton.icon(
+                            onPressed: _uploadingLogo ? null : _pickAndUploadLogo,
+                            icon: _uploadingLogo
                                 ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
+                                    width: 18,
+                                    height: 18,
                                     child: CircularProgressIndicator(strokeWidth: 2),
                                   )
-                                : const Icon(Icons.save),
-                            label: Text(_savingTheme ? 'Salvando...' : 'Salvar missões semanais'),
-                          );
-                          final resetBtn = OutlinedButton.icon(
-                            onPressed: _resetting ? null : _resetMissions,
-                            icon: _resetting
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.refresh),
-                            label: Text(_resetting ? 'Reiniciando...' : 'Reiniciar missões'),
-                          );
-                          if (narrow) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                saveBtn,
-                                const SizedBox(height: 8),
-                                resetBtn,
-                              ],
-                            );
-                          }
-                          return Row(
-                            children: [
-                              Expanded(child: saveBtn),
-                              const SizedBox(width: 12),
-                              Expanded(child: resetBtn),
-                            ],
-                          );
-                        },
+                                : const Icon(Icons.upload),
+                            label: Text(_uploadingLogo ? 'Enviando...' : 'Selecionar imagem'),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Quadro de horários (imagem opcional)',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_academy.scheduleImageUrl != null &&
+                          _academy.scheduleImageUrl!.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            _academy.scheduleImageUrl!.startsWith('/')
+                                ? '${_api.baseUrl}${_academy.scheduleImageUrl}'
+                                : _academy.scheduleImageUrl!,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      if (AuthService().canEditResources())
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _scheduleImageUrlController,
+                                decoration: const InputDecoration(
+                                  labelText: 'URL da imagem de horários',
+                                  hintText: 'https://... ou /media/...',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            FilledButton(
+                              onPressed: _savingScheduleImageUrl ? null : _saveScheduleImageUrl,
+                              child: Text(_savingScheduleImageUrl ? 'Salvando...' : 'Salvar'),
+                            ),
+                          ],
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Apenas visualização. Apenas administradores, gestores e professores podem alterar.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              if (_loadingExtra)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_errorExtra != null)
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Icon(Icons.error_outline,
-                          size: 48, color: Colors.grey.shade600),
-                      const SizedBox(height: 8),
-                      Text(_errorExtra!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700)),
-                      const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: _loadRankingAndReport,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Tentar novamente'),
+              if (AuthService().isAdmin() || AuthService().isManager()) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                      child: const Icon(Icons.handshake_outlined, color: AppTheme.primary),
+                    ),
+                    title: const Text('Parceiros', style: TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: const Text('Divulgação para os alunos: empresas e academias parceiras'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => PartnerListScreen(academy: _academy),
                       ),
-                    ],
+                    ),
                   ),
-                )
-              else ...[
-                _SectionTitle(title: 'Ranking (últimos 30 dias)'),
-                Card(
-                  child: _ranking != null &&
-                          (_ranking!['entries'] as List).isNotEmpty
-                      ? ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount:
-                              (_ranking!['entries'] as List).length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final e = (_ranking!['entries'] as List)[i]
-                                as AcademyRankingEntry;
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppTheme.primary
-                                    .withValues(alpha: 0.2),
-                                child: Text(
-                                  '${e.rank}',
-                                  style: const TextStyle(
-                                    color: AppTheme.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              title: Text(e.name ?? 'Sem nome'),
-                              trailing: Text(
-                                '${e.completionsCount} conclusões',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(
-                            child: Text(
-                              'Nenhuma conclusão no período.',
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 20),
-                _SectionTitle(title: 'Dificuldades reportadas'),
-                Card(
-                  child: _difficulties != null &&
-                          (_difficulties!['entries'] as List).isNotEmpty
-                      ? ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount:
-                              (_difficulties!['entries'] as List).length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (context, i) {
-                            final e = (_difficulties!['entries'] as List)[i]
-                                as AcademyDifficultyEntry;
-                            return ListTile(
-                              title: Text(e.positionName),
-                              trailing: Text(
-                                '${e.count} reportes',
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          },
-                        )
-                      : const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(
-                            child: Text(
-                              'Nenhuma dificuldade reportada.',
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 20),
-                _SectionTitle(title: 'Relatório semanal'),
-                Card(
-                  child: _weeklyReport != null
-                      ? Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${_weeklyReport!.weekStart} a ${_weeklyReport!.weekEnd}',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
-                                        color: AppTheme.textSecondary,
-                                      ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${_weeklyReport!.completionsCount} conclusões · '
-                                '${_weeklyReport!.activeUsersCount} ativos',
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              if (_weeklyReport!.entries.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                const Divider(),
-                                ..._weeklyReport!.entries.map((e) => ListTile(
-                                      dense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                      leading: Text(
-                                        '${e.rank}º',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppTheme.primary,
-                                        ),
-                                      ),
-                                      title: Text(e.name ?? 'Sem nome'),
-                                      trailing: Text(
-                                        '${e.completionsCount}',
-                                        style: TextStyle(
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    )),
-                              ],
-                            ],
-                          ),
-                        )
-                      : const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(
-                            child: Text(
-                              'Sem dados da semana.',
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          ),
-                        ),
                 ),
               ],
+              const SizedBox(height: 24),
+              ..._buildExtraSections(),
             ],
           ),
         ),
       ),
     );
+  }
+
+  List<Widget> _buildTrophiesSectionChildren() {
+    return [
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Troféus desta academia (ouro/prata/bronze por execuções)',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (AuthService().canEditResources())
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline),
+              onPressed: _showCreateTrophyDialog,
+              tooltip: 'Criar troféu',
+            ),
+        ],
+      ),
+      if (_loadingTrophies)
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        )
+      else if (_trophies.isEmpty)
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            'Nenhum troféu. Crie um troféu vinculado a uma técnica, com período e meta de execuções.',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+          ),
+        )
+      else
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _trophies.length,
+          separatorBuilder: (_, __) => const Divider(height: 1),
+          itemBuilder: (context, i) {
+            final t = _trophies[i];
+            final name = t['name'] as String? ?? '—';
+            final techniqueName = t['technique_name'] as String? ?? '';
+            final start = t['start_date'] as String? ?? '';
+            final end = t['end_date'] as String? ?? '';
+            final target = t['target_count'] as int? ?? 0;
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.emoji_events_outlined, color: AppTheme.primary, size: 24),
+              title: Text(name),
+              subtitle: Text(
+                '${techniqueName.isNotEmpty ? techniqueName : 'Técnica'} · $start a $end · Meta: $target',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            );
+          },
+        ),
+    ];
+  }
+
+  List<Widget> _buildWeeklyMissionsFormChildren() {
+    return [
+      Text(
+        'Missões semanais (3 técnicas)',
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: AppTheme.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        'As técnicas selecionadas aparecem como missões no painel do aluno enquanto estiverem configuradas.',
+        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+      ),
+      const SizedBox(height: 12),
+      if (_loadingTechniques)
+        const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
+      else ...[
+        DropdownButtonFormField<String>(
+          value: _weeklyTechniqueId,
+          decoration: const InputDecoration(
+            labelText: 'Missão 1',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+          ],
+          onChanged: (v) => setState(() => _weeklyTechniqueId = v),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _weeklyTechnique2Id,
+          decoration: const InputDecoration(
+            labelText: 'Missão 2',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+          ],
+          onChanged: (v) => setState(() => _weeklyTechnique2Id = v),
+        ),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(
+          value: _weeklyTechnique3Id,
+          decoration: const InputDecoration(
+            labelText: 'Missão 3',
+            border: OutlineInputBorder(),
+          ),
+          items: [
+            const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
+            ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+          ],
+          onChanged: (v) => setState(() => _weeklyTechnique3Id = v),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Pontuação base (por slot)',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppTheme.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = AppTheme.isNarrow(context);
+            final fields = [
+              TextFormField(
+                controller: _mult1Controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Missão 1',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) {
+                  final n = int.tryParse(v);
+                  if (n != null && n >= 1) setState(() => _weeklyMultiplier1 = n);
+                },
+              ),
+              TextFormField(
+                controller: _mult2Controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Missão 2',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) {
+                  final n = int.tryParse(v);
+                  if (n != null && n >= 1) setState(() => _weeklyMultiplier2 = n);
+                },
+              ),
+              TextFormField(
+                controller: _mult3Controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Missão 3',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: (v) {
+                  final n = int.tryParse(v);
+                  if (n != null && n >= 1) setState(() => _weeklyMultiplier3 = n);
+                },
+              ),
+            ];
+            if (narrow) {
+              return Column(
+                children: fields
+                    .map((f) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: f,
+                        ))
+                    .toList(),
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: fields[0]),
+                const SizedBox(width: 12),
+                Expanded(child: fields[1]),
+                const SizedBox(width: 12),
+                Expanded(child: fields[2]),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
+          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = AppTheme.isNarrow(context);
+            final saveBtn = FilledButton.icon(
+              onPressed: _savingTheme ? null : _saveTheme,
+              icon: _savingTheme
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save),
+              label: Text(_savingTheme ? 'Salvando...' : 'Salvar missões semanais'),
+            );
+            final resetBtn = OutlinedButton.icon(
+              onPressed: _resetting ? null : _resetMissions,
+              icon: _resetting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(_resetting ? 'Reiniciando...' : 'Reiniciar missões'),
+            );
+            if (narrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  saveBtn,
+                  const SizedBox(height: 8),
+                  resetBtn,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: saveBtn),
+                const SizedBox(width: 12),
+                Expanded(child: resetBtn),
+              ],
+            );
+          },
+        ),
+      ],
+    ];
+  }
+
+  List<Widget> _buildExtraSections() {
+    if (_loadingExtra) {
+      return const [
+        Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
+    }
+    if (_errorExtra != null) {
+      return [
+        Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 8),
+              Text(
+                _errorExtra!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _loadRankingAndReport,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
+              ),
+            ],
+          ),
+        ),
+      ];
+    }
+    return [
+      _SectionTitle(title: 'Ranking (últimos 30 dias)'),
+      Card(
+        child: _ranking != null && (_ranking!['entries'] as List).isNotEmpty
+            ? ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: (_ranking!['entries'] as List).length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final e = (_ranking!['entries'] as List)[i] as AcademyRankingEntry;
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                      child: Text(
+                        '${e.rank}',
+                        style: const TextStyle(
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(e.name ?? 'Sem nome'),
+                    trailing: Text(
+                      '${e.completionsCount} conclusões',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                  );
+                },
+              )
+            : const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'Nenhuma conclusão no período.',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
+              ),
+      ),
+      const SizedBox(height: 20),
+      _SectionTitle(title: 'Execuções focadas em troféu/medalha/posição'),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _loadingUsageMetrics
+              ? const Center(child: CircularProgressIndicator())
+              : _errorUsageMetrics != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _errorUsageMetrics!,
+                          style: TextStyle(color: Colors.red.shade700),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _loadUsageMetrics,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    )
+                  : _usageMetrics == null
+                      ? const Text(
+                          'Ainda não há respostas suficientes para este relatório.',
+                          style: TextStyle(color: AppTheme.textSecondary),
+                        )
+                      : _AcademyUsageMetricsView(metrics: _usageMetrics!),
+        ),
+      ),
+      const SizedBox(height: 20),
+      _SectionTitle(title: 'Relatório semanal'),
+      Card(
+        child: _weeklyReport != null
+            ? Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${_weeklyReport!.weekStart} a ${_weeklyReport!.weekEnd}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.textSecondary,
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${_weeklyReport!.completionsCount} conclusões · '
+                      '${_weeklyReport!.activeUsersCount} ativos',
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    if (_weeklyReport!.entries.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Divider(),
+                      ..._weeklyReport!.entries.map(
+                        (e) => ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Text(
+                            '${e.rank}º',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary,
+                            ),
+                          ),
+                          title: Text(e.name ?? 'Sem nome'),
+                          trailing: Text(
+                            '${e.completionsCount}',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              )
+            : const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text(
+                    'Sem dados da semana.',
+                    style: TextStyle(color: AppTheme.textSecondary),
+                  ),
+                ),
+              ),
+      ),
+    ];
   }
 }
 
@@ -1225,3 +1589,51 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
+
+class _AcademyUsageMetricsView extends StatelessWidget {
+  final UsageMetrics metrics;
+
+  const _AcademyUsageMetricsView({required this.metrics});
+
+  @override
+  Widget build(BuildContext context) {
+    final totalExecutions =
+        metrics.beforeTrainingCount + metrics.afterTrainingCount;
+    if (totalExecutions == 0) {
+      return const Text(
+        'Nenhuma resposta registrada ainda para esta academia.',
+        style: TextStyle(color: AppTheme.textSecondary),
+      );
+    }
+
+    final plannedCount = metrics.afterTrainingCount;
+    final naturalCount = metrics.beforeTrainingCount;
+    final plannedPercent =
+        totalExecutions > 0 ? (plannedCount / totalExecutions * 100) : 0.0;
+    final naturalPercent =
+        totalExecutions > 0 ? (naturalCount / totalExecutions * 100) : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$totalExecutions respostas registradas nesta academia',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Premeditadas (focando em troféu/medalha/posição): '
+          '$plannedCount (${plannedPercent.toStringAsFixed(1)}%)',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Naturais (aconteceu naturalmente): '
+          '$naturalCount (${naturalPercent.toStringAsFixed(1)}%)',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    );
+  }
+}
+

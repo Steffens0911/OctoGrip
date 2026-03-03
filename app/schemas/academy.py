@@ -19,6 +19,8 @@ class AcademyRead(BaseModel):
     id: UUID
     name: str
     slug: str | None
+    logo_url: str | None = None
+    schedule_image_url: str | None = None
     weekly_theme: str | None = None
     weekly_technique_id: UUID | None = None
     weekly_technique_name: str | None = None
@@ -51,6 +53,8 @@ class AcademyUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=255)
     slug: str | None = Field(None, max_length=255)
+    logo_url: str | None = Field(None, max_length=512)
+    schedule_image_url: str | None = Field(None, max_length=512)
     weekly_theme: str | None = Field(None, max_length=128)
     weekly_technique_id: UUID | None = None
     weekly_technique_2_id: UUID | None = None

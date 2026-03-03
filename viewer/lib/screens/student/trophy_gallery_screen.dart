@@ -140,9 +140,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       barrierDismissible: false,
       builder: (ctx) => PointerInterceptor(
         child: AlertDialog(
-          title: const Text('Quando você aplicou a técnica?'),
           content: const Text(
-            'Em que momento você executou esta técnica?',
+            'A execução foi premeditada focando no troféu/medalha ou posição do dia?',
           ),
           actions: [
             TextButton(
@@ -150,12 +149,12 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, 'before_training'),
-              child: const Text('Antes do treino'),
+              onPressed: () => Navigator.pop(ctx, 'planned'),
+              child: const Text('Sim'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(ctx, 'after_training'),
-              child: const Text('Depois do treino'),
+              onPressed: () => Navigator.pop(ctx, 'natural'),
+              child: const Text('Não, aconteceu naturalmente'),
             ),
           ],
         ),
@@ -228,8 +227,13 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       }
       return;
     }
-    final usageType = await _showUsageTypeDialog();
-    if (usageType == null || !mounted) return;
+    final usageTypeUi = await _showUsageTypeDialog();
+    if (usageTypeUi == null || !mounted) return;
+    final usageType = usageTypeUi == 'planned'
+        ? 'after_training'
+        : usageTypeUi == 'natural'
+            ? 'before_training'
+            : usageTypeUi;
     final opponentId = await _showOpponentDialog(academyId);
     if (opponentId == null || !mounted) return;
     try {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission_today.dart';
@@ -10,6 +11,7 @@ import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
+import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -36,6 +38,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   int _pendingConfirmationsCount = 0;
   bool _loading = true;
   String? _error;
+  String? _academyLogoUrl;
+  bool _academyLogoLoaded = false;
+  String? _academyScheduleImageUrl;
+  String? _academyScheduleDisplayUrl;
+  String? _academyScheduleOriginalUrl;
+  bool _academyScheduleLoaded = false;
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
   static String _levelFromGraduation(String? g) {
@@ -100,13 +108,24 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Future<void> _load() async {
-    final currentUser = AuthService().currentUser;
     setState(() {
       _loading = true;
       _error = null;
       _missionWeek = null;
-      _selectedUser = currentUser;
+      _academyLogoUrl = null;
+      _academyLogoLoaded = false;
+      _academyScheduleImageUrl = null;
+      _academyScheduleDisplayUrl = null;
+      _academyScheduleOriginalUrl = null;
+      _academyScheduleLoaded = false;
     });
+    try {
+      await AuthService().refreshMe();
+    } catch (_) {
+      // Mantém dados em cache se a API falhar (ex.: offline).
+    }
+    final currentUser = AuthService().currentUser;
+    setState(() => _selectedUser = currentUser);
     if (currentUser == null) {
       setState(() {
         _loading = false;
@@ -121,6 +140,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loadUserPointsWith(currentUser.id),
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
+        _loadAcademyLogoWith(currentUser.academyId),
       ]);
       if (mounted) setState(() => _loading = false);
     } catch (e) {
@@ -128,6 +148,52 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loading = false;
         _error = userFacingMessage(e);
       });
+    }
+  }
+
+  Future<void> _loadAcademyLogoWith(String? academyId) async {
+    if (academyId == null || academyId.isEmpty) return;
+    try {
+      final academy = await _api.getAcademyFresh(academyId);
+      if (!mounted) return;
+      setState(() {
+        _academyLogoUrl = academy.logoUrl;
+        _academyLogoLoaded = true;
+        _academyScheduleImageUrl = academy.scheduleImageUrl;
+        _academyScheduleLoaded = true;
+        _academyScheduleDisplayUrl = null;
+        _academyScheduleOriginalUrl = null;
+      });
+      if (academy.scheduleImageUrl != null && academy.scheduleImageUrl!.isNotEmpty) {
+        try {
+          final res = await _api.getScheduleDisplayUrl(academy.scheduleImageUrl!);
+          if (mounted) {
+            setState(() {
+              _academyScheduleDisplayUrl = res['display_url'] as String?;
+              _academyScheduleOriginalUrl = res['original_url'] as String?;
+            });
+          }
+        } catch (_) {
+          if (mounted) {
+            setState(() {
+              _academyScheduleDisplayUrl = null;
+              _academyScheduleOriginalUrl = academy.scheduleImageUrl;
+            });
+          }
+        }
+      }
+    } catch (_) {
+      // Falha de rede ou permissão: mostra placeholder em vez de ficar em "Carregando...".
+      if (mounted) {
+        setState(() {
+          _academyLogoUrl = null;
+          _academyLogoLoaded = true;
+          _academyScheduleImageUrl = null;
+          _academyScheduleDisplayUrl = null;
+          _academyScheduleOriginalUrl = null;
+          _academyScheduleLoaded = true;
+        });
+      }
     }
   }
 
@@ -275,6 +341,78 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 8),
+            if (_selectedUser?.academyId != null && _selectedUser!.academyId!.isNotEmpty) ...[
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppTheme.screenPadding(context),
+                  vertical: 20,
+                ),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceOf(context),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppTheme.borderOf(context)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _academyLogoUrl != null && _academyLogoUrl!.isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            _academyLogoUrl!.startsWith('/')
+                                ? '${_api.baseUrl}$_academyLogoUrl'
+                                : _academyLogoUrl!,
+                            height: 92,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.shield_outlined,
+                                  size: 48,
+                                  color: AppTheme.textSecondaryOf(context),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Não foi possível carregar o brasão',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.textSecondaryOf(context),
+                                      ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.shield_outlined,
+                              size: 48,
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _academyLogoLoaded
+                                  ? 'Brasão não definido para esta academia'
+                                  : 'Carregando...',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondaryOf(context),
+                                  ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
             Text(
               _selectedUser != null
                   ? 'Olá, ${_selectedUser!.name ?? _selectedUser!.email}'
@@ -320,35 +458,113 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             if (_selectedUser != null &&
                 (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
               const SizedBox(height: 16),
-            if (_missionWeek != null) _buildMissionWeekSection(),
-            if (_missionWeek == null && !_loading && _selectedUser != null)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceOf(context),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.borderOf(context)),
-                ),
-                child: Text(
-                  _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
-                      ? 'Configure a academia do usuário para ver as missões.'
-                      : 'Nenhuma missão da semana no momento.',
-                  style: TextStyle(color: AppTheme.textSecondaryOf(context)),
-                ),
-              ),
-            if (_missionWeek == null && _selectedUser != null) const SizedBox(height: 16),
             if (_selectedUser != null) ...[
-              Text(
-                'Atalhos',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppTheme.textPrimaryOf(context),
-                    ),
-              ),
-              const SizedBox(height: 12),
-              _buildShortcuts(),
+              const SizedBox(height: 16),
+              _buildMainAccordion(),
+              if (_selectedUser!.academyId != null && _selectedUser!.academyId!.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildPartnersSection(),
+              ],
+            ],
+            if (_academyScheduleImageUrl != null &&
+                _academyScheduleImageUrl!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildScheduleCard(),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _openScheduleUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url.startsWith('http') ? url : 'https://$url');
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Widget _buildScheduleCard() {
+    final displayUrl = _academyScheduleDisplayUrl;
+    final openUrl = _academyScheduleOriginalUrl ?? _academyScheduleImageUrl;
+    final hasImage = displayUrl != null && displayUrl.isNotEmpty;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: openUrl != null && openUrl.isNotEmpty ? () => _openScheduleUrl(openUrl) : null,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Horários da academia',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppTheme.textPrimaryOf(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              if (hasImage)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    displayUrl!.startsWith('/') ? '${_api.baseUrl}$displayUrl' : displayUrl,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _schedulePlaceholder(context, openUrl),
+                  ),
+                )
+              else
+                _schedulePlaceholder(context, openUrl),
+              if (openUrl != null && openUrl.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Toque para abrir',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.primary,
+                        ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _schedulePlaceholder(BuildContext context, String? openUrl) {
+    return Container(
+      height: 100,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppTheme.borderOf(context).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.schedule, size: 32, color: AppTheme.textSecondaryOf(context)),
+          const SizedBox(width: 12),
+          Text(
+            openUrl != null && openUrl.isNotEmpty
+                ? 'Toque para ver horários'
+                : 'Não foi possível carregar a imagem',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondaryOf(context),
+                ),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -584,11 +800,126 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildShortcuts() {
-    if (_selectedUser == null) return const SizedBox.shrink();
-    final userId = _selectedUser!.id;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  /// Acordeom pai que agrupa Missões da semana, Troféus e Confirmações e solicitações.
+  Widget _buildMainAccordion() {
+    final missionWidget = _missionWeek != null
+        ? _buildMissionWeekSection()
+        : (_missionWeek == null && !_loading && _selectedUser != null
+            ? Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceOf(context),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.borderOf(context)),
+                ),
+                child: Text(
+                  _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
+                      ? 'Configure a academia do usuário para ver as missões.'
+                      : 'Nenhuma missão da semana no momento.',
+                  style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+                ),
+              )
+            : const SizedBox.shrink());
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            leading: Icon(Icons.home_rounded, color: AppTheme.primary, size: 26),
+            title: Text(
+              'Início',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.textPrimaryOf(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            children: [
+              missionWidget,
+              const SizedBox(height: 16),
+              _buildTrophiesSection(),
+              const SizedBox(height: 16),
+              _buildConfirmationsAndRequestsSection(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeAccordion({
+    required IconData icon,
+    required String title,
+    bool showAlert = false,
+    required List<Widget> children,
+  }) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: false,
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            leading: Icon(icon, color: AppTheme.primary, size: 26),
+            title: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.textPrimaryOf(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                if (showAlert) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      size: 16,
+                      color: Colors.amber.shade900,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConfirmationsAndRequestsSection() {
+    final u = _selectedUser;
+    if (u == null) return const SizedBox.shrink();
+    final userId = u.id;
+    final hasConfirmationsAlert = _pendingConfirmationsCount > 0;
+    return _buildHomeAccordion(
+      icon: Icons.notifications_active_outlined,
+      title: 'Confirmações e solicitações',
+      showAlert: hasConfirmationsAlert,
       children: [
         _ShortcutTile(
           icon: Icons.list_alt,
@@ -604,11 +935,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           ),
         ),
+        const SizedBox(height: 8),
         _ShortcutTile(
           icon: Icons.how_to_reg,
           title: 'Confirmações pendentes',
           subtitle: 'Confirmar execuções em você',
-          showAlertBadge: _pendingConfirmationsCount > 0,
+          showAlertBadge: hasConfirmationsAlert,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
@@ -619,6 +951,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           ).then((_) => _loadPendingConfirmationsWith()),
         ),
+        const SizedBox(height: 8),
         _ShortcutTile(
           icon: Icons.send_outlined,
           title: 'Minhas solicitações',
@@ -630,52 +963,83 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           ),
         ),
-        _ShortcutTile(
-          icon: Icons.warning_amber_rounded,
-          title: 'Reportar dificuldade',
-          subtitle: 'Marcar posição difícil no treino',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ReportDifficultyScreen(
-                userId: userId,
-                academyId: _selectedUser?.academyId,
-              ),
-            ),
-          ),
-        ),
-        _ShortcutTile(
-          icon: Icons.emoji_events_outlined,
-          title: 'Galeria de troféus',
-          subtitle: 'Troféus conquistados (ouro, prata, bronze)',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TrophyGalleryScreen(
-                userId: userId,
-                userName: _selectedUser?.name ?? _selectedUser?.email,
-              ),
-            ),
-          ),
-        ),
-        if (_selectedUser?.academyId != null && _selectedUser!.academyId!.isNotEmpty)
-          _ShortcutTile(
-            icon: Icons.people_outline,
-            title: 'Galeria dos colegas',
-            subtitle: 'Troféus e medalhas dos colegas da academia',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ClassmatesGalleryScreen(
-                  academyId: _selectedUser!.academyId!,
-                  currentUserId: userId,
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
+
+  Widget _buildTrophiesSection() {
+    final u = _selectedUser;
+    if (u == null) return const SizedBox.shrink();
+    final userId = u.id;
+    final hasAcademy = u.academyId != null && u.academyId!.isNotEmpty;
+
+    final children = <Widget>[
+      _ShortcutTile(
+        icon: Icons.emoji_events_outlined,
+        title: 'Galeria de troféus',
+        subtitle: 'Troféus conquistados (ouro, prata, bronze)',
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TrophyGalleryScreen(
+              userId: userId,
+              userName: _selectedUser?.name ?? _selectedUser?.email,
+            ),
+          ),
+        ),
+      ),
+    ];
+
+    if (hasAcademy) {
+      children.addAll([
+        const SizedBox(height: 8),
+        _ShortcutTile(
+          icon: Icons.people_outline,
+          title: 'Galeria dos colegas',
+          subtitle: 'Troféus e medalhas dos colegas da academia',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClassmatesGalleryScreen(
+                academyId: u.academyId!,
+                currentUserId: userId,
+              ),
+            ),
+          ),
+        ),
+      ]);
+    }
+
+    return _buildHomeAccordion(
+      icon: Icons.emoji_events,
+      title: 'Troféus',
+      children: children,
+    );
+  }
+
+  Widget _buildPartnersSection() {
+    final u = _selectedUser;
+    if (u == null || u.academyId == null || u.academyId!.isEmpty) return const SizedBox.shrink();
+    return _buildHomeAccordion(
+      icon: Icons.handshake_outlined,
+      title: 'Parceiros',
+      children: [
+        _ShortcutTile(
+          icon: Icons.business_center_outlined,
+          title: 'Nossos parceiros',
+          subtitle: 'Empresas e academias parceiras',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PartnersScreen(academyId: u.academyId!),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildShortcuts() => const SizedBox.shrink();
 }
 
 class _ShortcutTile extends StatelessWidget {

@@ -72,6 +72,11 @@ class ProfessorNotFoundError(NotFoundError):
         super().__init__(message)
 
 
+class PartnerNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Parceiro não encontrado."):
+        super().__init__(message)
+
+
 # --- Conflict (409) ---
 
 

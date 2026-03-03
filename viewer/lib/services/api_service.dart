@@ -1,18 +1,23 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'package:viewer/config.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/active_students_report.dart';
+import 'package:viewer/models/engagement_report.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
+import 'package:viewer/models/partner.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/models/usage_metrics.dart';
+import 'dart:typed_data';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/auth_service.dart';
 
@@ -194,6 +199,33 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
+  /// Retorna a academia sem usar cache (para o brasão na home do aluno aparecer logo após o admin salvar).
+  Future<Academy> getAcademyFresh(String id) async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/academies/$id'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return Academy.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Resolve URL de horários: se for post do Instagram, retorna thumbnail para exibição; senão retorna a própria URL.
+  /// Retorna { display_url: String?, original_url: String? }.
+  Future<Map<String, dynamic>> getScheduleDisplayUrl(String scheduleUrl) async {
+    final uri = Uri.parse('$baseUrl/academies/schedule_display_url').replace(
+      queryParameters: {'url': scheduleUrl},
+    );
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    return {
+      'display_url': map['display_url'] as String?,
+      'original_url': map['original_url'] as String?,
+    };
+  }
+
   Future<Map<String, dynamic>?> getCollectiveGoalCurrent(String academyId) async {
     final r = await _getWithCache(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current'), _cacheTtlShort);
     final data = await _decodeResponse(r);
@@ -225,6 +257,71 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
+  static const _pngMagic = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  static const _jpegMagic = [0xFF, 0xD8];
+  static const _webpMagic = [0x52, 0x49, 0x46, 0x46]; // RIFF
+  static const _webpFourcc = [0x57, 0x45, 0x42, 0x50]; // WEBP at 8:12
+
+  static MediaType? _contentTypeFromFilename(String filename) {
+    final ext = filename.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'png':
+        return MediaType('image', 'png');
+      case 'jpg':
+      case 'jpeg':
+        return MediaType('image', 'jpeg');
+      case 'webp':
+        return MediaType('image', 'webp');
+      default:
+        return null;
+    }
+  }
+
+  static String _extensionFromBytes(Uint8List bytes) {
+    if (bytes.length >= 8) {
+      bool match(List<int> magic, int offset) {
+        for (var i = 0; i < magic.length; i++) {
+          if (offset + i >= bytes.length || (bytes[offset + i] & 0xff) != magic[i]) return false;
+        }
+        return true;
+      }
+      if (match(_pngMagic, 0)) return 'png';
+      if (bytes.length >= 2 && match(_jpegMagic, 0)) return 'jpg';
+      if (bytes.length >= 12 && match(_webpMagic, 0) && match(_webpFourcc, 8)) return 'webp';
+    }
+    return 'png';
+  }
+
+  Future<Academy> uploadAcademyLogo(String id, Uint8List bytes, String filename) async {
+    var name = filename;
+    var contentType = _contentTypeFromFilename(filename);
+    if (contentType == null && bytes.isNotEmpty) {
+      final ext = _extensionFromBytes(bytes);
+      name = filename.contains('.') ? filename : 'image.$ext';
+      contentType = ext == 'png'
+          ? MediaType('image', 'png')
+          : ext == 'jpg'
+              ? MediaType('image', 'jpeg')
+              : MediaType('image', 'webp');
+    }
+    final uri = Uri.parse('$baseUrl/academies/$id/logo');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: name,
+        contentType: contentType,
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return Academy.fromJson(data! as Map<String, dynamic>);
+  }
+
   /// Atualiza academia (nome, slug, tema, técnicas, lição visível). Campos omitidos não são alterados.
   /// Se [updateVisibleLesson] for true, envia [visibleLessonId] (null limpa a lição visível).
   Future<Academy> updateAcademy(
@@ -232,6 +329,8 @@ class ApiService {
     String? name,
     String? slug,
     String? weeklyTheme,
+    String? logoUrl,
+    String? scheduleImageUrl,
     String? weeklyTechniqueId,
     String? visibleLessonId,
     bool updateVisibleLesson = false,
@@ -240,6 +339,8 @@ class ApiService {
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (weeklyTheme != null) body['weekly_theme'] = weeklyTheme;
+    if (logoUrl != null) body['logo_url'] = logoUrl;
+    if (scheduleImageUrl != null) body['schedule_image_url'] = scheduleImageUrl;
     if (weeklyTechniqueId != null) body['weekly_technique_id'] = weeklyTechniqueId;
     if (updateVisibleLesson) body['visible_lesson_id'] = visibleLessonId;
     if (body.isEmpty) return getAcademy(id);
@@ -366,6 +467,73 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
+  }
+
+  /// Lista parceiros da academia (alunos: sem academy_id usa a do usuário; gestor/admin: academy_id obrigatório para admin).
+  Future<List<Partner>> getPartners([String? academyId]) async {
+    final queryParams = academyId != null && academyId.isNotEmpty ? {'academy_id': academyId} : null;
+    final uri = Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => Partner.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Cria parceiro na academia.
+  Future<Partner> createPartner({
+    required String academyId,
+    required String name,
+    String? description,
+    String? url,
+    String? logoUrl,
+  }) async {
+    final body = <String, dynamic>{
+      'academy_id': academyId,
+      'name': name,
+    };
+    if (description != null && description.isNotEmpty) body['description'] = description;
+    if (url != null && url.isNotEmpty) body['url'] = url;
+    if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/partners'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/partners');
+    return Partner.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Atualiza parceiro.
+  Future<Partner> updatePartner({
+    required String partnerId,
+    required String academyId,
+    String? name,
+    String? description,
+    String? url,
+    String? logoUrl,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    if (url != null) body['url'] = url;
+    if (logoUrl != null) body['logo_url'] = logoUrl;
+    final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/partners');
+    return Partner.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Remove parceiro.
+  Future<void> deletePartner(String partnerId, String academyId) async {
+    final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/partners');
   }
 
   Future<UserModel> getUser(String id) async {
@@ -928,6 +1096,55 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UsageMetrics.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<UsageMetrics> getMetricsUsageForAcademy(String academyId) async {
+    final uri = Uri.parse('$baseUrl/metrics/usage/by_academy')
+        .replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return UsageMetrics.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<EngagementReport> getEngagementReport({
+    required DateTime referenceDate,
+    String? academyId,
+  }) async {
+    final params = <String, String>{
+      'reference_date':
+          '${referenceDate.year.toString().padLeft(4, '0')}-${referenceDate.month.toString().padLeft(2, '0')}-${referenceDate.day.toString().padLeft(2, '0')}',
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/engagement')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return EngagementReport.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<ActiveStudentsReport> getActiveStudentsReport({
+    required DateTime referenceDate,
+    required String academyId,
+  }) async {
+    final params = <String, String>{
+      'reference_date':
+          '${referenceDate.year.toString().padLeft(4, '0')}-${referenceDate.month.toString().padLeft(2, '0')}-${referenceDate.day.toString().padLeft(2, '0')}',
+      'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/active_students')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return ActiveStudentsReport.fromJson(data! as Map<String, dynamic>);
   }
 
   // ---------- Academy extras (ranking, dificuldades, relatório, reset, missões semanais) ----------

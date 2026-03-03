@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
+import 'package:viewer/screens/admin/engagement_reports_screen.dart';
+import 'package:viewer/screens/admin/execution_reports_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
@@ -54,6 +56,32 @@ class AdminSectionScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const UserListScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AdminTile(
+            icon: Icons.bar_chart_rounded,
+            title: 'Relatórios de execuções',
+            subtitle: 'Premeditadas vs naturais por academia',
+            color: AppTheme.primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ExecutionReportsScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AdminTile(
+            icon: Icons.insights_rounded,
+            title: 'Relatórios de engajamento',
+            subtitle: 'Semana e mês · % de alunos ativos',
+            color: AppTheme.primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const EngagementReportsScreen(),
               ),
             ),
           ),
