@@ -15,6 +15,7 @@ from app.models.technique_execution import TechniqueExecution
 from app.models.collective_goal import CollectiveGoal
 from app.models.trophy import Trophy
 from app.models.partner import Partner
+from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 
 __all__ = [
     "Base",
@@ -32,5 +33,7 @@ __all__ = [
     "TechniqueExecution",
     "CollectiveGoal",
     "Trophy",
-    "Partner",
+  "Partner",
+  "TrainingVideo",
+  "TrainingVideoDailyView",
 ]

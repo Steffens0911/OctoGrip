@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
 import 'package:viewer/screens/admin/engagement_reports_screen.dart';
 import 'package:viewer/screens/admin/execution_reports_screen.dart';
+import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
@@ -43,6 +44,19 @@ class AdminSectionScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const AcademyListScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _AdminTile(
+            icon: Icons.ondemand_video_rounded,
+            title: 'Vídeos de treinamento',
+            subtitle: 'Cadastrar vídeos do YouTube com pontos diários',
+            color: AppTheme.primary,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TrainingVideoListScreen(),
               ),
             ),
           ),

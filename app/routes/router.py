@@ -24,6 +24,8 @@ from app.routes import (
     techniques,
     trophies,
     training_feedback,
+    training_videos,
+    me_training_videos,
     users,
 )
 
@@ -49,3 +51,5 @@ api_router.include_router(lesson_complete.router, prefix="/lesson_complete", tag
 api_router.include_router(training_feedback.router, prefix="/training_feedback", tags=["training_feedback"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+api_router.include_router(training_videos.router, prefix="/training_videos", tags=["training_videos"])
+api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])

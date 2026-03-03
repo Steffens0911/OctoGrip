@@ -16,6 +16,7 @@ import 'package:viewer/models/position.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
+import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'dart:typed_data';
 import 'package:viewer/models/user.dart';
@@ -1337,4 +1338,114 @@ class ApiService {
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
+
+  // ---------- Training videos (campo de treinamento) ----------
+  /// Lista vídeos de treinamento disponíveis hoje para o aluno logado.
+  /// Endpoint esperado: GET /me/training_videos/today
+  Future<List<TrainingVideo>> getTrainingVideosToday() async {
+    final uri = Uri.parse('$baseUrl/me/training_videos/today');
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+    );
+    final decoded = jsonDecode(r.body);
+    _throwIfNotOk(r, decoded is Map ? decoded : null);
+    final raw = decoded is List ? decoded : <dynamic>[];
+    return raw
+        .map((e) => TrainingVideo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Registra a conclusão diária de um vídeo de treinamento.
+  /// Endpoint esperado: POST /me/training_videos/{id}/complete
+  Future<TrainingVideoCompletionResult> completeTrainingVideo(
+    String trainingVideoId,
+  ) async {
+    final uri =
+        Uri.parse('$baseUrl/me/training_videos/$trainingVideoId/complete');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = (data ?? {}) as Map<String, dynamic>;
+    return TrainingVideoCompletionResult.fromJson(map);
+  }
+
+  /// Lista todos os vídeos de treinamento (admin/professor).
+  /// Endpoint esperado: GET /training_videos
+  Future<List<TrainingVideo>> getTrainingVideosAdmin() async {
+    final uri = Uri.parse('$baseUrl/training_videos');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final decoded = jsonDecode(r.body);
+    _throwIfNotOk(r, decoded is Map ? decoded : null);
+    final raw = decoded is List ? decoded : <dynamic>[];
+    return raw
+        .map((e) => TrainingVideo.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Cria vídeo de treinamento (admin/professor).
+  Future<void> createTrainingVideo({
+    required String title,
+    required String youtubeUrl,
+    required int pointsPerDay,
+    bool isActive = true,
+    int? durationSeconds,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'youtube_url': youtubeUrl,
+      'points_per_day': pointsPerDay,
+      'is_active': isActive,
+    };
+    if (durationSeconds != null) {
+      body['duration_seconds'] = durationSeconds;
+    }
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/training_videos'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Atualiza vídeo de treinamento (admin/professor).
+  Future<void> updateTrainingVideo({
+    required String id,
+    required String title,
+    required String youtubeUrl,
+    required int pointsPerDay,
+    required bool isActive,
+    int? durationSeconds,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'youtube_url': youtubeUrl,
+      'points_per_day': pointsPerDay,
+      'is_active': isActive,
+    };
+    if (durationSeconds != null) {
+      body['duration_seconds'] = durationSeconds;
+    }
+    final r = await _req(http.put(
+      Uri.parse('$baseUrl/training_videos/$id'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Remove vídeo de treinamento (admin/professor).
+  Future<void> deleteTrainingVideo(String id) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/training_videos/$id'),
+      headers: await _headers(auth: true),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
+  }
 }
+
+

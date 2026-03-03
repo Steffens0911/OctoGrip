@@ -7,14 +7,17 @@ import 'youtube_player_embed_stub.dart'
 
 /// Player de vídeo YouTube: embed (web) ou link (outras plataformas).
 /// [reelsMode] = true usa aspect ratio vertical 9:16 (estilo shorts/reels).
+/// [onEnded] é chamado quando o vídeo chega ao fim, se suportado pela plataforma.
 class YoutubePlayerEmbed extends StatelessWidget {
   final String? videoUrl;
   final bool reelsMode;
+  final VoidCallback? onEnded;
 
   const YoutubePlayerEmbed({
     super.key,
     required this.videoUrl,
     this.reelsMode = false,
+    this.onEnded,
   });
 
   @override
@@ -53,6 +56,8 @@ class YoutubePlayerEmbed extends StatelessWidget {
       reelsMode: reelsMode,
       width: width,
       height: height,
+      onEnded: onEnded,
     );
   }
 }
+

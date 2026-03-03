@@ -82,3 +82,13 @@ class User(Base, UUIDMixin):
         back_populates="opponent",
         lazy="selectin",
     )
+    training_videos: Mapped[list["TrainingVideo"]] = relationship(
+        "TrainingVideo",
+        back_populates="created_by",
+        lazy="selectin",
+    )
+    training_video_daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
+        "TrainingVideoDailyView",
+        back_populates="user",
+        lazy="selectin",
+    )

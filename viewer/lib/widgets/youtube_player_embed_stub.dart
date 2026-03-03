@@ -7,6 +7,7 @@ Widget buildYoutubeEmbed({
   required bool reelsMode,
   required double width,
   required double height,
+  VoidCallback? onEnded,
 }) {
   return InkWell(
     onTap: () {

@@ -461,7 +461,10 @@ async def reject_execution(
 
 
 async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
-    """Soma dos points_awarded de execuções confirmadas (apenas posições da semana, mission_id) + conclusões de missão (MissionUsage) + points_adjustment."""
+    """Soma dos points_awarded de execuções confirmadas (apenas posições da semana, mission_id)
+    + conclusões de missão (MissionUsage)
+    + vídeos de treinamento diários
+    + points_adjustment."""
     exec_points = await db.scalar(
         select(func.coalesce(func.sum(TechniqueExecution.points_awarded), 0)).where(
             TechniqueExecution.user_id == user_id,
@@ -474,15 +477,29 @@ async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
             MissionUsage.user_id == user_id,
         )
     )
+    # Pontos de vídeos de treinamento diários
+    from app.models import TrainingVideoDailyView
+
+    training_video_points = await db.scalar(
+        select(func.coalesce(func.sum(TrainingVideoDailyView.points_awarded), 0)).where(
+            TrainingVideoDailyView.user_id == user_id,
+        )
+    )
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     adjustment = (user.points_adjustment if user else 0) or 0
-    return int(exec_points or 0) + int(mission_points or 0) + adjustment
+    return (
+        int(exec_points or 0)
+        + int(mission_points or 0)
+        + int(training_video_points or 0)
+        + adjustment
+    )
 
 
 async def batch_total_points_for_users(
     db: AsyncSession, user_ids: list[UUID]
 ) -> dict[UUID, int]:
-    """Retorna mapa user_id -> total de pontos (apenas posições da semana: execuções com mission_id + MissionUsage + adjustment)."""
+    """Retorna mapa user_id -> total de pontos (apenas posições da semana: execuções com mission_id
+    + MissionUsage + vídeos de treinamento diários + adjustment)."""
     if not user_ids:
         return {}
     exec_rows = (
@@ -509,6 +526,19 @@ async def batch_total_points_for_users(
             .group_by(MissionUsage.user_id)
         )
     ).all()
+    # Pontos de vídeos de treinamento diários
+    from app.models import TrainingVideoDailyView
+
+    training_rows = (
+        await db.execute(
+            select(
+                TrainingVideoDailyView.user_id,
+                func.coalesce(func.sum(TrainingVideoDailyView.points_awarded), 0).label("pts"),
+            )
+            .where(TrainingVideoDailyView.user_id.in_(user_ids))
+            .group_by(TrainingVideoDailyView.user_id)
+        )
+    ).all()
     user_rows = (
         await db.execute(
             select(User.id, func.coalesce(User.points_adjustment, 0).label("adj")).where(
@@ -520,6 +550,8 @@ async def batch_total_points_for_users(
     for uid, pts in exec_rows:
         result[uid] = result.get(uid, 0) + int(pts or 0)
     for uid, pts in mission_rows:
+        result[uid] = result.get(uid, 0) + int(pts or 0)
+    for uid, pts in training_rows:
         result[uid] = result.get(uid, 0) + int(pts or 0)
     for uid, adj in user_rows:
         result[uid] = result.get(uid, 0) + int(adj or 0)
@@ -677,7 +709,27 @@ async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offs
         )
     )
 
-    combined = union_all(exec_query, usage_query).subquery()
+    # Vídeos de treinamento diários
+    from app.models import TrainingVideoDailyView
+
+    training_query = (
+        select(
+            TrainingVideoDailyView.completed_at.label("event_date"),
+            TrainingVideoDailyView.points_awarded.label("points"),
+            literal("training_video").label("source"),
+            TrainingVideoDailyView.id.label("ref_id"),
+            literal(None).label("technique_id"),
+            literal(None).label("mission_id"),
+            literal(None).label("lesson_id"),
+            literal(None).label("opponent_id"),
+        )
+        .where(
+            TrainingVideoDailyView.user_id == user_id,
+            TrainingVideoDailyView.points_awarded.isnot(None),
+        )
+    )
+
+    combined = union_all(exec_query, usage_query, training_query).subquery()
     result = await db.execute(
         select(combined)
         .order_by(combined.c.event_date.desc().nullslast())
@@ -733,12 +785,19 @@ async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offs
                 "source": "execution",
                 "description": desc,
             })
-        else:
+        elif r.source == "mission":
             entries.append({
                 "date": dt.isoformat() if dt else None,
                 "points": r.points or 0,
                 "source": "mission",
                 "description": "Conclusão de missão",
+            })
+        else:
+            entries.append({
+                "date": dt.isoformat() if dt else None,
+                "points": r.points or 0,
+                "source": "training_video",
+                "description": "Vídeo de campo de treinamento",
             })
 
     return entries

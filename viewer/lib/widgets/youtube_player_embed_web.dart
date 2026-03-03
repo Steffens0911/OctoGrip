@@ -14,6 +14,7 @@ Widget buildYoutubeEmbed({
   required bool reelsMode,
   required double width,
   required double height,
+  VoidCallback? onEnded,
 }) {
   final viewType = 'youtube_embed_$videoId';
   if (!_registered.contains(videoId)) {

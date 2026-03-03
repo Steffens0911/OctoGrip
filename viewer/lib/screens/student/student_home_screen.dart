@@ -19,6 +19,7 @@ import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/screens/student/training_videos_section.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -881,6 +882,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
             children: [
               missionWidget,
+              const SizedBox(height: 16),
+              TrainingVideosSection(),
               const SizedBox(height: 16),
               _buildTrophiesSection(),
               const SizedBox(height: 16),
