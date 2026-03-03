@@ -73,6 +73,7 @@ async def partner_create(
         description=body.description,
         url=body.url,
         logo_url=body.logo_url,
+        highlight_on_login=body.highlight_on_login,
     )
 
 
@@ -97,6 +98,7 @@ async def partner_update(
         description=payload.get("description"),
         url=payload.get("url"),
         logo_url=payload.get("logo_url"),
+        highlight_on_login=payload.get("highlight_on_login"),
     )
     return updated
 

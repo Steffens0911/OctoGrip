@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'dart:math';
+
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
@@ -13,6 +15,7 @@ import 'package:viewer/screens/student/classmates_gallery_screen.dart';
 import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
+import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -142,12 +145,46 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loadPendingConfirmationsWith(),
         _loadAcademyLogoWith(currentUser.academyId),
       ]);
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        _maybeShowRandomPartnerHighlight();
+      }
     } catch (e) {
-      if (mounted) setState(() {
-        _loading = false;
-        _error = userFacingMessage(e);
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = userFacingMessage(e);
+        });
+      }
+    }
+  }
+
+  Future<void> _maybeShowRandomPartnerHighlight() async {
+    if (!mounted) return;
+    final auth = AuthService();
+    final user = _selectedUser;
+    if (user == null) return;
+    if (!auth.isStudent()) return;
+    if (auth.randomPartnerShown) return;
+    final academyId = user.academyId;
+    if (academyId == null || academyId.isEmpty) return;
+
+    try {
+      final partners = await _api.getPartners(academyId);
+      if (!mounted || partners.isEmpty) return;
+      final eligible = partners.where((p) => p.highlightOnLogin).toList();
+      if (eligible.isEmpty) return;
+      final randomPartner = eligible[Random().nextInt(eligible.length)];
+      auth.markRandomPartnerShown();
+      await showDialog(
+        context: context,
+        builder: (context) => _RandomPartnerDialog(
+          partner: randomPartner,
+          api: _api,
+        ),
+      );
+    } catch (_) {
+      // Silencia erros de rede para não quebrar a experiência de login.
     }
   }
 
@@ -836,7 +873,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             leading: Icon(Icons.home_rounded, color: AppTheme.primary, size: 26),
             title: Text(
-              'Início',
+              'Centro de treinamento',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppTheme.textPrimaryOf(context),
                     fontWeight: FontWeight.w600,
@@ -1040,6 +1077,103 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Widget _buildShortcuts() => const SizedBox.shrink();
+}
+
+class _RandomPartnerDialog extends StatelessWidget {
+  final Partner partner;
+  final ApiService api;
+
+  const _RandomPartnerDialog({
+    required this.partner,
+    required this.api,
+  });
+
+  Future<void> _openUrl(String? url) async {
+    if (url == null || url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      contentPadding: const EdgeInsets.all(20),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Parceiro em destaque',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: AppTheme.textPrimaryOf(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              IconButton(
+                icon: Icon(Icons.close, size: 20, color: AppTheme.textSecondaryOf(context)),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (partner.logoUrl != null && partner.logoUrl!.isNotEmpty)
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  partner.logoUrl!.startsWith('/') ? '${api.baseUrl}${partner.logoUrl}' : partner.logoUrl!,
+                  height: 72,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+          if (partner.logoUrl != null && partner.logoUrl!.isNotEmpty)
+            const SizedBox(height: 12),
+          Text(
+            partner.name,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppTheme.textPrimaryOf(context),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          if (partner.description != null && partner.description!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              partner.description!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Agora não'),
+              ),
+              if (partner.url != null && partner.url!.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: () => _openUrl(partner.url),
+                  child: const Text('Conhecer'),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ShortcutTile extends StatelessWidget {

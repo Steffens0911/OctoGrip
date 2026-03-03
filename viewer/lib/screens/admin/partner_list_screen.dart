@@ -24,6 +24,40 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
   bool _loading = true;
   String? _error;
 
+  Future<void> _toggleHighlight(Partner partner) async {
+    final current = partner.highlightOnLogin;
+    try {
+      await _api.updatePartner(
+        partnerId: partner.id,
+        academyId: widget.academy.id,
+        highlightOnLogin: !current,
+      );
+      if (!mounted) return;
+      setState(() {
+        _list = _list
+            .map(
+              (p) => p.id == partner.id
+                  ? Partner(
+                      id: p.id,
+                      academyId: p.academyId,
+                      name: p.name,
+                      description: p.description,
+                      url: p.url,
+                      logoUrl: p.logoUrl,
+                      highlightOnLogin: !current,
+                    )
+                  : p,
+            )
+            .toList();
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingMessage(e))),
+      );
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -148,6 +182,20 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                                   ? Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
+                                        IconButton(
+                                          tooltip: p.highlightOnLogin
+                                              ? 'Remover deste pop-up inicial'
+                                              : 'Destacar no pop-up inicial',
+                                          icon: Icon(
+                                            p.highlightOnLogin
+                                                ? Icons.campaign
+                                                : Icons.campaign_outlined,
+                                            color: p.highlightOnLogin
+                                                ? AppTheme.primary
+                                                : AppTheme.textSecondaryOf(context),
+                                          ),
+                                          onPressed: () => _toggleHighlight(p),
+                                        ),
                                         IconButton(
                                           icon: const Icon(Icons.edit, color: AppTheme.primary),
                                           onPressed: () => _openForm(p),

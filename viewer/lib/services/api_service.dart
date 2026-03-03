@@ -487,6 +487,7 @@ class ApiService {
     String? description,
     String? url,
     String? logoUrl,
+    bool highlightOnLogin = false,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
@@ -495,6 +496,7 @@ class ApiService {
     if (description != null && description.isNotEmpty) body['description'] = description;
     if (url != null && url.isNotEmpty) body['url'] = url;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
+     body['highlight_on_login'] = highlightOnLogin;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/partners'),
       headers: await _jsonHeaders(auth: true),
@@ -514,12 +516,14 @@ class ApiService {
     String? description,
     String? url,
     String? logoUrl,
+    bool? highlightOnLogin,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (description != null) body['description'] = description;
     if (url != null) body['url'] = url;
     if (logoUrl != null) body['logo_url'] = logoUrl;
+    if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
     final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);

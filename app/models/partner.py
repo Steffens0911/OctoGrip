@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -24,5 +24,10 @@ class Partner(Base, UUIDMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    highlight_on_login: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+    )
 
     academy: Mapped["Academy"] = relationship("Academy", back_populates="partners")

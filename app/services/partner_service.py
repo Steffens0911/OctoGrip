@@ -32,6 +32,7 @@ async def create_partner(
     description: str | None = None,
     url: str | None = None,
     logo_url: str | None = None,
+    highlight_on_login: bool = False,
 ) -> Partner:
     """Cria um parceiro na academia."""
     partner = Partner(
@@ -40,6 +41,7 @@ async def create_partner(
         description=description.strip() if description else None,
         url=url.strip() if url else None,
         logo_url=logo_url.strip() if logo_url else None,
+        highlight_on_login=highlight_on_login,
     )
     db.add(partner)
     await db.commit()
@@ -55,6 +57,7 @@ async def update_partner(
     description: str | None = None,
     url: str | None = None,
     logo_url: str | None = None,
+    highlight_on_login: bool | None = None,
 ) -> Partner | None:
     """Atualiza um parceiro. Retorna None se não existir."""
     partner = await get_partner(db, partner_id)
@@ -68,6 +71,8 @@ async def update_partner(
         partner.url = url.strip() if url else None
     if logo_url is not None:
         partner.logo_url = logo_url.strip() if logo_url else None
+    if highlight_on_login is not None:
+        partner.highlight_on_login = highlight_on_login
     await db.commit()
     await db.refresh(partner)
     logger.info("update_partner", extra={"partner_id": str(partner_id)})

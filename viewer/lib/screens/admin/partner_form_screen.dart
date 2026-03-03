@@ -26,6 +26,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
   final _logoUrlController = TextEditingController();
   bool _saving = false;
   String? _error;
+  bool _highlightOnLogin = false;
 
   @override
   void initState() {
@@ -36,6 +37,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
       _descriptionController.text = p.description ?? '';
       _urlController.text = p.url ?? '';
       _logoUrlController.text = p.logoUrl ?? '';
+      _highlightOnLogin = p.highlightOnLogin;
     }
   }
 
@@ -67,6 +69,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
           description: description.isEmpty ? null : description,
           url: url.isEmpty ? null : url,
           logoUrl: logoUrl.isEmpty ? null : logoUrl,
+          highlightOnLogin: _highlightOnLogin,
         );
       } else {
         await _api.createPartner(
@@ -75,6 +78,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
           description: description.isEmpty ? null : description,
           url: url.isEmpty ? null : url,
           logoUrl: logoUrl.isEmpty ? null : logoUrl,
+          highlightOnLogin: _highlightOnLogin,
         );
       }
       if (mounted) {
@@ -160,6 +164,20 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
                   hintText: 'https://... ou /media/...',
                 ),
                 keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Usar no pop-up inicial do aluno'),
+                subtitle: const Text(
+                  'Quando um aluno desta academia fizer login, este parceiro poderá aparecer aleatoriamente em destaque.',
+                ),
+                value: _highlightOnLogin,
+                onChanged: (v) {
+                  setState(() {
+                    _highlightOnLogin = v;
+                  });
+                },
               ),
               const SizedBox(height: 24),
               FilledButton(

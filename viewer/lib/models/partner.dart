@@ -6,6 +6,7 @@ class Partner {
   final String? description;
   final String? url;
   final String? logoUrl;
+  final bool highlightOnLogin;
 
   Partner({
     required this.id,
@@ -14,6 +15,7 @@ class Partner {
     this.description,
     this.url,
     this.logoUrl,
+    this.highlightOnLogin = false,
   });
 
   factory Partner.fromJson(Map<String, dynamic> json) {
@@ -24,6 +26,7 @@ class Partner {
       description: json['description'] as String?,
       url: json['url'] as String?,
       logoUrl: json['logo_url'] as String?,
+      highlightOnLogin: json['highlight_on_login'] as bool? ?? false,
     );
   }
 
@@ -35,6 +38,7 @@ class Partner {
       'description': description,
       'url': url,
       'logo_url': logoUrl,
+      'highlight_on_login': highlightOnLogin,
     };
   }
 }
