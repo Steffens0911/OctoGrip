@@ -10,6 +10,7 @@ from app.models import (
     MissionUsage,
     TechniqueExecution,
     TrainingFeedback,
+    TrainingVideoDailyView,
     User,
 )
 from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
@@ -125,6 +126,7 @@ async def delete_user(db: AsyncSession, user_id: UUID) -> bool:
     user = await get_user(db, user_id)
     if not user:
         return False
+    await db.execute(sa_delete(TrainingVideoDailyView).where(TrainingVideoDailyView.user_id == user_id))
     await db.execute(sa_delete(LessonProgress).where(LessonProgress.user_id == user_id))
     await db.execute(sa_delete(MissionUsage).where(MissionUsage.user_id == user_id))
     await db.execute(

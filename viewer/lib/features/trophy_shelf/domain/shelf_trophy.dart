@@ -14,7 +14,7 @@ class ShelfTrophy {
     required this.slotIndex,
     bool? isUnlocked,
     bool? isGold,
-  })  : isUnlocked = isUnlocked ?? (data.earnedTier != null),
+  })  : isUnlocked = isUnlocked ?? data.unlocked,
         isGold = isGold ?? (data.earnedTier == 'gold');
 
   /// Mapeia lista da API para lista de estante com posições determinísticas.

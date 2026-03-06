@@ -16,6 +16,11 @@ class Academy {
   final int weeklyMultiplier1;
   final int weeklyMultiplier2;
   final int weeklyMultiplier3;
+  final bool showTrophies;
+  final bool showPartners;
+  final bool showSchedule;
+  final bool showGlobalSupporters;
+  final String? updatedAt;
 
   Academy({
     required this.id,
@@ -35,6 +40,11 @@ class Academy {
     this.weeklyMultiplier1 = 1,
     this.weeklyMultiplier2 = 1,
     this.weeklyMultiplier3 = 1,
+    this.showTrophies = true,
+    this.showPartners = true,
+    this.showSchedule = true,
+    this.showGlobalSupporters = true,
+    this.updatedAt,
   });
 
   factory Academy.fromJson(Map<String, dynamic> json) {
@@ -56,6 +66,11 @@ class Academy {
       weeklyMultiplier1: json['weekly_multiplier_1'] as int? ?? 1,
       weeklyMultiplier2: json['weekly_multiplier_2'] as int? ?? 1,
       weeklyMultiplier3: json['weekly_multiplier_3'] as int? ?? 1,
+      showTrophies: json['show_trophies'] as bool? ?? true,
+      showPartners: json['show_partners'] as bool? ?? true,
+      showSchedule: json['show_schedule'] as bool? ?? true,
+      showGlobalSupporters: json['show_global_supporters'] as bool? ?? true,
+      updatedAt: json['updated_at'] as String?,
     );
   }
 
@@ -69,6 +84,11 @@ class Academy {
         'weekly_technique_id': weeklyTechniqueId,
         'weekly_technique_2_id': weeklyTechnique2Id,
         'weekly_technique_3_id': weeklyTechnique3Id,
+        'show_trophies': showTrophies,
+        'show_partners': showPartners,
+        'show_schedule': showSchedule,
+        'show_global_supporters': showGlobalSupporters,
+        'updated_at': updatedAt,
       };
 }
 

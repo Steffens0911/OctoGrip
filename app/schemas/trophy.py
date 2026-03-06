@@ -3,9 +3,10 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 AwardKind = Literal["medal", "trophy"]
+VALID_GRADUATIONS = frozenset({"white", "blue", "purple", "brown", "black"})
 
 
 class TrophyCreate(BaseModel):
@@ -19,6 +20,18 @@ class TrophyCreate(BaseModel):
     target_count: int = Field(..., gt=0)
     award_kind: AwardKind = Field(default="trophy", description="medal=ordinária, trophy=especial")
     min_duration_days: int | None = Field(default=None, description="Obrigatório para trophy (ex: 30)")
+    min_points_to_unlock: int = Field(default=0, ge=0, description="Pontos mínimos do aluno para desbloquear; 0 = todos")
+    min_graduation_to_unlock: str | None = Field(default=None, description="Faixa mínima (white, blue, purple, brown, black); null = todos")
+
+    @field_validator("min_graduation_to_unlock")
+    @classmethod
+    def validate_min_graduation(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            return None
+        g = v.strip().lower()
+        if g not in VALID_GRADUATIONS:
+            raise ValueError(f"min_graduation_to_unlock deve ser um de: {', '.join(sorted(VALID_GRADUATIONS))}")
+        return g
 
 
 class TrophyRead(BaseModel):
@@ -32,6 +45,8 @@ class TrophyRead(BaseModel):
     target_count: int
     award_kind: str = "trophy"
     min_duration_days: int | None = None
+    min_points_to_unlock: int = 0
+    min_graduation_to_unlock: str | None = None
     created_at: datetime | None = None
 
     class Config:
@@ -53,6 +68,9 @@ class UserTrophyEarned(BaseModel):
     target_count: int
     award_kind: str = "trophy"
     min_duration_days: int | None = None
+    min_points_to_unlock: int = 0
+    min_graduation_to_unlock: str | None = None
+    unlocked: bool = True
     earned_tier: TrophyTier | None = None
     gold_count: int = 0
     silver_count: int = 0

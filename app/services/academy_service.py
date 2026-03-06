@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Academy, LessonProgress, Mission, MissionUsage, Position, TechniqueExecution, TrainingFeedback, User
+from app.models import Academy, LessonProgress, Mission, MissionUsage, Partner, Position, TechniqueExecution, TrainingFeedback, User
 from app.services.mission_crud_service import upsert_academy_week_missions
 
 logger = logging.getLogger(__name__)
@@ -150,6 +150,8 @@ async def delete_academy(db: AsyncSession, academy_id: UUID) -> bool:
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return False
+    # Remover parceiros vinculados para evitar violações de integridade ao apagar a academia.
+    await db.execute(sa_delete(Partner).where(Partner.academy_id == academy_id))
     await db.delete(academy)
     await db.commit()
     logger.info("delete_academy", extra={"academy_id": str(academy_id)})
@@ -182,6 +184,7 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
         return None
     technique_keys = {"weekly_technique_id", "weekly_technique_2_id", "weekly_technique_3_id"}
     multiplier_keys = {"weekly_multiplier_1", "weekly_multiplier_2", "weekly_multiplier_3"}
+    visibility_keys = {"show_trophies", "show_partners", "show_schedule", "show_global_supporters"}
     for key, value in kwargs.items():
         if key == "name" and value is not None:
             academy.name = value.strip()
@@ -199,6 +202,8 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
             academy.visible_lesson_id = value
         elif key in multiplier_keys and value is not None and value >= 1:
             setattr(academy, key, value)
+        elif key in visibility_keys and value is not None:
+            setattr(academy, key, bool(value))
     if (technique_keys | multiplier_keys) & set(kwargs.keys()):
         t1 = academy.weekly_technique_id
         t2 = academy.weekly_technique_2_id

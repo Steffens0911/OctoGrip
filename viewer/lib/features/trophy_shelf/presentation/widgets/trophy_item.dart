@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:viewer/features/trophy_shelf/domain/shelf_trophy.dart';
+import 'package:viewer/models/trophy.dart';
 
 /// O troféu em si: ícone/imagem, estado bloqueado (opacidade), estado ouro (glow).
 /// Animações: desbloqueio (scale/opacity) e pulsação suave para ouro.
@@ -181,6 +182,31 @@ class _TrophyItemState extends State<TrophyItem>
                 fontWeight: FontWeight.w500,
               ),
             ),
+            if (!widget.shelfTrophy.isUnlocked) ...[
+              const SizedBox(height: 2),
+              if (t.minPointsToUnlock > 0)
+                Text(
+                  'Desbloqueie com ${t.minPointsToUnlock} pts',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
+                  ),
+                ),
+              if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty)
+                Text(
+                  'Faixa mín.: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
+                  ),
+                ),
+            ],
           ],
         ),
       ),

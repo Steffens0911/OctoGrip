@@ -124,9 +124,9 @@ class TrophyDetailModal extends StatelessWidget {
                         ),
                       ),
                     Text(
-                      t.tierLabel,
+                      t.unlocked ? t.tierLabel : 'Trancado',
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: _tierColor(context, t.earnedTier),
+                        color: t.unlocked ? _tierColor(context, t.earnedTier) : theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -142,7 +142,47 @@ class TrophyDetailModal extends StatelessWidget {
               color: AppTheme.textMutedOf(context),
             ),
           ),
-          if (_hasProgress(t)) ...[
+          if (!t.unlocked) ...[
+            const SizedBox(height: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (t.minPointsToUnlock > 0)
+                  Row(
+                    children: [
+                      Icon(Icons.lock_outline, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Desbloqueie com ${t.minPointsToUnlock} pontos para competir.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty) ...[
+                  if (t.minPointsToUnlock > 0) const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.shield_outlined, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Requer faixa mínima: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock}.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ],
+          if (t.unlocked && _hasProgress(t)) ...[
             const SizedBox(height: 12),
             _progressSection(context, t),
           ],

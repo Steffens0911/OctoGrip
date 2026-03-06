@@ -4,6 +4,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
@@ -48,11 +49,17 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   }
 
   Future<void> _openAcademy(Academy academy) async {
+    Academy effective = academy;
+    try {
+      effective = await _api.getAcademyFresh(academy.id);
+    } catch (_) {
+      // Em caso de erro de rede, cai para os dados em cache.
+    }
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
         builder: (context) => AcademyDetailScreen(
-          academy: academy,
+          academy: effective,
           onUpdated: _load,
           onDeleted: () {
             Navigator.pop(context);
@@ -67,14 +74,15 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count += 1; // Card "Usuários da academia"
+      count += 2; // Cards extras: Usuários da academia + Vídeos de treinamento
     }
     return count;
   }
 
   Widget _buildListItem(BuildContext context, int index) {
-    final isManagerOrProfessor = AuthService().isManager() || AuthService().isProfessor();
-    
+    final isManagerOrProfessor =
+        AuthService().isManager() || AuthService().isProfessor();
+
     if (isManagerOrProfessor && index == 0) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
@@ -92,9 +100,35 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
+    } else if (isManagerOrProfessor && index == 1) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.ondemand_video_rounded, color: AppTheme.primary),
+          ),
+          title: const Text(
+            'Vídeos de treinamento',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Cadastrar vídeos de campo de treinamento da sua academia',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TrainingVideoListScreen(
+                localOnly: true,
+              ),
+            ),
+          ),
+        ),
+      );
     }
-    
-    final academyIndex = isManagerOrProfessor ? index - 1 : index;
+
+    final academyIndex = isManagerOrProfessor ? index - 2 : index;
     final academy = _academies[academyIndex];
     
     return Card(

@@ -7,15 +7,17 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TrainingVideoAdminRead(BaseModel):
-  id: UUID
-  title: str
-  youtube_url: str
-  points_per_day: int
-  is_active: bool
-  duration_seconds: int | None
+    id: UUID
+    title: str
+    youtube_url: str
+    points_per_day: int
+    is_active: bool
+    duration_seconds: int | None
+    academy_id: UUID | None = None
+    academy_name: str | None = None
 
-  class Config:
-    from_attributes = True
+    class Config:
+        from_attributes = True
 
 
 class TrainingVideoCreate(BaseModel):
@@ -44,6 +46,8 @@ class TrainingVideoStudentRead(BaseModel):
   youtube_url: str
   points_per_day: int
   duration_seconds: int | None
+  academy_id: UUID | None = None
+  academy_name: str | None = None
   has_completed_today: bool
   last_completed_at: datetime | None
 

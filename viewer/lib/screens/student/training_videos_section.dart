@@ -4,6 +4,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
 class TrainingVideosSection extends StatefulWidget {
@@ -99,11 +100,22 @@ class _TrainingVideosSectionState extends State<TrainingVideosSection> {
       );
     }
 
-    if (_videos.isEmpty) {
+    final currentUser = AuthService().currentUser;
+    final userAcademyId = currentUser?.academyId;
+    final localVideos = _videos.where((v) {
+      if (userAcademyId == null || userAcademyId.isEmpty) {
+        return false;
+      }
+      return v.academyId == userAcademyId;
+    }).toList();
+
+    if (localVideos.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
         child: Text(
-          'Nenhum vídeo de campo de treinamento disponível hoje.',
+          userAcademyId == null || userAcademyId.isEmpty
+              ? 'Nenhum vídeo de campo de treinamento disponível. Vincule-se a uma academia para ver vídeos locais.'
+              : 'Nenhum vídeo de campo de treinamento disponível hoje para sua academia.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondaryOf(context),
               ),
@@ -114,7 +126,7 @@ class _TrainingVideosSectionState extends State<TrainingVideosSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var v in _videos) ...[
+        for (var v in localVideos) ...[
           _TrainingVideoTile(
             video: v,
             onOpen: () async {

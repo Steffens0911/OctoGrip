@@ -24,18 +24,36 @@ class TrainingVideo(Base, UUIDMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     order_index: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    academy_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("academies.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+        comment="NULL = vídeo global; preenchido = vídeo local da academia.",
+    )
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
-
-    created_by: Mapped["User | None"] = relationship("User", back_populates="training_videos", lazy="selectin")
+    academy: Mapped["Academy | None"] = relationship(
+        "Academy",
+        back_populates="training_videos",
+        lazy="selectin",
+    )
+    created_by: Mapped["User | None"] = relationship(
+        "User",
+        back_populates="training_videos",
+        lazy="selectin",
+    )
     daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
         "TrainingVideoDailyView",
         back_populates="training_video",
         lazy="selectin",
     )
+
+    @property
+    def academy_name(self) -> str | None:
+        return self.academy.name if self.academy else None
 
 
 class TrainingVideoDailyView(Base, UUIDMixin):

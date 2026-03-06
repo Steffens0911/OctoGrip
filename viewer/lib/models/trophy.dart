@@ -11,6 +11,12 @@ class TrophyWithEarned {
   /// 'medal' = premiação ordinária; 'trophy' = premiação especial (longo prazo).
   final String awardKind;
   final int? minDurationDays;
+  /// Pontos mínimos para desbloquear este troféu; 0 = todos.
+  final int minPointsToUnlock;
+  /// Faixa mínima para desbloquear (white, blue, purple, brown, black); null = todos.
+  final String? minGraduationToUnlock;
+  /// Se o aluno já atingiu pontos e faixa mínimos para poder competir por este troféu.
+  final bool unlocked;
   final String? earnedTier; // 'gold' | 'silver' | 'bronze' | null
   final int goldCount;
   final int silverCount;
@@ -27,6 +33,9 @@ class TrophyWithEarned {
     required this.targetCount,
     this.awardKind = 'trophy',
     this.minDurationDays,
+    this.minPointsToUnlock = 0,
+    this.minGraduationToUnlock,
+    this.unlocked = true,
     this.earnedTier,
     this.goldCount = 0,
     this.silverCount = 0,
@@ -45,6 +54,9 @@ class TrophyWithEarned {
       targetCount: json['target_count'] as int,
       awardKind: json['award_kind'] as String? ?? 'trophy',
       minDurationDays: (json['min_duration_days'] as num?)?.toInt(),
+      minPointsToUnlock: (json['min_points_to_unlock'] as num?)?.toInt() ?? 0,
+      minGraduationToUnlock: json['min_graduation_to_unlock'] as String?,
+      unlocked: json['unlocked'] as bool? ?? true,
       earnedTier: json['earned_tier'] as String?,
       goldCount: (json['gold_count'] as num?)?.toInt() ?? 0,
       silverCount: (json['silver_count'] as num?)?.toInt() ?? 0,
@@ -63,6 +75,19 @@ class TrophyWithEarned {
       case 'silver': return 'Prata';
       case 'bronze': return 'Bronze';
       default: return earnedTier!;
+    }
+  }
+
+  /// Label em português da faixa mínima para desbloquear; null se não houver restrição.
+  static String? graduationLabel(String? graduation) {
+    if (graduation == null || graduation.isEmpty) return null;
+    switch (graduation.toLowerCase()) {
+      case 'white': return 'Branca';
+      case 'blue': return 'Azul';
+      case 'purple': return 'Roxa';
+      case 'brown': return 'Marrom';
+      case 'black': return 'Preta';
+      default: return graduation;
     }
   }
 }

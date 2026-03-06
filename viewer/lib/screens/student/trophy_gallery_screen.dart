@@ -563,12 +563,12 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                         width: 48,
                                         height: 48,
                                         decoration: BoxDecoration(
-                                          color: _tierColor(t.earnedTier).withValues(alpha: 0.2),
+                                          color: (t.unlocked ? _tierColor(t.earnedTier) : Colors.grey).withValues(alpha: 0.2),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Icon(
-                                          _tierIcon(t.earnedTier),
-                                          color: _tierColor(t.earnedTier),
+                                          t.unlocked ? _tierIcon(t.earnedTier) : Icons.lock_outline,
+                                          color: t.unlocked ? _tierColor(t.earnedTier) : Colors.grey,
                                           size: 28,
                                         ),
                                       ),
@@ -630,21 +630,59 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
-                                          color: _tierColor(t.earnedTier).withValues(alpha: 0.15),
+                                          color: (t.unlocked ? _tierColor(t.earnedTier) : Colors.grey).withValues(alpha: 0.15),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          t.tierLabel,
+                                          t.unlocked ? t.tierLabel : 'Trancado',
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
-                                            color: _tierColor(t.earnedTier),
+                                            color: t.unlocked ? _tierColor(t.earnedTier) : Colors.grey,
                                           ),
                                         ),
                                       ),
                                     ],
                                   ),
-                                  ...(){
+                                  if (!t.unlocked) ...[
+                                    const SizedBox(height: 10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 4,
+                                      children: [
+                                        if (t.minPointsToUnlock > 0)
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.lock_outline, size: 18, color: AppTheme.textSecondaryOf(context)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Desbloqueie com ${t.minPointsToUnlock} pontos',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppTheme.textSecondaryOf(context),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty)
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.shield_outlined, size: 18, color: AppTheme.textSecondaryOf(context)),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                'Requer faixa mínima: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock}',
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: AppTheme.textSecondaryOf(context),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                  ] else ...(){
                                     final progressLines = _progressLines(context, t);
                                     if (progressLines.isEmpty) return <Widget>[];
                                     return [
@@ -656,6 +694,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     ];
                                   }(),
                                   if (_isOwnGallery &&
+                                      t.unlocked &&
                                       t.academyId != null &&
                                       t.academyId!.isNotEmpty) ...[
                                     const SizedBox(height: 12),

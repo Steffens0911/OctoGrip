@@ -296,7 +296,10 @@ class _MainShellState extends State<MainShell> {
                     icon: Icons.home_rounded,
                     label: 'Início',
                     selected: _selected == 0,
-                    onTap: () => setState(() => _selected = 0),
+                    onTap: () => setState(() {
+                      _selected = 0;
+                      _inicioRefreshKey++;
+                    }),
                   ),
                 if (tabs.contains('Painel'))
                   _NavItem(

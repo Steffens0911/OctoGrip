@@ -8,7 +8,9 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 
 class TrainingVideoListScreen extends StatefulWidget {
-  const TrainingVideoListScreen({super.key});
+  final bool localOnly;
+
+  const TrainingVideoListScreen({super.key, this.localOnly = false});
 
   @override
   State<TrainingVideoListScreen> createState() =>
@@ -58,7 +60,26 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     try {
       final videos = await _api.getTrainingVideosAdmin();
       if (!mounted) return;
-      _all = videos;
+      if (widget.localOnly) {
+        final currentUser = AuthService().currentUser;
+        final academyId = currentUser?.academyId;
+        if (academyId != null && academyId.isNotEmpty) {
+          _all = videos.where((v) => v.academyId == academyId).toList();
+        } else {
+          _all = [];
+        }
+      } else {
+        // Admin global: nesta tela mostrar apenas vídeos globais (apoiadores do app).
+        final isAdmin = AuthService().isAdmin();
+        if (isAdmin) {
+          _all = videos
+              .where((v) =>
+                  v.academyId == null || (v.academyId?.isEmpty ?? true))
+              .toList();
+        } else {
+          _all = videos;
+        }
+      }
       _applyFilters();
       setState(() {
         _loading = false;
@@ -163,6 +184,37 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                     )
                   : Column(
                       children: [
+                        if (!widget.localOnly && AuthService().isAdmin())
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                            child: Card(
+                              color: AppTheme.primary.withValues(alpha: 0.06),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline_rounded,
+                                      size: 20,
+                                      color: AppTheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Para exibir ou ocultar o quadro "Apoiadores do app" na home do aluno: Administração → Academias → toque em uma academia → role até "Visibilidade na tela do aluno".',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppTheme.textSecondaryOf(context),
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: TextField(
@@ -192,10 +244,13 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                   AppTheme.screenPadding(context)),
                               itemCount: _filtered.length,
                               itemBuilder: (context, i) {
-                                final v = _filtered[i];
-                                final subtitle =
-                                    '${v.pointsPerDay} pts/dia · ${v.youtubeUrl}';
-                                return Card(
+                              final v = _filtered[i];
+                              final scopeLabel = v.academyId == null
+                                  ? 'Global'
+                                  : (v.academyName?.isNotEmpty == true
+                                      ? 'Academia: ${v.academyName}'
+                                      : 'Somente academia');
+                              return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
                                     title: Text(
@@ -204,10 +259,32 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
-                                    subtitle: Text(
-                                      subtitle,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${v.pointsPerDay} pts/dia · $scopeLabel',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: AppTheme.textSecondaryOf(context),
+                                              ),
+                                        ),
+                                        Text(
+                                          v.youtubeUrl,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall
+                                              ?.copyWith(
+                                                color: AppTheme.textMutedOf(context),
+                                                fontSize: 11,
+                                              ),
+                                        ),
+                                      ],
                                     ),
                                     trailing: canEdit
                                         ? Row(

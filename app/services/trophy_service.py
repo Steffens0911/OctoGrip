@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError
+from app.core.graduation import meets_minimum_graduation
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
+from app.services.execution_service import total_points_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +65,8 @@ async def create_trophy(
     target_count: int,
     award_kind: str = "trophy",
     min_duration_days: int | None = None,
+    min_points_to_unlock: int = 0,
+    min_graduation_to_unlock: str | None = None,
 ) -> Trophy:
     """Cria troféu ou medalha da academia. Valida técnica, datas e duração mínima para troféu."""
     logger.debug(
@@ -101,6 +105,8 @@ async def create_trophy(
         target_count=target_count,
         award_kind=award_kind,
         min_duration_days=min_duration_days if award_kind == "trophy" else None,
+        min_points_to_unlock=max(0, min_points_to_unlock),
+        min_graduation_to_unlock=(min_graduation_to_unlock.strip().lower() if min_graduation_to_unlock and min_graduation_to_unlock.strip() else None),
     )
     db.add(trophy)
     await db.commit()
@@ -286,6 +292,7 @@ async def list_user_trophies_with_earned(
         return []
 
     trophies = await list_trophies_by_academy(db, user.academy_id)
+    user_points = await total_points_for_user(db, user_id)
     all_executions = await _load_confirmed_executions_for_user(db, user_id)
     all_mission_usages = (
         await db.execute(
@@ -320,6 +327,13 @@ async def list_user_trophies_with_earned(
         if t.end_date < today and tier is None:
             continue
         technique_name = t.technique.name if t.technique else None
+        min_pts = getattr(t, "min_points_to_unlock", 0) or 0
+        min_grad = getattr(t, "min_graduation_to_unlock", None) or None
+        if min_grad and isinstance(min_grad, str) and not min_grad.strip():
+            min_grad = None
+        points_ok = user_points >= min_pts
+        graduation_ok = meets_minimum_graduation(user.graduation, min_grad)
+        unlocked = points_ok and graduation_ok
         result.append(
             {
                 "trophy_id": str(t.id),
@@ -332,6 +346,9 @@ async def list_user_trophies_with_earned(
                 "target_count": t.target_count,
                 "award_kind": getattr(t, "award_kind", "trophy"),
                 "min_duration_days": getattr(t, "min_duration_days", None),
+                "min_points_to_unlock": min_pts,
+                "min_graduation_to_unlock": min_grad,
+                "unlocked": unlocked,
                 "earned_tier": tier,
                 "gold_count": counts["gold_count"],
                 "silver_count": counts["silver_count"],

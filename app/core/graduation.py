@@ -39,6 +39,17 @@ def points_for_graduation(graduation: str | None) -> int:
     return GRADUATION_POINTS.get(graduation.strip().lower(), 0)
 
 
+def meets_minimum_graduation(user_graduation: str | None, min_graduation: str | None) -> bool:
+    """
+    True se o usuário atinge a faixa mínima exigida.
+    Se min_graduation for None/vazio, não há restrição (retorna True).
+    Ordem: branca(1) < azul(2) < roxa(3) < marrom(4) < preta(5).
+    """
+    if not min_graduation or not min_graduation.strip():
+        return True
+    return points_for_graduation(user_graduation) >= points_for_graduation(min_graduation)
+
+
 def calculate_points_awarded(
     opponent_graduation: str | None,
     outcome: str,

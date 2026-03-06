@@ -3,7 +3,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.role_deps import require_write_access
+from app.core.exceptions import ForbiddenError
+from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.training_video import (
@@ -38,7 +39,16 @@ async def training_video_create(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Cria um novo vídeo de treinamento."""
+    """Cria um novo vídeo de treinamento.
+
+    - Administrador global: cria vídeos globais (academy_id = NULL).
+    - Demais (gestor/professor): criam vídeos locais para sua própria academia.
+    """
+    academy_id: UUID | None = None
+    if current_user.role != "administrador":
+        if current_user.academy_id is None:
+            raise ForbiddenError("Você precisa estar vinculado a uma academia para criar vídeos de treinamento.")
+        academy_id = current_user.academy_id
     video = await create_training_video(
         db,
         title=body.title,
@@ -46,6 +56,7 @@ async def training_video_create(
         points_per_day=body.points_per_day,
         is_active=body.is_active,
         duration_seconds=body.duration_seconds,
+        academy_id=academy_id,
         created_by_id=current_user.id,
     )
     return TrainingVideoAdminRead.model_validate(video)
@@ -64,6 +75,10 @@ async def training_video_update(
         from app.core.exceptions import NotFoundError
 
         raise NotFoundError("Vídeo de treinamento não encontrado.")
+    # Gestores/professores só podem editar vídeos locais da sua própria academia.
+    if current_user.role != "administrador":
+        if current_user.academy_id is None or video.academy_id != current_user.academy_id:
+            raise ForbiddenError("Você não tem permissão para editar este vídeo.")
     payload = body.model_dump(exclude_unset=True)
     updated = await update_training_video(
         db,
@@ -85,6 +100,14 @@ async def training_video_delete(
     current_user: User = Depends(require_write_access),
 ):
     """Remove um vídeo de treinamento."""
+    video = await get_training_video(db, video_id)
+    if not video:
+        from app.core.exceptions import NotFoundError
+
+        raise NotFoundError("Vídeo de treinamento não encontrado.")
+    if current_user.role != "administrador":
+        if current_user.academy_id is None or video.academy_id != current_user.academy_id:
+            raise ForbiddenError("Você não tem permissão para remover este vídeo.")
     ok = await delete_training_video(db, video_id)
     if not ok:
         from app.core.exceptions import NotFoundError

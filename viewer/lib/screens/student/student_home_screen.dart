@@ -19,6 +19,7 @@ import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/screens/student/training_videos_section.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
@@ -42,12 +43,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   int _pendingConfirmationsCount = 0;
   bool _loading = true;
   String? _error;
+  int _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
   String? _academyLogoUrl;
   bool _academyLogoLoaded = false;
   String? _academyScheduleImageUrl;
-  String? _academyScheduleDisplayUrl;
-  String? _academyScheduleOriginalUrl;
+  String? _academyScheduleUpdatedAt;
   bool _academyScheduleLoaded = false;
+  bool _showTrophies = true;
+  bool _showPartners = true;
+  bool _showSchedule = true;
+  bool _showGlobalSupporters = true;
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
   static String _levelFromGraduation(String? g) {
@@ -101,12 +106,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (state == AppLifecycleState.resumed && _selectedUser != null) {
       final currentUser = _selectedUser!;
       final level = _levelFromGraduation(currentUser.graduation);
-      // Agrupar carregamentos para evitar múltiplos setState
+      // Agrupar carregamentos para evitar múltiplos setState (inclui quadro de horários)
       Future.wait([
         _loadMissionWeekWith(currentUser.academyId, level),
         _loadUserPointsWith(currentUser.id),
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
+        _loadAcademyLogoWith(currentUser.academyId),
       ]);
     }
   }
@@ -119,9 +125,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _academyLogoUrl = null;
       _academyLogoLoaded = false;
       _academyScheduleImageUrl = null;
-      _academyScheduleDisplayUrl = null;
-      _academyScheduleOriginalUrl = null;
+      _academyScheduleUpdatedAt = null;
       _academyScheduleLoaded = false;
+      _showTrophies = true;
+      _showPartners = true;
+      _showSchedule = true;
+      _showGlobalSupporters = true;
     });
     try {
       await AuthService().refreshMe();
@@ -195,31 +204,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       final academy = await _api.getAcademyFresh(academyId);
       if (!mounted) return;
       setState(() {
+        _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
         _academyLogoUrl = academy.logoUrl;
         _academyLogoLoaded = true;
         _academyScheduleImageUrl = academy.scheduleImageUrl;
+        _academyScheduleUpdatedAt = academy.updatedAt;
         _academyScheduleLoaded = true;
-        _academyScheduleDisplayUrl = null;
-        _academyScheduleOriginalUrl = null;
+        _showTrophies = academy.showTrophies;
+        _showPartners = academy.showPartners;
+        _showSchedule = academy.showSchedule;
+        _showGlobalSupporters = academy.showGlobalSupporters;
       });
-      if (academy.scheduleImageUrl != null && academy.scheduleImageUrl!.isNotEmpty) {
-        try {
-          final res = await _api.getScheduleDisplayUrl(academy.scheduleImageUrl!);
-          if (mounted) {
-            setState(() {
-              _academyScheduleDisplayUrl = res['display_url'] as String?;
-              _academyScheduleOriginalUrl = res['original_url'] as String?;
-            });
-          }
-        } catch (_) {
-          if (mounted) {
-            setState(() {
-              _academyScheduleDisplayUrl = null;
-              _academyScheduleOriginalUrl = academy.scheduleImageUrl;
-            });
-          }
-        }
-      }
     } catch (_) {
       // Falha de rede ou permissão: mostra placeholder em vez de ficar em "Carregando...".
       if (mounted) {
@@ -227,9 +222,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           _academyLogoUrl = null;
           _academyLogoLoaded = true;
           _academyScheduleImageUrl = null;
-          _academyScheduleDisplayUrl = null;
-          _academyScheduleOriginalUrl = null;
+          _academyScheduleUpdatedAt = null;
           _academyScheduleLoaded = true;
+          _showTrophies = true;
+          _showPartners = true;
+          _showSchedule = true;
+          _showGlobalSupporters = true;
         });
       }
     }
@@ -501,14 +499,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               _buildMainAccordion(),
               if (_selectedUser!.academyId != null && _selectedUser!.academyId!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _buildPartnersSection(),
+                if (_showPartners) _buildPartnersSection(),
               ],
             ],
             if (_academyScheduleImageUrl != null &&
-                _academyScheduleImageUrl!.isNotEmpty) ...[
+                _academyScheduleImageUrl!.isNotEmpty &&
+                _showSchedule) ...[
               const SizedBox(height: 16),
               _buildScheduleCard(),
             ],
+            if (_showGlobalSupporters) const GlobalSupportersSection(),
           ],
         ),
       ),
@@ -525,13 +525,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Widget _buildScheduleCard() {
-    final displayUrl = _academyScheduleDisplayUrl;
-    final openUrl = _academyScheduleOriginalUrl ?? _academyScheduleImageUrl;
-    final hasImage = displayUrl != null && displayUrl.isNotEmpty;
+    final rawUrl = _academyScheduleImageUrl;
+    if (rawUrl == null || rawUrl.isEmpty) return const SizedBox.shrink();
+    final baseUrl = rawUrl.startsWith('/') ? '${_api.baseUrl}$rawUrl' : rawUrl;
+    // Cache-buster local: sempre que recarregamos a academia (_loadAcademyLogoWith),
+    // _scheduleLocalVersion é atualizado, garantindo que a URL mude após um novo upload.
+    final v = _scheduleLocalVersion.toString();
+    final sep = baseUrl.contains('?') ? '&' : '?';
+    final openUrl = '$baseUrl${sep}v=$v';
+    final maxH = MediaQuery.of(context).size.height * 0.35;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: openUrl != null && openUrl.isNotEmpty ? () => _openScheduleUrl(openUrl) : null,
+        onTap: () => _openScheduleUrl(openUrl),
         borderRadius: BorderRadius.circular(20),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -551,28 +557,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     ),
               ),
               const SizedBox(height: 8),
-              if (hasImage)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: maxH.clamp(200.0, 320.0)),
                   child: Image.network(
-                    displayUrl!.startsWith('/') ? '${_api.baseUrl}$displayUrl' : displayUrl,
-                    height: 160,
-                    fit: BoxFit.cover,
+                    openUrl,
+                    width: double.infinity,
+                    fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) => _schedulePlaceholder(context, openUrl),
                   ),
-                )
-              else
-                _schedulePlaceholder(context, openUrl),
-              if (openUrl != null && openUrl.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(
-                    'Toque para abrir',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.primary,
-                        ),
-                  ),
                 ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  'Toque para abrir',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.primary,
+                      ),
+                ),
+              ),
             ],
           ),
         ),
@@ -885,7 +890,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               const SizedBox(height: 16),
               TrainingVideosSection(),
               const SizedBox(height: 16),
-              _buildTrophiesSection(),
+              if (_showTrophies) _buildTrophiesSection(),
               const SizedBox(height: 16),
               _buildConfirmationsAndRequestsSection(),
             ],

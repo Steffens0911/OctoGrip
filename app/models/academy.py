@@ -59,6 +59,26 @@ class Academy(Base, UUIDMixin):
     weekly_multiplier_1: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     weekly_multiplier_2: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     weekly_multiplier_3: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    show_trophies: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+        comment="Controle da home do aluno: exibe ou não o acordeon de troféus.",
+    )
+    show_partners: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+        comment="Controle da home do aluno: exibe ou não o acordeon de parceiros.",
+    )
+    show_schedule: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+        comment="Controle da home do aluno: exibe ou não o quadro de horários (mesmo havendo imagem).",
+    )
+    show_global_supporters: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+        comment="Controle da home do aluno: exibe ou não o quadro de apoiadores globais do app.",
+    )
 
     weekly_technique: Mapped["Technique | None"] = relationship(
         "Technique",
@@ -118,6 +138,11 @@ class Academy(Base, UUIDMixin):
     )
     partners: Mapped[list["Partner"]] = relationship(
         "Partner",
+        back_populates="academy",
+        lazy="selectin",
+    )
+    training_videos: Mapped[list["TrainingVideo"]] = relationship(
+        "TrainingVideo",
         back_populates="academy",
         lazy="selectin",
     )

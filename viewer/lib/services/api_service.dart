@@ -323,6 +323,36 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
+  Future<Academy> uploadAcademyScheduleImage(String id, Uint8List bytes, String filename) async {
+    var name = filename;
+    var contentType = _contentTypeFromFilename(filename);
+    if (contentType == null && bytes.isNotEmpty) {
+      final ext = _extensionFromBytes(bytes);
+      name = filename.contains('.') ? filename : 'schedule.$ext';
+      contentType = ext == 'png'
+          ? MediaType('image', 'png')
+          : ext == 'jpg'
+              ? MediaType('image', 'jpeg')
+              : MediaType('image', 'webp');
+    }
+    final uri = Uri.parse('$baseUrl/academies/$id/schedule_image');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: name,
+        contentType: contentType,
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return Academy.fromJson(data! as Map<String, dynamic>);
+  }
+
   /// Atualiza academia (nome, slug, tema, técnicas, lição visível). Campos omitidos não são alterados.
   /// Se [updateVisibleLesson] for true, envia [visibleLessonId] (null limpa a lição visível).
   Future<Academy> updateAcademy(
@@ -335,6 +365,10 @@ class ApiService {
     String? weeklyTechniqueId,
     String? visibleLessonId,
     bool updateVisibleLesson = false,
+    bool? showTrophies,
+    bool? showPartners,
+    bool? showSchedule,
+    bool? showGlobalSupporters,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -344,6 +378,12 @@ class ApiService {
     if (scheduleImageUrl != null) body['schedule_image_url'] = scheduleImageUrl;
     if (weeklyTechniqueId != null) body['weekly_technique_id'] = weeklyTechniqueId;
     if (updateVisibleLesson) body['visible_lesson_id'] = visibleLessonId;
+    if (showTrophies != null) body['show_trophies'] = showTrophies;
+    if (showPartners != null) body['show_partners'] = showPartners;
+    if (showSchedule != null) body['show_schedule'] = showSchedule;
+    if (showGlobalSupporters != null) {
+      body['show_global_supporters'] = showGlobalSupporters;
+    }
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/academies/$id'),
@@ -449,6 +489,8 @@ class ApiService {
     required int targetCount,
     required String awardKind,
     int? minDurationDays,
+    int minPointsToUnlock = 0,
+    String? minGraduationToUnlock,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
@@ -460,6 +502,8 @@ class ApiService {
       'award_kind': awardKind,
     };
     if (minDurationDays != null) body['min_duration_days'] = minDurationDays;
+    if (minPointsToUnlock != 0) body['min_points_to_unlock'] = minPointsToUnlock;
+    if (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) body['min_graduation_to_unlock'] = minGraduationToUnlock;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
       headers: await _jsonHeaders(auth: true),
@@ -571,6 +615,8 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    // Limpar cache de listagem de usuários para refletir imediatamente o novo usuário.
+    invalidateCache('GET:$baseUrl/users');
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -596,6 +642,8 @@ class ApiService {
   Future<void> deleteUser(String id) async {
     final r = await _req(http.delete(Uri.parse('$baseUrl/users/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
+    // Limpar cache de listagem de usuários após exclusão.
+    invalidateCache('GET:$baseUrl/users');
   }
 
   // ---------- Lessons ----------

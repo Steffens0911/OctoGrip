@@ -56,7 +56,9 @@ from app.services.collective_goal_service import (
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
 _ACADEMY_LOGOS_DIR: Final[Path] = _MEDIA_ROOT / "academy_logos"
+_ACADEMY_SCHEDULES_DIR: Final[Path] = _MEDIA_ROOT / "academy_schedules"
 _ACADEMY_LOGOS_DIR.mkdir(parents=True, exist_ok=True)
+_ACADEMY_SCHEDULES_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter()
 
@@ -80,6 +82,11 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         weekly_multiplier_1=a.weekly_multiplier_1,
         weekly_multiplier_2=a.weekly_multiplier_2,
         weekly_multiplier_3=a.weekly_multiplier_3,
+        show_trophies=a.show_trophies,
+        show_partners=a.show_partners,
+        show_schedule=a.show_schedule,
+        show_global_supporters=a.show_global_supporters,
+        updated_at=getattr(a, "updated_at", None),
     )
 
 
@@ -307,6 +314,56 @@ async def academy_upload_logo(
     dest.write_bytes(data)
 
     academy.logo_url = f"/media/academy_logos/{filename}"
+    await db.commit()
+    await db.refresh(academy)
+    return _academy_to_read(academy)
+
+
+@router.post("/{academy_id}/schedule_image", response_model=AcademyRead)
+async def academy_upload_schedule_image(
+    academy_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Faz upload da imagem de horários da academia e atualiza schedule_image_url."""
+    academy = await get_academy(db, academy_id)
+    if academy is None:
+        raise AcademyNotFoundError()
+    verify_academy_access(current_user, str(academy_id))
+
+    data = await file.read()
+    allowed = ("image/png", "image/jpeg", "image/jpg", "image/webp")
+    content_type = (file.content_type or "").strip().lower()
+    if content_type not in allowed:
+        name = (file.filename or "").lower()
+        if name.endswith(".png"):
+            content_type = "image/png"
+        elif name.endswith(".jpg") or name.endswith(".jpeg"):
+            content_type = "image/jpeg"
+        elif name.endswith(".webp"):
+            content_type = "image/webp"
+    if content_type not in allowed and len(data) >= 12:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            content_type = "image/png"
+        elif data[:2] == b"\xff\xd8":
+            content_type = "image/jpeg"
+        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            content_type = "image/webp"
+    if content_type not in allowed:
+        raise ForbiddenError("Tipo de arquivo não suportado. Envie PNG, JPEG ou WEBP.")
+
+    extension = ".png"
+    if content_type in ("image/jpeg", "image/jpg"):
+        extension = ".jpg"
+    elif content_type == "image/webp":
+        extension = ".webp"
+
+    filename = f"academy-schedule-{academy_id}{extension}"
+    dest = _ACADEMY_SCHEDULES_DIR / filename
+    dest.write_bytes(data)
+
+    academy.schedule_image_url = f"/media/academy_schedules/{filename}"
     await db.commit()
     await db.refresh(academy)
     return _academy_to_read(academy)

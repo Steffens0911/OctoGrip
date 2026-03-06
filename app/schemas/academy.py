@@ -1,4 +1,5 @@
 """Schemas para Academia (A-03, A-04)."""
+from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -33,6 +34,11 @@ class AcademyRead(BaseModel):
     weekly_multiplier_1: int = 1
     weekly_multiplier_2: int = 1
     weekly_multiplier_3: int = 1
+    show_trophies: bool = True
+    show_partners: bool = True
+    show_schedule: bool = True
+    show_global_supporters: bool = True
+    updated_at: datetime | None = None
 
     class Config:
         from_attributes = True
@@ -63,6 +69,10 @@ class AcademyUpdate(BaseModel):
     weekly_multiplier_1: int | None = None
     weekly_multiplier_2: int | None = None
     weekly_multiplier_3: int | None = None
+    show_trophies: bool | None = None
+    show_partners: bool | None = None
+    show_schedule: bool | None = None
+    show_global_supporters: bool | None = None
 
 
 class RankingEntry(BaseModel):

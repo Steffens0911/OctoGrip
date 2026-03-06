@@ -64,8 +64,13 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   String? _errorUsageMetrics;
   late final TextEditingController _logoUrlController;
   bool _uploadingLogo = false;
-  late final TextEditingController _scheduleImageUrlController;
-  bool _savingScheduleImageUrl = false;
+  bool _uploadingScheduleImage = false;
+  bool _showTrophies = true;
+  bool _showPartners = true;
+  bool _showSchedule = true;
+  bool _savingVisibility = false;
+  bool _showGlobalSupporters = true;
+  int? _scheduleImageCacheBuster;
 
   @override
   void initState() {
@@ -81,8 +86,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
     _logoUrlController = TextEditingController(text: _academy.logoUrl ?? '');
-    _scheduleImageUrlController =
-        TextEditingController(text: _academy.scheduleImageUrl ?? '');
+    _showTrophies = _academy.showTrophies;
+    _showPartners = _academy.showPartners;
+    _showSchedule = _academy.showSchedule;
+    _showGlobalSupporters = _academy.showGlobalSupporters;
     _loadTechniques();
     _loadPositions();
     _loadRankingAndReport();
@@ -96,7 +103,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult2Controller.dispose();
     _mult3Controller.dispose();
     _logoUrlController.dispose();
-    _scheduleImageUrlController.dispose();
     super.dispose();
   }
 
@@ -229,6 +235,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   'techniqueId': _techniques.first.id,
                   'awardKind': 'trophy',
                   'minDurationDays': '30',
+                  'minPointsToUnlock': '0',
+                  'minGraduationToUnlock': null,
                   'startDate': DateTime.now(),
                   'endDate': DateTime.now().add(const Duration(days: 30)),
                   'targetCount': '10',
@@ -285,6 +293,35 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       validator: FormBuilderValidators.compose([
                         FormBuilderValidators.required(errorText: 'Selecione uma técnica'),
                       ]),
+                    ),
+                    const SizedBox(height: 12),
+                    FormBuilderTextField(
+                      name: 'minPointsToUnlock',
+                      decoration: const InputDecoration(
+                        labelText: 'Pontos mínimos para desbloquear',
+                        hintText: '0 = todos podem competir',
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: FormBuilderValidators.compose([
+                        FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
+                        FormBuilderValidators.min(0, errorText: 'Mínimo 0'),
+                      ]),
+                    ),
+                    const SizedBox(height: 8),
+                    FormBuilderDropdown<String?>(
+                      name: 'minGraduationToUnlock',
+                      decoration: const InputDecoration(
+                        labelText: 'Faixa mínima para desbloquear',
+                        hintText: 'Nenhuma = todos podem competir',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: null, child: Text('Nenhuma')),
+                        DropdownMenuItem(value: 'white', child: Text('Branca')),
+                        DropdownMenuItem(value: 'blue', child: Text('Azul')),
+                        DropdownMenuItem(value: 'purple', child: Text('Roxa')),
+                        DropdownMenuItem(value: 'brown', child: Text('Marrom')),
+                        DropdownMenuItem(value: 'black', child: Text('Preta')),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     FormBuilderDateTimePicker(
@@ -361,6 +398,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       }
                     }
                     final targetCount = int.parse(values['targetCount'] as String);
+                    final minPointsToUnlock = int.tryParse((values['minPointsToUnlock'] as String?)?.trim() ?? '0') ?? 0;
+                    final minGraduationToUnlock = values['minGraduationToUnlock'] as String?;
                     final startDate = toApiDate(startDateValue);
                     final endDate = toApiDate(endDateValue);
 
@@ -375,6 +414,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         targetCount: targetCount,
                         awardKind: kind,
                         minDurationDays: kind == 'trophy' ? minDurationDays : null,
+                        minPointsToUnlock: minPointsToUnlock < 0 ? 0 : minPointsToUnlock,
+                        minGraduationToUnlock: (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) ? minGraduationToUnlock : null,
                       );
                       if (mounted) {
                         _loadTrophies();
@@ -475,8 +516,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       setState(() {
         _academy = updated;
         _logoUrlController.text = updated.logoUrl ?? '';
-        _scheduleImageUrlController.text =
-            updated.scheduleImageUrl ?? _scheduleImageUrlController.text;
         _uploadingLogo = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -495,32 +534,108 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       );
     }
   }
-
-  Future<void> _saveScheduleImageUrl() async {
+  Future<void> _pickAndUploadScheduleImage() async {
     setState(() {
-      _savingScheduleImageUrl = true;
+      _uploadingScheduleImage = true;
     });
     try {
-      final url = _scheduleImageUrlController.text.trim();
-      final updated = await _api.updateAcademy(
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) {
+        setState(() {
+          _uploadingScheduleImage = false;
+        });
+        return;
+      }
+      final file = result.files.first;
+      if (file.bytes == null) {
+        setState(() {
+          _uploadingScheduleImage = false;
+        });
+        return;
+      }
+      final updated = await _api.uploadAcademyScheduleImage(
         _academy.id,
-        scheduleImageUrl: url.isEmpty ? null : url,
+        file.bytes!,
+        file.name,
       );
       if (!mounted) return;
       setState(() {
         _academy = updated;
-        _savingScheduleImageUrl = false;
+        _uploadingScheduleImage = false;
+        _scheduleImageCacheBuster = DateTime.now().millisecondsSinceEpoch;
       });
+      _api.invalidateCache('GET:${_api.baseUrl}/academies');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Imagem de horários atualizada.'),
+          content: Text('Quadro de horários atualizado.'),
           backgroundColor: AppTheme.primary,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _savingScheduleImageUrl = false;
+        _uploadingScheduleImage = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingMessage(e))),
+      );
+    }
+  }
+
+  String _scheduleImageUrlWithCacheBuster() {
+    final raw = _academy.scheduleImageUrl!;
+    final base = raw.startsWith('/') ? '${_api.baseUrl}$raw' : raw;
+    final v = (_scheduleImageCacheBuster ?? _academy.updatedAt ?? '').toString();
+    if (v.isEmpty) return base;
+    final sep = base.contains('?') ? '&' : '?';
+    return '$base${sep}v=$v';
+  }
+
+  Future<void> _updateHomeVisibility({
+    bool? showTrophies,
+    bool? showPartners,
+    bool? showSchedule,
+    bool? showGlobalSupporters,
+  }) async {
+    if (_savingVisibility) return;
+    setState(() {
+      _savingVisibility = true;
+      if (showTrophies != null) _showTrophies = showTrophies;
+      if (showPartners != null) _showPartners = showPartners;
+      if (showSchedule != null) _showSchedule = showSchedule;
+      if (showGlobalSupporters != null) {
+        _showGlobalSupporters = showGlobalSupporters;
+      }
+    });
+    try {
+      final updated = await _api.updateAcademy(
+        _academy.id,
+        showTrophies: _showTrophies,
+        showPartners: _showPartners,
+        showSchedule: _showSchedule,
+        showGlobalSupporters: _showGlobalSupporters,
+      );
+      if (!mounted) return;
+      setState(() {
+        _academy = updated;
+        _showTrophies = updated.showTrophies;
+        _showPartners = updated.showPartners;
+        _showSchedule = updated.showSchedule;
+        _showGlobalSupporters = updated.showGlobalSupporters;
+        _savingVisibility = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Visibilidade atualizada na tela do aluno.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _savingVisibility = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(userFacingMessage(e))),
@@ -1084,35 +1199,31 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           _academy.scheduleImageUrl!.isNotEmpty) ...[
                         ClipRRect(
                           borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            _academy.scheduleImageUrl!.startsWith('/')
-                                ? '${_api.baseUrl}${_academy.scheduleImageUrl}'
-                                : _academy.scheduleImageUrl!,
-                            height: 120,
-                            fit: BoxFit.cover,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 240),
+                            child: Image.network(
+                              _scheduleImageUrlWithCacheBuster(),
+                              width: double.infinity,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
                       ],
                       if (AuthService().canEditResources())
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _scheduleImageUrlController,
-                                decoration: const InputDecoration(
-                                  labelText: 'URL da imagem de horários',
-                                  hintText: 'https://... ou /media/...',
-                                  border: OutlineInputBorder(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FilledButton(
-                              onPressed: _savingScheduleImageUrl ? null : _saveScheduleImageUrl,
-                              child: Text(_savingScheduleImageUrl ? 'Salvando...' : 'Salvar'),
-                            ),
-                          ],
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilledButton.icon(
+                            onPressed: _uploadingScheduleImage ? null : _pickAndUploadScheduleImage,
+                            icon: _uploadingScheduleImage
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.upload),
+                            label: Text(_uploadingScheduleImage ? 'Enviando...' : 'Selecionar imagem'),
+                          ),
                         )
                       else
                         Padding(
@@ -1148,6 +1259,79 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ),
                 ),
               ],
+              const SizedBox(height: 12),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Visibilidade na tela do aluno',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Defina quais blocos aparecem na home dos alunos desta academia.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Mostrar troféus'),
+                        subtitle: const Text('Exibe o acordeon de troféus na tela inicial do aluno.'),
+                        value: _showTrophies,
+                        onChanged: _savingVisibility
+                            ? null
+                            : (value) {
+                                _updateHomeVisibility(showTrophies: value);
+                              },
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Mostrar parceiros'),
+                        subtitle: const Text('Exibe o acordeon de parceiros na tela inicial do aluno.'),
+                        value: _showPartners,
+                        onChanged: _savingVisibility
+                            ? null
+                            : (value) {
+                                _updateHomeVisibility(showPartners: value);
+                              },
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Mostrar horários da academia'),
+                        subtitle: const Text('Exibe o quadro de horários na tela inicial (quando houver imagem configurada).'),
+                        value: _showSchedule,
+                        onChanged: _savingVisibility
+                            ? null
+                            : (value) {
+                                _updateHomeVisibility(showSchedule: value);
+                              },
+                      ),
+                      if (AuthService().isAdmin())
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Mostrar apoiadores do app'),
+                          subtitle: const Text(
+                            'Exibe o quadro de apoiadores do app (vídeos globais) no final da tela inicial do aluno.',
+                          ),
+                          value: _showGlobalSupporters,
+                          onChanged: _savingVisibility
+                              ? null
+                              : (value) {
+                                  _updateHomeVisibility(showGlobalSupporters: value);
+                                },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
               ..._buildExtraSections(),
             ],

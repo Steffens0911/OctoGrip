@@ -4,7 +4,7 @@ import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import TrainingVideo, TrainingVideoDailyView, User
@@ -35,6 +35,7 @@ async def create_training_video(
     points_per_day: int,
     is_active: bool = True,
     duration_seconds: int | None = None,
+    academy_id: UUID | None = None,
     created_by_id: UUID | None = None,
 ) -> TrainingVideo:
     video = TrainingVideo(
@@ -43,6 +44,7 @@ async def create_training_video(
         points_per_day=points_per_day,
         is_active=is_active,
         duration_seconds=duration_seconds,
+        academy_id=academy_id,
         created_by_id=created_by_id,
     )
     db.add(video)
@@ -101,9 +103,23 @@ async def get_training_videos_for_user_today(
     if today is None:
         today = datetime.now(timezone.utc).date()
 
+    # Vídeos globais (academy_id IS NULL) + vídeos locais da academia do usuário (se houver).
+    base_query = select(TrainingVideo).where(TrainingVideo.is_active.is_(True))
+    if user.academy_id is not None:
+        base_query = base_query.where(
+            or_(
+                TrainingVideo.academy_id.is_(None),
+                TrainingVideo.academy_id == user.academy_id,
+            )
+        )
+    else:
+        base_query = base_query.where(TrainingVideo.academy_id.is_(None))
+
     videos = (await db.execute(
-        select(TrainingVideo).where(TrainingVideo.is_active.is_(True))
-        .order_by(TrainingVideo.order_index.nulls_last(), TrainingVideo.created_at.desc())
+        base_query.order_by(
+            TrainingVideo.order_index.nulls_last(),
+            TrainingVideo.created_at.desc(),
+        )
     )).scalars().all()
     if not videos:
         return []
@@ -132,6 +148,8 @@ async def get_training_videos_for_user_today(
                 "youtube_url": v.youtube_url,
                 "points_per_day": v.points_per_day,
                 "duration_seconds": v.duration_seconds,
+                "academy_id": v.academy_id,
+                "academy_name": getattr(v.academy, "name", None) if hasattr(v, "academy") else None,
                 "has_completed_today": has_completed_today,
                 "last_completed_at": last_completed_at,
             }
