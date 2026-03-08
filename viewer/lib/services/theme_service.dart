@@ -4,10 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _keyThemeMode = 'theme_mode';
 const _keyThemeStyle = 'theme_style';
 
-/// Estilo visual do app: jogo (marrom/âmbar) ou premium (lavanda/claro).
+/// Estilo visual do app: jogo (marrom/âmbar), premium (lavanda/claro) ou memo (Memo UI Kit).
 enum ThemeStyle {
   game,
   premium,
+  memo,
 }
 
 /// Serviço para persistir e restaurar preferência de tema (light/dark/system) e estilo (game/premium).
@@ -59,16 +60,42 @@ class ThemeService {
   static Future<ThemeStyle> loadStyle() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(_keyThemeStyle);
-    return value == 'premium' ? ThemeStyle.premium : ThemeStyle.game;
+    switch (value) {
+      case 'premium':
+        return ThemeStyle.premium;
+      case 'game':
+        return ThemeStyle.game;
+      case 'memo':
+        return ThemeStyle.memo;
+      default:
+        return ThemeStyle.memo; // padrão: Memo UI Kit
+    }
   }
 
   static Future<void> saveStyle(ThemeStyle style) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyThemeStyle, style == ThemeStyle.premium ? 'premium' : 'game');
+    final value = switch (style) {
+      ThemeStyle.game => 'game',
+      ThemeStyle.premium => 'premium',
+      ThemeStyle.memo => 'memo',
+    };
+    await prefs.setString(_keyThemeStyle, value);
   }
 
-  /// Alterna entre estilo jogo e premium (um clique = troca de estilo).
+  /// Alterna entre estilos: game → premium → memo → game.
   static ThemeStyle nextStyle(ThemeStyle current) {
-    return current == ThemeStyle.game ? ThemeStyle.premium : ThemeStyle.game;
+    return switch (current) {
+      ThemeStyle.game => ThemeStyle.premium,
+      ThemeStyle.premium => ThemeStyle.memo,
+      ThemeStyle.memo => ThemeStyle.game,
+    };
+  }
+
+  static String labelStyle(ThemeStyle style) {
+    return switch (style) {
+      ThemeStyle.game => 'Jogo',
+      ThemeStyle.premium => 'Premium',
+      ThemeStyle.memo => 'Memo',
+    };
   }
 }

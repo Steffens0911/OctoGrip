@@ -27,7 +27,9 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
-      CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:8080","http://localhost","http://127.0.0.1:8080"]}
+      # Em desenvolvimento use ["*"] para acessar pelo celular na mesma rede (ex.: http://IP_DO_PC:8080).
+      # Em produção defina CORS_ORIGINS com origens específicas (a API rejeita "*").
+      CORS_ORIGINS: ${CORS_ORIGINS:-["*"]}
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENABLE_METRICS: ${ENABLE_METRICS:-true}

@@ -57,12 +57,30 @@ class _ViewerAppState extends State<ViewerApp> {
     await ThemeService.save(_themeMode);
   }
 
+  Future<void> _cycleStyle(BuildContext context) async {
+    setState(() => _themeStyle = ThemeService.nextStyle(_themeStyle));
+    await ThemeService.saveStyle(_themeStyle);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Estilo: ${ThemeService.labelStyle(_themeStyle)}'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = switch (_themeStyle) {
+      ThemeStyle.game => (light: AppTheme.light, dark: AppTheme.dark),
+      ThemeStyle.premium => (light: AppTheme.premiumLight, dark: AppTheme.premiumDark),
+      ThemeStyle.memo => (light: AppTheme.memoLight, dark: AppTheme.memoDark),
+    };
     return MaterialApp(
       title: 'JJB Viewer',
-      theme: _themeStyle == ThemeStyle.game ? AppTheme.light : AppTheme.premiumLight,
-      darkTheme: _themeStyle == ThemeStyle.game ? AppTheme.dark : AppTheme.premiumDark,
+      theme: theme.light,
+      darkTheme: theme.dark,
       themeMode: _themeMode,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [
@@ -75,7 +93,10 @@ class _ViewerAppState extends State<ViewerApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
-      home: AuthGate(onThemeToggle: _cycleTheme),
+      home: AuthGate(
+        onThemeToggle: _cycleTheme,
+        onStyleToggle: _cycleStyle,
+      ),
     );
   }
 }
@@ -83,8 +104,13 @@ class _ViewerAppState extends State<ViewerApp> {
 /// Gate: mostra LoginScreen ou MainShell conforme autenticação via Provider.
 class AuthGate extends StatelessWidget {
   final void Function(BuildContext context) onThemeToggle;
+  final void Function(BuildContext context) onStyleToggle;
 
-  const AuthGate({super.key, required this.onThemeToggle});
+  const AuthGate({
+    super.key,
+    required this.onThemeToggle,
+    required this.onStyleToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -92,6 +118,7 @@ class AuthGate extends StatelessWidget {
     if (auth.isLoggedIn) {
       return MainShell(
         onThemeToggle: onThemeToggle,
+        onStyleToggle: onStyleToggle,
         onLogout: () async {
           await auth.logout();
         },
@@ -104,9 +131,15 @@ class AuthGate extends StatelessWidget {
 /// Shell principal: navegação estilo Lovable com Provider para estado de auth.
 class MainShell extends StatefulWidget {
   final void Function(BuildContext context) onThemeToggle;
+  final void Function(BuildContext context) onStyleToggle;
   final VoidCallback onLogout;
 
-  const MainShell({super.key, required this.onThemeToggle, required this.onLogout});
+  const MainShell({
+    super.key,
+    required this.onThemeToggle,
+    required this.onStyleToggle,
+    required this.onLogout,
+  });
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -229,7 +262,8 @@ class _MainShellState extends State<MainShell> {
                   : Icons.dark_mode_outlined,
             ),
             onPressed: () => widget.onThemeToggle(context),
-            tooltip: 'Alternar tema',
+            onLongPress: () => widget.onStyleToggle(context),
+            tooltip: 'Clique: claro/escuro. Pressione e segure: estilo (Jogo / Premium / Memo)',
           ),
           IconButton(
             icon: const Icon(Icons.logout_outlined),

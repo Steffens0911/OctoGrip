@@ -4,10 +4,10 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/models/trophy.dart';
-import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart' show ApiException, ApiService;
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/opponent_picker_sheet.dart';
 
 /// Galeria de troféus e medalhas do usuário: premiações da academia com tier conquistado (ouro/prata/bronze) ou "A conquistar".
 class TrophyGalleryScreen extends StatefulWidget {
@@ -162,58 +162,12 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     );
   }
 
-  static String _faixaLabel(String? g) {
-    if (g == null || g.isEmpty) return '—';
-    switch (g.toLowerCase()) {
-      case 'white': return 'Branca';
-      case 'blue': return 'Azul';
-      case 'purple': return 'Roxa';
-      case 'brown': return 'Marrom';
-      case 'black': return 'Preta';
-      default: return g;
-    }
-  }
-
-  Future<String?> _showOpponentDialog(String academyId) async {
-    List<UserModel> colleagues = [];
-    try {
-      final list = await _api.getUsers(academyId: academyId);
-      colleagues = list.where((u) => u.id != widget.userId).toList();
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não foi possível carregar colegas da academia.')),
-        );
-      }
-      return null;
-    }
-    if (colleagues.isEmpty) return null;
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PointerInterceptor(
-        child: AlertDialog(
-          title: const Text('Em quem você aplicou a técnica?'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: colleagues.map<Widget>((u) {
-                return ListTile(
-                  title: Text(u.name ?? u.email),
-                  subtitle: Text(_faixaLabel(u.graduation)),
-                  onTap: () => Navigator.pop(ctx, u.id),
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-          ],
-        ),
-      ),
+  Future<String?> _showOpponentDialog(String academyId) {
+    return OpponentPickerSheet.show(
+      context,
+      academyId: academyId,
+      currentUserId: widget.userId,
+      allowSkip: false,
     );
   }
 

@@ -1,21 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:viewer/generated/app_color_theme.dart';
 
-/// Extensão do tema para indicar se o estilo atual é jogo (marrom) ou premium (lavanda).
+/// Extensão do tema: jogo (marrom), premium (lavanda/claro) ou memo (Memo UI Kit).
 class AppThemeStyleExtension extends ThemeExtension<AppThemeStyleExtension> {
   final bool isGameStyle;
+  final bool isMemoStyle;
 
-  const AppThemeStyleExtension({required this.isGameStyle});
+  const AppThemeStyleExtension({
+    required this.isGameStyle,
+    this.isMemoStyle = false,
+  });
+
+  bool get isPremiumStyle => !isGameStyle && !isMemoStyle;
 
   @override
-  AppThemeStyleExtension copyWith({bool? isGameStyle}) =>
-      AppThemeStyleExtension(isGameStyle: isGameStyle ?? this.isGameStyle);
+  AppThemeStyleExtension copyWith({bool? isGameStyle, bool? isMemoStyle}) =>
+      AppThemeStyleExtension(
+        isGameStyle: isGameStyle ?? this.isGameStyle,
+        isMemoStyle: isMemoStyle ?? this.isMemoStyle,
+      );
 
   @override
   AppThemeStyleExtension lerp(
       ThemeExtension<AppThemeStyleExtension>? other, double t) {
     if (other is! AppThemeStyleExtension) return this;
-    return AppThemeStyleExtension(isGameStyle: t < 0.5 ? isGameStyle : other.isGameStyle);
+    return AppThemeStyleExtension(
+      isGameStyle: t < 0.5 ? isGameStyle : other.isGameStyle,
+      isMemoStyle: t < 0.5 ? isMemoStyle : other.isMemoStyle,
+    );
   }
 }
 
@@ -74,14 +87,17 @@ class AppTheme {
   static const Color borderDark = Color(0xFF4A3328);
   static const Color borderLightDark = Color(0xFF5C4033);
 
-  /// Cores sensíveis ao tema atual. Respeita tanto o brilho (light/dark)
-  /// quanto o estilo (jogo x premium) via [AppThemeStyleExtension].
+  /// Cores sensíveis ao tema atual. Respeita brilho (light/dark) e estilo
+  /// (jogo / premium / memo) via [AppThemeStyleExtension].
   static Color backgroundOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN900Background : c.neutralsN50;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumBackgroundDark : premiumBackground;
     }
     return isDark ? backgroundDark : background;
@@ -89,10 +105,13 @@ class AppTheme {
 
   static Color surfaceOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN900Background : c.white;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumSurfaceDark : premiumSurface;
     }
     return isDark ? surfaceDark : surface;
@@ -100,10 +119,13 @@ class AppTheme {
 
   static Color textPrimaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN100 : c.textPrimary;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumTextPrimaryDark : premiumTextPrimary;
     }
     return isDark ? textPrimaryDark : textPrimary;
@@ -111,10 +133,13 @@ class AppTheme {
 
   static Color textSecondaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN300 : c.neutralsN600;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumTextSecondaryDark : premiumTextSecondary;
     }
     return isDark ? textSecondaryDark : textSecondary;
@@ -122,10 +147,13 @@ class AppTheme {
 
   static Color textMutedOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN500 : c.neutralsN500;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumTextMutedDark : premiumTextMuted;
     }
     return isDark ? textMutedDark : textMuted;
@@ -133,10 +161,13 @@ class AppTheme {
 
   static Color borderOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN700 : c.neutralsN200;
+    }
+    if (ext?.isGameStyle != true) {
       return isDark ? premiumBorderDark : premiumBorder;
     }
     return isDark ? borderDark : border;
@@ -717,6 +748,216 @@ class AppTheme {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       extensions: const [AppThemeStyleExtension(isGameStyle: false)],
+    );
+  }
+
+  // --- Memo UI Kit (cores do figma_puller: lib/generated/app_color_theme.dart) ---
+
+  static ThemeData get memoLight {
+    const c = AppColorTheme.light;
+    final colorScheme = ColorScheme.light(
+      primary: c.primaryP500,
+      onPrimary: Colors.white,
+      primaryContainer: c.primaryP50,
+      onPrimaryContainer: c.primaryP900,
+      secondary: c.secondaryS500,
+      onSecondary: Colors.white,
+      secondaryContainer: c.secondaryS50,
+      onSecondaryContainer: c.secondaryS900,
+      tertiary: c.primaryP400,
+      onTertiary: Colors.white,
+      error: c.error,
+      onError: Colors.white,
+      surface: c.white,
+      onSurface: c.textPrimary,
+      onSurfaceVariant: c.neutralsN600,
+      outline: c.neutralsN200,
+      surfaceContainerHighest: c.neutralsN100,
+      surfaceContainerLow: c.neutralsN50,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: c.neutralsN50,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme).copyWith(
+        displaySmall: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w700, color: c.textPrimary),
+        headlineMedium: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w600, color: c.textPrimary),
+        titleLarge: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary),
+        titleMedium: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w600, color: c.textPrimary),
+        bodyLarge: GoogleFonts.plusJakartaSans(fontSize: 16, color: c.textPrimary),
+        bodyMedium: GoogleFonts.plusJakartaSans(fontSize: 14, color: c.neutralsN600),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: c.white,
+        foregroundColor: c.textPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary),
+      ),
+      cardTheme: CardThemeData(
+        color: c.white,
+        elevation: 1,
+        shadowColor: const Color(0x1A000000),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: c.neutralsN200, width: 1),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: c.primaryP500,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: c.primaryP500,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: c.primaryP500,
+          side: BorderSide(color: c.primaryP500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: c.primaryP500,
+        foregroundColor: Colors.white,
+        elevation: 2,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: c.white,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c.neutralsN200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c.primaryP500, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      extensions: const [
+        AppThemeStyleExtension(isGameStyle: false, isMemoStyle: true),
+        AppColorTheme.light,
+      ],
+    );
+  }
+
+  static ThemeData get memoDark {
+    const c = AppColorTheme.light;
+    final colorScheme = ColorScheme.dark(
+      primary: c.primaryP400,
+      onPrimary: c.neutralsN900Background,
+      primaryContainer: c.primaryP900,
+      onPrimaryContainer: c.primaryP100,
+      secondary: c.secondaryS400,
+      onSecondary: c.neutralsN900Background,
+      secondaryContainer: c.secondaryS900,
+      onSecondaryContainer: c.secondaryS100,
+      tertiary: c.primaryP400,
+      onTertiary: c.neutralsN900Background,
+      error: c.dangerD500,
+      onError: Colors.white,
+      surface: c.neutralsN900Background,
+      onSurface: c.neutralsN100,
+      onSurfaceVariant: c.neutralsN300,
+      outline: c.neutralsN700,
+      surfaceContainerHighest: c.neutralsN800,
+      surfaceContainerLow: c.neutralsN900Background,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: c.neutralsN900Background,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme).copyWith(
+        displaySmall: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w700, color: c.neutralsN100),
+        headlineMedium: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w600, color: c.neutralsN100),
+        titleLarge: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.neutralsN100),
+        titleMedium: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w600, color: c.neutralsN100),
+        bodyLarge: GoogleFonts.plusJakartaSans(fontSize: 16, color: c.neutralsN100),
+        bodyMedium: GoogleFonts.plusJakartaSans(fontSize: 14, color: c.neutralsN300),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: c.neutralsN900Background,
+        foregroundColor: c.neutralsN100,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.neutralsN100),
+      ),
+      cardTheme: CardThemeData(
+        color: c.neutralsN800,
+        elevation: 0,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: c.neutralsN700, width: 1),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: c.primaryP400,
+          foregroundColor: c.neutralsN900Background,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: c.primaryP400,
+          foregroundColor: c.neutralsN900Background,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: c.primaryP400,
+          side: BorderSide(color: c.primaryP400),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: c.primaryP400,
+        foregroundColor: c.neutralsN900Background,
+        elevation: 2,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: c.neutralsN800,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c.neutralsN700),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: c.primaryP400, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      extensions: const [
+        AppThemeStyleExtension(isGameStyle: false, isMemoStyle: true),
+        AppColorTheme.light,
+      ],
     );
   }
 }
