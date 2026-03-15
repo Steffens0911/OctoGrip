@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String
+from sqlalchemy import ForeignKey, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -61,21 +61,25 @@ class Academy(Base, UUIDMixin):
     weekly_multiplier_3: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     show_trophies: Mapped[bool] = mapped_column(
         default=True,
+        server_default=text("true"),
         nullable=False,
         comment="Controle da home do aluno: exibe ou não o acordeon de troféus.",
     )
     show_partners: Mapped[bool] = mapped_column(
         default=True,
+        server_default=text("true"),
         nullable=False,
         comment="Controle da home do aluno: exibe ou não o acordeon de parceiros.",
     )
     show_schedule: Mapped[bool] = mapped_column(
         default=True,
+        server_default=text("true"),
         nullable=False,
         comment="Controle da home do aluno: exibe ou não o quadro de horários (mesmo havendo imagem).",
     )
     show_global_supporters: Mapped[bool] = mapped_column(
         default=True,
+        server_default=text("true"),
         nullable=False,
         comment="Controle da home do aluno: exibe ou não o quadro de apoiadores globais do app.",
     )

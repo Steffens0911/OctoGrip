@@ -32,9 +32,12 @@ CREATE TABLE IF NOT EXISTS training_video_daily_views (
     points_awarded INTEGER NOT NULL DEFAULT 0
 );
 
-ALTER TABLE training_video_daily_views
-    ADD CONSTRAINT uq_training_video_daily_view_unique
-    UNIQUE (user_id, training_video_id, view_date);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_training_video_daily_view_unique') THEN
+    ALTER TABLE training_video_daily_views ADD CONSTRAINT uq_training_video_daily_view_unique UNIQUE (user_id, training_video_id, view_date);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS ix_training_video_daily_views_user_date
     ON training_video_daily_views(user_id, view_date);

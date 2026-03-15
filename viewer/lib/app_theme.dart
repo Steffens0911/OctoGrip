@@ -1,21 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:viewer/services/theme_service.dart';
 
-/// Extensão do tema para indicar se o estilo atual é jogo (marrom) ou premium (lavanda).
+/// Extensão do tema para indicar o estilo visual: jogo, premium ou memo (Memo UI Kit).
 class AppThemeStyleExtension extends ThemeExtension<AppThemeStyleExtension> {
-  final bool isGameStyle;
+  final ThemeStyle style;
 
-  const AppThemeStyleExtension({required this.isGameStyle});
+  const AppThemeStyleExtension({required this.style});
+
+  bool get isGameStyle => style == ThemeStyle.game;
+  bool get isMemoStyle => style == ThemeStyle.memo;
 
   @override
-  AppThemeStyleExtension copyWith({bool? isGameStyle}) =>
-      AppThemeStyleExtension(isGameStyle: isGameStyle ?? this.isGameStyle);
+  AppThemeStyleExtension copyWith({ThemeStyle? style}) =>
+      AppThemeStyleExtension(style: style ?? this.style);
 
   @override
   AppThemeStyleExtension lerp(
       ThemeExtension<AppThemeStyleExtension>? other, double t) {
     if (other is! AppThemeStyleExtension) return this;
-    return AppThemeStyleExtension(isGameStyle: t < 0.5 ? isGameStyle : other.isGameStyle);
+    return AppThemeStyleExtension(style: t < 0.5 ? style : other.style);
   }
 }
 
@@ -74,71 +78,59 @@ class AppTheme {
   static const Color borderDark = Color(0xFF4A3328);
   static const Color borderLightDark = Color(0xFF5C4033);
 
-  /// Cores sensíveis ao tema atual. Respeita tanto o brilho (light/dark)
-  /// quanto o estilo (jogo x premium) via [AppThemeStyleExtension].
+  /// Cores sensíveis ao tema atual. Respeita brilho (light/dark) e estilo
+  /// (jogo / premium / memo) via [AppThemeStyleExtension].
   static Color backgroundOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumBackgroundDark : premiumBackground;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoBackgroundDark : memoBackground;
+    if (style == ThemeStyle.premium) return isDark ? premiumBackgroundDark : premiumBackground;
     return isDark ? backgroundDark : background;
   }
 
   static Color surfaceOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumSurfaceDark : premiumSurface;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoSurfaceDark : memoSurface;
+    if (style == ThemeStyle.premium) return isDark ? premiumSurfaceDark : premiumSurface;
     return isDark ? surfaceDark : surface;
   }
 
   static Color textPrimaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumTextPrimaryDark : premiumTextPrimary;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoTextPrimaryDark : memoTextPrimary;
+    if (style == ThemeStyle.premium) return isDark ? premiumTextPrimaryDark : premiumTextPrimary;
     return isDark ? textPrimaryDark : textPrimary;
   }
 
   static Color textSecondaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumTextSecondaryDark : premiumTextSecondary;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoTextSecondaryDark : memoTextSecondary;
+    if (style == ThemeStyle.premium) return isDark ? premiumTextSecondaryDark : premiumTextSecondary;
     return isDark ? textSecondaryDark : textSecondary;
   }
 
   static Color textMutedOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumTextMutedDark : premiumTextMuted;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoTextMutedDark : memoTextMuted;
+    if (style == ThemeStyle.premium) return isDark ? premiumTextMutedDark : premiumTextMuted;
     return isDark ? textMutedDark : textMuted;
   }
 
   static Color borderOf(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
     final isDark = theme.brightness == Brightness.dark;
-    if (!isGameStyle) {
-      return isDark ? premiumBorderDark : premiumBorder;
-    }
+    if (style == ThemeStyle.memo) return isDark ? memoBorderDark : memoBorder;
+    if (style == ThemeStyle.premium) return isDark ? premiumBorderDark : premiumBorder;
     return isDark ? borderDark : border;
   }
 
@@ -262,7 +254,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(isGameStyle: true)],
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.game)],
     );
   }
 
@@ -385,9 +377,28 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(isGameStyle: true)],
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.game)],
     );
   }
+
+  // --- Paleta Memo UI Kit (tema escuro roxo/verde) ---
+  static const Color memoPrimary = Color(0xFF49AB6C); // P500
+  static const Color memoPrimaryLight = Color(0xFF60D88B); // P400
+  static const Color memoSecondary = Color(0xFF9C81EA); // S400
+  static const Color memoBackground = Color(0xFF252330); // claro: variante suave
+  static const Color memoBackgroundDark = Color(0xFF1F1D28); // N900
+  static const Color memoSurface = Color(0xFF2A2835);
+  static const Color memoSurfaceDark = Color(0xFF343141); // N800
+  static const Color memoSurfaceElevatedDark = Color(0xFF4A465B); // N700
+  static const Color memoTextPrimary = Color(0xFF343141);
+  static const Color memoTextPrimaryDark = Color(0xFFFFFFFF);
+  static const Color memoTextSecondary = Color(0xFF7A748E); // N500
+  static const Color memoTextSecondaryDark = Color(0xFFC7C3DB); // N200
+  static const Color memoTextMuted = Color(0xFF928CA6); // N400
+  static const Color memoTextMutedDark = Color(0xFFADA7C1); // N300
+  static const Color memoBorder = Color(0xFF4A465B);
+  static const Color memoBorderDark = Color(0xFF343141);
+  static const Color memoDanger = Color(0xFFE63D70); // D500
 
   // --- Paleta premium (tema claro verde estilo coffee shop) ---
   static const Color premiumPrimary = Color(0xFF6CB238); // verde principal
@@ -562,7 +573,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(isGameStyle: false)],
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.premium)],
     );
   }
 
@@ -716,7 +727,187 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(isGameStyle: false)],
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.premium)],
+    );
+  }
+
+  static ThemeData get memoLight {
+    final colorScheme = ColorScheme.fromSeed(
+      seedColor: memoPrimary,
+      primary: memoPrimary,
+      onPrimary: Colors.white,
+      secondary: memoSecondary,
+      surface: memoSurface,
+      onSurface: memoTextPrimary,
+      surfaceContainerHighest: memoSurfaceDark,
+      brightness: Brightness.light,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: memoBackground,
+      fontFamily: GoogleFonts.robotoMono().fontFamily,
+      textTheme: GoogleFonts.robotoMonoTextTheme(ThemeData.light().textTheme).copyWith(
+        displaySmall: GoogleFonts.robotoMono(fontSize: 28, fontWeight: FontWeight.w700, color: memoTextPrimary),
+        headlineMedium: GoogleFonts.robotoMono(fontSize: 22, fontWeight: FontWeight.w600, color: memoTextPrimary),
+        titleLarge: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimary),
+        titleMedium: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.w600, color: memoTextPrimary),
+        bodyLarge: GoogleFonts.robotoMono(fontSize: 16, color: memoTextPrimary),
+        bodyMedium: GoogleFonts.robotoMono(fontSize: 14, color: memoTextSecondary),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: memoSurface,
+        foregroundColor: memoTextPrimary,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimary),
+      ),
+      cardTheme: CardThemeData(
+        color: memoSurfaceDark,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: memoBorder, width: 1),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: memoPrimary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: memoPrimary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: memoSecondary,
+          side: const BorderSide(color: memoSecondary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: memoSurface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoPrimary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoDanger),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.memo)],
+    );
+  }
+
+  static ThemeData get memoDark {
+    final colorScheme = ColorScheme.dark(
+      primary: memoPrimaryLight,
+      onPrimary: memoBackgroundDark,
+      secondary: memoSecondary,
+      surface: memoSurfaceDark,
+      onSurface: memoTextPrimaryDark,
+      surfaceContainerHighest: memoSurfaceElevatedDark,
+      outline: memoBorderDark,
+      error: memoDanger,
+      onError: Colors.white,
+      brightness: Brightness.dark,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: memoBackgroundDark,
+      fontFamily: GoogleFonts.robotoMono().fontFamily,
+      textTheme: GoogleFonts.robotoMonoTextTheme(ThemeData.dark().textTheme).copyWith(
+        displaySmall: GoogleFonts.robotoMono(fontSize: 28, fontWeight: FontWeight.w700, color: memoTextPrimaryDark),
+        headlineMedium: GoogleFonts.robotoMono(fontSize: 22, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
+        titleLarge: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
+        titleMedium: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
+        bodyLarge: GoogleFonts.robotoMono(fontSize: 16, color: memoTextPrimaryDark),
+        bodyMedium: GoogleFonts.robotoMono(fontSize: 14, color: memoTextSecondaryDark),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: memoBackgroundDark,
+        foregroundColor: memoTextPrimaryDark,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
+      ),
+      cardTheme: CardThemeData(
+        color: memoSurfaceDark,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: memoBorderDark, width: 1),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: memoPrimary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: memoPrimary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: memoSecondary,
+          side: const BorderSide(color: memoSecondary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: memoSurfaceDark,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoBorderDark),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoPrimary, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: memoDanger),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      ),
+      extensions: const [AppThemeStyleExtension(style: ThemeStyle.memo)],
     );
   }
 }

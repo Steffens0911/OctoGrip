@@ -48,6 +48,25 @@ def run_seed():
             db.refresh(aluno)
             logger.info("Criado aluno@jjb.com (login: senha123)")
 
+        # Garante que admin@jjb.com exista com senha "saas" (login como administrador).
+        admin = db.query(User).filter(User.email.ilike("admin@jjb.com")).first()
+        if admin:
+            admin.role = "administrador"
+            if not admin.password_hash:
+                admin.password_hash = hash_password_sync("saas")
+                logger.info("Senha definida para admin@jjb.com (login: saas)")
+            db.commit()
+        else:
+            admin = User(
+                email="admin@jjb.com",
+                name="Administrador",
+                role="administrador",
+                password_hash=hash_password_sync("saas"),
+            )
+            db.add(admin)
+            db.commit()
+            logger.info("Criado admin@jjb.com (login: saas)")
+
         if db.query(User).first():
             return  # Seed já aplicado; evita reimprimir mensagens em startup automático
 

@@ -14,9 +14,23 @@ from app.services.execution_service import total_points_for_user
 
 logger = logging.getLogger(__name__)
 
-GOLD_GRADUATIONS = ("purple", "brown", "black")
-SILVER_GRADUATIONS = ("blue",)
-BRONZE_GRADUATIONS = ("white",)
+GOLD_GRADUATIONS = ("purple", "brown", "black", "roxa", "marrom", "preta")
+SILVER_GRADUATIONS = ("blue", "azul")
+BRONZE_GRADUATIONS = ("white", "branca")
+
+
+def _graduation_to_tier(graduation: str | None) -> str | None:
+    """Retorna 'bronze', 'silver' ou 'gold' conforme a faixa do adversário. None/vazio → bronze (conta)."""
+    if not graduation or not graduation.strip():
+        return "bronze"
+    g = graduation.strip().lower()
+    if g in GOLD_GRADUATIONS:
+        return "gold"
+    if g in SILVER_GRADUATIONS:
+        return "silver"
+    if g in BRONZE_GRADUATIONS:
+        return "bronze"
+    return "bronze"
 
 
 def _execution_technique_id(execution: TechniqueExecution) -> UUID | None:
@@ -183,28 +197,22 @@ def _executions_in_period_from_list(
 def _compute_counts_from_executions(
     in_period: list[TechniqueExecution],
 ) -> dict:
-    """Retorna gold_count, silver_count, bronze_count a partir de lista de execuções em período."""
-    gold_count = sum(
-        1
-        for e in in_period
-        if e.opponent
-        and e.opponent.graduation
-        and e.opponent.graduation.strip().lower() in GOLD_GRADUATIONS
-    )
-    silver_count = sum(
-        1
-        for e in in_period
-        if e.opponent
-        and e.opponent.graduation
-        and e.opponent.graduation.strip().lower() in SILVER_GRADUATIONS
-    )
+    """Retorna gold_count, silver_count, bronze_count a partir de lista de execuções em período.
+    Adversário sem faixa (graduation) é tratado como bronze para a execução contar.
+    Aceita faixa em inglês (white, blue, ...) ou português (branca, azul, ...).
+    """
+    gold_count = 0
+    silver_count = 0
     white_opponent_ids = set()
     for e in in_period:
-        if (
-            e.opponent
-            and e.opponent.graduation
-            and e.opponent.graduation.strip().lower() in BRONZE_GRADUATIONS
-        ):
+        if not e.opponent:
+            continue
+        tier = _graduation_to_tier(e.opponent.graduation)
+        if tier == "gold":
+            gold_count += 1
+        elif tier == "silver":
+            silver_count += 1
+        elif tier == "bronze":
             white_opponent_ids.add(e.opponent_id)
     bronze_count = len(white_opponent_ids)
     return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}

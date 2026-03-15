@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/services/theme_service.dart';
 
-/// Fundo em gradiente estilo jogo (marrom) ou cor do tema (premium).
-/// No estilo premium usa o scaffoldBackgroundColor do tema.
+/// Fundo em gradiente ou cor sólida conforme o estilo (jogo, premium, memo).
 class GameBackground extends StatelessWidget {
   final Widget? child;
 
@@ -11,10 +11,21 @@ class GameBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isGameStyle =
-        theme.extension<AppThemeStyleExtension>()?.isGameStyle ?? true;
+    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
 
-    // Estilo jogo: claro = fundo liso coffee; escuro = gradiente marrom original.
+    // Estilo memo: fundo sólido (N900) ou gradiente sutil.
+    if (style == ThemeStyle.memo) {
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: theme.scaffoldBackgroundColor,
+        child: child,
+      );
+    }
+
+    final isGameStyle = style == ThemeStyle.game;
+
+    // Estilo jogo: claro = fundo liso; escuro = gradiente marrom.
     if (isGameStyle) {
       if (theme.brightness == Brightness.light) {
         return Container(
@@ -41,7 +52,7 @@ class GameBackground extends StatelessWidget {
       );
     }
 
-    // Estilo premium: gradiente suave claro/escuro baseado no tema.
+    // Estilo premium: gradiente suave.
     final scaffold = theme.scaffoldBackgroundColor;
     final surfaceHigh = theme.colorScheme.surfaceContainerHighest;
     return Container(

@@ -13,6 +13,7 @@ ou, com o ambiente configurado localmente:
 import sys
 import logging
 
+from app.core.security import hash_password_sync
 from app.database import SessionLocal
 from app.models import (
     Academy,
@@ -48,19 +49,23 @@ def cleanup_db_keep_admin() -> None:
         )
 
         if not admin:
-            logger.info("Usuário admin@jjb.com não encontrado; criando novo admin.")
+            logger.info("Usuário admin@jjb.com não encontrado; criando novo admin (senha: saas).")
             admin = User(
                 email=ADMIN_EMAIL,
                 name="Administrador",
                 role="administrador",
                 gallery_visible=True,
+                password_hash=hash_password_sync("saas"),
             )
             db.add(admin)
             db.flush()
         else:
-            # Garante role de administrador
+            # Garante role de administrador e senha "saas"
             if admin.role != "administrador":
                 admin.role = "administrador"
+            if not admin.password_hash:
+                admin.password_hash = hash_password_sync("saas")
+                logger.info("Senha definida para admin@jjb.com (login: saas)")
 
         # Apaga tabelas dependentes primeiro (ordem importante para FKs).
         # Tabelas que referenciam usuários, técnicas, lições etc.

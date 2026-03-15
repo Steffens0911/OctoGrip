@@ -6,6 +6,7 @@ version: 1.0.1+2
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
+# Dependencies aligned with Flutter 3 / Dart 3 (Context7 docs: Material 3, ThemeData.colorScheme, TextTheme M3 names).
 dependencies:
   flutter:
     sdk: flutter
@@ -14,7 +15,7 @@ dependencies:
   flutter_form_builder: ^9.1.1
   form_builder_validators: ^10.0.0
   google_fonts: ^6.2.1
-  http: ^1.1.0
+  http: ^1.2.0
   http_parser: ^4.0.0
   pointer_interceptor: ^0.10.1+2
   provider: ^6.1.2
@@ -26,7 +27,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
+  flutter_lints: ^4.0.0
   figma_puller: ^1.0.1
 
 dependency_overrides:

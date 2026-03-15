@@ -594,6 +594,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     return '$base${sep}v=$v';
   }
 
+  /// URL completa do logo (evita 404/HTML quando a API devolve path relativo).
+  String _academyLogoFullUrl() {
+    final raw = _academy.logoUrl!;
+    return raw.startsWith('/') ? '${_api.baseUrl}$raw' : raw;
+  }
+
   Future<void> _updateHomeVisibility({
     bool? showTrophies,
     bool? showPartners,
@@ -919,7 +925,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     title: Text(
                       'Posições e técnicas',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -945,7 +951,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                       Text(
                                         'Posições desta academia',
                                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                              color: AppTheme.textPrimary,
+                                              color: AppTheme.textPrimaryOf(context),
                                               fontWeight: FontWeight.w600,
                                             ),
                                       ),
@@ -965,7 +971,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                       padding: const EdgeInsets.all(16),
                                       child: Text(
                                         'Nenhuma posição. Adicione posições para criar técnicas.',
-                                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
                                       ),
                                     )
                                   else
@@ -1017,7 +1023,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                       Text(
                                         'Técnicas desta academia',
                                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                              color: AppTheme.textPrimary,
+                                              color: AppTheme.textPrimaryOf(context),
                                               fontWeight: FontWeight.w600,
                                             ),
                                       ),
@@ -1038,7 +1044,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                       padding: const EdgeInsets.all(16),
                                       child: Text(
                                         'Nenhuma técnica. Adicione posições primeiro, depois crie técnicas.',
-                                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
                                       ),
                                     )
                                   else
@@ -1094,7 +1100,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     title: Text(
                       'Troféus e missões semanais',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -1141,7 +1147,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Text(
                         'Brasão / logo da academia',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppTheme.textPrimary,
+                              color: AppTheme.textPrimaryOf(context),
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -1152,9 +1158,22 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
                             child: Image.network(
-                              _academy.logoUrl!,
+                              _academyLogoFullUrl(),
                               height: 72,
                               fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 72,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 40,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1190,7 +1209,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Text(
                         'Quadro de horários (imagem opcional)',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppTheme.textPrimary,
+                              color: AppTheme.textPrimaryOf(context),
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -1205,6 +1224,16 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                               _scheduleImageUrlWithCacheBuster(),
                               width: double.infinity,
                               fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 120,
+                                alignment: Alignment.center,
+                                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                child: Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 48,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1231,7 +1260,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           child: Text(
                             'Apenas visualização. Apenas administradores, gestores e professores podem alterar.',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppTheme.textSecondary,
+                                  color: AppTheme.textSecondaryOf(context),
                                 ),
                           ),
                         ),
@@ -1269,7 +1298,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Text(
                         'Visibilidade na tela do aluno',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: AppTheme.textPrimary,
+                              color: AppTheme.textPrimaryOf(context),
                               fontWeight: FontWeight.bold,
                             ),
                       ),
@@ -1277,7 +1306,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Text(
                         'Defina quais blocos aparecem na home dos alunos desta academia.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.textSecondaryOf(context),
                             ),
                       ),
                       const SizedBox(height: 8),
@@ -1349,7 +1378,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           Text(
             'Troféus desta academia (ouro/prata/bronze por execuções)',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
           ),
@@ -1371,7 +1400,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           padding: const EdgeInsets.all(16),
           child: Text(
             'Nenhum troféu. Crie um troféu vinculado a uma técnica, com período e meta de execuções.',
-            style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
           ),
         )
       else
@@ -1396,7 +1425,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 '${techniqueName.isNotEmpty ? techniqueName : 'Técnica'} · $start a $end · Meta: $target',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
               ),
             );
           },
@@ -1409,14 +1438,14 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       Text(
         'Missões semanais (3 técnicas)',
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
               fontWeight: FontWeight.bold,
             ),
       ),
       const SizedBox(height: 8),
       Text(
         'As técnicas selecionadas aparecem como missões no painel do aluno enquanto estiverem configuradas.',
-        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+        style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
       ),
       const SizedBox(height: 12),
       if (_loadingTechniques)
@@ -1464,7 +1493,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         Text(
           'Pontuação base (por slot)',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
                 fontWeight: FontWeight.w600,
               ),
         ),
@@ -1534,7 +1563,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         const SizedBox(height: 6),
         Text(
           'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
-          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryOf(context)),
         ),
         const SizedBox(height: 12),
         LayoutBuilder(
@@ -1651,12 +1680,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   );
                 },
               )
-            : const Padding(
-                padding: EdgeInsets.all(24),
+            : Padding(
+                padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
                     'Nenhuma conclusão no período.',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                    style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                   ),
                 ),
               ),
@@ -1685,9 +1714,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       ],
                     )
                   : _usageMetrics == null
-                      ? const Text(
+                      ? Text(
                           'Ainda não há respostas suficientes para este relatório.',
-                          style: TextStyle(color: AppTheme.textSecondary),
+                          style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                         )
                       : _AcademyUsageMetricsView(metrics: _usageMetrics!),
         ),
@@ -1704,7 +1733,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     Text(
                       '${_weeklyReport!.weekStart} a ${_weeklyReport!.weekEnd}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
+                            color: AppTheme.textSecondaryOf(context),
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -1740,12 +1769,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ],
                 ),
               )
-            : const Padding(
-                padding: EdgeInsets.all(24),
+            : Padding(
+                padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
                     'Sem dados da semana.',
-                    style: TextStyle(color: AppTheme.textSecondary),
+                    style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                   ),
                 ),
               ),
@@ -1766,7 +1795,7 @@ class _SectionTitle extends StatelessWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
               fontWeight: FontWeight.bold,
             ),
       ),
@@ -1784,9 +1813,9 @@ class _AcademyUsageMetricsView extends StatelessWidget {
     final totalExecutions =
         metrics.beforeTrainingCount + metrics.afterTrainingCount;
     if (totalExecutions == 0) {
-      return const Text(
+      return Text(
         'Nenhuma resposta registrada ainda para esta academia.',
-        style: TextStyle(color: AppTheme.textSecondary),
+        style: TextStyle(color: AppTheme.textSecondaryOf(context)),
       );
     }
 

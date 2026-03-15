@@ -107,12 +107,14 @@ def register_exception_handlers(application: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Aplica migrações e (opcionalmente) roda seed ao subir a API."""
+    """Cria tabelas a partir dos models (se não existirem), aplica migrações e (opcionalmente) roda seed ao subir a API."""
     setup_logging(level=settings.LOG_LEVEL, format_type=settings.LOG_FORMAT)
 
     # Inicializar Sentry se configurado
     init_sentry(settings.SENTRY_DSN)
-    
+
+    # Garante que tabelas base (users, lessons, techniques, etc.) existam antes das migrações
+    Base.metadata.create_all(bind=engine)
     run_migrations(engine)
     if settings.SEED_ON_STARTUP:
         run_seed()
