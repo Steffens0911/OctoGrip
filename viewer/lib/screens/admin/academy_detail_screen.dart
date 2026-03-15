@@ -372,7 +372,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
               FilledButton(
                 onPressed: () async {
-                  final currentAwardKind = formKey.currentState?.value['awardKind'] as String? ?? awardKind;
                   if (formKey.currentState?.saveAndValidate() ?? false) {
                     final values = formKey.currentState!.value;
                     final name = values['name'] as String;
@@ -405,7 +404,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
 
                     Navigator.pop(ctx);
                     try {
-                      await _api.createTrophy(
+                      final created = await _api.createTrophy(
                         academyId: _academy.id,
                         techniqueId: techniqueId,
                         name: name.trim(),
@@ -417,12 +416,21 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         minPointsToUnlock: minPointsToUnlock < 0 ? 0 : minPointsToUnlock,
                         minGraduationToUnlock: (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) ? minGraduationToUnlock : null,
                       );
-                      if (mounted) {
-                        _loadTrophies();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Premiação criada. Alunos podem conquistar ouro, prata ou bronze.')),
-                        );
-                      }
+                      if (!mounted) return;
+                      setState(() {
+                        final map = Map<String, dynamic>.from(created);
+                        final techniqueName = _techniques.firstWhere(
+                          (t) => t.id == techniqueId,
+                          orElse: () => _techniques.first,
+                        ).name;
+                        map['technique_name'] ??= techniqueName;
+                        _trophies = [..._trophies, map];
+                      });
+                      // Recarrega em background para garantir ordenação/idempotência com backend.
+                      _loadTrophies();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Premiação criada. Alunos podem conquistar ouro, prata ou bronze.')),
+                      );
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(

@@ -82,7 +82,10 @@ class _ViewerAppState extends State<ViewerApp> {
 class AuthGate extends StatelessWidget {
   final void Function(BuildContext context) onThemeToggle;
 
-  const AuthGate({super.key, required this.onThemeToggle});
+  const AuthGate({
+    super.key,
+    required this.onThemeToggle,
+  });
 
   @override
   Widget build(BuildContext context) {

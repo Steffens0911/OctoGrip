@@ -1,25 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:viewer/services/theme_service.dart';
+import 'package:viewer/generated/app_color_theme.dart';
 
-/// Extensão do tema para indicar o estilo visual: jogo, premium ou memo (Memo UI Kit).
+/// Extensão do tema: jogo (marrom), premium (lavanda/claro) ou memo (Memo UI Kit).
 class AppThemeStyleExtension extends ThemeExtension<AppThemeStyleExtension> {
-  final ThemeStyle style;
+  final bool isGameStyle;
+  final bool isMemoStyle;
 
-  const AppThemeStyleExtension({required this.style});
+  const AppThemeStyleExtension({
+    required this.isGameStyle,
+    this.isMemoStyle = false,
+  });
 
-  bool get isGameStyle => style == ThemeStyle.game;
-  bool get isMemoStyle => style == ThemeStyle.memo;
+  bool get isPremiumStyle => !isGameStyle && !isMemoStyle;
 
   @override
-  AppThemeStyleExtension copyWith({ThemeStyle? style}) =>
-      AppThemeStyleExtension(style: style ?? this.style);
+  AppThemeStyleExtension copyWith({bool? isGameStyle, bool? isMemoStyle}) =>
+      AppThemeStyleExtension(
+        isGameStyle: isGameStyle ?? this.isGameStyle,
+        isMemoStyle: isMemoStyle ?? this.isMemoStyle,
+      );
 
   @override
   AppThemeStyleExtension lerp(
       ThemeExtension<AppThemeStyleExtension>? other, double t) {
     if (other is! AppThemeStyleExtension) return this;
-    return AppThemeStyleExtension(style: t < 0.5 ? style : other.style);
+    return AppThemeStyleExtension(
+      isGameStyle: t < 0.5 ? isGameStyle : other.isGameStyle,
+      isMemoStyle: t < 0.5 ? isMemoStyle : other.isMemoStyle,
+    );
   }
 }
 
@@ -82,55 +91,85 @@ class AppTheme {
   /// (jogo / premium / memo) via [AppThemeStyleExtension].
   static Color backgroundOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoBackgroundDark : memoBackground;
-    if (style == ThemeStyle.premium) return isDark ? premiumBackgroundDark : premiumBackground;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN900Background : c.neutralsN50;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumBackgroundDark : premiumBackground;
+    }
     return isDark ? backgroundDark : background;
   }
 
   static Color surfaceOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoSurfaceDark : memoSurface;
-    if (style == ThemeStyle.premium) return isDark ? premiumSurfaceDark : premiumSurface;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN900Background : c.white;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumSurfaceDark : premiumSurface;
+    }
     return isDark ? surfaceDark : surface;
   }
 
   static Color textPrimaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoTextPrimaryDark : memoTextPrimary;
-    if (style == ThemeStyle.premium) return isDark ? premiumTextPrimaryDark : premiumTextPrimary;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.labelColorDarkPrimary : c.textPrimary;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumTextPrimaryDark : premiumTextPrimary;
+    }
     return isDark ? textPrimaryDark : textPrimary;
   }
 
   static Color textSecondaryOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoTextSecondaryDark : memoTextSecondary;
-    if (style == ThemeStyle.premium) return isDark ? premiumTextSecondaryDark : premiumTextSecondary;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN200 : c.neutralsN600;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumTextSecondaryDark : premiumTextSecondary;
+    }
     return isDark ? textSecondaryDark : textSecondary;
   }
 
   static Color textMutedOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoTextMutedDark : memoTextMuted;
-    if (style == ThemeStyle.premium) return isDark ? premiumTextMutedDark : premiumTextMuted;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN300 : c.neutralsN500;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumTextMutedDark : premiumTextMuted;
+    }
     return isDark ? textMutedDark : textMuted;
   }
 
   static Color borderOf(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
     final isDark = theme.brightness == Brightness.dark;
-    if (style == ThemeStyle.memo) return isDark ? memoBorderDark : memoBorder;
-    if (style == ThemeStyle.premium) return isDark ? premiumBorderDark : premiumBorder;
+    if (ext?.isMemoStyle == true) {
+      final c = theme.extension<AppColorTheme>();
+      if (c != null) return isDark ? c.neutralsN700 : c.neutralsN200;
+    }
+    if (ext?.isGameStyle != true) {
+      return isDark ? premiumBorderDark : premiumBorder;
+    }
     return isDark ? borderDark : border;
   }
 
@@ -254,7 +293,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.game)],
+      extensions: const [AppThemeStyleExtension(isGameStyle: true, isMemoStyle: false)],
     );
   }
 
@@ -377,7 +416,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.game)],
+      extensions: const [AppThemeStyleExtension(isGameStyle: true, isMemoStyle: false)],
     );
   }
 
@@ -573,7 +612,7 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.premium)],
+      extensions: const [AppThemeStyleExtension(isGameStyle: false, isMemoStyle: false)],
     );
   }
 
@@ -727,187 +766,217 @@ class AppTheme {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.premium)],
+      extensions: const [AppThemeStyleExtension(isGameStyle: false, isMemoStyle: false)],
     );
   }
 
+  // --- Memo UI Kit (cores do figma_puller: lib/generated/app_color_theme.dart) ---
+
   static ThemeData get memoLight {
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: memoPrimary,
-      primary: memoPrimary,
+    const c = AppColorTheme.light;
+    final colorScheme = ColorScheme.light(
+      primary: c.primaryP500,
       onPrimary: Colors.white,
-      secondary: memoSecondary,
-      surface: memoSurface,
-      onSurface: memoTextPrimary,
-      surfaceContainerHighest: memoSurfaceDark,
-      brightness: Brightness.light,
+      primaryContainer: c.primaryP50,
+      onPrimaryContainer: c.primaryP900,
+      secondary: c.secondaryS500,
+      onSecondary: Colors.white,
+      secondaryContainer: c.secondaryS50,
+      onSecondaryContainer: c.secondaryS900,
+      tertiary: c.primaryP400,
+      onTertiary: Colors.white,
+      error: c.error,
+      onError: Colors.white,
+      surface: c.white,
+      onSurface: c.textPrimary,
+      onSurfaceVariant: c.neutralsN600,
+      outline: c.neutralsN200,
+      surfaceContainerHighest: c.neutralsN100,
+      surfaceContainerLow: c.neutralsN50,
     );
     return ThemeData(
       useMaterial3: true,
-      colorScheme: colorScheme,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: memoBackground,
-      fontFamily: GoogleFonts.robotoMono().fontFamily,
-      textTheme: GoogleFonts.robotoMonoTextTheme(ThemeData.light().textTheme).copyWith(
-        displaySmall: GoogleFonts.robotoMono(fontSize: 28, fontWeight: FontWeight.w700, color: memoTextPrimary),
-        headlineMedium: GoogleFonts.robotoMono(fontSize: 22, fontWeight: FontWeight.w600, color: memoTextPrimary),
-        titleLarge: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimary),
-        titleMedium: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.w600, color: memoTextPrimary),
-        bodyLarge: GoogleFonts.robotoMono(fontSize: 16, color: memoTextPrimary),
-        bodyMedium: GoogleFonts.robotoMono(fontSize: 14, color: memoTextSecondary),
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: c.neutralsN50,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.light().textTheme).copyWith(
+        displaySmall: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w700, color: c.textPrimary),
+        headlineMedium: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w600, color: c.textPrimary),
+        titleLarge: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary),
+        titleMedium: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w600, color: c.textPrimary),
+        bodyLarge: GoogleFonts.plusJakartaSans(fontSize: 16, color: c.textPrimary),
+        bodyMedium: GoogleFonts.plusJakartaSans(fontSize: 14, color: c.neutralsN600),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: memoSurface,
-        foregroundColor: memoTextPrimary,
+        backgroundColor: c.white,
+        foregroundColor: c.textPrimary,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimary),
+        titleTextStyle: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.textPrimary),
       ),
       cardTheme: CardThemeData(
-        color: memoSurfaceDark,
-        elevation: 0,
+        color: c.white,
+        elevation: 1,
+        shadowColor: const Color(0x1A000000),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: memoBorder, width: 1),
+          side: BorderSide(color: c.neutralsN200, width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: memoPrimary,
+          backgroundColor: c.primaryP500,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: memoPrimary,
+          backgroundColor: c.primaryP500,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: memoSecondary,
-          side: const BorderSide(color: memoSecondary),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          foregroundColor: c.primaryP500,
+          side: BorderSide(color: c.primaryP500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: c.primaryP500,
+        foregroundColor: Colors.white,
+        elevation: 2,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: memoSurface,
+        fillColor: c.white,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoBorder),
+          borderSide: BorderSide(color: c.neutralsN200),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoPrimary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoDanger),
+          borderSide: BorderSide(color: c.primaryP500, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.memo)],
+      extensions: const [
+        AppThemeStyleExtension(isGameStyle: false, isMemoStyle: true),
+        AppColorTheme.light,
+      ],
     );
   }
 
   static ThemeData get memoDark {
+    const c = AppColorTheme.light;
     final colorScheme = ColorScheme.dark(
-      primary: memoPrimaryLight,
-      onPrimary: memoBackgroundDark,
-      secondary: memoSecondary,
-      surface: memoSurfaceDark,
-      onSurface: memoTextPrimaryDark,
-      surfaceContainerHighest: memoSurfaceElevatedDark,
-      outline: memoBorderDark,
-      error: memoDanger,
+      primary: c.primaryP400,
+      onPrimary: c.neutralsN900Background,
+      primaryContainer: c.primaryP900,
+      onPrimaryContainer: c.primaryP100,
+      secondary: c.secondaryS400,
+      onSecondary: c.neutralsN900Background,
+      secondaryContainer: c.secondaryS900,
+      onSecondaryContainer: c.secondaryS100,
+      tertiary: c.primaryP400,
+      onTertiary: c.neutralsN900Background,
+      error: c.dangerD500,
       onError: Colors.white,
-      brightness: Brightness.dark,
+      surface: c.neutralsN900Background,
+      onSurface: c.labelColorDarkPrimary,
+      onSurfaceVariant: c.neutralsN200,
+      outline: c.neutralsN700,
+      surfaceContainerHighest: c.neutralsN800,
+      surfaceContainerLow: c.neutralsN900Background,
     );
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: memoBackgroundDark,
-      fontFamily: GoogleFonts.robotoMono().fontFamily,
-      textTheme: GoogleFonts.robotoMonoTextTheme(ThemeData.dark().textTheme).copyWith(
-        displaySmall: GoogleFonts.robotoMono(fontSize: 28, fontWeight: FontWeight.w700, color: memoTextPrimaryDark),
-        headlineMedium: GoogleFonts.robotoMono(fontSize: 22, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
-        titleLarge: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
-        titleMedium: GoogleFonts.robotoMono(fontSize: 16, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
-        bodyLarge: GoogleFonts.robotoMono(fontSize: 16, color: memoTextPrimaryDark),
-        bodyMedium: GoogleFonts.robotoMono(fontSize: 14, color: memoTextSecondaryDark),
+      scaffoldBackgroundColor: c.neutralsN900Background,
+      fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+      textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme).copyWith(
+        displaySmall: GoogleFonts.plusJakartaSans(fontSize: 28, fontWeight: FontWeight.w700, color: c.labelColorDarkPrimary),
+        headlineMedium: GoogleFonts.plusJakartaSans(fontSize: 22, fontWeight: FontWeight.w600, color: c.labelColorDarkPrimary),
+        titleLarge: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.labelColorDarkPrimary),
+        titleMedium: GoogleFonts.plusJakartaSans(fontSize: 16, fontWeight: FontWeight.w600, color: c.labelColorDarkPrimary),
+        bodyLarge: GoogleFonts.plusJakartaSans(fontSize: 16, color: c.labelColorDarkPrimary),
+        bodyMedium: GoogleFonts.plusJakartaSans(fontSize: 14, color: c.neutralsN200),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: memoBackgroundDark,
-        foregroundColor: memoTextPrimaryDark,
+        backgroundColor: c.neutralsN900Background,
+        foregroundColor: c.labelColorDarkPrimary,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        scrolledUnderElevation: 1,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.robotoMono(fontSize: 18, fontWeight: FontWeight.w600, color: memoTextPrimaryDark),
+        titleTextStyle: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: c.labelColorDarkPrimary),
       ),
       cardTheme: CardThemeData(
-        color: memoSurfaceDark,
+        color: c.neutralsN800,
         elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: memoBorderDark, width: 1),
+          side: BorderSide(color: c.neutralsN700, width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: memoPrimary,
-          foregroundColor: Colors.white,
+          backgroundColor: c.primaryP400,
+          foregroundColor: c.neutralsN900Background,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.plusJakartaSans(fontSize: 14, fontWeight: FontWeight.w600),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: memoPrimary,
-          foregroundColor: Colors.white,
+          backgroundColor: c.primaryP400,
+          foregroundColor: c.neutralsN900Background,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-          textStyle: GoogleFonts.robotoMono(fontSize: 14, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: memoSecondary,
-          side: const BorderSide(color: memoSecondary),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          foregroundColor: c.primaryP400,
+          side: BorderSide(color: c.primaryP400),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: c.primaryP400,
+        foregroundColor: c.neutralsN900Background,
+        elevation: 2,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: memoSurfaceDark,
+        fillColor: c.neutralsN800,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoBorderDark),
+          borderSide: BorderSide(color: c.neutralsN700),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoPrimary, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: memoDanger),
+          borderSide: BorderSide(color: c.primaryP400, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
-      extensions: const [AppThemeStyleExtension(style: ThemeStyle.memo)],
+      extensions: const [
+        AppThemeStyleExtension(isGameStyle: false, isMemoStyle: true),
+        AppColorTheme.light,
+      ],
     );
   }
 }

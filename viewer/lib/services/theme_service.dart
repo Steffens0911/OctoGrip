@@ -85,7 +85,7 @@ class ThemeService {
     };
   }
 
-  static String styleLabel(ThemeStyle style) {
+  static String labelStyle(ThemeStyle style) {
     return switch (style) {
       ThemeStyle.game => 'Jogo',
       ThemeStyle.premium => 'Premium',

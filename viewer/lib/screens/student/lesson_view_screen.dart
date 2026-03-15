@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
-import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
 /// Tela de visualização de uma lição (missão do dia ou biblioteca). Botão Concluir registra no backend.
@@ -80,9 +80,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               : usageTypeUi;
       if (d.academyId != null && d.academyId!.isNotEmpty) {
         final opponentId = await _showOpponentDialog(d.academyId!);
-        if (opponentId != null && mounted) {
+        if (!mounted) return;
+        if (opponentId != null && opponentId.isNotEmpty) {
           await _completeMissionWithOpponent(d.missionId!, usageType, opponentId);
-        } else if (mounted) {
+        } else {
           await _completeMissionLegacy(d.missionId!, usageType);
         }
       } else {
@@ -98,9 +99,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
                 ? 'before_training'
                 : usageTypeUi;
         final opponentId = await _showOpponentDialog(d.academyId!);
-        if (opponentId != null && mounted) {
+        if (!mounted) return;
+        if (opponentId != null && opponentId.isNotEmpty) {
           await _completeLessonWithOpponent(d.lessonId!, usageType, opponentId);
-        } else if (mounted) {
+        } else {
           await _completeLesson(d.lessonId!);
         }
       } else {
@@ -112,59 +114,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     }
   }
 
-  static String _faixaLabel(String? g) {
-    if (g == null || g.isEmpty) return '—';
-    switch (g.toLowerCase()) {
-      case 'white': return 'Branca';
-      case 'blue': return 'Azul';
-      case 'purple': return 'Roxa';
-      case 'brown': return 'Marrom';
-      case 'black': return 'Preta';
-      default: return g;
-    }
-  }
-
-  Future<String?> _showOpponentDialog(String academyId) async {
-    List<UserModel> colleagues = [];
-    try {
-      final list = await _api.getUsers(academyId: academyId);
-      colleagues = list.where((u) => u.id != widget.data.userId).toList();
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Não foi possível carregar colegas da academia.');
-      return null;
-    }
-    if (colleagues.isEmpty && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nenhum colega na academia. Registrando apenas visualização.')),
-      );
-      return null;
-    }
-    return showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => PointerInterceptor(
-        child: AlertDialog(
-          title: const Text('Em quem você aplicou a técnica?'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: colleagues.map<Widget>((u) {
-                return ListTile(
-                  title: Text(u.name ?? u.email),
-                  subtitle: Text(_faixaLabel(u.graduation)),
-                  onTap: () => Navigator.pop(ctx, u.id),
-                );
-              }).toList(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-          ],
-        ),
-      ),
+  Future<String?> _showOpponentDialog(String academyId) {
+    return OpponentPickerSheet.show(
+      context,
+      academyId: academyId,
+      currentUserId: widget.data.userId,
+      allowSkip: true,
     );
   }
 
