@@ -201,7 +201,7 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                                           onPressed: () => _openForm(p),
                                         ),
                                         IconButton(
-                                          icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                          icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                                           onPressed: () => _delete(p),
                                         ),
                                       ],

@@ -58,7 +58,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            child: Text('Excluir', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -196,12 +196,12 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey.shade600),
+              Icon(Icons.error_outline, size: 48, color: AppTheme.textMutedOf(context)),
               const SizedBox(height: 16),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade700),
+                style: TextStyle(color: AppTheme.textSecondaryOf(context)),
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
@@ -221,7 +221,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.school, size: 64, color: Colors.grey.shade400),
+              Icon(Icons.school, size: 64, color: AppTheme.textMutedOf(context)),
               const SizedBox(height: 16),
               Text(
                 'Nenhuma academia cadastrada.',
@@ -281,8 +281,8 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                     const PopupMenuItem(
                       value: 'delete',
                       child: ListTile(
-                        leading: Icon(Icons.delete, color: Colors.red),
-                        title: Text('Excluir', style: TextStyle(color: Colors.red)),
+leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
+                title: Text('Excluir', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
                       ),
                     ),
                   ],

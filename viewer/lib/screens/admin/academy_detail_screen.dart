@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
@@ -107,24 +108,30 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   }
 
   Future<void> _loadTechniques() async {
+    if (mounted) setState(() => _loadingTechniques = true);
     try {
       final list = await _api.getTechniques(academyId: _academy.id);
-      if (mounted) setState(() {
-        _techniques = list;
-        _loadingTechniques = false;
-      });
+      if (mounted) {
+        setState(() {
+          _techniques = list;
+          _loadingTechniques = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingTechniques = false);
     }
   }
 
   Future<void> _loadPositions() async {
+    if (mounted) setState(() => _loadingPositions = true);
     try {
       final list = await _api.getPositions(academyId: _academy.id);
-      if (mounted) setState(() {
-        _positions = list;
-        _loadingPositions = false;
-      });
+      if (mounted) {
+        setState(() {
+          _positions = list;
+          _loadingPositions = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingPositions = false);
     }
@@ -139,7 +146,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         builder: (context) => PositionFormScreen(academyId: _academy.id, position: p),
       ),
     );
-    if (mounted) _loadPositions();
+    if (mounted) await _loadPositions();
   }
 
   Future<void> _openTechniqueForm([Technique? t]) async {
@@ -150,8 +157,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       ),
     );
     if (mounted) {
-      _loadTechniques();
-      _loadPositions();
+      await _loadTechniques();
+      await _loadPositions();
     }
   }
 
@@ -170,7 +177,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     if (ok != true || !mounted) return;
     try {
       await _api.deletePosition(p.id, academyId: _academy.id);
-      if (mounted) _loadPositions();
+      if (mounted) await _loadPositions();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posição excluída')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
@@ -192,7 +199,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     if (ok != true || !mounted) return;
     try {
       await _api.deleteTechnique(t.id, academyId: _academy.id);
-      if (mounted) _loadTechniques();
+      if (mounted) await _loadTechniques();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnica excluída')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
@@ -203,10 +210,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     setState(() => _loadingTrophies = true);
     try {
       final list = await _api.getTrophies(_academy.id);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _trophies = list;
         _loadingTrophies = false;
       });
+      }
     } catch (_) {
       if (mounted) setState(() => _loadingTrophies = false);
     }
@@ -256,7 +265,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         setDialogState(() {});
                       },
                     ),
-                    const SizedBox(height: 12),
+                    AppSpacing.verticalM,
                     if (awardKind == 'trophy')
                       FormBuilderTextField(
                         name: 'minDurationDays',
@@ -271,7 +280,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           FormBuilderValidators.min(1, errorText: 'Mínimo 1 dia'),
                         ]),
                       ),
-                    if (awardKind == 'trophy') const SizedBox(height: 12),
+                    if (awardKind == 'trophy') AppSpacing.verticalM,
                     FormBuilderTextField(
                       name: 'name',
                       decoration: const InputDecoration(
@@ -282,7 +291,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         FormBuilderValidators.required(errorText: 'Nome é obrigatório'),
                       ]),
                     ),
-                    const SizedBox(height: 12),
+                    AppSpacing.verticalM,
                     FormBuilderDropdown<String>(
                       name: 'techniqueId',
                       decoration: const InputDecoration(labelText: 'Técnica'),
@@ -294,7 +303,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         FormBuilderValidators.required(errorText: 'Selecione uma técnica'),
                       ]),
                     ),
-                    const SizedBox(height: 12),
+                    AppSpacing.verticalM,
                     FormBuilderTextField(
                       name: 'minPointsToUnlock',
                       decoration: const InputDecoration(
@@ -323,7 +332,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         DropdownMenuItem(value: 'black', child: Text('Preta')),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    AppSpacing.verticalM,
                     FormBuilderDateTimePicker(
                       name: 'startDate',
                       inputType: InputType.date,
@@ -458,17 +467,21 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       final ranking = await _api.getAcademyRanking(_academy.id);
       final difficulties = await _api.getAcademyDifficulties(_academy.id);
       final report = await _api.getAcademyWeeklyReport(_academy.id);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _ranking = ranking;
         _difficulties = difficulties;
         _weeklyReport = report;
         _loadingExtra = false;
       });
+      }
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _errorExtra = userFacingMessage(e);
         _loadingExtra = false;
       });
+      }
     }
   }
 
@@ -740,7 +753,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (mounted) {
         setState(() => _resetting = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Colors.red),
+          SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Theme.of(context).colorScheme.error),
         );
       }
     }
@@ -760,7 +773,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            child: Text('Excluir', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -802,9 +815,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             controller: nameController,
                             decoration: const InputDecoration(labelText: 'Nome'),
                           ),
-                          const SizedBox(height: 12),
+                          AppSpacing.verticalM,
                           DropdownButtonFormField<String>(
-                            value: techniqueId,
+                            initialValue: techniqueId,
                             decoration: const InputDecoration(labelText: 'Missão do dia (técnica)'),
                             items: [
                               const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
@@ -859,12 +872,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
               if (value == 'delete') _confirmDelete();
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: ListTile(
-                  leading: Icon(Icons.delete, color: Colors.red),
+                  leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
                   title: Text('Excluir academia',
-                      style: TextStyle(color: Colors.red)),
+                      style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
                 ),
               ),
             ],
@@ -874,9 +887,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadRankingAndReport();
-          _loadTechniques();
-          _loadPositions();
-          _loadTrophies();
+          await _loadTechniques();
+          await _loadPositions();
+          await _loadTrophies();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -904,7 +917,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               if (AuthService().isAdmin() || AuthService().isManager() || AuthService().isSupervisor())
                 Card(
                   child: ListTile(
@@ -925,7 +938,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: Card(
@@ -956,13 +969,24 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'Posições desta academia',
-                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                              color: AppTheme.textPrimaryOf(context),
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                      Expanded(
+                                        child: Text(
+                                          'Posições desta academia',
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                color: AppTheme.textPrimaryOf(context),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
                                       ),
+                                      if (_loadingPositions)
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 8),
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                        ),
                                       IconButton(
                                         icon: const Icon(Icons.add_circle_outline),
                                         onPressed: () => _openPositionForm(),
@@ -970,7 +994,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                       ),
                                     ],
                                   ),
-                                  if (_loadingPositions)
+                                  if (_loadingPositions && _positions.isEmpty)
                                     const Padding(
                                         padding: EdgeInsets.all(16),
                                         child: Center(child: CircularProgressIndicator()))
@@ -978,8 +1002,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                     Padding(
                                       padding: const EdgeInsets.all(16),
                                       child: Text(
-                                        'Nenhuma posição. Adicione posições para criar técnicas.',
-                                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
+                                        'Nenhuma posição. Toque em + para criar.',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryOf(context)),
                                       ),
                                     )
                                   else
@@ -1003,13 +1027,23 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
                                                     IconButton(
+                                                        style: IconButton.styleFrom(
+                                                          minimumSize: const Size(44, 44),
+                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        ),
                                                         icon: const Icon(Icons.edit,
                                                             size: 20, color: AppTheme.primary),
-                                                        onPressed: () => _openPositionForm(p)),
+                                                        onPressed: () => _openPositionForm(p),
+                                                        tooltip: 'Editar'),
                                                     IconButton(
-                                                        icon: const Icon(Icons.delete_outline,
-                                                            size: 20, color: Colors.red),
-                                                        onPressed: () => _deletePosition(p)),
+                                                        style: IconButton.styleFrom(
+                                                          minimumSize: const Size(44, 44),
+                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        ),
+                                                        icon: Icon(Icons.delete_outline,
+                                                            size: 20, color: Theme.of(context).colorScheme.error),
+                                                        onPressed: () => _deletePosition(p),
+                                                        tooltip: 'Excluir'),
                                                   ],
                                                 )
                                               : null,
@@ -1028,13 +1062,24 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text(
-                                        'Técnicas desta academia',
-                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                              color: AppTheme.textPrimaryOf(context),
-                                              fontWeight: FontWeight.w600,
-                                            ),
+                                      Expanded(
+                                        child: Text(
+                                          'Técnicas desta academia',
+                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                color: AppTheme.textPrimaryOf(context),
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                        ),
                                       ),
+                                      if (_loadingTechniques)
+                                        const Padding(
+                                          padding: EdgeInsets.only(right: 8),
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                          ),
+                                        ),
                                       if (AuthService().canEditResources())
                                         IconButton(
                                           icon: const Icon(Icons.add_circle_outline),
@@ -1043,7 +1088,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                         ),
                                     ],
                                   ),
-                                  if (_loadingTechniques)
+                                  if (_loadingTechniques && _techniques.isEmpty)
                                     const Padding(
                                         padding: EdgeInsets.all(16),
                                         child: Center(child: CircularProgressIndicator()))
@@ -1051,8 +1096,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                     Padding(
                                       padding: const EdgeInsets.all(16),
                                       child: Text(
-                                        'Nenhuma técnica. Adicione posições primeiro, depois crie técnicas.',
-                                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
+                                        'Nenhuma técnica. Toque em + para criar.',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryOf(context)),
                                       ),
                                     )
                                   else
@@ -1077,13 +1122,23 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                                   mainAxisSize: MainAxisSize.min,
                                                   children: [
                                                     IconButton(
+                                                        style: IconButton.styleFrom(
+                                                          minimumSize: const Size(44, 44),
+                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        ),
                                                         icon: const Icon(Icons.edit,
                                                             size: 20, color: AppTheme.primary),
-                                                        onPressed: () => _openTechniqueForm(t)),
+                                                        onPressed: () => _openTechniqueForm(t),
+                                                        tooltip: 'Editar'),
                                                     IconButton(
-                                                        icon: const Icon(Icons.delete_outline,
-                                                            size: 20, color: Colors.red),
-                                                        onPressed: () => _deleteTechnique(t)),
+                                                        style: IconButton.styleFrom(
+                                                          minimumSize: const Size(44, 44),
+                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                        ),
+                                                        icon: Icon(Icons.delete_outline,
+                                                            size: 20, color: Theme.of(context).colorScheme.error),
+                                                        onPressed: () => _deleteTechnique(t),
+                                                        tooltip: 'Excluir'),
                                                   ],
                                                 )
                                               : null,
@@ -1100,7 +1155,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: Card(
@@ -1145,7 +1200,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -1164,7 +1219,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           _academy.logoUrl!.isNotEmpty) ...[
                         Center(
                           child: ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: AppRadius.cardRadius,
                             child: Image.network(
                               _academyLogoFullUrl(),
                               height: 72,
@@ -1174,7 +1229,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: AppRadius.cardRadius,
                                 ),
                                 child: Icon(
                                   Icons.broken_image_outlined,
@@ -1185,7 +1240,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        AppSpacing.verticalM,
                       ],
                       Row(
                         children: [
@@ -1245,7 +1300,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        AppSpacing.verticalM,
                       ],
                       if (AuthService().canEditResources())
                         Align(
@@ -1277,7 +1332,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 ),
               ),
               if (AuthService().isAdmin() || AuthService().isManager()) ...[
-                const SizedBox(height: 12),
+                AppSpacing.verticalM,
                 Card(
                   child: ListTile(
                     leading: CircleAvatar(
@@ -1296,7 +1351,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -1408,7 +1463,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           padding: const EdgeInsets.all(16),
           child: Text(
             'Nenhum troféu. Crie um troféu vinculado a uma técnica, com período e meta de execuções.',
-            style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryOf(context)),
           ),
         )
       else
@@ -1427,7 +1482,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
             return ListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.emoji_events_outlined, color: AppTheme.primary, size: 24),
+              leading: const Icon(Icons.emoji_events_outlined, color: AppTheme.primary, size: 24),
               title: Text(name),
               subtitle: Text(
                 '${techniqueName.isNotEmpty ? techniqueName : 'Técnica'} · $start a $end · Meta: $target',
@@ -1455,12 +1510,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         'As técnicas selecionadas aparecem como missões no painel do aluno enquanto estiverem configuradas.',
         style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
       ),
-      const SizedBox(height: 12),
+      AppSpacing.verticalM,
       if (_loadingTechniques)
         const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
       else ...[
         DropdownButtonFormField<String>(
-          value: _weeklyTechniqueId,
+          initialValue: _weeklyTechniqueId,
           decoration: const InputDecoration(
             labelText: 'Missão 1',
             border: OutlineInputBorder(),
@@ -1471,9 +1526,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           ],
           onChanged: (v) => setState(() => _weeklyTechniqueId = v),
         ),
-        const SizedBox(height: 12),
+        AppSpacing.verticalM,
         DropdownButtonFormField<String>(
-          value: _weeklyTechnique2Id,
+          initialValue: _weeklyTechnique2Id,
           decoration: const InputDecoration(
             labelText: 'Missão 2',
             border: OutlineInputBorder(),
@@ -1484,9 +1539,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           ],
           onChanged: (v) => setState(() => _weeklyTechnique2Id = v),
         ),
-        const SizedBox(height: 12),
+        AppSpacing.verticalM,
         DropdownButtonFormField<String>(
-          value: _weeklyTechnique3Id,
+          initialValue: _weeklyTechnique3Id,
           decoration: const InputDecoration(
             labelText: 'Missão 3',
             border: OutlineInputBorder(),
@@ -1497,7 +1552,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           ],
           onChanged: (v) => setState(() => _weeklyTechnique3Id = v),
         ),
-        const SizedBox(height: 12),
+        AppSpacing.verticalM,
         Text(
           'Pontuação base (por slot)',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -1573,7 +1628,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
           style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryOf(context)),
         ),
-        const SizedBox(height: 12),
+        AppSpacing.verticalM,
         LayoutBuilder(
           builder: (context, constraints) {
             final narrow = AppTheme.isNarrow(context);
@@ -1637,14 +1692,14 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
               const SizedBox(height: 8),
               Text(
                 _errorExtra!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
+                style: TextStyle(color: AppTheme.textMutedOf(context)),
               ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalM,
               TextButton.icon(
                 onPressed: _loadRankingAndReport,
                 icon: const Icon(Icons.refresh),
@@ -1656,7 +1711,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       ];
     }
     return [
-      _SectionTitle(title: 'Ranking (últimos 30 dias)'),
+      const _SectionTitle(title: 'Ranking (últimos 30 dias)'),
       Card(
         child: _ranking != null && (_ranking!['entries'] as List).isNotEmpty
             ? ListView.separated(
@@ -1681,7 +1736,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     trailing: Text(
                       '${e.completionsCount} conclusões',
                       style: TextStyle(
-                        color: Colors.grey.shade600,
+                        color: AppTheme.textMutedOf(context),
                         fontSize: 12,
                       ),
                     ),
@@ -1699,7 +1754,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
               ),
       ),
       const SizedBox(height: 20),
-      _SectionTitle(title: 'Execuções focadas em troféu/medalha/posição'),
+      const _SectionTitle(title: 'Execuções focadas em troféu/medalha/posição'),
       Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1711,7 +1766,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       children: [
                         Text(
                           _errorUsageMetrics!,
-                          style: TextStyle(color: Colors.red.shade700),
+                          style: TextStyle(color: Theme.of(context).colorScheme.error),
                         ),
                         const SizedBox(height: 8),
                         TextButton.icon(
@@ -1730,7 +1785,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      _SectionTitle(title: 'Relatório semanal'),
+      const _SectionTitle(title: 'Relatório semanal'),
       Card(
         child: _weeklyReport != null
             ? Padding(
@@ -1751,7 +1806,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       style: Theme.of(context).textTheme.titleSmall,
                     ),
                     if (_weeklyReport!.entries.isNotEmpty) ...[
-                      const SizedBox(height: 12),
+                      AppSpacing.verticalM,
                       const Divider(),
                       ..._weeklyReport!.entries.map(
                         (e) => ListTile(
@@ -1768,7 +1823,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                           trailing: Text(
                             '${e.completionsCount}',
                             style: TextStyle(
-                              color: Colors.grey.shade600,
+                              color: AppTheme.textMutedOf(context),
                             ),
                           ),
                         ),

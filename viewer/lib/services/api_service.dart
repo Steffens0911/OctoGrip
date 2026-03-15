@@ -734,10 +734,10 @@ class ApiService {
   }
 
   // ---------- Techniques ----------
-  /// Lista técnicas da academia. [academyId] obrigatório.
+  /// Lista técnicas da academia. [academyId] obrigatório. Sem cache para refletir CRUD na hora.
   Future<List<Technique>> getTechniques({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: {'academy_id': academyId});
-    final r = await _getWithCache(uri, _cacheTtlMedium);
+    final r = await _getWithCache(uri, 0);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -777,6 +777,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/techniques');
     return Technique.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -805,6 +806,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/techniques');
     return Technique.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -812,13 +814,14 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/techniques');
   }
 
   // ---------- Positions ----------
-  /// Lista posições da academia. [academyId] obrigatório.
+  /// Lista posições da academia. [academyId] obrigatório. Sem cache para refletir CRUD na hora.
   Future<List<Position>> getPositions({required String academyId}) async {
     final uri = Uri.parse('$baseUrl/positions').replace(queryParameters: {'academy_id': academyId});
-    final r = await _getWithCache(uri, _cacheTtlMedium);
+    final r = await _getWithCache(uri, 0);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -849,6 +852,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/positions');
     return Position.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -871,6 +875,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/positions');
     return Position.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -878,6 +883,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/positions');
   }
 
   // ---------- Missions ----------

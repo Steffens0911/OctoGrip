@@ -198,7 +198,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                       subtitle: Text('${_lessonTechniqueDisplay(l)} · ordem ${l.orderIndex}'),
                       trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(l)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(l)),
+                        IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(l)),
                       ]) : null,
                       onTap: () => _openForm(l),
                     ),

@@ -8,7 +8,9 @@ import 'package:viewer/screens/admin/technique_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
 class TechniqueListScreen extends StatefulWidget {
-  const TechniqueListScreen({super.key});
+  final String academyId;
+
+  const TechniqueListScreen({super.key, required this.academyId});
 
   @override
   State<TechniqueListScreen> createState() => _TechniqueListScreenState();
@@ -41,12 +43,14 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([_api.getTechniques(), _api.getPositions()]);
-      if (mounted) setState(() {
+      final results = await Future.wait([_api.getTechniques(academyId: widget.academyId), _api.getPositions(academyId: widget.academyId)]);
+      if (mounted) {
+        setState(() {
         _allItems = results[0] as List<Technique>;
         _positions = results[1] as List<Position>;
         _loading = false;
       });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
@@ -62,8 +66,8 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
   String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
 
   Future<void> _openForm([Technique? t]) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (context) => TechniqueFormScreen(technique: t)));
-    if (mounted) _load();
+    await Navigator.push(context, MaterialPageRoute(builder: (context) => TechniqueFormScreen(academyId: widget.academyId, technique: t)));
+    if (mounted) await _load();
   }
 
   Future<void> _delete(Technique t) async {
@@ -77,8 +81,8 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
     ));
     if (ok != true) return;
     try {
-      await _api.deleteTechnique(t.id);
-      if (mounted) _load();
+      await _api.deleteTechnique(t.id, academyId: widget.academyId);
+      if (mounted) await _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnica excluída')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
@@ -123,7 +127,7 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
                               Expanded(
                                 child: Text(
                                   'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                 ),
                               ),
                               TextButton(
@@ -156,20 +160,23 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
                             itemCount: _filteredItems.length,
                             itemBuilder: (context, i) {
                               final t = _filteredItems[i];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text(t.name),
-                      subtitle: Text('da posição ${_positionName(t.fromPositionId)} → para posição ${_positionName(t.toPositionId)}'),
-                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(t)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(t)),
-                      ]) : null,
-                      onTap: () => _openForm(t),
-                    ),
-                  );
-                },
-              ),
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  title: Text(t.name),
+                                  subtitle: Text('da posição ${_positionName(t.fromPositionId)} → para posição ${_positionName(t.toPositionId)}'),
+                                  trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                    IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(t)),
+                                    IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(t)),
+                                  ]) : null,
+                                  onTap: () => _openForm(t),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );

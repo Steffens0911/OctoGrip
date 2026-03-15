@@ -7,7 +7,9 @@ import 'package:viewer/screens/admin/position_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 
 class PositionListScreen extends StatefulWidget {
-  const PositionListScreen({super.key});
+  final String academyId;
+
+  const PositionListScreen({super.key, required this.academyId});
 
   @override
   State<PositionListScreen> createState() => _PositionListScreenState();
@@ -22,7 +24,7 @@ class _PositionListScreenState extends State<PositionListScreen> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final list = await _api.getPositions();
+      final list = await _api.getPositions(academyId: widget.academyId);
       if (mounted) setState(() { _list = list; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
@@ -36,8 +38,8 @@ class _PositionListScreenState extends State<PositionListScreen> {
   }
 
   Future<void> _openForm([Position? p]) async {
-    await Navigator.push(context, MaterialPageRoute(builder: (context) => PositionFormScreen(position: p)));
-    if (mounted) _load();
+    await Navigator.push(context, MaterialPageRoute(builder: (context) => PositionFormScreen(academyId: widget.academyId, position: p)));
+    if (mounted) await _load();
   }
 
   Future<void> _delete(Position p) async {
@@ -51,8 +53,8 @@ class _PositionListScreenState extends State<PositionListScreen> {
     ));
     if (ok != true) return;
     try {
-      await _api.deletePosition(p.id);
-      if (mounted) _load();
+      await _api.deletePosition(p.id, academyId: widget.academyId);
+      if (mounted) await _load();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posição excluída')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
@@ -80,7 +82,7 @@ class _PositionListScreenState extends State<PositionListScreen> {
                       subtitle: Text(p.description ?? ''),
                       trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(p)),
-                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(p)),
+                        IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(p)),
                       ]) : null,
                       onTap: () => _openForm(p),
                     ),

@@ -313,7 +313,7 @@ class _UserListScreenState extends State<UserListScreen> {
                                       ),
                                       if (AuthService().canEditResources()) ...[
                                         IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
-                                        IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: () => _delete(u)),
+                                        IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(u)),
                                       ],
                                     ],
                                   ),

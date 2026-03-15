@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -149,7 +150,7 @@ class _PositionFormScreenState extends State<PositionFormScreen> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: AppRadius.chipRadius,
                   border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: Column(

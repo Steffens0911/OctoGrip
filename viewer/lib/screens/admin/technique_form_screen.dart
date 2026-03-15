@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
@@ -180,7 +181,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: AppRadius.chipRadius,
                     border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: Column(

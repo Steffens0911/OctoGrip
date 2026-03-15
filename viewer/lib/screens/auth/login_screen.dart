@@ -6,6 +6,7 @@ import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/app_error_message.dart';
 
 /// Tela de login com e-mail e senha.
 class LoginScreen extends StatefulWidget {
@@ -84,7 +85,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                      'Faça login para continuar',
+                      'Entre com sua conta',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: AppTheme.textMutedOf(context),
                           ),
@@ -126,25 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       if (_error != null) ...[
                       const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _error!,
-                                style: TextStyle(color: Colors.red.shade700, fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      AppErrorMessage(message: _error!),
                       ],
                       const SizedBox(height: 24),
                       FilledButton(

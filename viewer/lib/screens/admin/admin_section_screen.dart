@@ -22,7 +22,7 @@ class AdminSectionScreen extends StatelessWidget {
         children: [
           const SizedBox(height: 8),
           Text(
-            'Administração',
+            'Admin',
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   color: AppTheme.textPrimaryOf(context),
                 ),
@@ -136,7 +136,7 @@ class _AdminTile extends StatelessWidget {
             border: Border.all(color: AppTheme.borderOf(context)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 2),
               ),
@@ -167,9 +167,8 @@ class _AdminTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondaryOf(context),
-                            fontSize: 13,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textMutedOf(context),
                           ),
                     ),
                   ],

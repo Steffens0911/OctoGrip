@@ -11,7 +11,10 @@ class GameBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.extension<AppThemeStyleExtension>()?.style ?? ThemeStyle.game;
+    final ext = theme.extension<AppThemeStyleExtension>();
+    final style = ext?.isMemoStyle == true
+        ? ThemeStyle.memo
+        : (ext?.isGameStyle == true ? ThemeStyle.game : ThemeStyle.premium);
 
     // Estilo memo: fundo sólido (N900) ou gradiente sutil.
     if (style == ThemeStyle.memo) {

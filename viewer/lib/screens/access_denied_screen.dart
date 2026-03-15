@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/design/app_tokens.dart';
 
 /// Tela exibida quando o usuário tenta acessar um recurso sem permissão.
 class AccessDeniedScreen extends StatelessWidget {
@@ -24,7 +25,7 @@ class AccessDeniedScreen extends StatelessWidget {
               Icon(
                 Icons.lock_outline,
                 size: 64,
-                color: Colors.grey.shade400,
+                color: AppTheme.textMutedOf(context),
               ),
               const SizedBox(height: 24),
               Text(
@@ -34,9 +35,9 @@ class AccessDeniedScreen extends StatelessWidget {
                       color: AppTheme.textPrimaryOf(context),
                     ),
               ),
-              const SizedBox(height: 12),
+              AppSpacing.verticalS,
               Text(
-                'Você não tem permissão para acessar este recurso.',
+                'Sem permissão para esta área.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppTheme.textSecondaryOf(context),
                     ),

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyThemeMode = 'theme_mode';
 const _keyThemeStyle = 'theme_style';
+const _keyFontStyle = 'font_style';
 
 /// Estilo visual do app: jogo (marrom/âmbar), premium (lavanda/claro) ou memo (Memo UI Kit).
 enum ThemeStyle {
@@ -91,5 +92,16 @@ class ThemeService {
       ThemeStyle.premium => 'Premium',
       ThemeStyle.memo => 'Memo',
     };
+  }
+
+  static Future<bool> loadUseGameFont() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = prefs.getString(_keyFontStyle);
+    return value != 'sans';
+  }
+
+  static Future<void> saveUseGameFont(bool useGameFont) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyFontStyle, useGameFont ? 'game' : 'sans');
   }
 }

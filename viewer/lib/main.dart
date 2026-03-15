@@ -33,12 +33,16 @@ class ViewerApp extends StatefulWidget {
 
 class _ViewerAppState extends State<ViewerApp> {
   ThemeMode _themeMode = ThemeMode.system;
+  bool _useGameFont = true;
 
   @override
   void initState() {
     super.initState();
     ThemeService.load().then((mode) {
       if (mounted) setState(() => _themeMode = mode);
+    });
+    ThemeService.loadUseGameFont().then((useGameFont) {
+      if (mounted) setState(() => _useGameFont = useGameFont);
     });
   }
 
@@ -53,12 +57,17 @@ class _ViewerAppState extends State<ViewerApp> {
     await ThemeService.save(_themeMode);
   }
 
+  Future<void> _cycleFont() async {
+    setState(() => _useGameFont = !_useGameFont);
+    await ThemeService.saveUseGameFont(_useGameFont);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'JJB Viewer',
-      theme: AppTheme.memoLight,
-      darkTheme: AppTheme.memoDark,
+      theme: _useGameFont ? AppTheme.memoLight : AppTheme.memoLightSans,
+      darkTheme: _useGameFont ? AppTheme.memoDark : AppTheme.memoDarkSans,
       themeMode: _themeMode,
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [
@@ -73,6 +82,7 @@ class _ViewerAppState extends State<ViewerApp> {
       debugShowCheckedModeBanner: false,
       home: AuthGate(
         onThemeToggle: _cycleTheme,
+        onFontToggle: _cycleFont,
       ),
     );
   }
@@ -81,10 +91,12 @@ class _ViewerAppState extends State<ViewerApp> {
 /// Gate: mostra LoginScreen ou MainShell conforme autenticação via Provider.
 class AuthGate extends StatelessWidget {
   final void Function(BuildContext context) onThemeToggle;
+  final VoidCallback onFontToggle;
 
   const AuthGate({
     super.key,
     required this.onThemeToggle,
+    required this.onFontToggle,
   });
 
   @override
@@ -93,6 +105,7 @@ class AuthGate extends StatelessWidget {
     if (auth.isLoggedIn) {
       return MainShell(
         onThemeToggle: onThemeToggle,
+        onFontToggle: onFontToggle,
         onLogout: () async {
           await auth.logout();
         },
@@ -105,11 +118,13 @@ class AuthGate extends StatelessWidget {
 /// Shell principal: navegação estilo Lovable com Provider para estado de auth.
 class MainShell extends StatefulWidget {
   final void Function(BuildContext context) onThemeToggle;
+  final VoidCallback onFontToggle;
   final VoidCallback onLogout;
 
   const MainShell({
     super.key,
     required this.onThemeToggle,
+    required this.onFontToggle,
     required this.onLogout,
   });
 
@@ -135,7 +150,7 @@ class _MainShellState extends State<MainShell> {
     if (role == 'aluno') {
       return ['Início'];
     } else if (role == 'administrador') {
-      return ['Início', 'Painel', 'Administração'];
+      return ['Início', 'Painel', 'Admin'];
     } else {
       return ['Início', 'Painel'];
     }
@@ -204,10 +219,12 @@ class _MainShellState extends State<MainShell> {
     final effectiveId = effectiveUser?.id;
     if (effectiveId != _lastEffectiveUserId) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _lastEffectiveUserId = effectiveId;
           _inicioRefreshKey++;
         });
+        }
       });
     }
 
@@ -227,6 +244,11 @@ class _MainShellState extends State<MainShell> {
               onPressed: _showImpersonateDialog,
               tooltip: 'Atuar como',
             ),
+          IconButton(
+            icon: const Icon(Icons.text_fields),
+            onPressed: widget.onFontToggle,
+            tooltip: 'Alternar fonte',
+          ),
           IconButton(
             icon: Icon(
               Theme.of(context).brightness == Brightness.dark
@@ -258,13 +280,28 @@ class _MainShellState extends State<MainShell> {
                         Icon(Icons.person_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            'Atuando como: ${effectiveUser.name ?? effectiveUser.email} (${effectiveUser.email})',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontSize: 13,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Atuando como: ${effectiveUser.name ?? effectiveUser.email}',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                effectiveUser.email,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ),
                         TextButton(
@@ -285,7 +322,7 @@ class _MainShellState extends State<MainShell> {
           color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -313,7 +350,7 @@ class _MainShellState extends State<MainShell> {
                     selected: _selected == 1,
                     onTap: () => setState(() => _selected = 1),
                   ),
-                if (tabs.contains('Administração'))
+                if (tabs.contains('Admin'))
                   _NavItem(
                     icon: Icons.settings_rounded,
                     label: 'Admin',
@@ -448,7 +485,7 @@ class _ImpersonateDialogContentState extends State<_ImpersonateDialogContent> {
           ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String?>(
-            value: _selectedAcademyId,
+            initialValue: _selectedAcademyId,
             decoration: const InputDecoration(
               labelText: 'Academia',
               border: OutlineInputBorder(),

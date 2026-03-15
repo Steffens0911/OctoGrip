@@ -57,7 +57,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            child: Text('Excluir', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -165,7 +165,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey.shade600),
+              Icon(Icons.error_outline, size: 48, color: AppTheme.textMutedOf(context)),
               const SizedBox(height: 16),
               Text(
                 _error!,
@@ -191,7 +191,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.person_off, size: 64, color: Colors.grey.shade400),
+                Icon(Icons.person_off, size: 64, color: AppTheme.textMutedOf(context)),
                 const SizedBox(height: 16),
                 Text(
                   'Nenhum professor cadastrado.',
@@ -249,8 +249,8 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
                     const PopupMenuItem(
                       value: 'delete',
                       child: ListTile(
-                        leading: Icon(Icons.delete, color: Colors.red),
-                        title: Text('Excluir', style: TextStyle(color: Colors.red)),
+                        leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
+                        title: Text('Excluir', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
                       ),
                     ),
                   ],

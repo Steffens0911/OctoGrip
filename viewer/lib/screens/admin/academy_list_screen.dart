@@ -234,7 +234,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                                                 onPressed: () => _openForm(a),
                                               ),
                                               IconButton(
-                                                icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                                                 onPressed: () => _delete(a),
                                               ),
                                             ],
