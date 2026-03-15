@@ -36,16 +36,15 @@ class ThemeService {
     await prefs.setString(_keyThemeMode, value);
   }
 
-  /// Ciclo: light ↔ dark. Se [resolvedBrightness] for passado e current for system,
-  /// retorna o tema oposto ao que está sendo exibido (um clique alterna de verdade).
+  /// Um toque: alterna entre claro e escuro (toggle binário).
   static ThemeMode next(ThemeMode current, [Brightness? resolvedBrightness]) {
     if (current == ThemeMode.system && resolvedBrightness != null) {
       return resolvedBrightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark;
     }
     return switch (current) {
       ThemeMode.light => ThemeMode.dark,
-      ThemeMode.dark => ThemeMode.system,
-      ThemeMode.system => ThemeMode.light,
+      ThemeMode.dark => ThemeMode.light,
+      ThemeMode.system => resolvedBrightness == Brightness.dark ? ThemeMode.light : ThemeMode.dark,
     };
   }
 
