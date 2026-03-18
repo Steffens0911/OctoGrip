@@ -9,7 +9,6 @@ class TrainingFeedbackRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    position_id: UUID
     observation: str | None = None
 
 
@@ -18,7 +17,6 @@ class TrainingFeedbackResponse(BaseModel):
 
     id: UUID
     user_id: UUID
-    position_id: UUID
     observation: str | None
     created_at: datetime
 

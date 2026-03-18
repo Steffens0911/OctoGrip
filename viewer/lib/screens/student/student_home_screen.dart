@@ -6,21 +6,24 @@ import 'dart:math';
 
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/models/training_video.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
-import 'package:viewer/screens/student/report_difficulty_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
+import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/global_supporters_section.dart';
-import 'package:viewer/screens/student/training_videos_section.dart';
+import 'package:viewer/theme/fantasy_theme.dart';
+import 'package:viewer/widgets/header_widget.dart';
+import 'package:viewer/widgets/partners_card.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -35,20 +38,21 @@ class StudentHomeScreen extends StatefulWidget {
 
 class _StudentHomeScreenState extends State<StudentHomeScreen>
     with WidgetsBindingObserver {
+  static const int _defaultMaxXp = 519;
   final _api = ApiService();
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
   int? _userPoints;
   Map<String, dynamic>? _collectiveGoal;
   int _pendingConfirmationsCount = 0;
+  TrainingVideo? _dailyVideo;
+  int _dailyVideoPoints = 0;
+  bool _dailyVideoCompleted = false;
   bool _loading = true;
   String? _error;
   int _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
   String? _academyLogoUrl;
-  bool _academyLogoLoaded = false;
   String? _academyScheduleImageUrl;
-  String? _academyScheduleUpdatedAt;
-  bool _academyScheduleLoaded = false;
   bool _showTrophies = true;
   bool _showPartners = true;
   bool _showSchedule = true;
@@ -71,12 +75,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   static String _faixaLabel(String? g) {
     if (g == null || g.isEmpty) return '';
     switch (g.toLowerCase()) {
-      case 'white': return 'Branca';
-      case 'blue': return 'Azul';
-      case 'purple': return 'Roxa';
-      case 'brown': return 'Marrom';
-      case 'black': return 'Preta';
-      default: return g;
+      case 'white':
+        return 'Branca';
+      case 'blue':
+        return 'Azul';
+      case 'purple':
+        return 'Roxa';
+      case 'brown':
+        return 'Marrom';
+      case 'black':
+        return 'Preta';
+      default:
+        return g;
     }
   }
 
@@ -118,19 +128,20 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
       _missionWeek = null;
       _academyLogoUrl = null;
-      _academyLogoLoaded = false;
       _academyScheduleImageUrl = null;
-      _academyScheduleUpdatedAt = null;
-      _academyScheduleLoaded = false;
       _showTrophies = true;
       _showPartners = true;
       _showSchedule = true;
       _showGlobalSupporters = true;
+      _dailyVideo = null;
+      _dailyVideoPoints = 0;
+      _dailyVideoCompleted = false;
     });
     try {
       await AuthService().refreshMe();
@@ -138,8 +149,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       // Mantém dados em cache se a API falhar (ex.: offline).
     }
     final currentUser = AuthService().currentUser;
+    if (!mounted) return;
     setState(() => _selectedUser = currentUser);
     if (currentUser == null) {
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _pendingConfirmationsCount = 0;
@@ -154,6 +167,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
         _loadAcademyLogoWith(currentUser.academyId),
+        _loadDailyVideo(),
       ]);
       if (mounted) {
         setState(() => _loading = false);
@@ -206,10 +220,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       setState(() {
         _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
         _academyLogoUrl = academy.logoUrl;
-        _academyLogoLoaded = true;
         _academyScheduleImageUrl = academy.scheduleImageUrl;
-        _academyScheduleUpdatedAt = academy.updatedAt;
-        _academyScheduleLoaded = true;
         _showTrophies = academy.showTrophies;
         _showPartners = academy.showPartners;
         _showSchedule = academy.showSchedule;
@@ -220,10 +231,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       if (mounted) {
         setState(() {
           _academyLogoUrl = null;
-          _academyLogoLoaded = true;
           _academyScheduleImageUrl = null;
-          _academyScheduleUpdatedAt = null;
-          _academyScheduleLoaded = true;
           _showTrophies = true;
           _showPartners = true;
           _showSchedule = true;
@@ -235,7 +243,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadMissionWeekWith(String? academyId, String level) async {
     try {
-      final week = await _api.getMissionWeek(academyId: academyId, level: level);
+      final week =
+          await _api.getMissionWeek(academyId: academyId, level: level);
       if (mounted) {
         setState(() {
           _missionWeek = week;
@@ -346,10 +355,61 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     _loadCollectiveGoal();
   }
 
+  /// Vídeo do dia que pontua: primeiro da lista getTrainingVideosToday da academia do usuário.
+  Future<void> _loadDailyVideo() async {
+    final academyId = _selectedUser?.academyId;
+    if (academyId == null || academyId.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _dailyVideo = null;
+          _dailyVideoPoints = 0;
+          _dailyVideoCompleted = false;
+        });
+      }
+      return;
+    }
+    try {
+      final list = await _api.getTrainingVideosToday();
+      if (!mounted) return;
+      final forAcademy = list
+          .where((v) => v.academyId == academyId && v.pointsPerDay > 0)
+          .toList();
+      final video = forAcademy.isNotEmpty ? forAcademy.first : null;
+      setState(() {
+        _dailyVideo = video;
+        _dailyVideoPoints = video?.pointsPerDay ?? 0;
+        _dailyVideoCompleted = video?.hasCompletedToday ?? false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _dailyVideo = null;
+          _dailyVideoPoints = 0;
+          _dailyVideoCompleted = false;
+        });
+      }
+    }
+  }
+
+  void _onDailyVideoTap() {
+    if (_dailyVideo == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => TrainingVideoViewScreen(video: _dailyVideo!),
+      ),
+    ).then((_) {
+      _loadDailyVideo();
+      _loadUserPoints();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _selectedUser == null) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+      return const Center(
+        child: CircularProgressIndicator(color: AppTheme.primary),
+      );
     }
     if (_error != null && _selectedUser == null) {
       return Center(
@@ -358,159 +418,106 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.red.shade700),
+              ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: const Text('Tentar novamente')),
+              FilledButton(
+                onPressed: _load,
+                child: const Text('Tentar novamente'),
+              ),
             ],
           ),
         ),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      color: AppTheme.primary,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 8),
-            if (_selectedUser?.academyId != null && _selectedUser!.academyId!.isNotEmpty) ...[
-              Container(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppTheme.screenPadding(context),
-                  vertical: 20,
-                ),
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceOf(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppTheme.borderOf(context)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: _academyLogoUrl != null && _academyLogoUrl!.isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.network(
-                            _academyLogoUrl!.startsWith('/')
-                                ? '${_api.baseUrl}$_academyLogoUrl'
-                                : _academyLogoUrl!,
-                            height: 92,
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.shield_outlined,
-                                  size: 48,
-                                  color: AppTheme.textSecondaryOf(context),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Não foi possível carregar o brasão',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.textSecondaryOf(context),
-                                      ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
+    final u = _selectedUser;
+    final screenPadding = AppTheme.screenPadding(context);
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          const _FantasyBackground(),
+          RefreshIndicator(
+            onRefresh: _load,
+            color: FantasyTheme.gold,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(screenPadding, 0, screenPadding, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  HeaderWidget(
+                    userName: u?.name ?? u?.email ?? 'Perin',
+                    userBelt: _faixaLabel(u?.graduation),
+                    currentXp: _userPoints ?? 0,
+                    maxXp: _defaultMaxXp,
+                    academyLogoUrl: _academyLogoUrl != null &&
+                            _academyLogoUrl!.isNotEmpty
+                        ? (_academyLogoUrl!.startsWith('/')
+                            ? '${_api.baseUrl}$_academyLogoUrl'
+                            : _academyLogoUrl!)
+                        : null,
+                    dailyVideoPoints: _dailyVideoPoints,
+                    dailyVideoCompleted: _dailyVideoCompleted,
+                    onDailyVideoTap: _onDailyVideoTap,
+                  ),
+                  const SizedBox(height: 12),
+                  if (_collectiveGoal != null) _buildCollectiveGoalCard(),
+                  if (_collectiveGoal != null) const SizedBox(height: 16),
+                  if (u != null &&
+                      (u.academyId == null || u.academyId!.isEmpty))
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: Colors.orange.shade700,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Vincule este usuário a uma academia em Administração → Usuários para ver as missões semanais.',
+                              style: TextStyle(
+                                color: AppTheme.textSecondaryOf(context),
+                                fontSize: 13,
+                              ),
                             ),
                           ),
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.shield_outlined,
-                              size: 48,
-                              color: AppTheme.textSecondaryOf(context),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _academyLogoLoaded
-                                  ? 'Brasão não definido para esta academia'
-                                  : 'Carregando...',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.textSecondaryOf(context),
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ],
-            Text(
-              _selectedUser != null
-                  ? 'Olá, ${_selectedUser!.name ?? _selectedUser!.email}'
-                  : 'Olá',
-              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    color: AppTheme.textPrimaryOf(context),
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Suas missões e atividades da semana',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppTheme.textSecondaryOf(context),
-                  ),
-            ),
-            const SizedBox(height: 24),
-            _buildUserCard(),
-            const SizedBox(height: 20),
-            if (_collectiveGoal != null) _buildCollectiveGoalCard(),
-            if (_collectiveGoal != null) const SizedBox(height: 16),
-            if (_selectedUser != null &&
-                (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, color: Colors.orange.shade700),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Vincule este usuário a uma academia em Administração → Usuários para ver as missões semanais.',
-                        style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 13),
+                        ],
                       ),
                     ),
+                  if (u != null &&
+                      (u.academyId == null || u.academyId!.isEmpty))
+                    const SizedBox(height: 16),
+                  if (u != null) ...[
+                    _buildMainAccordion(),
+                    if (u.academyId != null && u.academyId!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      if (_showPartners) _buildPartnersSection(),
+                    ],
                   ],
-                ),
+                  if (_academyScheduleImageUrl != null &&
+                      _academyScheduleImageUrl!.isNotEmpty &&
+                      _showSchedule) ...[
+                    const SizedBox(height: 16),
+                    _buildScheduleCard(),
+                  ],
+                  if (_showGlobalSupporters) const GlobalSupportersSection(),
+                ],
               ),
-            if (_selectedUser != null &&
-                (_selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty))
-              const SizedBox(height: 16),
-            if (_selectedUser != null) ...[
-              const SizedBox(height: 16),
-              _buildMainAccordion(),
-              if (_selectedUser!.academyId != null && _selectedUser!.academyId!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                if (_showPartners) _buildPartnersSection(),
-              ],
-            ],
-            if (_academyScheduleImageUrl != null &&
-                _academyScheduleImageUrl!.isNotEmpty &&
-                _showSchedule) ...[
-              const SizedBox(height: 16),
-              _buildScheduleCard(),
-            ],
-            if (_showGlobalSupporters) const GlobalSupportersSection(),
-          ],
-        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -560,12 +567,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: maxH.clamp(200.0, 320.0)),
+                  constraints:
+                      BoxConstraints(maxHeight: maxH.clamp(200.0, 320.0)),
                   child: Image.network(
                     openUrl,
                     width: double.infinity,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => _schedulePlaceholder(context, openUrl),
+                    errorBuilder: (_, __, ___) =>
+                        _schedulePlaceholder(context, openUrl),
                   ),
                 ),
               ),
@@ -596,7 +605,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.schedule, size: 32, color: AppTheme.textSecondaryOf(context)),
+          Icon(Icons.schedule,
+              size: 32, color: AppTheme.textSecondaryOf(context)),
           const SizedBox(width: 12),
           Text(
             openUrl != null && openUrl.isNotEmpty
@@ -606,34 +616,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   color: AppTheme.textSecondaryOf(context),
                 ),
             textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserCard() {
-    final u = _selectedUser;
-    if (u == null) return const SizedBox.shrink();
-    final displayName = u.name ?? u.email;
-    final faixa = _faixaLabel(u.graduation);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderOf(context)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            faixa.isNotEmpty ? '$displayName – $faixa' : displayName,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: AppTheme.textPrimaryOf(context)),
-          ),
-          Text(
-            'Pontos: ${_userPoints ?? '—'}',
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.primary),
           ),
         ],
       ),
@@ -684,7 +666,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               child: LinearProgressIndicator(
                 value: progress,
                 backgroundColor: AppTheme.borderOf(context),
-                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppTheme.primary),
                 minHeight: 8,
               ),
             ),
@@ -709,9 +692,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
           child: ExpansionTile(
             initiallyExpanded: false,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            leading: Icon(Icons.flag, color: AppTheme.primary, size: 28),
+            leading: const Icon(Icons.flag, color: AppTheme.primary, size: 28),
             title: Text(
               'Missões da semana',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
@@ -793,7 +777,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.flag, color: AppTheme.primary, size: 28),
+              const Icon(Icons.flag, color: AppTheme.primary, size: 28),
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
@@ -805,7 +789,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 ),
               ),
               if (m.alreadyCompleted)
-                Icon(Icons.check_circle, color: Colors.green.shade700, size: 22),
+                Icon(Icons.check_circle,
+                    color: Colors.green.shade700, size: 22),
             ],
           ),
           const SizedBox(height: 10),
@@ -822,20 +807,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               m.positionName.isNotEmpty
                   ? '${m.techniqueName} ${m.positionName}'
                   : m.techniqueName,
-              style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 14),
+              style: TextStyle(
+                  color: AppTheme.textSecondaryOf(context), fontSize: 14),
             ),
           ],
-          if (m.estimatedDurationSeconds != null && m.estimatedDurationSeconds! > 0) ...[
+          if (m.estimatedDurationSeconds != null &&
+              m.estimatedDurationSeconds! > 0) ...[
             const SizedBox(height: 4),
             Text(
               '~${m.estimatedDurationSeconds! ~/ 60} min',
-              style: TextStyle(color: AppTheme.textSecondaryOf(context), fontSize: 12),
+              style: TextStyle(
+                  color: AppTheme.textSecondaryOf(context), fontSize: 12),
             ),
           ],
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: () => _openLesson(data),
-            icon: Icon(m.alreadyCompleted ? Icons.visibility_rounded : Icons.play_arrow_rounded, size: 20),
+            icon: Icon(
+                m.alreadyCompleted
+                    ? Icons.visibility_rounded
+                    : Icons.play_arrow_rounded,
+                size: 20),
             label: Text(m.alreadyCompleted ? 'Ver novamente' : 'Começar'),
           ),
         ],
@@ -856,7 +848,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   border: Border.all(color: AppTheme.borderOf(context)),
                 ),
                 child: Text(
-                  _selectedUser!.academyId == null || _selectedUser!.academyId!.isEmpty
+                  _selectedUser!.academyId == null ||
+                          _selectedUser!.academyId!.isEmpty
                       ? 'Configure a academia do usuário para ver as missões.'
                       : 'Nenhuma missão da semana no momento.',
                   style: TextStyle(color: AppTheme.textSecondaryOf(context)),
@@ -875,9 +868,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
           child: ExpansionTile(
             initiallyExpanded: false,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            leading: Icon(Icons.home_rounded, color: AppTheme.primary, size: 26),
+            leading: const Icon(Icons.home_rounded,
+                color: AppTheme.primary, size: 26),
             title: Text(
               'Centro de treinamento',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -887,8 +882,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
             children: [
               missionWidget,
-              const SizedBox(height: 16),
-              TrainingVideosSection(),
               const SizedBox(height: 16),
               if (_showTrophies) _buildTrophiesSection(),
               const SizedBox(height: 16),
@@ -918,7 +911,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
           child: ExpansionTile(
             initiallyExpanded: false,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            tilePadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             leading: Icon(icon, color: AppTheme.primary, size: 26),
             title: Row(
@@ -935,7 +929,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 if (showAlert) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Colors.amber,
                       borderRadius: BorderRadius.circular(6),
@@ -1064,27 +1059,35 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Widget _buildPartnersSection() {
     final u = _selectedUser;
-    if (u == null || u.academyId == null || u.academyId!.isEmpty) return const SizedBox.shrink();
-    return _buildHomeAccordion(
-      icon: Icons.handshake_outlined,
-      title: 'Parceiros',
-      children: [
-        _ShortcutTile(
-          icon: Icons.business_center_outlined,
-          title: 'Nossos parceiros',
-          subtitle: 'Empresas e academias parceiras',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PartnersScreen(academyId: u.academyId!),
-            ),
-          ),
+    if (u == null || u.academyId == null || u.academyId!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return PartnersCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PartnersScreen(academyId: u.academyId!),
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildShortcuts() => const SizedBox.shrink();
+}
+
+/// Fundo espacial/gradiente usado também na home fantasia.
+class _FantasyBackground extends StatelessWidget {
+  const _FantasyBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: FantasyTheme.backgroundGradient,
+      ),
+    );
+  }
 }
 
 class _RandomPartnerDialog extends StatelessWidget {
@@ -1125,7 +1128,8 @@ class _RandomPartnerDialog extends StatelessWidget {
                     ),
               ),
               IconButton(
-                icon: Icon(Icons.close, size: 20, color: AppTheme.textSecondaryOf(context)),
+                icon: Icon(Icons.close,
+                    size: 20, color: AppTheme.textSecondaryOf(context)),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -1136,7 +1140,9 @@ class _RandomPartnerDialog extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Image.network(
-                  partner.logoUrl!.startsWith('/') ? '${api.baseUrl}${partner.logoUrl}' : partner.logoUrl!,
+                  partner.logoUrl!.startsWith('/')
+                      ? '${api.baseUrl}${partner.logoUrl}'
+                      : partner.logoUrl!,
                   height: 72,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
@@ -1152,7 +1158,8 @@ class _RandomPartnerDialog extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
           ),
-          if (partner.description != null && partner.description!.isNotEmpty) ...[
+          if (partner.description != null &&
+              partner.description!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               partner.description!,
@@ -1203,7 +1210,7 @@ class _ShortcutTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-        child: Material(
+      child: Material(
         color: AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
@@ -1236,7 +1243,10 @@ class _ShortcutTile extends StatelessWidget {
                           Flexible(
                             child: Text(
                               title,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
                                     color: AppTheme.textPrimaryOf(context),
                                   ),
                             ),
@@ -1244,12 +1254,14 @@ class _ShortcutTile extends StatelessWidget {
                           if (showAlertBadge) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.amber,
                                 borderRadius: BorderRadius.circular(6),
                               ),
-                              child: Icon(Icons.warning_amber_rounded, size: 16, color: Colors.amber.shade900),
+                              child: Icon(Icons.warning_amber_rounded,
+                                  size: 16, color: Colors.amber.shade900),
                             ),
                           ],
                         ],
@@ -1265,7 +1277,8 @@ class _ShortcutTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppTheme.textMutedOf(context)),
+                Icon(Icons.arrow_forward_ios_rounded,
+                    size: 14, color: AppTheme.textMutedOf(context)),
               ],
             ),
           ),

@@ -18,7 +18,6 @@ from app.routes import (
     mission_usages,
     missions,
     partners,
-    positions,
     professors,
     reports,
     techniques,
@@ -39,7 +38,6 @@ api_router.include_router(professors.router, prefix="/professors", tags=["profes
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["lessons"])
 api_router.include_router(techniques.router, prefix="/techniques", tags=["techniques"])
-api_router.include_router(positions.router, prefix="/positions", tags=["positions"])
 api_router.include_router(partners.router, prefix="/partners", tags=["partners"])
 api_router.include_router(missions.router, prefix="/missions", tags=["missions"])
 api_router.include_router(mission.router, prefix="/mission_today", tags=["mission"])
