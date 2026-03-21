@@ -166,6 +166,33 @@ class ApiService {
     return jsonDecode(body);
   }
 
+  /// Formata `detail` do FastAPI (string, lista de erros de validação, etc.).
+  static String formatApiDetail(dynamic detail) {
+    if (detail == null) return '';
+    if (detail is String) return detail;
+    if (detail is List) {
+      final raw = detail.toString();
+      // API antiga ainda exige posições removidas no schema atual do repositório.
+      if (raw.contains('from_position_id') || raw.contains('to_position_id')) {
+        return 'A API que está rodando está desatualizada: ela ainda exige '
+            '"from_position_id" e "to_position_id", que foram removidos do modelo de técnicas. '
+            'Reconstrua e suba o serviço da API com o código atual e aplique as migrações '
+            '(inclui migrations/044_remove_technique_positions.sql). '
+            'Ex.: na pasta do projeto: docker compose build --no-cache api && docker compose up -d api';
+      }
+      final msgs = <String>[];
+      for (final e in detail) {
+        if (e is Map && e['msg'] != null) {
+          final loc = e['loc'];
+          final locStr = loc is List ? loc.join('.') : '$loc';
+          msgs.add('$locStr: ${e['msg']}');
+        }
+      }
+      if (msgs.isNotEmpty) return msgs.join('\n');
+    }
+    return detail.toString();
+  }
+
   void _throwIfNotOk(http.Response r, [dynamic data]) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
     if (r.statusCode == 401) {
@@ -173,8 +200,7 @@ class ApiService {
     }
     String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
     if (data is Map && data['detail'] != null) {
-      final d = data['detail'];
-      msg = d is String ? d : d.toString();
+      msg = formatApiDetail(data['detail']);
     }
     if (r.statusCode == 404) {
       msg = 'Não encontrado (404). Verifique se a API está rodando em $baseUrl';
@@ -183,8 +209,12 @@ class ApiService {
   }
 
   // ---------- Academies ----------
-  Future<List<Academy>> getAcademies() async {
-    final r = await _getWithCache(Uri.parse('$baseUrl/academies'), _cacheTtlMedium);
+  /// [asRealUser] true = não envia X-Impersonate-User (lista completa para o seletor "Atuar como" mesmo durante simulação).
+  Future<List<Academy>> getAcademies({bool asRealUser = false}) async {
+    final uri = Uri.parse('$baseUrl/academies');
+    final r = asRealUser
+        ? await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)))
+        : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -467,9 +497,16 @@ class ApiService {
     return raw.map((e) => TrophyWithEarned.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Lista troféus da academia (admin).
-  Future<List<Map<String, dynamic>>> getTrophies(String academyId) async {
-    final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: {'academy_id': academyId});
+  /// Lista troféus da academia (admin). [cacheBust] evita resposta HTTP antiga no browser.
+  Future<List<Map<String, dynamic>>> getTrophies(
+    String academyId, {
+    bool cacheBust = false,
+  }) async {
+    final params = <String, String>{'academy_id': academyId};
+    if (cacheBust) {
+      params['_t'] = DateTime.now().microsecondsSinceEpoch.toString();
+    }
+    final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: params);
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -509,7 +546,58 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/trophies');
     return data! as Map<String, dynamic>;
+  }
+
+  /// Atualiza troféu/medalha (PATCH). Apenas chaves não nulas entram no body.
+  Future<Map<String, dynamic>> updateTrophy(
+    String trophyId, {
+    String? techniqueId,
+    String? name,
+    String? startDate,
+    String? endDate,
+    int? targetCount,
+    String? awardKind,
+    int? minDurationDays,
+    int? minPointsToUnlock,
+    String? minGraduationToUnlock,
+  }) async {
+    final body = <String, dynamic>{};
+    if (techniqueId != null) body['technique_id'] = techniqueId;
+    if (name != null) body['name'] = name;
+    if (startDate != null) body['start_date'] = startDate;
+    if (endDate != null) body['end_date'] = endDate;
+    if (targetCount != null) body['target_count'] = targetCount;
+    if (awardKind != null) body['award_kind'] = awardKind;
+    if (minDurationDays != null) body['min_duration_days'] = minDurationDays;
+    if (minPointsToUnlock != null) body['min_points_to_unlock'] = minPointsToUnlock;
+    if (minGraduationToUnlock != null) {
+      body['min_graduation_to_unlock'] =
+          minGraduationToUnlock.isEmpty ? null : minGraduationToUnlock;
+    }
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/trophies/${Uri.encodeComponent(trophyId)}'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/trophies');
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Remove troféu (soft delete no servidor).
+  Future<void> deleteTrophy(String trophyId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/trophies/${Uri.encodeComponent(trophyId)}'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+    invalidateCache('GET:$baseUrl/trophies');
   }
 
   /// Lista parceiros da academia (alunos: sem academy_id usa a do usuário; gestor/admin: academy_id obrigatório para admin).
@@ -697,6 +785,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/lessons');
     return Lesson.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -729,12 +818,21 @@ class ApiService {
   Future<void> deleteLesson(String id) async {
     final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/lessons');
   }
 
   // ---------- Techniques ----------
-  /// Lista técnicas da academia. [academyId] obrigatório. Sem cache para refletir CRUD na hora.
-  Future<List<Technique>> getTechniques({required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: {'academy_id': academyId});
+  /// Lista técnicas da academia. [academyId] obrigatório.
+  /// [_cacheBust] evita respostas antigas em cache HTTP do browser (web) após CRUD.
+  Future<List<Technique>> getTechniques({
+    required String academyId,
+    bool cacheBust = false,
+  }) async {
+    final params = <String, String>{'academy_id': academyId};
+    if (cacheBust) {
+      params['_t'] = DateTime.now().microsecondsSinceEpoch.toString();
+    }
+    final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
     final r = await _getWithCache(uri, 0);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
@@ -851,6 +949,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/missions');
     return Mission.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -879,12 +978,14 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/missions');
     return Mission.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<void> deleteMission(String id) async {
     final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id'), headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/missions');
   }
 
   // ---------- Área do aluno (missão do dia, conclusão, histórico, feedback, métricas) ----------
@@ -1286,6 +1387,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/professors');
     return Professor.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1306,6 +1408,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/professors');
     return Professor.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1315,6 +1418,7 @@ class ApiService {
       headers: await _headers(auth: true),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/professors');
   }
 
   // ---------- Training videos (campo de treinamento) ----------
@@ -1387,6 +1491,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/training_videos');
   }
 
   /// Atualiza vídeo de treinamento (admin/professor).
@@ -1414,6 +1519,7 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/training_videos');
   }
 
   /// Remove vídeo de treinamento (admin/professor).
@@ -1423,6 +1529,7 @@ class ApiService {
       headers: await _headers(auth: true),
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/training_videos');
   }
 }
 

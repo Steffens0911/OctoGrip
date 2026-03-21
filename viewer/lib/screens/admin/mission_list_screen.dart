@@ -185,7 +185,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                               _searchController.text.isNotEmpty || _filterLevel != null
                                   ? 'Nenhuma missão encontrada.'
                                   : 'Nenhuma missão. Toque em + para criar.',
-                              style: const const TextStyle(color: AppTheme.textSecondary),
+                              style: const const const TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(

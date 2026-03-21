@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
@@ -15,11 +17,14 @@ import 'package:viewer/services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
   await AuthService().init();
   runApp(
-    ChangeNotifierProvider<AuthService>.value(
-      value: AuthService(),
-      child: const ViewerApp(),
+    ProviderScope(
+      child: ChangeNotifierProvider<AuthService>.value(
+        value: AuthService(),
+        child: const ViewerApp(),
+      ),
     ),
   );
 }
@@ -176,7 +181,7 @@ class _MainShellState extends State<MainShell> {
               final users = await ApiService().getUsers(asRealUser: true);
               List<Academy> academies = [];
               try {
-                academies = await ApiService().getAcademies();
+                academies = await ApiService().getAcademies(asRealUser: true);
               } catch (_) {}
               return (users: users, academies: academies);
             }(),

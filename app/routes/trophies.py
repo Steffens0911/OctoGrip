@@ -5,15 +5,18 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
-from app.core.exceptions import ForbiddenError
+from app.core.exceptions import ForbiddenError, TrophyNotFoundError
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
-from app.schemas.trophy import TrophyCreate, TrophyRead, UserTrophyEarned
+from app.schemas.trophy import TrophyCreate, TrophyRead, TrophyUpdate, UserTrophyEarned
 from app.services.trophy_service import (
     create_trophy,
+    get_trophy,
     list_trophies_by_academy,
     list_user_trophies_with_earned,
+    soft_delete_trophy,
+    update_trophy,
 )
 from app.services.user_service import get_user_or_raise
 
@@ -71,6 +74,37 @@ async def trophy_list(
     """Lista troféus da academia."""
     verify_academy_access(current_user, str(academy_id))
     return [_trophy_to_read(t) for t in await list_trophies_by_academy(db, academy_id)]
+
+
+@router.patch("/{trophy_id}", response_model=TrophyRead)
+async def trophy_update(
+    trophy_id: UUID,
+    body: TrophyUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Atualiza troféu (edição livre; cliente pode avisar sobre impacto em conquistas)."""
+    trophy = await get_trophy(db, trophy_id)
+    if not trophy or trophy.deleted_at is not None:
+        raise TrophyNotFoundError()
+    verify_academy_access(current_user, str(trophy.academy_id))
+    payload = body.model_dump(exclude_unset=True)
+    updated = await update_trophy(db, trophy_id, payload)
+    return _trophy_to_read(updated)
+
+
+@router.delete("/{trophy_id}", status_code=204)
+async def trophy_delete(
+    trophy_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Remove troféu (soft delete: não aparece mais em listas/galeria)."""
+    trophy = await get_trophy(db, trophy_id)
+    if not trophy or trophy.deleted_at is not None:
+        raise TrophyNotFoundError()
+    verify_academy_access(current_user, str(trophy.academy_id))
+    await soft_delete_trophy(db, trophy_id)
 
 
 @router.get("/user/{user_id}", response_model=list[UserTrophyEarned])

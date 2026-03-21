@@ -102,7 +102,7 @@ class MissionCard extends StatelessWidget {
                                 ),
                           ),
                           const SizedBox(width: 6),
-                          const const Icon(
+                          const const const Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
                             color: FantasyTheme.backgroundTop,

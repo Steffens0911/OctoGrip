@@ -42,11 +42,12 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
           _loading = false;
         });
+      }
     }
   }
 

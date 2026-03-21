@@ -145,16 +145,23 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Middleware de logging de requisições
 app.add_middleware(RequestLoggingMiddleware, log_successful=False)
 
+# CORS: allow_headers=["*"] com allow_credentials=False é suportado pelo Starlette e espelha no preflight
+# os headers pedidos pelo browser (Authorization, X-Impersonate-User, extensões, etc.). Evita 400
+# "Disallowed CORS headers" que bloqueava Flutter Web (CRUD troféus, /auth/me, etc.) mesmo com lista explícita.
 app.add_middleware(
     CORSMiddleware,
     # Em produção, use CORS_ORIGINS para listar domínios permitidos (ex.: frontend em produção).
     allow_origins=settings.CORS_ORIGINS,
-    # Em desenvolvimento, aceitar qualquer porta em localhost/127.0.0.1 (Flutter Web usa porta dinâmica).
-    allow_origin_regex=r"http://localhost(:\d+)?$|http://127\.0\.0\.1(:\d+)?$",
+    # Flutter Web: localhost com porta dinâmica, 127.0.0.1 e ::1 (IPv6).
+    allow_origin_regex=(
+        r"http://localhost(:\d+)?$"
+        r"|http://127\.0\.0\.1(:\d+)?$"
+        r"|http://\[::1\](:\d+)?$"
+    ),
     # Usamos autenticação via header Authorization: Bearer, então não precisamos de credenciais de cookie.
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=["*"],
 )
 
 register_exception_handlers(app)

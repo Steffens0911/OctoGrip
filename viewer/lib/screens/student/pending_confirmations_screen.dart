@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
@@ -61,18 +60,20 @@ class _PendingConfirmationsScreenState
     });
     try {
       final list = await _api.getPendingConfirmations();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _allItems = list;
           _loading = false;
         });
+      }
       _applyFilters();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
           _loading = false;
         });
+      }
     }
   }
 

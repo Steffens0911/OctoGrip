@@ -186,7 +186,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                               _searchController.text.isNotEmpty || _filterTechniqueId != null
                                   ? 'Nenhuma lição encontrada.'
                                   : 'Nenhuma lição. Toque em + para criar.',
-                              style: const const TextStyle(color: AppTheme.textSecondary),
+                              style: const const const TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(

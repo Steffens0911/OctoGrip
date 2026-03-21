@@ -77,6 +77,11 @@ class PartnerNotFoundError(NotFoundError):
         super().__init__(message)
 
 
+class TrophyNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Troféu não encontrado."):
+        super().__init__(message)
+
+
 # --- Conflict (409) ---
 
 

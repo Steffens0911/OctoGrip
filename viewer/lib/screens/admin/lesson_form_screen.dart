@@ -132,11 +132,12 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
           _saving = false;
         });
+      }
     }
   }
 

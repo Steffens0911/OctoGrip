@@ -91,11 +91,12 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
           }
         }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _error = userFacingMessage(e);
             _saving = false;
           });
+        }
       }
     }
   }

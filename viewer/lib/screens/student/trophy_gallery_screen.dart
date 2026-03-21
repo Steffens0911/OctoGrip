@@ -772,8 +772,9 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                   final progressLines =
                                                       _progressLines(
                                                           context, t);
-                                                  if (progressLines.isEmpty)
+                                                  if (progressLines.isEmpty) {
                                                     return <Widget>[];
+                                                  }
                                                   return [
                                                     const SizedBox(height: 10),
                                                     ...progressLines

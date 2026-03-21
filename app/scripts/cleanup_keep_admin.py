@@ -1,4 +1,4 @@
-"""Limpa todo o banco de dados de uso (academias, posições, técnicas, lições,
+"""Limpa todo o banco de dados de uso (academias, técnicas, lições,
 missões, execuções, feedbacks etc.) e mantém apenas o usuário admin@jjb.com.
 
 Pode ser executado via:
@@ -22,7 +22,6 @@ from app.models import (
     LessonProgress,
     Mission,
     MissionUsage,
-    Position,
     Professor,
     Technique,
     TechniqueExecution,
@@ -79,7 +78,6 @@ def cleanup_db_keep_admin() -> None:
             Mission,
             Lesson,
             Technique,
-            Position,
             Professor,
             Academy,
         ):

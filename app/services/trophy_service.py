@@ -1,13 +1,13 @@
 """Serviço de troféus: CRUD e cálculo de tier conquistado (ouro/prata/bronze) por execuções confirmadas."""
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError
+from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
 from app.services.execution_service import total_points_for_user
@@ -138,15 +138,94 @@ async def create_trophy(
 
 
 async def list_trophies_by_academy(db: AsyncSession, academy_id: UUID) -> list[Trophy]:
-    """Lista troféus da academia ordenados por nome."""
+    """Lista troféus ativos (não soft-deletados) da academia ordenados por nome."""
     return (
         await db.execute(
             select(Trophy)
             .options(selectinload(Trophy.technique))
-            .where(Trophy.academy_id == academy_id)
+            .where(Trophy.academy_id == academy_id, Trophy.deleted_at.is_(None))
             .order_by(Trophy.name)
         )
     ).unique().scalars().all()
+
+
+async def get_trophy(db: AsyncSession, trophy_id: UUID) -> Trophy | None:
+    """Obtém troféu por id (inclui soft-deletados)."""
+    result = await db.execute(
+        select(Trophy)
+        .options(selectinload(Trophy.technique))
+        .where(Trophy.id == trophy_id),
+    )
+    return result.scalar_one_or_none()
+
+
+async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Trophy:
+    """Atualiza troféu com campos presentes em ``updates`` (model_dump exclude_unset). Valida como no create."""
+    trophy = await get_trophy(db, trophy_id)
+    if not trophy or trophy.deleted_at is not None:
+        raise TrophyNotFoundError()
+    academy_id = trophy.academy_id
+    tid = updates["technique_id"] if "technique_id" in updates else trophy.technique_id
+    nm = updates["name"].strip() if "name" in updates else trophy.name
+    sd = updates["start_date"] if "start_date" in updates else trophy.start_date
+    ed = updates["end_date"] if "end_date" in updates else trophy.end_date
+    tc = updates["target_count"] if "target_count" in updates else trophy.target_count
+    ak = updates["award_kind"] if "award_kind" in updates else trophy.award_kind
+    mdd = updates["min_duration_days"] if "min_duration_days" in updates else trophy.min_duration_days
+    mpu = updates["min_points_to_unlock"] if "min_points_to_unlock" in updates else trophy.min_points_to_unlock
+    if "min_graduation_to_unlock" in updates:
+        mgrad = updates["min_graduation_to_unlock"]
+        if mgrad is not None and isinstance(mgrad, str) and not mgrad.strip():
+            mgrad = None
+    else:
+        mgrad = trophy.min_graduation_to_unlock
+
+    technique = (await db.execute(select(Technique).where(Technique.id == tid))).scalar_one_or_none()
+    if not technique:
+        raise TechniqueNotFoundError("Técnica não encontrada.")
+    if technique.academy_id != academy_id:
+        raise AppError("A técnica deve pertencer à academia.", status_code=400)
+    if sd > ed:
+        raise AppError("start_date deve ser anterior ou igual a end_date.", status_code=400)
+    if ak == "trophy":
+        min_days = mdd if mdd is not None else 30
+        duration_days = (ed - sd).days
+        if duration_days < min_days:
+            raise AppError(
+                f"Troféu exige duração mínima de {min_days} dias. Período informado: {duration_days} dias.",
+                status_code=400,
+            )
+
+    trophy.technique_id = tid
+    trophy.name = nm if isinstance(nm, str) else trophy.name
+    trophy.start_date = sd
+    trophy.end_date = ed
+    trophy.target_count = tc
+    trophy.award_kind = ak
+    trophy.min_duration_days = mdd if ak == "trophy" else None
+    trophy.min_points_to_unlock = max(0, mpu)
+    trophy.min_graduation_to_unlock = (
+        mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
+    )
+
+    await db.commit()
+    await db.refresh(trophy)
+    trophy = (await get_trophy(db, trophy_id)) or trophy
+    logger.info(
+        "update_trophy",
+        extra={"trophy_id": str(trophy_id), "academy_id": str(academy_id)},
+    )
+    return trophy
+
+
+async def soft_delete_trophy(db: AsyncSession, trophy_id: UUID) -> None:
+    """Marca troféu como removido (soft delete)."""
+    trophy = await get_trophy(db, trophy_id)
+    if not trophy or trophy.deleted_at is not None:
+        raise TrophyNotFoundError()
+    trophy.deleted_at = datetime.now(timezone.utc)
+    await db.commit()
+    logger.info("soft_delete_trophy", extra={"trophy_id": str(trophy_id)})
 
 
 async def _load_confirmed_executions_for_user(

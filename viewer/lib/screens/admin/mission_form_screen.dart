@@ -89,8 +89,9 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       setState(() {
         _academies = academies;
         _loading = false;
-        if (_techniqueId == null && widget.mission != null)
+        if (_techniqueId == null && widget.mission != null) {
           _techniqueId = widget.mission!.techniqueId;
+        }
       });
       if (_academyId != null) await _loadTechniques(_academyId!);
     } catch (_) {
@@ -175,11 +176,12 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
           _saving = false;
         });
+      }
     }
   }
 

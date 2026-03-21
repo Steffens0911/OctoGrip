@@ -34,6 +34,32 @@ class TrophyCreate(BaseModel):
         return g
 
 
+class TrophyUpdate(BaseModel):
+    """Atualização parcial de troféu (admin)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    technique_id: UUID | None = None
+    name: str | None = Field(None, min_length=1, max_length=255)
+    start_date: date | None = None
+    end_date: date | None = None
+    target_count: int | None = Field(None, gt=0)
+    award_kind: AwardKind | None = None
+    min_duration_days: int | None = Field(default=None, description="Para trophy")
+    min_points_to_unlock: int | None = Field(None, ge=0)
+    min_graduation_to_unlock: str | None = None
+
+    @field_validator("min_graduation_to_unlock")
+    @classmethod
+    def validate_min_graduation_u(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            return None
+        g = v.strip().lower()
+        if g not in VALID_GRADUATIONS:
+            raise ValueError(f"min_graduation_to_unlock deve ser um de: {', '.join(sorted(VALID_GRADUATIONS))}")
+        return g
+
+
 class TrophyRead(BaseModel):
     id: UUID
     academy_id: UUID

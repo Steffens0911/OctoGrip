@@ -5,6 +5,15 @@ Documentação completa dos endpoints da API REST.
 **Base URL:** `http://localhost:8000` (ou conforme configuração)  
 **Documentação interativa:** `/docs` (Swagger)
 
+### CORS (Flutter Web e preflight)
+
+O frontend em **outra origem** (ex.: `http://localhost:55767` → API `http://localhost:8000`) dispara pedidos **OPTIONS** (preflight). O `CORSMiddleware` deve responder **200** com os cabeçalhos `Access-Control-*` corretos.
+
+- **`allow_headers=["*"]`** com **`allow_credentials=False`**: o Starlette espelha no preflight os headers pedidos pelo browser (`Authorization`, `X-Impersonate-User`, etc.), evitando **400 Disallowed CORS headers** que bloqueava CRUD no Flutter Web. Não combinar `allow_headers=["*"]` com `allow_credentials=True` (restrição do Starlette).
+- **Produção**: definir **`CORS_ORIGINS`** com as origens do frontend (ver `app/config.py`).
+
+Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
+
 ---
 
 ## Índice

@@ -124,11 +124,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
           }
         }
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _error = userFacingMessage(e);
             _saving = false;
           });
+        }
       }
     }
   }
@@ -189,8 +190,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 validator: (v) {
                   final s = (v)?.trim() ?? '';
                   if (s.isEmpty) return null;
-                  if (s.length < 6)
+                  if (s.length < 6) {
                     return 'Senha deve ter no mínimo 6 caracteres';
+                  }
                   return null;
                 },
               ),

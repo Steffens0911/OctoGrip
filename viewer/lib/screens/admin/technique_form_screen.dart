@@ -32,7 +32,10 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
 
   Future<void> _loadTechniques() async {
     try {
-      final list = await _api.getTechniques(academyId: widget.academyId);
+      final list = await _api.getTechniques(
+        academyId: widget.academyId,
+        cacheBust: true,
+      );
       if (mounted) {
         setState(() {
           _allTechniques = list
@@ -88,15 +91,16 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
 
       setState(() { _saving = true; _error = null; });
       try {
+        final Technique saved;
         if (widget.technique == null) {
-          await _api.createTechnique(
+          saved = await _api.createTechnique(
             academyId: widget.academyId,
             name: nameTrimmed,
             videoUrl: videoUrl?.trim().isEmpty == true ? null : videoUrl?.trim(),
             description: description?.trim().isEmpty == true ? null : description?.trim(),
           );
         } else {
-          await _api.updateTechnique(
+          saved = await _api.updateTechnique(
             widget.technique!.id,
             academyId: widget.academyId,
             name: nameTrimmed,
@@ -106,7 +110,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
-          Navigator.pop(context);
+          Navigator.pop(context, saved);
         }
       } catch (e) {
         if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });

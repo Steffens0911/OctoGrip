@@ -101,7 +101,7 @@ class PartnersCard extends StatelessWidget {
                                 ),
                           ),
                           const SizedBox(width: 6),
-                          Icon(
+                          const Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
                             color: FantasyTheme.backgroundTop,

@@ -3,7 +3,6 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/services/api_service.dart';
-import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/role_guard.dart';
 

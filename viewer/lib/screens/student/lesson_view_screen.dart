@@ -47,10 +47,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       final list = await _api.getMyExecutions();
       final pending = list.any((e) {
         if ((e['status'] as String?) != 'pending_confirmation') return false;
-        if (missionId != null && (e['mission_id'] as String?) == missionId)
+        if (missionId != null && (e['mission_id'] as String?) == missionId) {
           return true;
-        if (lessonId != null && (e['lesson_id'] as String?) == lessonId)
+        }
+        if (lessonId != null && (e['lesson_id'] as String?) == lessonId) {
           return true;
+        }
         return false;
       });
       if (mounted) setState(() => _pendingOpponentAcceptance = pending);

@@ -148,12 +148,25 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 2. **Academias (aba Academias)**
    - **Listar** academias; toque abre o detalhe.
    - **Detalhe da academia:**
+     - **Troféus:** linha "Troféus" (como "Técnicas") abre **`TrophyListScreen`** → módulo **`features/trophies`** (Riverpod + Hive): busca, criar/editar em formulário completo, excluir (soft delete na API). Ao editar período/técnica/meta, o app pede confirmação (impacto nas conquistas). Ver [`viewer/lib/features/trophies/README.md`](viewer/lib/features/trophies/README.md).
      - **Missões semanais:** 3 dropdowns para selecionar técnica (Missão 1, Missão 2, Missão 3). Se só Missão 1 estiver preenchida, aparece missão apenas no slot 1.
      - **Tema da semana:** campo de texto + **Salvar tema** (PATCH /academies/{id}).
      - **Ranking (últimos 30 dias):** lista legível (posição, nome, conclusões).
      - **Dificuldades reportadas:** posições mais marcadas como difíceis (nome, quantidade de reportes).
      - **Relatório semanal:** período da semana, total de conclusões, ativos e lista do ranking da semana.
    - Estado vazio: mensagem quando não há academias cadastradas.
+
+### CRUD Técnicas (módulo admin — referência para outros CRUDs)
+
+Implementação de referência em **`viewer/lib/features/techniques/`** (Riverpod + Clean Architecture + Hive):
+
+- Lista por academia com sync na API, cache Hive, aviso se a lista puder estar desatualizada (falha de rede).
+- Após **criar / editar / excluir**: invalidação do cache HTTP do `ApiService`, limpeza do Hive dessa lista e novo sync; overlay de loading durante mutações.
+- **Criação rápida** (FAB): bottom sheet com `createOptimistic` no notifier.
+- **Formulário completo** (`technique_form_screen.dart`): após salvar, `Navigator.pop` devolve o modelo gravado; a lista funde o item e reconcilia com o servidor (`syncAfterFormClose(saved:)`).
+- Busca com debounce, paginação client-side, pull-to-refresh.
+
+Documentação detalhada para replicar o padrão em lições, missões, etc.: **[docs/CRUD_PADRAO_FLUTTER.md](docs/CRUD_PADRAO_FLUTTER.md)**.
 
 ### Outras telas do app
 

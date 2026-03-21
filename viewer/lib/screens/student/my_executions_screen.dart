@@ -60,18 +60,20 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
     });
     try {
       final list = await _api.getMyExecutions();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _allItems = list;
           _loading = false;
         });
+      }
       _applyFilters();
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
           _loading = false;
         });
+      }
     }
   }
 
