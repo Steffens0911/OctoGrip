@@ -21,7 +21,7 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 | **User** | Usuário (email, name, academy_id opcional); UUID como PK |
 | **Academy** | Academia (name, slug, weekly_theme); 3 técnicas semanais (weekly_technique_id, weekly_technique_2_id, weekly_technique_3_id) para Missão 1, 2, 3 (A-01, A-02, A-03) |
 | **Position** | Posição do jiu-jitsu (name, slug, description) |
-| **Technique** | Técnica: de uma Position para outra (from_position_id, to_position_id) |
+| **Technique** | Técnica da academia (name, slug, description, video_url, base_points) — não depende mais de Position |
 | **Lesson** | Aula vinculada a uma Technique (title, slug, video_url, order_index) |
 | **LessonProgress** | Conclusão de lição por usuário (user_id, lesson_id, completed_at); constraint única (user, lesson) |
 | **MissionUsage** | Conclusão de missão (user_id, mission_id, usage_type: before_training \| after_training); constraint única (user, mission) |

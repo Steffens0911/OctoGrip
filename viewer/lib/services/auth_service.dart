@@ -98,6 +98,9 @@ class AuthService extends ChangeNotifier {
       _effectiveUser = null;
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_keyImpersonate);
+      // Ao sair da simulação, limpamos o cache para que as próximas
+      // chamadas de API reflitam imediatamente o usuário real.
+      ApiService().invalidateCache();
       notifyListeners();
       return;
     }
@@ -113,6 +116,9 @@ class AuthService extends ChangeNotifier {
       await prefs.remove(_keyImpersonate);
       rethrow;
     }
+    // Ao começar a atuar como outro usuário, limpamos o cache para que
+    // missões, XP, contadores etc. sejam recarregados para o perfil escolhido.
+    ApiService().invalidateCache();
     notifyListeners();
   }
 

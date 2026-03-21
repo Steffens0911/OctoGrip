@@ -60,12 +60,15 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   Future<void> _loadTechniques(String academyId) async {
     try {
       final techniques = await _api.getTechniques(academyId: academyId);
-      if (mounted) setState(() {
-        _techniques = techniques;
-        if (_techniqueId != null && !techniques.any((t) => t.id == _techniqueId)) {
-          _techniqueId = null;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _techniques = techniques;
+          if (_techniqueId != null &&
+              !techniques.any((t) => t.id == _techniqueId)) {
+            _techniqueId = null;
+          }
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _techniques = []);
     }
@@ -94,14 +97,20 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
       return;
     }
     final orderIndex = int.tryParse(_orderCtrl.text) ?? 0;
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       if (widget.lesson == null) {
         await _api.createLesson(
           techniqueId: _techniqueId!,
           title: _titleCtrl.text.trim(),
-          videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
-          content: _contentCtrl.text.trim().isEmpty ? null : _contentCtrl.text.trim(),
+          videoUrl:
+              _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
+          content: _contentCtrl.text.trim().isEmpty
+              ? null
+              : _contentCtrl.text.trim(),
           orderIndex: orderIndex,
         );
       } else {
@@ -109,17 +118,25 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
           widget.lesson!.id,
           techniqueId: _techniqueId,
           title: _titleCtrl.text.trim(),
-          videoUrl: _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
-          content: _contentCtrl.text.trim().isEmpty ? null : _contentCtrl.text.trim(),
+          videoUrl:
+              _videoCtrl.text.trim().isEmpty ? null : _videoCtrl.text.trim(),
+          content: _contentCtrl.text.trim().isEmpty
+              ? null
+              : _contentCtrl.text.trim(),
           orderIndex: orderIndex,
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
+      if (mounted)
+        setState(() {
+          _error = userFacingMessage(e);
+          _saving = false;
+        });
     }
   }
 
@@ -128,21 +145,30 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.lesson == null ? 'Nova lição' : 'Editar lição'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (_loading) const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
+            if (_loading)
+              const SizedBox(
+                  height: 48,
+                  child: Center(
+                      child:
+                          CircularProgressIndicator(color: AppTheme.primary)))
             else ...[
               DropdownButtonFormField<String>(
-                value: _academyId,
+                initialValue: _academyId,
                 decoration: const InputDecoration(labelText: 'Academia'),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('— Selecione academia —')),
-                  ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                  const DropdownMenuItem(
+                      value: null, child: Text('— Selecione academia —')),
+                  ..._academies.map((a) =>
+                      DropdownMenuItem(value: a.id, child: Text(a.name))),
                 ],
                 onChanged: (v) async {
                   setState(() {
@@ -155,26 +181,54 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _techniqueId,
+                initialValue: _techniqueId,
                 decoration: InputDecoration(
                   labelText: 'Técnica',
-                  hintText: _academyId == null ? 'Selecione academia primeiro' : null,
+                  hintText:
+                      _academyId == null ? 'Selecione academia primeiro' : null,
                 ),
-                items: _techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                items: _techniques
+                    .map((t) =>
+                        DropdownMenuItem(value: t.id, child: Text(t.name)))
+                    .toList(),
                 onChanged: (v) => setState(() => _techniqueId = v),
               ),
             ],
             const SizedBox(height: 16),
-            TextField(controller: _titleCtrl, decoration: const InputDecoration(labelText: 'Título')),
+            TextField(
+                controller: _titleCtrl,
+                decoration: const InputDecoration(labelText: 'Título')),
             const SizedBox(height: 16),
-            TextField(controller: _videoCtrl, decoration: const InputDecoration(labelText: 'Link do YouTube (opcional)'), keyboardType: TextInputType.url),
+            TextField(
+                controller: _videoCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Link do YouTube (opcional)'),
+                keyboardType: TextInputType.url),
             const SizedBox(height: 16),
-            TextField(controller: _contentCtrl, decoration: const InputDecoration(labelText: 'Conteúdo (opcional)'), maxLines: 3),
+            TextField(
+                controller: _contentCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Conteúdo (opcional)'),
+                maxLines: 3),
             const SizedBox(height: 16),
-            TextField(controller: _orderCtrl, decoration: const InputDecoration(labelText: 'Ordem'), keyboardType: TextInputType.number),
-            if (_error != null) ...[const SizedBox(height: 16), Text(_error!, style: const TextStyle(color: Colors.red))],
+            TextField(
+                controller: _orderCtrl,
+                decoration: const InputDecoration(labelText: 'Ordem'),
+                keyboardType: TextInputType.number),
+            if (_error != null) ...[
+              const SizedBox(height: 16),
+              Text(_error!, style: const TextStyle(color: Colors.red))
+            ],
             const SizedBox(height: 24),
-            ElevatedButton(onPressed: _saving ? null : _save, child: _saving ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Salvar')),
+            ElevatedButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Text('Salvar')),
           ],
         ),
       ),

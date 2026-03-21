@@ -33,15 +33,19 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     });
     try {
       final list = await _api.getAcademies();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _list = list;
         _loading = false;
       });
+      }
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _error = userFacingMessage(e);
         _loading = false;
       });
+      }
     }
   }
 
@@ -82,7 +86,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
     List<Technique> techniques = [];
     if (isEdit) {
       try {
-        techniques = await _api.getTechniques(academyId: existing!.id);
+        techniques = await _api.getTechniques(academyId: existing.id);
       } catch (_) {}
     }
     String? selectedTechniqueId = existing?.weeklyTechniqueId;
@@ -106,7 +110,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                 if (isEdit) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: selectedTechniqueId,
+                    initialValue: selectedTechniqueId,
                     decoration: const InputDecoration(
                       labelText: 'Missão do dia (técnica)',
                       hintText: 'Tema da semana = técnica para os alunos',
@@ -118,7 +122,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                     onChanged: (v) => setDialogState(() => selectedTechniqueId = v),
                   ),
                   const SizedBox(height: 6),
-                  Text(
+                  const Text(
                     'A técnica selecionada será a missão do dia para todos os alunos.',
                     style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                   ),
@@ -144,7 +148,7 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                 try {
                   if (isEdit) {
                     await _api.updateAcademy(
-                      existing!.id,
+                      existing.id,
                       name: name,
                       weeklyTechniqueId: selectedTechniqueId,
                     );

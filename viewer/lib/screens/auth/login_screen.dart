@@ -69,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
+                      const Icon(
                       Icons.sports_martial_arts_rounded,
                       size: 64,
                         color: AppTheme.primary,

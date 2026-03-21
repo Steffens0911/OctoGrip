@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/technique.dart';
-import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/technique_form_screen.dart';
@@ -19,14 +20,15 @@ class TechniqueListScreen extends StatefulWidget {
 class _TechniqueListScreenState extends State<TechniqueListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  Timer? _debounceTimer;
   List<Technique> _allItems = [];
   List<Technique> _filteredItems = [];
-  List<Position> _positions = [];
   bool _loading = true;
   String? _error;
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -35,25 +37,34 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
     var filtered = _allItems;
     final query = _searchController.text.trim().toLowerCase();
     if (query.isNotEmpty) {
-      filtered = filtered.where((t) => t.name.toLowerCase().contains(query)).toList();
+      filtered = filtered
+          .where((t) => t.name.toLowerCase().contains(query))
+          .toList();
     }
     setState(() => _filteredItems = filtered);
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final results = await Future.wait([_api.getTechniques(academyId: widget.academyId), _api.getPositions(academyId: widget.academyId)]);
+      final items = await _api.getTechniques(academyId: widget.academyId);
       if (mounted) {
         setState(() {
-        _allItems = results[0] as List<Technique>;
-        _positions = results[1] as List<Position>;
-        _loading = false;
-      });
+          _allItems = items;
+          _loading = false;
+        });
       }
       _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -62,8 +73,6 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
     super.initState();
     _load();
   }
-
-  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
 
   Future<void> _openForm([Technique? t]) async {
     await Navigator.push(context, MaterialPageRoute(builder: (context) => TechniqueFormScreen(academyId: widget.academyId, technique: t)));
@@ -95,89 +104,131 @@ class _TechniqueListScreenState extends State<TechniqueListScreen> {
       appBar: AppBar(title: const Text('Técnicas'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
       body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _allItems.isEmpty ? const Center(child: Text('Nenhuma técnica. Toque em + para criar.'))
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar por nome da técnica',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _applyFilters();
-                                  },
-                                )
-                              : null,
-                        ),
-                        onChanged: (_) => _applyFilters(),
-                      ),
-                      if (_searchController.text.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _applyFilters();
-                                },
-                                child: const Text('Limpar'),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    child: _filteredItems.isEmpty
-                        ? Center(
-                            child: Text(
-                              _searchController.text.isNotEmpty
-                                  ? 'Nenhuma técnica encontrada.'
-                                  : 'Nenhuma técnica. Toque em + para criar.',
-                              style: TextStyle(color: AppTheme.textSecondary),
+          : _allItems.isEmpty
+              ? const Center(
+                  child: Text('Nenhuma técnica. Toque em + para criar.'),
+                )
+              : Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              hintText: 'Buscar por nome da técnica',
+                              prefixIcon: const Icon(Icons.search),
+                              suffixIcon: _searchController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _applyFilters();
+                                      },
+                                    )
+                                  : null,
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _filteredItems.length,
-                            itemBuilder: (context, i) {
-                              final t = _filteredItems[i];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  title: Text(t.name),
-                                  subtitle: Text('da posição ${_positionName(t.fromPositionId)} → para posição ${_positionName(t.toPositionId)}'),
-                                  trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                                    IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(t)),
-                                    IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(t)),
-                                  ]) : null,
-                                  onTap: () => _openForm(t),
-                                ),
+                            onChanged: (_) {
+                              _debounceTimer?.cancel();
+                              _debounceTimer = Timer(
+                                const Duration(milliseconds: 300),
+                                _applyFilters,
                               );
                             },
                           ),
-                  ),
+                          const SizedBox(height: 12),
+                          if (_searchController.text.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondary,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _applyFilters();
+                                    },
+                                    child: const Text('Limpar'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _load,
+                        child: _filteredItems.isEmpty
+                            ? Center(
+                                child: Text(
+                                  _searchController.text.isNotEmpty
+                                      ? 'Nenhuma técnica encontrada.'
+                                      : 'Nenhuma técnica. Toque em + para criar.',
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _filteredItems.length,
+                                itemBuilder: (context, i) {
+                                  final t = _filteredItems[i];
+                                  return Card(
+                                    margin:
+                                        const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      title: Text(t.name),
+                                      subtitle: t.description != null && t.description!.isNotEmpty
+                                          ? Text(t.description!)
+                                          : null,
+                                      trailing: AuthService()
+                                              .canEditResources()
+                                          ? Row(
+                                              mainAxisSize:
+                                                  MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(
+                                                    Icons.edit,
+                                                    color: AppTheme.primary,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _openForm(t),
+                                                ),
+                                                IconButton(
+                                                  icon: Icon(
+                                                    Icons.delete_outline,
+                                                    color:
+                                                        Theme.of(context)
+                                                            .colorScheme
+                                                            .error,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _delete(t),
+                                                ),
+                                              ],
+                                            )
+                                          : null,
+                                      onTap: () => _openForm(t),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
       floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }

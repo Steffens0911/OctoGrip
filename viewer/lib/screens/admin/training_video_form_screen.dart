@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -62,7 +61,8 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
     }
     if (url.isEmpty || !isYouTubeUrl(url)) {
       setState(
-        () => _error = 'Informe um link válido do YouTube (watch, shorts, embed ou youtu.be).',
+        () => _error =
+            'Informe um link válido do YouTube (watch, shorts, embed ou youtu.be).',
       );
       return;
     }
@@ -165,7 +165,8 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
             SwitchListTile(
               value: _isActive,
               title: const Text('Ativo'),
-              subtitle: const Text('Vídeos inativos não aparecem para os alunos'),
+              subtitle:
+                  const Text('Vídeos inativos não aparecem para os alunos'),
               onChanged: (v) => setState(() => _isActive = v),
             ),
             if (_error != null) ...[
@@ -195,4 +196,3 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
     );
   }
 }
-

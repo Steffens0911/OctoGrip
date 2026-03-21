@@ -70,7 +70,7 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
           : (res.message ?? 'Pontos registrados com sucesso!');
       final points = res.pointsGranted ?? _video.pointsPerDay;
       final fullMessage =
-          points != null && !alreadyToday ? '$baseMessage (+$points pts)' : baseMessage;
+          !alreadyToday ? '$baseMessage (+$points pts)' : baseMessage;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(fullMessage),
@@ -165,7 +165,9 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
                       ),
                     )
                   : Icon(
-                      _completedToday ? Icons.check_circle : Icons.sports_martial_arts,
+                      _completedToday
+                          ? Icons.check_circle
+                          : Icons.sports_martial_arts,
                     ),
               label: Text(
                 _completedToday
@@ -186,4 +188,3 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
     );
   }
 }
-

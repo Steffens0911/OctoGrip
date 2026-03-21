@@ -16,7 +16,8 @@ class AcademyPointsEditScreen extends StatefulWidget {
   });
 
   @override
-  State<AcademyPointsEditScreen> createState() => _AcademyPointsEditScreenState();
+  State<AcademyPointsEditScreen> createState() =>
+      _AcademyPointsEditScreenState();
 }
 
 class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
@@ -43,7 +44,10 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final users = await _api.getUsers(academyId: widget.academyId);
       for (final u in users) {
@@ -51,17 +55,25 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
           text: (u.pointsAdjustment).toString(),
         );
       }
-      if (mounted) setState(() {
-        _users = users;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _users = users;
+          _loading = false;
+        });
+      }
       final pointsByUser = await _api.getAcademyUserPoints(widget.academyId);
-      if (mounted) setState(() {
-        _points.clear();
-        _points.addAll(pointsByUser);
-      });
+      if (mounted) {
+        setState(() {
+          _points.clear();
+          _points.addAll(pointsByUser);
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
     }
   }
 
@@ -73,18 +85,25 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
     try {
       await _api.updateUser(user.id, pointsAdjustment: val);
       final data = await _api.getUserPoints(user.id);
-      if (mounted) setState(() {
-        _savingIds.remove(user.id);
-        _points[user.id] = data['points'] as int? ?? 0;
-      });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ajuste salvo')),
-      );
+      if (mounted) {
+        setState(() {
+          _savingIds.remove(user.id);
+          _points[user.id] = data['points'] as int? ?? 0;
+        });
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ajuste salvo')),
+        );
+      }
     } catch (e) {
       if (mounted) setState(() => _savingIds.remove(user.id));
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(userFacingMessage(e)), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -99,7 +118,8 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
             const Text('Editar pontos dos alunos'),
             Text(
               widget.academyName,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -117,15 +137,19 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700)),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Tentar novamente')),
+                        FilledButton(
+                            onPressed: _load,
+                            child: const Text('Tentar novamente')),
                       ],
                     ),
                   ),
                 )
               : _users.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Text(
                         'Nenhum aluno nesta academia.',
                         style: TextStyle(color: AppTheme.textSecondary),
@@ -150,15 +174,19 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
                                   Expanded(
                                     flex: 2,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           u.name ?? u.email,
-                                          style: const TextStyle(fontWeight: FontWeight.w600),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600),
                                         ),
                                         Text(
                                           'Total: $total pts',
-                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary),
                                         ),
                                       ],
                                     ),
@@ -171,7 +199,8 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
                                       decoration: const InputDecoration(
                                         labelText: 'Ajuste',
                                         isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 8),
                                       ),
                                     ),
                                   ),
@@ -181,10 +210,13 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
                                         ? const SizedBox(
                                             width: 20,
                                             height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
                                           )
                                         : const Icon(Icons.save),
-                                    onPressed: saving ? null : () => _saveAdjustment(u),
+                                    onPressed: saving
+                                        ? null
+                                        : () => _saveAdjustment(u),
                                   ),
                                 ],
                               ),

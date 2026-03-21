@@ -32,15 +32,19 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     });
     try {
       final list = await _api.getProfessors();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _list = list;
         _loading = false;
       });
+      }
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _error = userFacingMessage(e);
         _loading = false;
       });
+      }
     }
   }
 
@@ -133,7 +137,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
               Navigator.pop(ctx);
               try {
                 if (isEdit) {
-                  await _api.updateProfessor(existing!.id, name: name, email: email);
+                  await _api.updateProfessor(existing.id, name: name, email: email);
                 } else {
                   await _api.createProfessor(name: name, email: email);
                 }
@@ -266,6 +270,6 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
-    );
+    )
   }
 }

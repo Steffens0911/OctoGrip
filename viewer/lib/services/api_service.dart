@@ -12,7 +12,6 @@ import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/partner.dart';
-import 'package:viewer/models/position.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
@@ -47,8 +46,7 @@ class ApiService {
 
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort = 30; // mission_today, week, pending count
-  static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, positions, users
-  static const int _cacheTtlLong = 90; // dados mais estáveis
+  static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, users
 
   ApiService._() {
     baseUrl = kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
@@ -758,18 +756,16 @@ class ApiService {
     String? slug,
     String? description,
     String? videoUrl,
-    required String fromPositionId,
-    required String toPositionId,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
       'name': name,
-      'from_position_id': fromPositionId,
-      'to_position_id': toPositionId,
     };
     if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
     if (description != null) body['description'] = description;
-    if (videoUrl != null && videoUrl.trim().isNotEmpty) body['video_url'] = videoUrl.trim();
+    if (videoUrl != null && videoUrl.trim().isNotEmpty) {
+      body['video_url'] = videoUrl.trim();
+    }
     final r = await _req(http.post(
       Uri.parse('$baseUrl/techniques'),
       headers: await _jsonHeaders(auth: true),
@@ -788,16 +784,14 @@ class ApiService {
     String? slug,
     String? description,
     String? videoUrl,
-    String? fromPositionId,
-    String? toPositionId,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
     if (slug != null) body['slug'] = slug;
     if (description != null) body['description'] = description;
-    if (videoUrl != null) body['video_url'] = videoUrl.trim().isEmpty ? null : videoUrl.trim();
-    if (fromPositionId != null) body['from_position_id'] = fromPositionId;
-    if (toPositionId != null) body['to_position_id'] = toPositionId;
+    if (videoUrl != null) {
+      body['video_url'] = videoUrl.trim().isEmpty ? null : videoUrl.trim();
+    }
     final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
       uri,
@@ -815,75 +809,6 @@ class ApiService {
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/techniques');
-  }
-
-  // ---------- Positions ----------
-  /// Lista posições da academia. [academyId] obrigatório. Sem cache para refletir CRUD na hora.
-  Future<List<Position>> getPositions({required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/positions').replace(queryParameters: {'academy_id': academyId});
-    final r = await _getWithCache(uri, 0);
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
-    return raw.map((e) => Position.fromJson(e as Map<String, dynamic>)).toList();
-  }
-
-  Future<Position> getPosition(String id, {required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    return Position.fromJson(data! as Map<String, dynamic>);
-  }
-
-  Future<Position> createPosition({
-    required String academyId,
-    required String name,
-    String? slug,
-    String? description,
-  }) async {
-    final body = <String, dynamic>{'academy_id': academyId, 'name': name};
-    if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
-    if (description != null) body['description'] = description;
-    final r = await _req(http.post(
-      Uri.parse('$baseUrl/positions'),
-      headers: await _jsonHeaders(auth: true),
-      body: jsonEncode(body),
-    ));
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    invalidateCache('GET:$baseUrl/positions');
-    return Position.fromJson(data! as Map<String, dynamic>);
-  }
-
-  Future<Position> updatePosition(
-    String id, {
-    required String academyId,
-    String? name,
-    String? slug,
-    String? description,
-  }) async {
-    final body = <String, dynamic>{};
-    if (name != null) body['name'] = name;
-    if (slug != null) body['slug'] = slug;
-    if (description != null) body['description'] = description;
-    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.put(
-      uri,
-      headers: await _jsonHeaders(auth: true),
-      body: jsonEncode(body),
-    ));
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    invalidateCache('GET:$baseUrl/positions');
-    return Position.fromJson(data! as Map<String, dynamic>);
-  }
-
-  Future<void> deletePosition(String id, {required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/positions/$id').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
-    _throwIfNotOk(r, await _decodeResponse(r));
-    invalidateCache('GET:$baseUrl/positions');
   }
 
   // ---------- Missions ----------
@@ -1137,10 +1062,9 @@ class ApiService {
   }
 
   Future<void> postTrainingFeedback({
-    required String positionId,
     String? observation,
   }) async {
-    final body = <String, dynamic>{'position_id': positionId};
+    final body = <String, dynamic>{};
     if (observation != null && observation.isNotEmpty) body['observation'] = observation;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/training_feedback'),

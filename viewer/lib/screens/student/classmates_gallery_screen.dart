@@ -18,7 +18,8 @@ class ClassmatesGalleryScreen extends StatefulWidget {
   });
 
   @override
-  State<ClassmatesGalleryScreen> createState() => _ClassmatesGalleryScreenState();
+  State<ClassmatesGalleryScreen> createState() =>
+      _ClassmatesGalleryScreenState();
 }
 
 class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
@@ -108,7 +109,7 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
                   ),
                 )
               : _users.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Text(
                         'Nenhum colega na academia.',
                         style: TextStyle(color: AppTheme.textSecondary),
@@ -122,9 +123,8 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
                         itemCount: _users.length,
                         itemBuilder: (context, i) {
                           final u = _users[i];
-                          final isCurrentUser =
-                              widget.currentUserId != null &&
-                                  u.id == widget.currentUserId;
+                          final isCurrentUser = widget.currentUserId != null &&
+                              u.id == widget.currentUserId;
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
@@ -148,7 +148,7 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
                                             .withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Text(
+                                      child: const Text(
                                         'Você',
                                         style: TextStyle(
                                           fontSize: 12,
@@ -164,7 +164,8 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
                                       _faixaLabel(u.graduation),
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: AppTheme.textSecondaryOf(context),
+                                        color:
+                                            AppTheme.textSecondaryOf(context),
                                       ),
                                     )
                                   : null,

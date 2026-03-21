@@ -24,7 +24,7 @@ Auditar o banco de dados do AppBaby focando em:
   - Índice composto: `(user_id, completed_at)`
   - Constraint único: `(user_id, lesson_id)`
 - **Lesson**: `academy_id`, `title`, `slug`, `technique_id`
-- **Technique**: `academy_id`, `name`, `slug`, `from_position_id`, `to_position_id`
+- **Technique**: `academy_id`, `name`, `slug`, `description`, `video_url`, `base_points`
 - **Position**: `academy_id`, `name`, `slug`
 - **Professor**: `name`, `email` (unique), `academy_id`
 - **Trophy**: `academy_id`, `technique_id`, `name`
@@ -117,9 +117,8 @@ Auditar o banco de dados do AppBaby focando em:
 - **FK**: `users.id`, `positions.id`
 - **Cascade**: `ondelete="CASCADE"` ✅ Correto
 
-#### 2.14. Technique → Academy, Position (from/to)
+#### 2.14. Technique → Academy
 - **FK**: `academies.id` → `ondelete="CASCADE"` ✅ Correto
-- **FK**: `positions.id` → `ondelete="RESTRICT"` ✅ Correto (não permite deletar posição se houver técnicas)
 
 #### 2.15. Lesson → Academy, Technique
 - **FK**: `academies.id` → `ondelete="SET NULL"` ✅ Correto

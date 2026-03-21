@@ -50,12 +50,14 @@ class _LessonListScreenState extends State<LessonListScreen> {
         _api.getLessons(),
         _api.getTechniques(),
       ]);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _allItems = results[0] as List<Lesson>;
         _techniques = results[1] as List<Technique>;
         _loading = false;
         _loadingTechniques = false;
       });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingTechniques = false; });
@@ -133,7 +135,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _filterTechniqueId,
+                        initialValue: _filterTechniqueId,
                         decoration: const InputDecoration(
                           labelText: 'Técnica',
                           hintText: 'Todas',
@@ -157,7 +159,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                               Expanded(
                                 child: Text(
                                   'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                 ),
                               ),
                               TextButton(
@@ -175,6 +177,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                   ),
                 ),
                 Expanded(
+                  floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
                   child: RefreshIndicator(
                     onRefresh: _load,
                     child: _filteredItems.isEmpty
@@ -183,7 +186,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                               _searchController.text.isNotEmpty || _filterTechniqueId != null
                                   ? 'Nenhuma lição encontrada.'
                                   : 'Nenhuma lição. Toque em + para criar.',
-                              style: TextStyle(color: AppTheme.textSecondary),
+                              style: const const TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(
@@ -206,7 +209,6 @@ class _LessonListScreenState extends State<LessonListScreen> {
                 },
               ),
             ),
-      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

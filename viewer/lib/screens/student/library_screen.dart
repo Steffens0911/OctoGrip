@@ -51,12 +51,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
     var filteredAll = _allLessons;
     final query = _searchController.text.trim().toLowerCase();
     if (query.isNotEmpty) {
-      filteredFeatured = filteredFeatured.where((l) => l.title.toLowerCase().contains(query)).toList();
-      filteredAll = filteredAll.where((l) => l.title.toLowerCase().contains(query)).toList();
+      filteredFeatured = filteredFeatured
+          .where((l) => l.title.toLowerCase().contains(query))
+          .toList();
+      filteredAll = filteredAll
+          .where((l) => l.title.toLowerCase().contains(query))
+          .toList();
     }
     if (_filterTechniqueId != null) {
-      filteredFeatured = filteredFeatured.where((l) => l.techniqueId == _filterTechniqueId).toList();
-      filteredAll = filteredAll.where((l) => l.techniqueId == _filterTechniqueId).toList();
+      filteredFeatured = filteredFeatured
+          .where((l) => l.techniqueId == _filterTechniqueId)
+          .toList();
+      filteredAll = filteredAll
+          .where((l) => l.techniqueId == _filterTechniqueId)
+          .toList();
     }
     setState(() {
       _filteredFeaturedLessons = filteredFeatured;
@@ -72,7 +80,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _load({bool loadMore = false}) async {
     if (loadMore && (_isLoadingMore || !_hasMore)) return;
-    
+
     if (loadMore) {
       setState(() => _isLoadingMore = true);
     } else {
@@ -84,17 +92,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
         _hasMore = true;
       });
     }
-    
+
     try {
       final page = loadMore ? _currentPage + 1 : 0;
       final results = await Future.wait([
-        widget.academyId != null ? _api.getLessons(academyId: widget.academyId, offset: 0, limit: 100) : Future.value(<Lesson>[]),
+        widget.academyId != null
+            ? _api.getLessons(
+                academyId: widget.academyId, offset: 0, limit: 100)
+            : Future.value(<Lesson>[]),
         _api.getLessons(offset: page * _pageSize, limit: _pageSize),
         page == 0 && widget.academyId != null
             ? _api.getTechniques(academyId: widget.academyId!)
             : Future.value(_techniques),
       ]);
-      
+
       final newLessons = results[1] as List<Lesson>;
       if (mounted) {
         setState(() {
@@ -131,7 +142,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
     await _load(loadMore: true);
   }
 
-
   Widget? _lessonSubtitle(Lesson lesson) {
     final parts = <String>[];
     if (lesson.techniqueName != null && lesson.techniqueName!.isNotEmpty) {
@@ -140,10 +150,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
           : lesson.techniqueName!);
     }
     if (lesson.content != null && lesson.content!.isNotEmpty) {
-      parts.add(lesson.content!.length > 60 ? '${lesson.content!.substring(0, 60)}...' : lesson.content!);
+      parts.add(lesson.content!.length > 60
+          ? '${lesson.content!.substring(0, 60)}...'
+          : lesson.content!);
     }
     if (parts.isEmpty) return null;
-    return Text(parts.join(' · '), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary));
+    return Text(parts.join(' · '),
+        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary));
   }
 
   int _getTotalItemCount() {
@@ -156,7 +169,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
     }
     count += _filteredAllLessons.length;
     // Adicionar item para "Carregar mais" se não houver filtros ativos e houver mais itens
-    final hasActiveFilters = _searchController.text.isNotEmpty || _filterTechniqueId != null;
+    final hasActiveFilters =
+        _searchController.text.isNotEmpty || _filterTechniqueId != null;
     if (!hasActiveFilters && _hasMore && !_isLoadingMore) {
       count += 1; // Botão "Carregar mais"
     }
@@ -168,7 +182,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _buildListItem(BuildContext context, int index) {
     int currentIndex = 0;
-    
+
     if (_filteredFeaturedLessons.isNotEmpty) {
       if (index == currentIndex) {
         return Padding(
@@ -183,7 +197,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         );
       }
       currentIndex++;
-      
+
       if (index < currentIndex + _filteredFeaturedLessons.length) {
         final lesson = _filteredFeaturedLessons[index - currentIndex];
         return Card(
@@ -193,7 +207,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
               backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
               child: const Icon(Icons.star, color: AppTheme.primary),
             ),
-            title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+            title: Text(lesson.title,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
             subtitle: _lessonSubtitle(lesson),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _openLesson(lesson),
@@ -201,12 +216,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
         );
       }
       currentIndex += _filteredFeaturedLessons.length;
-      
+
       if (index == currentIndex) {
         return const SizedBox(height: 16);
       }
       currentIndex++;
-      
+
       if (index == currentIndex) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
@@ -221,9 +236,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
       }
       currentIndex++;
     }
-    
+
     // Verificar se é o botão "Carregar mais" ou indicador de loading
-    final hasActiveFilters = _searchController.text.isNotEmpty || _filterTechniqueId != null;
+    final hasActiveFilters =
+        _searchController.text.isNotEmpty || _filterTechniqueId != null;
     if (!hasActiveFilters) {
       if (index == currentIndex + _filteredAllLessons.length) {
         if (_isLoadingMore) {
@@ -243,7 +259,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         }
       }
     }
-    
+
     final lesson = _filteredAllLessons[index - currentIndex];
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -252,7 +268,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
           backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
           child: const Icon(Icons.menu_book, color: AppTheme.primary),
         ),
-        title: Text(lesson.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(lesson.title,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: _lessonSubtitle(lesson),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _openLesson(lesson),
@@ -266,7 +283,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
       missionId: null,
       title: lesson.title,
       description: lesson.content ?? '',
-      videoUrl: (lesson.techniqueVideoUrl != null && lesson.techniqueVideoUrl!.trim().isNotEmpty)
+      videoUrl: (lesson.techniqueVideoUrl != null &&
+              lesson.techniqueVideoUrl!.trim().isNotEmpty)
           ? lesson.techniqueVideoUrl!
           : (lesson.videoUrl ?? ''),
       userId: widget.userId,
@@ -295,15 +313,19 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700)),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Tentar novamente')),
+                        FilledButton(
+                            onPressed: _load,
+                            child: const Text('Tentar novamente')),
                       ],
                     ),
                   ),
                 )
               : _allLessons.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Text(
                         'Nenhuma lição cadastrada.',
                         style: TextStyle(color: AppTheme.textSecondary),
@@ -332,30 +354,35 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 ),
                                 onChanged: (_) {
                                   _debounceTimer?.cancel();
-                                  _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                                  _debounceTimer = Timer(
+                                      const Duration(milliseconds: 300), () {
                                     _applyFilters();
                                   });
                                 },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                value: _filterTechniqueId,
+                                initialValue: _filterTechniqueId,
                                 decoration: const InputDecoration(
                                   labelText: 'Técnica',
                                   hintText: 'Todas',
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 16),
                                   isDense: true,
                                 ),
                                 items: [
-                                  const DropdownMenuItem(value: null, child: Text('Todas')),
-                                  ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                                  const DropdownMenuItem(
+                                      value: null, child: Text('Todas')),
+                                  ..._techniques.map((t) => DropdownMenuItem(
+                                      value: t.id, child: Text(t.name))),
                                 ],
                                 onChanged: (v) {
                                   setState(() => _filterTechniqueId = v);
                                   _applyFilters();
                                 },
                               ),
-                              if (_searchController.text.isNotEmpty || _filterTechniqueId != null)
+                              if (_searchController.text.isNotEmpty ||
+                                  _filterTechniqueId != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Row(
@@ -363,13 +390,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                       Expanded(
                                         child: Text(
                                           'Mostrando ${_filteredFeaturedLessons.length + _filteredAllLessons.length} de ${_featuredLessons.length + _allLessons.length}',
-                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary),
                                         ),
                                       ),
                                       TextButton(
                                         onPressed: () {
                                           _searchController.clear();
-                                          setState(() => _filterTechniqueId = null);
+                                          setState(
+                                              () => _filterTechniqueId = null);
                                           _applyFilters();
                                         },
                                         child: const Text('Limpar filtros'),
@@ -381,13 +411,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
                           ),
                         ),
                         Expanded(
-                          child: _filteredFeaturedLessons.isEmpty && _filteredAllLessons.isEmpty
+                          child: _filteredFeaturedLessons.isEmpty &&
+                                  _filteredAllLessons.isEmpty
                               ? Center(
                                   child: Text(
-                                    _searchController.text.isNotEmpty || _filterTechniqueId != null
+                                    _searchController.text.isNotEmpty ||
+                                            _filterTechniqueId != null
                                         ? 'Nenhuma lição encontrada.'
                                         : 'Nenhuma lição cadastrada.',
-                                    style: const TextStyle(color: AppTheme.textSecondary),
+                                    style: const TextStyle(
+                                        color: AppTheme.textSecondary),
                                   ),
                                 )
                               : ListView.builder(

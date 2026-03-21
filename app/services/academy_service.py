@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Academy, LessonProgress, Mission, MissionUsage, Partner, Position, TechniqueExecution, TrainingFeedback, User
+from app.models import Academy, LessonProgress, Mission, MissionUsage, Partner, TechniqueExecution, TrainingFeedback, User
 from app.services.mission_crud_service import upsert_academy_week_missions
 
 logger = logging.getLogger(__name__)
@@ -415,26 +415,31 @@ async def get_academy_difficulties(
     limit: int = 50,
 ) -> list[dict]:
     """
-    T-02: Posições mais marcadas como difíceis (TrainingFeedback).
+    T-02: Principais dificuldades reportadas (texto livre em TrainingFeedback).
     Filtra por usuários da academia; ordena por count desc.
     """
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return []
 
+    # Contar ocorrências por nota (texto) não nula, normalizada (trim e lower)
+    # Nota: usamos expressão SQL para normalizar evitando trazer tudo à memória.
+    note_expr = func.trim(func.lower(TrainingFeedback.note))
     rows = (
         await db.execute(
             select(
-                Position.id,
-                Position.name,
+                note_expr.label("note_norm"),
                 func.count(TrainingFeedback.id).label("count"),
             )
-            .join(TrainingFeedback, TrainingFeedback.position_id == Position.id)
             .join(User, User.id == TrainingFeedback.user_id)
-            .where(User.academy_id == academy_id)
-            .group_by(Position.id, Position.name)
+            .where(
+                User.academy_id == academy_id,
+                TrainingFeedback.note.isnot(None),
+                func.length(func.trim(TrainingFeedback.note)) > 0,
+            )
+            .group_by(note_expr)
             .order_by(func.count(TrainingFeedback.id).desc())
             .limit(limit)
         )
     ).all()
-    return [{"position_id": r[0], "position_name": r[1], "count": r[2]} for r in rows]
+    return [{"observation": r[0], "count": r[1]} for r in rows]

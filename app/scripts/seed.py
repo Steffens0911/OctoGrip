@@ -16,7 +16,6 @@ from app.models import (
     Lesson,
     LessonProgress,
     Mission,
-    Position,
     Technique,
     TrainingFeedback,
     User,
@@ -120,43 +119,41 @@ def run_seed():
         db.add(user_norte)
         db.flush()
 
-        # Posições (iniciante)
-        positions = [
-            Position(name="Guarda fechada", slug="guarda-fechada", description="Guarda com pernas fechadas no tronco."),
-            Position(name="Side control", slug="side-control", description="Controle lateral no chão."),
-            Position(name="Montada", slug="montada", description="Montada sobre o adversário."),
-            Position(name="Costas", slug="costas", description="Controle pelas costas."),
-            Position(name="Meia guarda", slug="meia-guarda", description="Uma perna por dentro, outra por fora."),
-        ]
-        for p in positions:
-            db.add(p)
-        db.flush()
-        pos_guarda, pos_side, pos_montada, pos_costas, pos_meia = positions
-
-        # Técnicas (transições iniciante)
+        # Técnicas por academia (slug único por academia; mesmos slugs nas duas academias)
         techniques_data = [
-            ("Passagem de guarda básica", "passagem-guarda-basica", "Passagem da guarda para side control.", pos_guarda.id, pos_side.id),
-            ("Abertura de guarda", "abertura-guarda", "Como abrir a guarda fechada.", pos_guarda.id, pos_side.id),
-            ("Passagem para montada", "passagem-para-montada", "Da side para a montada.", pos_side.id, pos_montada.id),
-            ("Escape da side (ponte)", "escape-side-ponte", "Escape da side com ponte.", pos_side.id, pos_guarda.id),
-            ("Montada: controle e ataque", "montada-controle-ataque", "Manter montada e atacar.", pos_montada.id, pos_montada.id),
-            ("Escape da montada (upa)", "escape-montada-upa", "Escape básico da montada (upa).", pos_montada.id, pos_guarda.id),
-            ("Pegada de costas", "pegada-costas", "Como chegar às costas a partir da montada.", pos_montada.id, pos_costas.id),
-            ("Controle de costas", "controle-costas", "Manter e finalizar pelas costas.", pos_costas.id, pos_costas.id),
-            ("Passagem da meia guarda", "passagem-meia-guarda", "Passar da meia guarda.", pos_meia.id, pos_side.id),
-            ("Recuperar guarda da meia", "recuperar-guarda-meia", "Sair da meia e recuperar guarda.", pos_meia.id, pos_guarda.id),
+            ("Passagem de guarda básica", "passagem-guarda-basica", "Passagem da guarda para side control."),
+            ("Abertura de guarda", "abertura-guarda", "Como abrir a guarda fechada."),
+            ("Passagem para montada", "passagem-para-montada", "Da side para a montada."),
+            ("Escape da side (ponte)", "escape-side-ponte", "Escape da side com ponte."),
+            ("Montada: controle e ataque", "montada-controle-ataque", "Manter montada e atacar."),
+            ("Escape da montada (upa)", "escape-montada-upa", "Escape básico da montada (upa)."),
+            ("Pegada de costas", "pegada-costas", "Como chegar às costas a partir da montada."),
+            ("Controle de costas", "controle-costas", "Manter e finalizar pelas costas."),
+            ("Passagem da meia guarda", "passagem-meia-guarda", "Passar da meia guarda."),
+            ("Recuperar guarda da meia", "recuperar-guarda-meia", "Sair da meia e recuperar guarda."),
         ]
         techniques = []
-        for name, slug, desc, from_id, to_id in techniques_data:
+        for name, slug, desc in techniques_data:
             t = Technique(
                 name=name,
                 slug=slug,
                 description=desc,
-                from_position_id=from_id,
-                to_position_id=to_id,
+                academy_id=academy.id,
             )
             db.add(t)
             techniques.append(t)
+        db.flush()
+
+        techniques_norte = []
+        for name, slug, desc in techniques_data:
+            t = Technique(
+                name=name,
+                slug=slug,
+                description=desc,
+                academy_id=academy2.id,
+            )
+            db.add(t)
+            techniques_norte.append(t)
         db.flush()
 
         # 12 lições para iniciante (order_index 0..11)
@@ -185,6 +182,7 @@ def run_seed():
                 content=content,
                 order_index=order,
                 technique_id=tech_id,
+                academy_id=academy.id,
             )
             db.add(lesson)
             lessons.append(lesson)
@@ -224,7 +222,7 @@ def run_seed():
         )
         db.add(mission_academy)
         mission_academy2 = Mission(
-            technique_id=lessons[3].technique_id,
+            technique_id=techniques_norte[3].id,
             start_date=today,
             end_date=week_end,
             is_active=True,
@@ -260,20 +258,19 @@ def run_seed():
             db.add(lp)
         db.flush()
 
-        # TrainingFeedback: dificuldades reportadas (T-02) para a tela não ficar vazia
+        # TrainingFeedback: dificuldades reportadas (sem position_id no modelo atual)
         feedback_data = [
-            (user.id, pos_guarda.id, "Dificuldade para manter a base."),
-            (user.id, pos_side.id, None),
-            (user2.id, pos_guarda.id, "Abertura da guarda difícil."),
-            (user2.id, pos_guarda.id, "Repetir mais vezes."),  # mesma posição, 2 reportes
-            (user3.id, pos_montada.id, "Escape complicado."),
-            (user_norte.id, pos_costas.id, None),
+            (user.id, 2, "Dificuldade para manter a base."),
+            (user.id, 1, None),
+            (user2.id, 3, "Abertura da guarda difícil."),
+            (user2.id, 2, "Repetir mais vezes."),
+            (user3.id, 4, "Escape complicado."),
+            (user_norte.id, 1, None),
         ]
-        for uid, pid, note in feedback_data:
+        for uid, difficulty_level, note in feedback_data:
             tf = TrainingFeedback(
                 user_id=uid,
-                position_id=pid,
-                difficulty_level=1,
+                difficulty_level=difficulty_level,
                 note=note,
             )
             db.add(tf)
@@ -286,8 +283,7 @@ def run_seed():
         print("Resumo:")
         print(f"  Academias:  2 ({academy.name}, {academy2.name})")
         print(f"  Usuários:   4 (3 em Academia Teste, 1 em Academia Norte)")
-        print(f"  Posições:   {len(positions)}")
-        print(f"  Técnicas:   {len(techniques)}")
+        print(f"  Técnicas:   {len(techniques)} (Academia Teste) + {len(techniques_norte)} (Academia Norte)")
         print(f"  Lições:     {len(lessons)} (4 com video_url)")
         print(f"  Missões:    4 (2 globais + 2 por academia)")
         print(f"  Conclusões (LessonProgress): {len(progress_data)}")
@@ -308,7 +304,7 @@ def run_seed():
         print("  GET  /lessons")
         print("  GET  /academies, /academies/{id}/ranking, /difficulties, /report/weekly")
         print("  POST /lesson_complete   (body: lesson_id; requer Authorization)")
-        print("  POST /training_feedback (body: position_id, observation?; requer Authorization)")
+        print("  POST /training_feedback (body: {\"observation\": \"...\"} opcional; requer Authorization)")
     except Exception as e:
         db.rollback()
         print(f"Erro no seed: {e}", file=sys.stderr)

@@ -1,6 +1,8 @@
 /// Implementação para plataformas não-web (Android, iOS, desktop).
 /// Emulador Android: 10.0.2.2 aponta para o localhost da máquina host.
 /// Dispositivo físico: defina [kApiHostOverride] com o IP do seu PC (ex.: '192.168.0.14').
+library;
+
 import 'dart:io' show Platform;
 
 const String? kApiHostOverride = null;

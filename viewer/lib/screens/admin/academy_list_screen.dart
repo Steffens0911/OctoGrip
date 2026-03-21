@@ -44,16 +44,20 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
     });
     try {
       final list = await _api.getAcademies();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _allItems = list;
         _loading = false;
       });
+      }
       _applyFilters();
     } catch (e) {
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _error = userFacingMessage(e);
         _loading = false;
       });
+      }
     }
   }
 
@@ -183,7 +187,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                                 Expanded(
                                   child: Text(
                                     'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                    style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                   ),
                                 ),
                                 TextButton(
@@ -205,7 +209,7 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
                                       _searchController.text.isNotEmpty
                                           ? 'Nenhuma academia encontrada.'
                                           : 'Nenhuma academia. Toque em + para criar.',
-                                      style: TextStyle(color: AppTheme.textSecondary),
+                                      style: const TextStyle(color: AppTheme.textSecondary),
                                     ),
                                   )
                                 : ListView.builder(

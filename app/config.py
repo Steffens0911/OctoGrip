@@ -26,7 +26,9 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 2  # 2 horas (reduzido de 7 dias)
 
     # CORS
-    CORS_ORIGINS: List[str] = ["*"]
+    # Em desenvolvimento, o backend aceita localhost em qualquer porta via allow_origin_regex
+    # configurado em app.main. Em produção, defina origens explícitas aqui (ex.: URLs do frontend).
+    CORS_ORIGINS: List[str] = []
 
     # Banco - pool
     DB_POOL_SIZE: int = 20

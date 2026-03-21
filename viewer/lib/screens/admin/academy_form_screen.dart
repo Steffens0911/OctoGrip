@@ -42,11 +42,13 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
         _api.getTechniques(academyId: widget.academy!.id),
         _api.getLessons(academyId: widget.academy!.id),
       ]);
-      if (mounted) setState(() {
-        _techniques = results[0] as List<Technique>;
-        _lessons = results[1] as List<Lesson>;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _techniques = results[0] as List<Technique>;
+          _lessons = results[1] as List<Lesson>;
+          _loading = false;
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
@@ -58,7 +60,7 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
       final name = values['name'] as String;
       final weeklyTechniqueId = values['weeklyTechniqueId'] as String?;
       final visibleLessonId = values['visibleLessonId'] as String?;
-      
+
       setState(() {
         _saving = true;
         _error = null;
@@ -67,7 +69,8 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
         if (widget.academy == null) {
           await _api.createAcademy(name: name.trim());
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Academia criada')));
+            ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Academia criada')));
             Navigator.pop(context);
           }
         } else {
@@ -82,12 +85,17 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
             final msg = weeklyTechniqueId != null
                 ? 'Academia atualizada. Missão do dia definida para todos os alunos.'
                 : 'Academia atualizada';
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text(msg)));
             Navigator.pop(context);
           }
         }
       } catch (e) {
-        if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
+        if (mounted)
+          setState(() {
+            _error = userFacingMessage(e);
+            _saving = false;
+          });
       }
     }
   }
@@ -121,7 +129,8 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                       name: 'name',
                       decoration: const InputDecoration(labelText: 'Nome'),
                       validator: FormBuilderValidators.compose([
-                        FormBuilderValidators.required(errorText: 'Nome é obrigatório'),
+                        FormBuilderValidators.required(
+                            errorText: 'Nome é obrigatório'),
                       ]),
                     ),
                     // Tema da semana e lição visível só ao editar (nova academia = só nome)
@@ -134,15 +143,18 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                           hintText: 'Selecione a técnica para todos os alunos',
                         ),
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                          ..._techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))),
+                          const DropdownMenuItem(
+                              value: null, child: Text('— Nenhuma —')),
+                          ..._techniques.map((t) => DropdownMenuItem(
+                              value: t.id, child: Text(t.name))),
                         ],
                         initialValue: widget.academy?.weeklyTechniqueId,
                       ),
                       const SizedBox(height: 8),
-                      Text(
+                      const Text(
                         'A técnica selecionada aparecerá como missão do dia para todos os alunos desta academia.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                       const SizedBox(height: 16),
                       FormBuilderDropdown<String>(
@@ -152,15 +164,18 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                           hintText: 'Selecione a lição em destaque',
                         ),
                         items: [
-                          const DropdownMenuItem(value: null, child: Text('— Nenhuma —')),
-                          ..._lessons.map((l) => DropdownMenuItem(value: l.id, child: Text(l.title))),
+                          const DropdownMenuItem(
+                              value: null, child: Text('— Nenhuma —')),
+                          ..._lessons.map((l) => DropdownMenuItem(
+                              value: l.id, child: Text(l.title))),
                         ],
                         initialValue: widget.academy?.visibleLessonId,
                       ),
                       const SizedBox(height: 8),
-                      Text(
+                      const Text(
                         'A lição selecionada aparecerá em destaque na biblioteca do aluno.',
-                        style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(
+                            fontSize: 12, color: AppTheme.textSecondary),
                       ),
                     ],
                     if (_error != null) ...[
@@ -171,7 +186,11 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
                     ElevatedButton(
                       onPressed: _saving ? null : _save,
                       child: _saving
-                          ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : const Text('Salvar'),
                     ),
                   ],

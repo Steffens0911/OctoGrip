@@ -95,8 +95,8 @@ _ADMIN_HTML = """<!DOCTYPE html>
       </div>
       <div id="panel-techniques" class="panel">
         <div class="toolbar"><h1>Técnicas</h1><button class="btn btn-primary" data-action="new-technique">Nova técnica</button></div>
-        <div id="form-technique" class="form-card hidden"><h3 id="form-technique-title">Nova técnica</h3><form id="f-technique"><input type="hidden" name="id"><div class="form-row"><label>Nome</label><input name="name" required></div><div class="form-row"><label>Link do YouTube</label><input name="video_url" type="url" placeholder="https://www.youtube.com/..."></div><div class="form-row"><label>De posição</label><select name="from_position_id" required></select></div><div class="form-row"><label>Para posição</label><select name="to_position_id" required></select></div><div class="form-row"><label>Descrição</label><textarea name="description"></textarea></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-technique" class="msg hidden"></div></div>
-        <table><thead><tr><th>Nome</th><th>De → Para</th><th>Ações</th></tr></thead><tbody id="tbl-techniques"></tbody></table>
+        <div id="form-technique" class="form-card hidden"><h3 id="form-technique-title">Nova técnica</h3><form id="f-technique"><input type="hidden" name="id"><div class="form-row"><label>Nome</label><input name="name" required></div><div class="form-row"><label>Link do YouTube</label><input name="video_url" type="url" placeholder="https://www.youtube.com/..."></div><div class="form-row"><label>Descrição</label><textarea name="description"></textarea></div><button type="submit" class="btn btn-primary">Salvar</button></form><div id="msg-technique" class="msg hidden"></div></div>
+        <table><thead><tr><th>Nome</th><th>Ações</th></tr></thead><tbody id="tbl-techniques"></tbody></table>
       </div>
       <div id="panel-positions" class="panel">
         <div class="toolbar"><h1>Posições</h1><button class="btn btn-primary" data-action="new-position">Nova posição</button></div>
@@ -187,10 +187,10 @@ _ADMIN_HTML = """<!DOCTYPE html>
   async function deleteUser(id) { if (!confirm('Excluir este usuário?')) return; try { await del('/users/' + id); $('form-user').classList.add('hidden'); loadUsers(); } catch (e) { alert(e.detail || 'Erro'); } }
 
   async function loadLessons() {
-    const [list, techniques, positions] = await Promise.all([get('/lessons'), get('/techniques'), get('/positions')]);
+    const [list, techniques] = await Promise.all([get('/lessons'), get('/techniques')]);
     const selTc = $('f-lesson').querySelector('select[name="technique_id"]'); selTc.innerHTML = techniques.map(t => '<option value="' + t.id + '">' + escapeHtml(t.name) + '</option>').join('');
     const tbody = $('tbl-lessons');
-    const techDisplay = (t, l) => { if (l.technique_name && l.position_name) return escapeHtml(l.technique_name) + ' ' + escapeHtml(l.position_name); if (!t) return ''; const fromP = positions.find(x => x.id === t.from_position_id); const toP = positions.find(x => x.id === t.to_position_id); const fromN = fromP ? fromP.name : ''; const toN = toP ? toP.name : ''; const posStr = fromN && toN ? ' da posição ' + fromN + ' → para posição ' + toN : ''; return escapeHtml(t.name) + posStr; };
+    const techDisplay = (t, l) => { if (l.technique_name) return escapeHtml(l.technique_name); if (!t) return ''; return escapeHtml(t.name); };
     tbody.innerHTML = list.map(l => { const t = techniques.find(x => x.id === l.technique_id); return '<tr><td>' + escapeHtml(l.title) + '</td><td>' + techDisplay(t, l) + '</td><td>' + l.order_index + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-lesson="' + l.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-lesson="' + l.id + '">Excluir</button></td></tr>'; }).join('');
     tbody.querySelectorAll('[data-edit-lesson]').forEach(b => b.addEventListener('click', () => editLesson(b.dataset.editLesson)));
     tbody.querySelectorAll('[data-delete-lesson]').forEach(b => b.addEventListener('click', () => deleteLesson(b.dataset.deleteLesson)));
@@ -206,21 +206,21 @@ _ADMIN_HTML = """<!DOCTYPE html>
   async function deleteLesson(id) { if (!confirm('Excluir esta lição?')) return; try { await del('/lessons/' + id); $('form-lesson').classList.add('hidden'); loadLessons(); } catch (e) { alert(e.detail || 'Erro'); } }
 
   async function loadTechniques() {
-    const [list, positions] = await Promise.all([get('/techniques'), get('/positions')]);
-    const fromSel = $('f-technique').querySelector('select[name="from_position_id"]'); const toSel = $('f-technique').querySelector('select[name="to_position_id"]');
-    const opts = positions.map(p => '<option value="' + p.id + '">' + escapeHtml(p.name) + '</option>').join(''); fromSel.innerHTML = '<option value="">—</option>' + opts; toSel.innerHTML = '<option value="">—</option>' + opts;
+    const list = await get('/techniques');
     const tbody = $('tbl-techniques');
-    tbody.innerHTML = list.map(t => { const fromP = positions.find(x => x.id === t.from_position_id); const toP = positions.find(x => x.id === t.to_position_id); const fromN = fromP ? fromP.name : ''; const toN = toP ? toP.name : ''; const posStr = fromN && toN ? 'da posição ' + fromN + ' → para posição ' + toN : fromN + ' → ' + toN; return '<tr><td>' + escapeHtml(t.name) + '</td><td>' + posStr + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-technique="' + t.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-technique="' + t.id + '">Excluir</button></td></tr>'; }).join('');
+    tbody.innerHTML = list.map(t => {
+      return '<tr><td>' + escapeHtml(t.name) + '</td><td class="actions"><button class="btn btn-secondary btn-sm" data-edit-technique="' + t.id + '">Editar</button><button class="btn btn-danger btn-sm" data-delete-technique="' + t.id + '">Excluir</button></td></tr>';
+    }).join('');
     tbody.querySelectorAll('[data-edit-technique]').forEach(b => b.addEventListener('click', () => editTechnique(b.dataset.editTechnique)));
     tbody.querySelectorAll('[data-delete-technique]').forEach(b => b.addEventListener('click', () => deleteTechnique(b.dataset.deleteTechnique)));
   }
   function showTechniqueForm(editId) {
     const form = $('form-technique'); form.classList.remove('hidden'); $('form-technique-title').textContent = editId ? 'Editar técnica' : 'Nova técnica';
     sel('#f-technique input[name="id"]').value = editId || ''; sel('#f-technique input[name="name"]').value = ''; sel('#f-technique input[name="video_url"]').value = ''; sel('#f-technique textarea[name="description"]').value = '';
-    if (editId) get('/techniques/' + editId).then(t => { sel('#f-technique input[name="name"]').value = t.name; sel('#f-technique input[name="video_url"]').value = t.video_url || ''; sel('#f-technique textarea[name="description"]').value = t.description || ''; sel('#f-technique select[name="from_position_id"]').value = t.from_position_id; sel('#f-technique select[name="to_position_id"]').value = t.to_position_id; }).catch(() => {});
+    if (editId) get('/techniques/' + editId).then(t => { sel('#f-technique input[name="name"]').value = t.name; sel('#f-technique input[name="video_url"]').value = t.video_url || ''; sel('#f-technique textarea[name="description"]').value = t.description || ''; }).catch(() => {});
   }
   document.querySelector('[data-action="new-technique"]').addEventListener('click', () => showTechniqueForm(null));
-  document.getElementById('f-technique').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-technique'); const body = { name: fd.get('name'), video_url: fd.get('video_url') || null, description: fd.get('description') || null, from_position_id: fd.get('from_position_id'), to_position_id: fd.get('to_position_id') }; try { if (id) { await put('/techniques/' + id, body); showMsg('msg-technique', 'Técnica atualizada.', true); } else { await post('/techniques', body); showMsg('msg-technique', 'Técnica criada.', true); $('form-technique').classList.add('hidden'); loadTechniques(); } } catch (err) { showMsg('msg-technique', (Array.isArray(err.detail) ? err.detail.map(x => x.msg).join(' ') : err.detail) || err.message || 'Erro', false); } });
+  document.getElementById('f-technique').addEventListener('submit', async e => { e.preventDefault(); const fd = new FormData(e.target); const id = fd.get('id'); hideMsg('msg-technique'); const body = { name: fd.get('name'), video_url: fd.get('video_url') || null, description: fd.get('description') || null }; try { if (id) { await put('/techniques/' + id, body); showMsg('msg-technique', 'Técnica atualizada.', true); } else { await post('/techniques', body); showMsg('msg-technique', 'Técnica criada.', true); $('form-technique').classList.add('hidden'); loadTechniques(); } } catch (err) { showMsg('msg-technique', (Array.isArray(err.detail) ? err.detail.map(x => x.msg).join(' ') : err.detail) || err.message || 'Erro', false); } });
   async function editTechnique(id) { showTechniqueForm(id); }
   async function deleteTechnique(id) { if (!confirm('Excluir esta técnica?')) return; try { await del('/techniques/' + id); $('form-technique').classList.add('hidden'); loadTechniques(); } catch (e) { alert(e.detail || 'Erro'); } }
 

@@ -73,8 +73,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
         final isAdmin = AuthService().isAdmin();
         if (isAdmin) {
           _all = videos
-              .where((v) =>
-                  v.academyId == null || (v.academyId?.isEmpty ?? true))
+              .where(
+                  (v) => v.academyId == null || (v.academyId?.isEmpty ?? true))
               .toList();
         } else {
           _all = videos;
@@ -151,7 +151,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null
               ? Center(
                   child: Column(
@@ -174,10 +175,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                   ? Center(
                       child: Text(
                         'Nenhum vídeo de treinamento. Toque em + para criar.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyLarge
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppTheme.textSecondaryOf(context),
                             ),
                       ),
@@ -193,7 +191,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
-                                    Icon(
+                                    const Icon(
                                       Icons.info_outline_rounded,
                                       size: 20,
                                       color: AppTheme.primary,
@@ -206,7 +204,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                             .textTheme
                                             .bodySmall
                                             ?.copyWith(
-                                              color: AppTheme.textSecondaryOf(context),
+                                              color: AppTheme.textSecondaryOf(
+                                                  context),
                                             ),
                                       ),
                                     ),
@@ -244,13 +243,13 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                   AppTheme.screenPadding(context)),
                               itemCount: _filtered.length,
                               itemBuilder: (context, i) {
-                              final v = _filtered[i];
-                              final scopeLabel = v.academyId == null
-                                  ? 'Global'
-                                  : (v.academyName?.isNotEmpty == true
-                                      ? 'Academia: ${v.academyName}'
-                                      : 'Somente academia');
-                              return Card(
+                                final v = _filtered[i];
+                                final scopeLabel = v.academyId == null
+                                    ? 'Global'
+                                    : (v.academyName?.isNotEmpty == true
+                                        ? 'Academia: ${v.academyName}'
+                                        : 'Somente academia');
+                                return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
                                     title: Text(
@@ -260,7 +259,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                       ),
                                     ),
                                     subtitle: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Text(
@@ -269,7 +269,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                               .textTheme
                                               .bodySmall
                                               ?.copyWith(
-                                                color: AppTheme.textSecondaryOf(context),
+                                                color: AppTheme.textSecondaryOf(
+                                                    context),
                                               ),
                                         ),
                                         Text(
@@ -280,7 +281,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                               .textTheme
                                               .bodySmall
                                               ?.copyWith(
-                                                color: AppTheme.textMutedOf(context),
+                                                color: AppTheme.textMutedOf(
+                                                    context),
                                                 fontSize: 11,
                                               ),
                                         ),
@@ -331,4 +333,3 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     );
   }
 }
-

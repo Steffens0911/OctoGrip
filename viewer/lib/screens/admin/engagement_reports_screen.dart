@@ -117,7 +117,7 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return RoleGuard(
-      allowedRoles: ['administrador'],
+      allowedRoles: const ['administrador'],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Relatórios de engajamento'),
@@ -230,7 +230,7 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       );
     }
     return DropdownButtonFormField<String>(
-      value: _selectedAcademyId,
+      initialValue: _selectedAcademyId,
       decoration: const InputDecoration(
         labelText: 'Filtrar por academia',
         border: OutlineInputBorder(),
@@ -284,7 +284,7 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
             children: [
               Text(
                 _errorAcademy!,
-                style: TextStyle(color: Colors.red),
+                style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
@@ -307,14 +307,14 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       );
     }
     final academyName = _academies
-            .firstWhere(
-              (a) => a.id == _selectedAcademyId,
-              orElse: () => Academy(
-                id: _selectedAcademyId ?? '',
-                name: 'Academia selecionada',
-              ),
-            )
-            .name;
+        .firstWhere(
+          (a) => a.id == _selectedAcademyId,
+          orElse: () => Academy(
+            id: _selectedAcademyId ?? '',
+            name: 'Academia selecionada',
+          ),
+        )
+        .name;
     return _EngagementCard(
       title: 'Visão da academia $academyName',
       report: _academyReport!,
@@ -435,4 +435,3 @@ class _EngagementCard extends StatelessWidget {
     );
   }
 }
-

@@ -25,14 +25,14 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
   final _searchController = TextEditingController();
   List<TrophyWithEarned> _allItems = [];
   List<TrophyWithEarned> _filteredItems = [];
-  String? _filterTier; // null=Todos, 'to_conquer'=A conquistar, 'bronze','silver','gold'
+  String?
+      _filterTier; // null=Todos, 'to_conquer'=A conquistar, 'bronze','silver','gold'
   String? _filterAwardKind; // null=Todos, 'medal', 'trophy'
   bool _loading = true;
   String? _error;
   bool _galleryVisible = true;
 
-  bool get _isOwnGallery =>
-      AuthService().currentUser?.id == widget.userId;
+  bool get _isOwnGallery => AuthService().currentUser?.id == widget.userId;
 
   @override
   void initState() {
@@ -65,26 +65,35 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       }
     }
     if (_filterAwardKind != null) {
-      filtered = filtered.where((t) => t.awardKind == _filterAwardKind).toList();
+      filtered =
+          filtered.where((t) => t.awardKind == _filterAwardKind).toList();
     }
     setState(() => _filteredItems = filtered);
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final list = await _api.getTrophiesForUser(widget.userId);
-      if (mounted) setState(() {
-        _allItems = list;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allItems = list;
+          _loading = false;
+        });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) {
         final msg = e is ApiException && e.statusCode == 403
             ? 'Esta galeria está privada.'
             : userFacingMessage(e);
-        setState(() { _error = msg; _loading = false; });
+        setState(() {
+          _error = msg;
+          _loading = false;
+        });
       }
     }
   }
@@ -118,19 +127,27 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
 
   static Color _tierColor(String? tier) {
     switch (tier) {
-      case 'gold': return const Color(0xFFD97706);
-      case 'silver': return const Color(0xFF6B7280);
-      case 'bronze': return const Color(0xFF92400E);
-      default: return AppTheme.textMuted;
+      case 'gold':
+        return const Color(0xFFD97706);
+      case 'silver':
+        return const Color(0xFF6B7280);
+      case 'bronze':
+        return const Color(0xFF92400E);
+      default:
+        return AppTheme.textMuted;
     }
   }
 
   static IconData _tierIcon(String? tier) {
     switch (tier) {
-      case 'gold': return Icons.emoji_events;
-      case 'silver': return Icons.emoji_events;
-      case 'bronze': return Icons.emoji_events;
-      default: return Icons.workspace_premium_outlined;
+      case 'gold':
+        return Icons.emoji_events;
+      case 'silver':
+        return Icons.emoji_events;
+      case 'bronze':
+        return Icons.emoji_events;
+      default:
+        return Icons.workspace_premium_outlined;
     }
   }
 
@@ -176,7 +193,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     if (academyId == null || academyId.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Academia não definida para este troféu.')),
+          const SnackBar(
+              content: Text('Academia não definida para este troféu.')),
         );
       }
       return;
@@ -198,7 +216,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
         usageType: usageType,
       );
       if (!mounted) return;
-      final message = res['message'] as String? ?? 'Aguardando confirmação do adversário.';
+      final message =
+          res['message'] as String? ?? 'Aguardando confirmação do adversário.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
       );
@@ -214,14 +233,17 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
 
   /// Linhas de progresso por tier (só para tiers ainda não conquistados).
   List<Widget> _progressLines(BuildContext context, TrophyWithEarned t) {
-    final style = TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context));
+    final style =
+        TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context));
     final lines = <Widget>[];
     final target = t.targetCount;
     final hasGold = t.earnedTier == 'gold';
     final hasSilver = t.earnedTier == 'silver' || hasGold;
     final hasBronze = t.earnedTier == 'bronze' || hasSilver;
     if (hasGold) {
-      lines.add(Text('Conquistado: ouro', style: style.copyWith(fontWeight: FontWeight.w600, color: _tierColor('gold'))));
+      lines.add(Text('Conquistado: ouro',
+          style: style.copyWith(
+              fontWeight: FontWeight.w600, color: _tierColor('gold'))));
       return lines;
     }
     if (!hasBronze) {
@@ -266,7 +288,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
             if (widget.userName != null && widget.userName!.isNotEmpty)
               Text(
                 widget.userName!,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.normal),
               ),
           ],
         ),
@@ -325,7 +348,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                         _isOwnGallery
                             ? 'Nenhum troféu cadastrado na sua academia.'
                             : 'Nenhuma premiação conquistada.',
-                        style: TextStyle(color: AppTheme.textSecondary),
+                        style: const TextStyle(color: AppTheme.textSecondary),
                         textAlign: TextAlign.center,
                       ),
                     )
@@ -345,7 +368,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                           'Galeria visível para outros',
                                           style: TextStyle(
                                             fontSize: 14,
-                                            color: AppTheme.textSecondaryOf(context),
+                                            color: AppTheme.textSecondaryOf(
+                                                context),
                                           ),
                                         ),
                                       ),
@@ -392,7 +416,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     label: const Text('Medalhas'),
                                     selected: _filterAwardKind == 'medal',
                                     onSelected: (selected) {
-                                      setState(() => _filterAwardKind = selected ? 'medal' : null);
+                                      setState(() => _filterAwardKind =
+                                          selected ? 'medal' : null);
                                       _applyFilters();
                                     },
                                   ),
@@ -400,7 +425,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     label: const Text('Troféus'),
                                     selected: _filterAwardKind == 'trophy',
                                     onSelected: (selected) {
-                                      setState(() => _filterAwardKind = selected ? 'trophy' : null);
+                                      setState(() => _filterAwardKind =
+                                          selected ? 'trophy' : null);
                                       _applyFilters();
                                     },
                                   ),
@@ -426,7 +452,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       label: const Text('A conquistar'),
                                       selected: _filterTier == 'to_conquer',
                                       onSelected: (selected) {
-                                        setState(() => _filterTier = selected ? 'to_conquer' : null);
+                                        setState(() => _filterTier =
+                                            selected ? 'to_conquer' : null);
                                         _applyFilters();
                                       },
                                     ),
@@ -434,7 +461,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     label: const Text('Bronze'),
                                     selected: _filterTier == 'bronze',
                                     onSelected: (selected) {
-                                      setState(() => _filterTier = selected ? 'bronze' : null);
+                                      setState(() => _filterTier =
+                                          selected ? 'bronze' : null);
                                       _applyFilters();
                                     },
                                   ),
@@ -442,7 +470,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     label: const Text('Prata'),
                                     selected: _filterTier == 'silver',
                                     onSelected: (selected) {
-                                      setState(() => _filterTier = selected ? 'silver' : null);
+                                      setState(() => _filterTier =
+                                          selected ? 'silver' : null);
                                       _applyFilters();
                                     },
                                   ),
@@ -450,13 +479,16 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     label: const Text('Ouro'),
                                     selected: _filterTier == 'gold',
                                     onSelected: (selected) {
-                                      setState(() => _filterTier = selected ? 'gold' : null);
+                                      setState(() => _filterTier =
+                                          selected ? 'gold' : null);
                                       _applyFilters();
                                     },
                                   ),
                                 ],
                               ),
-                              if (_searchController.text.isNotEmpty || _filterTier != null || _filterAwardKind != null)
+                              if (_searchController.text.isNotEmpty ||
+                                  _filterTier != null ||
+                                  _filterAwardKind != null)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Row(
@@ -464,7 +496,9 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                       Expanded(
                                         child: Text(
                                           'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary),
                                         ),
                                       ),
                                       TextButton(
@@ -490,10 +524,13 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                             child: _filteredItems.isEmpty
                                 ? Center(
                                     child: Text(
-                                      _searchController.text.isNotEmpty || _filterTier != null || _filterAwardKind != null
+                                      _searchController.text.isNotEmpty ||
+                                              _filterTier != null ||
+                                              _filterAwardKind != null
                                           ? 'Nenhuma premiação encontrada.'
                                           : 'Nenhuma premiação cadastrada na sua academia.',
-                                      style: TextStyle(color: AppTheme.textSecondary),
+                                      style: const TextStyle(
+                                          color: AppTheme.textSecondary),
                                       textAlign: TextAlign.center,
                                     ),
                                   )
@@ -502,175 +539,282 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     itemCount: _filteredItems.length,
                                     itemBuilder: (context, i) {
                                       final t = _filteredItems[i];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          color: (t.unlocked ? _tierColor(t.earnedTier) : Colors.grey).withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Icon(
-                                          t.unlocked ? _tierIcon(t.earnedTier) : Icons.lock_outline,
-                                          color: t.unlocked ? _tierColor(t.earnedTier) : Colors.grey,
-                                          size: 28,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    t.name,
-                                                    style: TextStyle(
-                                                      fontWeight: FontWeight.w600,
-                                                      color: AppTheme.textPrimaryOf(context),
+                                      return Card(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 12),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Container(
+                                                    width: 48,
+                                                    height: 48,
+                                                    decoration: BoxDecoration(
+                                                      color: (t.unlocked
+                                                              ? _tierColor(
+                                                                  t.earnedTier)
+                                                              : Colors.grey)
+                                                          .withValues(
+                                                              alpha: 0.2),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              12),
+                                                    ),
+                                                    child: Icon(
+                                                      t.unlocked
+                                                          ? _tierIcon(
+                                                              t.earnedTier)
+                                                          : Icons.lock_outline,
+                                                      color: t.unlocked
+                                                          ? _tierColor(
+                                                              t.earnedTier)
+                                                          : Colors.grey,
+                                                      size: 28,
                                                     ),
                                                   ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                t.name,
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                  color: AppTheme
+                                                                      .textPrimaryOf(
+                                                                          context),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          2),
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: t.isTrophy
+                                                                    ? Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .primaryContainer
+                                                                    : Theme.of(
+                                                                            context)
+                                                                        .colorScheme
+                                                                        .surfaceContainerHighest,
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            6),
+                                                              ),
+                                                              child: Text(
+                                                                t.awardKindLabel,
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                  color: t.isTrophy
+                                                                      ? Theme.of(
+                                                                              context)
+                                                                          .colorScheme
+                                                                          .onPrimaryContainer
+                                                                      : Theme.of(
+                                                                              context)
+                                                                          .colorScheme
+                                                                          .onSurfaceVariant,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        if (t.techniqueName !=
+                                                                null &&
+                                                            t.techniqueName!
+                                                                .isNotEmpty)
+                                                          Text(
+                                                            t.techniqueName!,
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: AppTheme
+                                                                  .textSecondaryOf(
+                                                                      context),
+                                                            ),
+                                                          ),
+                                                        Text(
+                                                          '${_formatDateRange(t.startDate, t.endDate)} · Meta: ${t.targetCount} execuções',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: AppTheme
+                                                                .textMutedOf(
+                                                                    context),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 10,
+                                                        vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: (t.unlocked
+                                                              ? _tierColor(
+                                                                  t.earnedTier)
+                                                              : Colors.grey)
+                                                          .withValues(
+                                                              alpha: 0.15),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              8),
+                                                    ),
+                                                    child: Text(
+                                                      t.unlocked
+                                                          ? t.tierLabel
+                                                          : 'Trancado',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: t.unlocked
+                                                            ? _tierColor(
+                                                                t.earnedTier)
+                                                            : Colors.grey,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              if (!t.unlocked) ...[
+                                                const SizedBox(height: 10),
+                                                Wrap(
+                                                  spacing: 8,
+                                                  runSpacing: 4,
+                                                  children: [
+                                                    if (t.minPointsToUnlock > 0)
+                                                      Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .lock_outline,
+                                                              size: 18,
+                                                              color: AppTheme
+                                                                  .textSecondaryOf(
+                                                                      context)),
+                                                          const SizedBox(
+                                                              width: 6),
+                                                          Text(
+                                                            'Desbloqueie com ${t.minPointsToUnlock} pontos',
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              color: AppTheme
+                                                                  .textSecondaryOf(
+                                                                      context),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    if (t.minGraduationToUnlock !=
+                                                            null &&
+                                                        t.minGraduationToUnlock!
+                                                            .isNotEmpty)
+                                                      Row(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                              Icons
+                                                                  .shield_outlined,
+                                                              size: 18,
+                                                              color: AppTheme
+                                                                  .textSecondaryOf(
+                                                                      context)),
+                                                          const SizedBox(
+                                                              width: 6),
+                                                          Text(
+                                                            'Requer faixa mínima: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock}',
+                                                            style: TextStyle(
+                                                              fontSize: 13,
+                                                              color: AppTheme
+                                                                  .textSecondaryOf(
+                                                                      context),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                  ],
                                                 ),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: t.isTrophy
-                                                        ? Theme.of(context).colorScheme.primaryContainer
-                                                        : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                                    borderRadius: BorderRadius.circular(6),
-                                                  ),
-                                                  child: Text(
-                                                    t.awardKindLabel,
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w500,
-                                                      color: t.isTrophy
-                                                          ? Theme.of(context).colorScheme.onPrimaryContainer
-                                                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                                                    ),
+                                              ] else
+                                                ...() {
+                                                  final progressLines =
+                                                      _progressLines(
+                                                          context, t);
+                                                  if (progressLines.isEmpty)
+                                                    return <Widget>[];
+                                                  return [
+                                                    const SizedBox(height: 10),
+                                                    ...progressLines
+                                                        .map((w) => Padding(
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .only(
+                                                                      bottom:
+                                                                          4),
+                                                              child: w,
+                                                            )),
+                                                  ];
+                                                }(),
+                                              if (_isOwnGallery &&
+                                                  t.unlocked &&
+                                                  t.academyId != null &&
+                                                  t.academyId!.isNotEmpty) ...[
+                                                const SizedBox(height: 12),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: OutlinedButton.icon(
+                                                    icon: const Icon(
+                                                        Icons.person_add,
+                                                        size: 18),
+                                                    label: const Text(
+                                                        'Indicar adversário'),
+                                                    onPressed: () =>
+                                                        _indicateOpponent(t),
                                                   ),
                                                 ),
                                               ],
-                                            ),
-                                            if (t.techniqueName != null && t.techniqueName!.isNotEmpty)
-                                              Text(
-                                                t.techniqueName!,
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppTheme.textSecondaryOf(context),
-                                                ),
-                                              ),
-                                            Text(
-                                              '${_formatDateRange(t.startDate, t.endDate)} · Meta: ${t.targetCount} execuções',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: AppTheme.textMutedOf(context),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: (t.unlocked ? _tierColor(t.earnedTier) : Colors.grey).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          t.unlocked ? t.tierLabel : 'Trancado',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: t.unlocked ? _tierColor(t.earnedTier) : Colors.grey,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (!t.unlocked) ...[
-                                    const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        if (t.minPointsToUnlock > 0)
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.lock_outline, size: 18, color: AppTheme.textSecondaryOf(context)),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Desbloqueie com ${t.minPointsToUnlock} pontos',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: AppTheme.textSecondaryOf(context),
-                                                ),
-                                              ),
                                             ],
                                           ),
-                                        if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty)
-                                          Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.shield_outlined, size: 18, color: AppTheme.textSecondaryOf(context)),
-                                              const SizedBox(width: 6),
-                                              Text(
-                                                'Requer faixa mínima: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock}',
-                                                style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: AppTheme.textSecondaryOf(context),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                      ],
-                                    ),
-                                  ] else ...(){
-                                    final progressLines = _progressLines(context, t);
-                                    if (progressLines.isEmpty) return <Widget>[];
-                                    return [
-                                      const SizedBox(height: 10),
-                                      ...progressLines.map((w) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 4),
-                                        child: w,
-                                      )),
-                                    ];
-                                  }(),
-                                  if (_isOwnGallery &&
-                                      t.unlocked &&
-                                      t.academyId != null &&
-                                      t.academyId!.isNotEmpty) ...[
-                                    const SizedBox(height: 12),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(Icons.person_add, size: 18),
-                                        label: const Text('Indicar adversário'),
-                                        onPressed: () => _indicateOpponent(t),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                                    ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                ),
-                              ],
-                            ),
+                          ),
+                        ),
+                      ],
+                    ),
     );
   }
 }

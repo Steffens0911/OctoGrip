@@ -86,7 +86,7 @@ class _ExecutionReportsScreenState extends State<ExecutionReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return RoleGuard(
-      allowedRoles: ['administrador'],
+      allowedRoles: const ['administrador'],
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Relatórios de execuções'),
@@ -174,7 +174,7 @@ class _ExecutionReportsScreenState extends State<ExecutionReportsScreen> {
       );
     }
     return DropdownButtonFormField<String>(
-      value: _selectedAcademyId,
+      initialValue: _selectedAcademyId,
       decoration: const InputDecoration(
         labelText: 'Filtrar por academia',
         border: OutlineInputBorder(),
@@ -228,7 +228,7 @@ class _ExecutionReportsScreenState extends State<ExecutionReportsScreen> {
             children: [
               Text(
                 _errorAcademyMetrics!,
-                style: TextStyle(color: Colors.red),
+                style: const TextStyle(color: Colors.red),
               ),
               const SizedBox(height: 8),
               TextButton.icon(
@@ -251,14 +251,14 @@ class _ExecutionReportsScreenState extends State<ExecutionReportsScreen> {
       );
     }
     final academyName = _academies
-            .firstWhere(
-              (a) => a.id == _selectedAcademyId,
-              orElse: () => Academy(
-                id: _selectedAcademyId ?? '',
-                name: 'Academia selecionada',
-              ),
-            )
-            .name;
+        .firstWhere(
+          (a) => a.id == _selectedAcademyId,
+          orElse: () => Academy(
+            id: _selectedAcademyId ?? '',
+            name: 'Academia selecionada',
+          ),
+        )
+        .name;
     return _UsageMetricsCard(
       title: 'Visão da academia $academyName',
       metrics: _academyMetrics!,
@@ -353,4 +353,3 @@ class _UsageMetricsCard extends StatelessWidget {
     );
   }
 }
-

@@ -10,7 +10,7 @@ from app.models.base import UUIDMixin
 
 
 class Technique(Base, UUIDMixin):
-    """Técnica: transição de uma posição para outra. Cada academia tem seu portfólio."""
+    """Técnica da academia (sem dependência de posição). Cada academia tem seu portfólio."""
 
     __tablename__ = "techniques"
 
@@ -24,26 +24,6 @@ class Technique(Base, UUIDMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     base_points: Mapped[int | None] = mapped_column(Integer, nullable=True, default=10)
-
-    from_position_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("positions.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-    to_position_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("positions.id", ondelete="RESTRICT"),
-        nullable=False,
-    )
-
-    from_position: Mapped["Position"] = relationship(
-        "Position",
-        foreign_keys=[from_position_id],
-        back_populates="techniques_from",
-    )
-    to_position: Mapped["Position"] = relationship(
-        "Position",
-        foreign_keys=[to_position_id],
-        back_populates="techniques_to",
-    )
     academy: Mapped["Academy"] = relationship(
         "Academy",
         back_populates="techniques",

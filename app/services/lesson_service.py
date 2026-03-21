@@ -33,8 +33,7 @@ async def list_lessons(
                 await db.execute(
                     select(Lesson)
                     .options(
-                        selectinload(Lesson.technique).selectinload(Technique.from_position),
-                        selectinload(Lesson.technique).selectinload(Technique.to_position),
+                        selectinload(Lesson.technique),
                     )
                     .where(Lesson.id == academy.visible_lesson_id)
                 )
@@ -51,8 +50,7 @@ async def list_lessons(
         await db.execute(
             select(Lesson)
             .options(
-                selectinload(Lesson.technique).selectinload(Technique.from_position),
-                selectinload(Lesson.technique).selectinload(Technique.to_position),
+                selectinload(Lesson.technique),
             )
             .order_by(Lesson.order_index.asc())
             .offset(offset)
@@ -69,8 +67,7 @@ async def get_lesson_by_id(db: AsyncSession, lesson_id: UUID) -> Lesson:
         await db.execute(
             select(Lesson)
             .options(
-                selectinload(Lesson.technique).selectinload(Technique.from_position),
-                selectinload(Lesson.technique).selectinload(Technique.to_position),
+                selectinload(Lesson.technique),
             )
             .where(Lesson.id == lesson_id)
         )

@@ -47,8 +47,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       final list = await _api.getMyExecutions();
       final pending = list.any((e) {
         if ((e['status'] as String?) != 'pending_confirmation') return false;
-        if (missionId != null && (e['mission_id'] as String?) == missionId) return true;
-        if (lessonId != null && (e['lesson_id'] as String?) == lessonId) return true;
+        if (missionId != null && (e['mission_id'] as String?) == missionId)
+          return true;
+        if (lessonId != null && (e['lesson_id'] as String?) == lessonId)
+          return true;
         return false;
       });
       if (mounted) setState(() => _pendingOpponentAcceptance = pending);
@@ -82,7 +84,8 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         final opponentId = await _showOpponentDialog(d.academyId!);
         if (!mounted) return;
         if (opponentId != null && opponentId.isNotEmpty) {
-          await _completeMissionWithOpponent(d.missionId!, usageType, opponentId);
+          await _completeMissionWithOpponent(
+              d.missionId!, usageType, opponentId);
         } else {
           await _completeMissionLegacy(d.missionId!, usageType);
         }
@@ -123,8 +126,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     );
   }
 
-  Future<void> _completeLessonWithOpponent(String lessonId, String usageType, String opponentId) async {
-    setState(() { _completing = true; _error = null; });
+  Future<void> _completeLessonWithOpponent(
+      String lessonId, String usageType, String opponentId) async {
+    setState(() {
+      _completing = true;
+      _error = null;
+    });
     try {
       final res = await _api.postExecution(
         lessonId: lessonId,
@@ -132,19 +139,27 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         usageType: usageType,
       );
       if (!mounted) return;
-      final message = res['message'] as String? ?? 'Aguardando confirmação do adversário.';
+      final message =
+          res['message'] as String? ?? 'Aguardando confirmação do adversário.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
       );
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      setState(() { _completing = false; _error = userFacingMessage(e); });
+      setState(() {
+        _completing = false;
+        _error = userFacingMessage(e);
+      });
     }
   }
 
-  Future<void> _completeMissionWithOpponent(String missionId, String usageType, String opponentId) async {
-    setState(() { _completing = true; _error = null; });
+  Future<void> _completeMissionWithOpponent(
+      String missionId, String usageType, String opponentId) async {
+    setState(() {
+      _completing = true;
+      _error = null;
+    });
     try {
       final res = await _api.postExecution(
         missionId: missionId,
@@ -152,7 +167,8 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         usageType: usageType,
       );
       if (!mounted) return;
-      final message = res['message'] as String? ?? 'Aguardando confirmação do adversário.';
+      final message =
+          res['message'] as String? ?? 'Aguardando confirmação do adversário.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
       );
@@ -163,12 +179,19 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         await _completeLessonAsFallback();
         return;
       }
-      setState(() { _completing = false; _error = userFacingMessage(e); });
+      setState(() {
+        _completing = false;
+        _error = userFacingMessage(e);
+      });
     }
   }
 
-  Future<void> _completeMissionLegacy(String missionId, String usageType) async {
-    setState(() { _completing = true; _error = null; });
+  Future<void> _completeMissionLegacy(
+      String missionId, String usageType) async {
+    setState(() {
+      _completing = true;
+      _error = null;
+    });
     try {
       await _api.postMissionComplete(
         missionId: missionId,
@@ -176,7 +199,9 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Missão concluída!'), backgroundColor: AppTheme.primary),
+        const SnackBar(
+            content: Text('Missão concluída!'),
+            backgroundColor: AppTheme.primary),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -186,12 +211,15 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         return;
       }
       final msg = e.toString();
-      final is409 = (e is ApiException && e.statusCode == 409) || msg.toLowerCase().contains('já foi concluída');
-      if (mounted) setState(() {
-        _completing = false;
-        if (is409) _alreadyCompleted = true;
-        _error = is409 ? null : userFacingMessage(e);
-      });
+      final is409 = (e is ApiException && e.statusCode == 409) ||
+          msg.toLowerCase().contains('já foi concluída');
+      if (mounted) {
+        setState(() {
+          _completing = false;
+          if (is409) _alreadyCompleted = true;
+          _error = is409 ? null : userFacingMessage(e);
+        });
+      }
     }
   }
 
@@ -212,7 +240,8 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Missão fora do período; registrada como visualização da lição.'),
+          content: Text(
+              'Missão fora do período; registrada como visualização da lição.'),
           backgroundColor: AppTheme.primary,
         ),
       );
@@ -254,7 +283,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     );
   }
 
-
   Future<void> _completeLesson(String lessonId) async {
     setState(() {
       _completing = true;
@@ -264,7 +292,9 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lição concluída!'), backgroundColor: AppTheme.primary),
+        const SnackBar(
+            content: Text('Lição concluída!'),
+            backgroundColor: AppTheme.primary),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -272,11 +302,13 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       final msg = e.toString();
       final is409 = (e is ApiException && e.statusCode == 409) ||
           msg.toLowerCase().contains('já foi concluída');
-      if (mounted) setState(() {
-        _completing = false;
-        if (is409) _alreadyCompleted = true;
-        _error = is409 ? null : userFacingMessage(e);
-      });
+      if (mounted) {
+        setState(() {
+          _completing = false;
+          if (is409) _alreadyCompleted = true;
+          _error = is409 ? null : userFacingMessage(e);
+        });
+      }
     }
   }
 
@@ -303,18 +335,23 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
                 d.positionName != null && d.positionName!.isNotEmpty
                     ? '${d.techniqueName!} ${d.positionName}'
                     : d.techniqueName!,
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 16),
               ),
             ],
-            if (d.estimatedDurationSeconds != null && d.estimatedDurationSeconds! > 0) ...[
+            if (d.estimatedDurationSeconds != null &&
+                d.estimatedDurationSeconds! > 0) ...[
               const SizedBox(height: 4),
               Text(
                 'Duração estimada: ~${d.estimatedDurationSeconds! ~/ 60} min',
-                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 12),
               ),
             ],
             const SizedBox(height: 20),
-            YoutubePlayerEmbed(videoUrl: d.videoUrl.isNotEmpty ? d.videoUrl : null, reelsMode: _reelsMode),
+            YoutubePlayerEmbed(
+                videoUrl: d.videoUrl.isNotEmpty ? d.videoUrl : null,
+                reelsMode: _reelsMode),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -331,26 +368,40 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             if (d.description.isNotEmpty)
               Text(
                 d.description,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppTheme.textPrimary),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: AppTheme.textPrimary),
               ),
             if (d.description.isNotEmpty) const SizedBox(height: 24),
             if (_error != null) ...[
-              Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
+              Text(_error!,
+                  style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
               const SizedBox(height: 12),
             ],
             if (widget.data.missionId != null || widget.data.lessonId != null)
               FilledButton.icon(
-                onPressed: _alreadyCompleted || _completing || _pendingOpponentAcceptance ? null : _complete,
+                onPressed: _alreadyCompleted ||
+                        _completing ||
+                        _pendingOpponentAcceptance
+                    ? null
+                    : _complete,
                 icon: _alreadyCompleted
                     ? const Icon(Icons.check_circle)
                     : _pendingOpponentAcceptance
                         ? const Icon(Icons.schedule)
                         : _completing
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
                             : const Icon(Icons.check_circle),
                 label: Text(
                   _alreadyCompleted
-                      ? (widget.data.missionId != null ? 'Missão concluída' : 'Lição concluída')
+                      ? (widget.data.missionId != null
+                          ? 'Missão concluída'
+                          : 'Lição concluída')
                       : _pendingOpponentAcceptance
                           ? 'Aguardando aceite do oponente'
                           : _completing
@@ -358,7 +409,8 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
                               : 'Concluir',
                 ),
                 style: _alreadyCompleted
-                    ? FilledButton.styleFrom(backgroundColor: Colors.green.shade700)
+                    ? FilledButton.styleFrom(
+                        backgroundColor: Colors.green.shade700)
                     : _pendingOpponentAcceptance
                         ? FilledButton.styleFrom(backgroundColor: Colors.grey)
                         : null,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/trophy_shelf/domain/shelf_trophy.dart';
 import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/features/trophy_shelf/utils/shelf_layout_config.dart';
@@ -67,7 +66,8 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
       }).toList();
     }
     if (_filterAwardKind != null) {
-      filtered = filtered.where((t) => t.awardKind == _filterAwardKind).toList();
+      filtered =
+          filtered.where((t) => t.awardKind == _filterAwardKind).toList();
     }
     return filtered;
   }
@@ -158,7 +158,8 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
       return Scaffold(
         body: GameBackground(
           child: Center(
-            child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary),
+            child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary),
           ),
         ),
       );
@@ -199,7 +200,8 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
     final list = _list ?? [];
     final availableYears = _availableYears(list);
     final filtered = _filteredList(list);
-    final config = ShelfLayoutConfig.fromWidth(MediaQuery.sizeOf(context).width);
+    final config =
+        ShelfLayoutConfig.fromWidth(MediaQuery.sizeOf(context).width);
     final shelfTrophies = ShelfTrophy.fromTrophies(
       filtered,
       slotsPerRow: config.slotsPerRow,
@@ -218,7 +220,8 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
             if (widget.userName != null && widget.userName!.isNotEmpty)
               Text(
                 widget.userName!,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.normal),
               ),
           ],
         ),
@@ -251,8 +254,11 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
                             isDense: true,
                             hint: const Text('Ano'),
                             items: [
-                              const DropdownMenuItem<int?>(value: null, child: Text('Todos')),
-                              ...availableYears.map((y) => DropdownMenuItem<int?>(value: y, child: Text('$y'))),
+                              const DropdownMenuItem<int?>(
+                                  value: null, child: Text('Todos')),
+                              ...availableYears.map((y) =>
+                                  DropdownMenuItem<int?>(
+                                      value: y, child: Text('$y'))),
                             ],
                             onChanged: (v) => setState(() => _selectedYear = v),
                           ),
@@ -261,17 +267,20 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
                     ChoiceChip(
                       label: const Text('Todos'),
                       selected: _filterAwardKind == null,
-                      onSelected: (s) => setState(() => _filterAwardKind = null),
+                      onSelected: (s) =>
+                          setState(() => _filterAwardKind = null),
                     ),
                     ChoiceChip(
                       label: const Text('Medalhas'),
                       selected: _filterAwardKind == 'medal',
-                      onSelected: (s) => setState(() => _filterAwardKind = s ? 'medal' : null),
+                      onSelected: (s) =>
+                          setState(() => _filterAwardKind = s ? 'medal' : null),
                     ),
                     ChoiceChip(
                       label: const Text('Troféus'),
                       selected: _filterAwardKind == 'trophy',
-                      onSelected: (s) => setState(() => _filterAwardKind = s ? 'trophy' : null),
+                      onSelected: (s) => setState(
+                          () => _filterAwardKind = s ? 'trophy' : null),
                     ),
                   ],
                 ),
@@ -287,7 +296,8 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
                             _selectedYear != null
                                 ? 'Nenhum troféu ou medalha em $_selectedYear.'
                                 : 'Nenhum troféu ou medalha nesta galeria.',
-                            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                                color: theme.colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
                           ),
                         ),

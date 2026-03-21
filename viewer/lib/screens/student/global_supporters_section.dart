@@ -73,7 +73,7 @@ class _GlobalSupportersSectionState extends State<GlobalSupportersSection> {
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.favorite_outline,
                     color: AppTheme.primary,
                   ),
@@ -149,7 +149,7 @@ class _GlobalSupporterTile extends StatelessWidget {
             color: AppTheme.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
+          child: const Icon(
             Icons.ondemand_video_rounded,
             color: AppTheme.primary,
           ),
@@ -192,4 +192,3 @@ class _GlobalSupporterTile extends StatelessWidget {
     );
   }
 }
-

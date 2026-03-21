@@ -159,37 +159,13 @@ def aluno_headers(aluno_token) -> dict:
 
 
 @pytest.fixture
-async def position_pair(db: AsyncSession, academy):
-    from app.models import Position
-
-    p1 = Position(
-        academy_id=academy.id,
-        name=f"Guarda {uuid4().hex[:4]}",
-        slug=f"guarda-{uuid4().hex[:6]}",
-    )
-    p2 = Position(
-        academy_id=academy.id,
-        name=f"Montada {uuid4().hex[:4]}",
-        slug=f"montada-{uuid4().hex[:6]}",
-    )
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
-    return p1, p2
-
-
-@pytest.fixture
-async def technique(db: AsyncSession, academy, position_pair):
+async def technique(db: AsyncSession, academy):
     from app.models import Technique
 
-    p1, p2 = position_pair
     t = Technique(
         academy_id=academy.id,
         name=f"Raspagem {uuid4().hex[:4]}",
         slug=f"raspagem-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
         base_points=10,
     )
     db.add(t)

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
-import 'package:form_builder_validators/form_builder_validators.dart';
 
 /// Dropdown pesquisável usando Autocomplete do Flutter Material.
 class SearchableDropdown<T extends Object> extends StatelessWidget {
@@ -55,8 +54,8 @@ class SearchableDropdown<T extends Object> extends StatelessWidget {
                   return items;
                 }
                 final query = textEditingValue.text.toLowerCase();
-                return items.where((item) =>
-                    getLabel(item).toLowerCase().contains(query));
+                return items.where(
+                    (item) => getLabel(item).toLowerCase().contains(query));
               },
               displayStringForOption: getLabel,
               onSelected: (T selection) {

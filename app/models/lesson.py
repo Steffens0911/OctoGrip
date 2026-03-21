@@ -52,9 +52,8 @@ class Lesson(Base, UUIDMixin):
 
     @property
     def position_name(self) -> str | None:
-        if not self.technique or not self.technique.from_position or not self.technique.to_position:
-            return None
-        return f"da posição {self.technique.from_position.name} → para posição {self.technique.to_position.name}"
+        # Sem relacionamento de técnica com posições, não há nome de posição derivado.
+        return None
 
     @property
     def technique_video_url(self) -> str | None:

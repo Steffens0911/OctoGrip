@@ -91,23 +91,13 @@ async def test_metricas_uso_basicas(client, db):
 
 async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
     """Métricas com dados existentes."""
-    from app.models import Lesson, LessonProgress, Technique, Position, MissionUsage
+    from app.models import Lesson, LessonProgress, Technique, MissionUsage
     from datetime import datetime, timezone, timedelta
-
-    # Criar técnica e lição
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
 
     technique = Technique(
         academy_id=academy.id,
         name="Técnica Teste",
         slug=f"tecnica-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
     )
     db.add(technique)
     await db.commit()
@@ -154,22 +144,13 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
 
 async def test_metricas_uso_percentual(client, db, academy, aluno_user):
     """Métricas calculam percentual corretamente."""
-    from app.models import Lesson, MissionUsage, Technique, Position
+    from app.models import Lesson, MissionUsage, Technique
     from datetime import datetime, timezone
-
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
 
     technique = Technique(
         academy_id=academy.id,
         name="Técnica Teste",
         slug=f"tecnica-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
     )
     db.add(technique)
     await db.commit()
@@ -231,7 +212,7 @@ async def test_metricas_uso_sem_dados(client):
 
 async def test_metricas_uso_por_academia(client, db, academy, aluno_user):
     """Métricas por academy_id retornam estrutura igual ao global e respeitam filtro."""
-    from app.models import Lesson, LessonProgress, Technique, Position, MissionUsage
+    from app.models import Lesson, LessonProgress, Technique, MissionUsage
     from datetime import datetime, timezone
 
     # Criar técnica/posição/lesson vinculadas à academia do aluno

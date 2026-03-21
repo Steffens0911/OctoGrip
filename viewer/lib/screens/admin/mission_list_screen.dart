@@ -53,10 +53,12 @@ class _MissionListScreenState extends State<MissionListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final list = await _api.getMissions();
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _allItems = list;
         _loading = false;
       });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
@@ -132,7 +134,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
-                        value: _filterLevel,
+                        initialValue: _filterLevel,
                         decoration: const InputDecoration(
                           labelText: 'Nível',
                           hintText: 'Todos',
@@ -156,7 +158,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                               Expanded(
                                 child: Text(
                                   'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                 ),
                               ),
                               TextButton(
@@ -174,6 +176,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                   ),
                 ),
                 Expanded(
+                  floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
                   child: RefreshIndicator(
                     onRefresh: _load,
                     child: _filteredItems.isEmpty
@@ -182,7 +185,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                               _searchController.text.isNotEmpty || _filterLevel != null
                                   ? 'Nenhuma missão encontrada.'
                                   : 'Nenhuma missão. Toque em + para criar.',
-                              style: TextStyle(color: AppTheme.textSecondary),
+                              style: const const TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(
@@ -205,7 +208,6 @@ class _MissionListScreenState extends State<MissionListScreen> {
                 },
               ),
             ),
-      floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }
 }

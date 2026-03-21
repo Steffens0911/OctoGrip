@@ -1,4 +1,4 @@
-"""Serviços CRUD para Technique."""
+"""Serviços CRUD para Technique (sem dependência de Position)."""
 import logging
 from uuid import UUID
 
@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import techniques_cache
 from app.core.slug import ensure_unique_slug, make_slug
-from app.models import Position, Technique
+from app.models import Technique
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +29,12 @@ async def create_technique(
     db: AsyncSession,
     academy_id: UUID,
     name: str,
-    from_position_id: UUID,
-    to_position_id: UUID,
     slug: str | None = None,
     description: str | None = None,
     video_url: str | None = None,
     base_points: int | None = None,
 ) -> Technique:
-    """Cria uma técnica na academia. from_position e to_position devem pertencer à mesma academia."""
-    from_pos = (await db.execute(select(Position).where(Position.id == from_position_id))).scalar_one_or_none()
-    to_pos = (await db.execute(select(Position).where(Position.id == to_position_id))).scalar_one_or_none()
-    if not from_pos or from_pos.academy_id != academy_id:
-        raise ValueError("from_position_id deve ser uma posição desta academia.")
-    if not to_pos or to_pos.academy_id != academy_id:
-        raise ValueError("to_position_id deve ser uma posição desta academia.")
+    """Cria uma técnica na academia (sem posições de origem/destino)."""
     if not slug or not str(slug).strip():
         base = make_slug(name, fallback="tecnica")
         slug = await ensure_unique_slug(db, Technique, "slug", base, academy_id=academy_id)
@@ -52,8 +44,6 @@ async def create_technique(
         academy_id=academy_id,
         name=name.strip(),
         slug=slug,
-        from_position_id=from_position_id,
-        to_position_id=to_position_id,
         description=description.strip() if description else None,
         video_url=video_url.strip() if video_url and video_url.strip() else None,
         base_points=base_points,
@@ -74,8 +64,6 @@ async def update_technique(
     description: str | None = None,
     video_url: str | None = None,
     base_points: int | None = None,
-    from_position_id: UUID | None = None,
-    to_position_id: UUID | None = None,
 ) -> Technique | None:
     """Atualiza uma técnica. Retorna None se não existir."""
     technique = await get_technique(db, technique_id)
@@ -91,16 +79,6 @@ async def update_technique(
         technique.video_url = video_url.strip() if video_url and video_url.strip() else None
     if base_points is not None:
         technique.base_points = base_points
-    if from_position_id is not None:
-        from_pos = (await db.execute(select(Position).where(Position.id == from_position_id))).scalar_one_or_none()
-        if not from_pos or from_pos.academy_id != technique.academy_id:
-            raise ValueError("from_position_id deve ser uma posição desta academia.")
-        technique.from_position_id = from_position_id
-    if to_position_id is not None:
-        to_pos = (await db.execute(select(Position).where(Position.id == to_position_id))).scalar_one_or_none()
-        if not to_pos or to_pos.academy_id != technique.academy_id:
-            raise ValueError("to_position_id deve ser uma posição desta academia.")
-        technique.to_position_id = to_position_id
     await db.commit()
     await db.refresh(technique)
     await techniques_cache.invalidate_prefix(f"techniques:{technique.academy_id}")

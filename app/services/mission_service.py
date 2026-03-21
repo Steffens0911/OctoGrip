@@ -33,11 +33,8 @@ async def get_today_mission(
         level_normalized = "beginner"
 
     options = (
-        selectinload(Mission.technique).selectinload(Technique.from_position),
-        selectinload(Mission.technique).selectinload(Technique.to_position),
         selectinload(Mission.technique).selectinload(Technique.lessons),
-        selectinload(Mission.lesson).selectinload(Lesson.technique).selectinload(Technique.from_position),
-        selectinload(Mission.lesson).selectinload(Lesson.technique).selectinload(Technique.to_position),
+        selectinload(Mission.lesson).selectinload(Lesson.technique),
     )
 
     mission = None
@@ -119,20 +116,12 @@ async def _mission_to_today_response(
         lesson_title = lesson.title
         description = (lesson.content or "").strip() or (technique.description or "")
         video_url = (lesson.video_url or "").strip() or (lesson.technique_video_url or "").strip() or _get_video_url(technique)
-        position_name = lesson.position_name or (
-            f"da posição {technique.from_position.name} → para posição {technique.to_position.name}"
-            if technique.from_position and technique.to_position
-            else ""
-        )
+        position_name = lesson.position_name or ""
         lesson_id = lesson.id
     else:
         lesson_title = technique.name
         description = technique.description or ""
-        position_name = (
-            f"da posição {technique.from_position.name} → para posição {technique.to_position.name}"
-            if technique.from_position and technique.to_position
-            else ""
-        )
+        position_name = ""
         video_url = _get_video_url(technique)
         lesson_id = None
         if technique.lessons:
@@ -229,8 +218,6 @@ async def get_mission_today_response(
     stmt = (
         select(Technique)
         .options(
-            selectinload(Technique.from_position),
-            selectinload(Technique.to_position),
             selectinload(Technique.lessons),
         )
         .order_by(Technique.name.asc())
@@ -241,7 +228,7 @@ async def get_mission_today_response(
     if not technique:
         logger.info("get_mission_today_response", extra={"found": False})
         return None
-    position_name = f"da posição {technique.from_position.name} → para posição {technique.to_position.name}"
+    position_name = ""
     grad_mult = max(1, points_for_graduation(user.graduation) if user else 1)
     return MissionTodayResponse(
         mission_id=None,
@@ -292,11 +279,8 @@ async def get_mission_week_response(
         level_n = "beginner"
 
     options = (
-        selectinload(Mission.technique).selectinload(Technique.from_position),
-        selectinload(Mission.technique).selectinload(Technique.to_position),
         selectinload(Mission.technique).selectinload(Technique.lessons),
-        selectinload(Mission.lesson).selectinload(Lesson.technique).selectinload(Technique.from_position),
-        selectinload(Mission.lesson).selectinload(Lesson.technique).selectinload(Technique.to_position),
+        selectinload(Mission.lesson).selectinload(Lesson.technique),
     )
 
     entries: list[MissionWeekSlotResponse] = []

@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
-import 'package:viewer/app_theme.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/technique.dart';
-import 'package:viewer/models/position.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
-import 'package:viewer/widgets/searchable_dropdown.dart';
 
 class TechniqueFormScreen extends StatefulWidget {
   final String academyId;
@@ -22,10 +19,7 @@ class TechniqueFormScreen extends StatefulWidget {
 class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
   final _api = ApiService();
   final _formKey = GlobalKey<FormBuilderState>();
-  List<Position> _positions = [];
   List<Technique> _allTechniques = [];
-  bool _loadingPositions = true;
-  bool _loadingTechniques = true;
   bool _saving = false;
   String? _error;
   String _nameQuery = '';
@@ -33,20 +27,7 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPositions();
     _loadTechniques();
-  }
-
-  Future<void> _loadPositions() async {
-    try {
-      final list = await _api.getPositions(academyId: widget.academyId);
-      if (mounted) setState(() {
-        _positions = list..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-        _loadingPositions = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loadingPositions = false);
-    }
   }
 
   Future<void> _loadTechniques() async {
@@ -54,12 +35,13 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
       final list = await _api.getTechniques(academyId: widget.academyId);
       if (mounted) {
         setState(() {
-          _allTechniques = list..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-          _loadingTechniques = false;
+          _allTechniques = list
+            ..sort((a, b) =>
+                a.name.toLowerCase().compareTo(b.name.toLowerCase()));
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingTechniques = false);
+      // silencioso – sugestões são complementares ao formulário
     }
   }
 
@@ -76,8 +58,6 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
       final nameTrimmed = name.trim();
       final videoUrl = values['videoUrl'] as String?;
       final description = values['description'] as String?;
-      final fromPositionId = values['fromPositionId'] as String;
-      final toPositionId = values['toPositionId'] as String;
 
       // Verificar possível duplicata ao criar nova técnica
       if (widget.technique == null && nameTrimmed.isNotEmpty && _allTechniques.isNotEmpty) {
@@ -114,8 +94,6 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
             name: nameTrimmed,
             videoUrl: videoUrl?.trim().isEmpty == true ? null : videoUrl?.trim(),
             description: description?.trim().isEmpty == true ? null : description?.trim(),
-            fromPositionId: fromPositionId,
-            toPositionId: toPositionId,
           );
         } else {
           await _api.updateTechnique(
@@ -124,8 +102,6 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
             name: nameTrimmed,
             videoUrl: videoUrl?.trim().isEmpty == true ? null : videoUrl?.trim(),
             description: description?.trim().isEmpty == true ? null : description?.trim(),
-            fromPositionId: fromPositionId,
-            toPositionId: toPositionId,
           );
         }
         if (mounted) {
@@ -153,8 +129,6 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
             'name': widget.technique?.name ?? '',
             'videoUrl': widget.technique?.videoUrl ?? '',
             'description': widget.technique?.description ?? '',
-            'fromPositionId': widget.technique?.fromPositionId,
-            'toPositionId': widget.technique?.toPositionId,
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -242,33 +216,6 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
                 ]),
               ),
               const SizedBox(height: 16),
-              if (_loadingPositions)
-                const SizedBox(height: 48, child: Center(child: CircularProgressIndicator(color: AppTheme.primary)))
-              else ...[
-                SearchableDropdown<Position>(
-                  name: 'fromPositionId',
-                  labelText: 'De posição',
-                  items: _positions,
-                  getLabel: (p) => p.name,
-                  getValue: (p) => p.id,
-                  initialValue: widget.technique?.fromPositionId,
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Selecione a posição de origem'),
-                  ]),
-                ),
-                const SizedBox(height: 16),
-                SearchableDropdown<Position>(
-                  name: 'toPositionId',
-                  labelText: 'Para posição',
-                  items: _positions,
-                  getLabel: (p) => p.name,
-                  getValue: (p) => p.id,
-                  initialValue: widget.technique?.toPositionId,
-                  validator: FormBuilderValidators.compose([
-                    FormBuilderValidators.required(errorText: 'Selecione a posição de destino'),
-                  ]),
-                ),
-              ],
               const SizedBox(height: 16),
               FormBuilderTextField(
                 name: 'description',

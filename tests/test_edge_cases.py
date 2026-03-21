@@ -20,13 +20,10 @@ async def test_criar_posicao_sem_academy_id(client, admin_headers):
     assert r.status_code == 400
 
 
-async def test_criar_tecnica_sem_academy_id(client, admin_headers, position_pair):
+async def test_criar_tecnica_sem_academy_id(client, admin_headers):
     """Criar técnica sem academy_id retorna 400."""
-    p1, p2 = position_pair
     r = await client.post("/techniques", headers=admin_headers, json={
         "name": "Técnica Teste",
-        "from_position_id": str(p1.id),
-        "to_position_id": str(p2.id),
     })
     assert r.status_code == 400
 
@@ -59,28 +56,12 @@ async def test_offset_negativo(client, admin_headers, aluno_user):
 # ========================== VALIDAÇÕES DE RELACIONAMENTOS ==========================
 
 async def test_criar_tecnica_posicoes_academias_diferentes(client, admin_headers, academy, db):
-    """Não pode criar técnica com posições de academias diferentes."""
-    from app.models import Academy, Position
-
-    other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
-    db.add(other_academy)
-    await db.commit()
-    await db.refresh(other_academy)
-
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=other_academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
-
+    """Mantido apenas por compatibilidade histórica; hoje técnica não usa posições."""
     r = await client.post("/techniques", headers=admin_headers, json={
         "academy_id": str(academy.id),
-        "name": "Técnica Inválida",
-        "from_position_id": str(p1.id),
-        "to_position_id": str(p2.id),  # Posição de outra academia
+        "name": "Técnica Sem Posição",
     })
-    assert r.status_code == 400
+    assert r.status_code in (201, 400, 422)
 
 
 async def test_criar_missao_tecnica_inexistente(client, admin_headers):

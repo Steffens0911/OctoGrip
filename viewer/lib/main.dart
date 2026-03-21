@@ -147,13 +147,10 @@ class _MainShellState extends State<MainShell> {
 
   List<String> _availableTabs(AuthService auth) {
     final role = auth.currentUser?.role ?? 'aluno';
-    if (role == 'aluno') {
-      return ['Início'];
-    } else if (role == 'administrador') {
-      return ['Início', 'Painel', 'Admin'];
-    } else {
-      return ['Início', 'Painel'];
+    if (role == 'administrador') {
+      return ['Missões', 'Painel', 'Admin'];
     }
+    return ['Missões', 'Painel'];
   }
 
   Widget _currentBody(AuthService auth, List<String> tabs) {
@@ -333,10 +330,10 @@ class _MainShellState extends State<MainShell> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                if (tabs.contains('Início'))
+                if (tabs.contains('Missões'))
                   _NavItem(
-                    icon: Icons.home_rounded,
-                    label: 'Início',
+                    icon: Icons.emoji_events_rounded,
+                    label: 'Missões',
                     selected: _selected == 0,
                     onTap: () => setState(() {
                       _selected = 0;

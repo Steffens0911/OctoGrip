@@ -70,13 +70,10 @@ async def test_listar_tecnicas_sem_academy_id(client):
     assert r.status_code == 400
 
 
-async def test_criar_tecnica(client, admin_headers, academy, position_pair):
-    p1, p2 = position_pair
+async def test_criar_tecnica(client, admin_headers, academy):
     r = await client.post("/techniques", json={
         "academy_id": str(academy.id),
         "name": f"Técnica {uuid4().hex[:4]}",
-        "from_position_id": str(p1.id),
-        "to_position_id": str(p2.id),
     })
     assert r.status_code == 201
     data = r.json()
@@ -102,16 +99,13 @@ async def test_atualizar_tecnica(client, admin_headers, academy, technique):
     assert r.json()["name"] == "Técnica Renomeada"
 
 
-async def test_excluir_tecnica(client, admin_headers, academy, db, position_pair):
+async def test_excluir_tecnica(client, admin_headers, academy, db):
     from app.models import Technique
 
-    p1, p2 = position_pair
     t = Technique(
         academy_id=academy.id,
         name=f"Temp {uuid4().hex[:4]}",
         slug=f"temp-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
     )
     db.add(t)
     await db.commit()

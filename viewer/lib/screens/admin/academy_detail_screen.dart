@@ -4,15 +4,13 @@ import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
-import 'package:viewer/models/position.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:viewer/screens/admin/academy_active_students_screen.dart';
 import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
 import 'package:viewer/screens/admin/partner_list_screen.dart';
-import 'package:viewer/screens/admin/position_form_screen.dart';
-import 'package:viewer/screens/admin/technique_form_screen.dart';
+import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -39,7 +37,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   final ApiService _api = ApiService();
   late Academy _academy;
   List<Technique> _techniques = [];
-  List<Position> _positions = [];
   String? _weeklyTechniqueId;
   String? _weeklyTechnique2Id;
   String? _weeklyTechnique3Id;
@@ -50,7 +47,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   late final TextEditingController _mult2Controller;
   late final TextEditingController _mult3Controller;
   bool _loadingTechniques = true;
-  bool _loadingPositions = true;
   bool _savingTheme = false;
   bool _resetting = false;
   Map<String, dynamic>? _ranking;
@@ -92,7 +88,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _showSchedule = _academy.showSchedule;
     _showGlobalSupporters = _academy.showGlobalSupporters;
     _loadTechniques();
-    _loadPositions();
     _loadRankingAndReport();
     _loadTrophies();
     _loadUsageMetrics();
@@ -119,90 +114,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       }
     } catch (_) {
       if (mounted) setState(() => _loadingTechniques = false);
-    }
-  }
-
-  Future<void> _loadPositions() async {
-    if (mounted) setState(() => _loadingPositions = true);
-    try {
-      final list = await _api.getPositions(academyId: _academy.id);
-      if (mounted) {
-        setState(() {
-          _positions = list;
-          _loadingPositions = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loadingPositions = false);
-    }
-  }
-
-  String _positionName(String id) => _positions.where((p) => p.id == id).map((p) => p.name).firstOrNull ?? id;
-
-  Future<void> _openPositionForm([Position? p]) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PositionFormScreen(academyId: _academy.id, position: p),
-      ),
-    );
-    if (mounted) await _loadPositions();
-  }
-
-  Future<void> _openTechniqueForm([Technique? t]) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TechniqueFormScreen(academyId: _academy.id, technique: t),
-      ),
-    );
-    if (mounted) {
-      await _loadTechniques();
-      await _loadPositions();
-    }
-  }
-
-  Future<void> _deletePosition(Position p) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Excluir posição'),
-        content: Text('Excluir "${p.name}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir')),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    try {
-      await _api.deletePosition(p.id, academyId: _academy.id);
-      if (mounted) await _loadPositions();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Posição excluída')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
-    }
-  }
-
-  Future<void> _deleteTechnique(Technique t) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Excluir técnica'),
-        content: Text('Excluir "${t.name}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir')),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    try {
-      await _api.deleteTechnique(t.id, academyId: _academy.id);
-      if (mounted) await _loadTechniques();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Técnica excluída')));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
     }
   }
 
@@ -888,7 +799,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         onRefresh: () async {
           await _loadRankingAndReport();
           await _loadTechniques();
-          await _loadPositions();
           await _loadTrophies();
         },
         child: SingleChildScrollView(
@@ -954,202 +864,25 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     controlAffinity: ListTileControlAffinity.leading,
                     childrenPadding: EdgeInsets.zero,
                     children: [
-                      Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Column(
-                            children: [
-                              ExpansionTile(
-                                title: const Text('Posições'),
-                                childrenPadding: const EdgeInsets.all(16),
-                                initiallyExpanded: false,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'Posições desta academia',
-                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                color: AppTheme.textPrimaryOf(context),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                      ),
-                                      if (_loadingPositions)
-                                        const Padding(
-                                          padding: EdgeInsets.only(right: 8),
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          ),
-                                        ),
-                                      IconButton(
-                                        icon: const Icon(Icons.add_circle_outline),
-                                        onPressed: () => _openPositionForm(),
-                                        tooltip: 'Nova posição',
-                                      ),
-                                    ],
-                                  ),
-                                  if (_loadingPositions && _positions.isEmpty)
-                                    const Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Center(child: CircularProgressIndicator()))
-                                  else if (_positions.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Text(
-                                        'Nenhuma posição. Toque em + para criar.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryOf(context)),
-                                      ),
-                                    )
-                                  else
-                                    ListView.separated(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      itemCount: _positions.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
-                                      itemBuilder: (context, i) {
-                                        final p = _positions[i];
-                                        return ListTile(
-                                          dense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                          title: Text(p.name),
-                                          subtitle: p.description != null && p.description!.isNotEmpty
-                                              ? Text(p.description!,
-                                                  maxLines: 1, overflow: TextOverflow.ellipsis)
-                                              : null,
-                                          trailing: AuthService().canEditResources()
-                                              ? Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    IconButton(
-                                                        style: IconButton.styleFrom(
-                                                          minimumSize: const Size(44, 44),
-                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                        ),
-                                                        icon: const Icon(Icons.edit,
-                                                            size: 20, color: AppTheme.primary),
-                                                        onPressed: () => _openPositionForm(p),
-                                                        tooltip: 'Editar'),
-                                                    IconButton(
-                                                        style: IconButton.styleFrom(
-                                                          minimumSize: const Size(44, 44),
-                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                        ),
-                                                        icon: Icon(Icons.delete_outline,
-                                                            size: 20, color: Theme.of(context).colorScheme.error),
-                                                        onPressed: () => _deletePosition(p),
-                                                        tooltip: 'Excluir'),
-                                                  ],
-                                                )
-                                              : null,
-                                        );
-                                      },
-                                    ),
-                                ],
+                      ListTile(
+                        leading: const Icon(Icons.alt_route_rounded),
+                        title: const Text('Técnicas'),
+                        subtitle:
+                            const Text('Gerencie as técnicas desta academia'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TechniqueListScreen(
+                                academyId: _academy.id,
                               ),
-                              const Divider(height: 1),
-                              ExpansionTile(
-                                title: const Text('Técnicas'),
-                                childrenPadding: const EdgeInsets.all(16),
-                                initiallyExpanded: false,
-                                controlAffinity: ListTileControlAffinity.leading,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          'Técnicas desta academia',
-                                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                color: AppTheme.textPrimaryOf(context),
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                        ),
-                                      ),
-                                      if (_loadingTechniques)
-                                        const Padding(
-                                          padding: EdgeInsets.only(right: 8),
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                          ),
-                                        ),
-                                      if (AuthService().canEditResources())
-                                        IconButton(
-                                          icon: const Icon(Icons.add_circle_outline),
-                                          onPressed: () => _openTechniqueForm(),
-                                          tooltip: 'Nova técnica',
-                                        ),
-                                    ],
-                                  ),
-                                  if (_loadingTechniques && _techniques.isEmpty)
-                                    const Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Center(child: CircularProgressIndicator()))
-                                  else if (_techniques.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.all(16),
-                                      child: Text(
-                                        'Nenhuma técnica. Toque em + para criar.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppTheme.textSecondaryOf(context)),
-                                      ),
-                                    )
-                                  else
-                                    ListView.separated(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      itemCount: _techniques.length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
-                                      itemBuilder: (context, i) {
-                                        final t = _techniques[i];
-                                        return ListTile(
-                                          dense: true,
-                                          contentPadding: EdgeInsets.zero,
-                                          title: Text(t.name),
-                                          subtitle: Text(
-                                            '${_positionName(t.fromPositionId)} → ${_positionName(t.toPositionId)}',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          trailing: AuthService().canEditResources()
-                                              ? Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    IconButton(
-                                                        style: IconButton.styleFrom(
-                                                          minimumSize: const Size(44, 44),
-                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                        ),
-                                                        icon: const Icon(Icons.edit,
-                                                            size: 20, color: AppTheme.primary),
-                                                        onPressed: () => _openTechniqueForm(t),
-                                                        tooltip: 'Editar'),
-                                                    IconButton(
-                                                        style: IconButton.styleFrom(
-                                                          minimumSize: const Size(44, 44),
-                                                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                        ),
-                                                        icon: Icon(Icons.delete_outline,
-                                                            size: 20, color: Theme.of(context).colorScheme.error),
-                                                        onPressed: () => _deleteTechnique(t),
-                                                        tooltip: 'Excluir'),
-                                                  ],
-                                                )
-                                              : null,
-                                        );
-                                      },
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                            ),
+                          );
+                          if (mounted) {
+                            await _loadTechniques();
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -1242,31 +975,19 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         ),
                         AppSpacing.verticalM,
                       ],
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _logoUrlController,
-                              readOnly: true,
-                              decoration: const InputDecoration(
-                                labelText: 'URL atual do brasão',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          FilledButton.icon(
-                            onPressed: _uploadingLogo ? null : _pickAndUploadLogo,
-                            icon: _uploadingLogo
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  )
-                                : const Icon(Icons.upload),
-                            label: Text(_uploadingLogo ? 'Enviando...' : 'Selecionar imagem'),
-                          ),
-                        ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: _uploadingLogo ? null : _pickAndUploadLogo,
+                          icon: _uploadingLogo
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.upload),
+                          label: Text(_uploadingLogo ? 'Enviando...' : 'Selecionar imagem'),
+                        ),
                       ),
                       const SizedBox(height: 24),
                       Text(

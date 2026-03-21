@@ -34,15 +34,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
     });
     try {
       final list = await _api.getMissionUsagesHistory(limit: 500);
-      if (mounted) setState(() {
-        _items = list;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _items = list;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() {
-        _loading = false;
-        _error = userFacingMessage(e);
-      });
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = userFacingMessage(e);
+        });
+      }
     }
   }
 
@@ -67,15 +71,19 @@ class _ProgressScreenState extends State<ProgressScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700)),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Tentar novamente')),
+                        FilledButton(
+                            onPressed: _load,
+                            child: const Text('Tentar novamente')),
                       ],
                     ),
                   ),
                 )
               : _items.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Text(
                         'Nenhuma missão concluída ainda.',
                         style: TextStyle(color: AppTheme.textSecondary),
@@ -88,33 +96,42 @@ class _ProgressScreenState extends State<ProgressScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                           child: Text(
                             'Todas as missões cumpridas (${_items.length})',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
                                   color: AppTheme.textSecondary,
                                 ),
                           ),
                         ),
                         Expanded(
                           child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _items.length,
-                      itemBuilder: (context, i) {
-                        final item = _items[i];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                              child: const Icon(Icons.check_circle, color: AppTheme.primary),
-                            ),
-                            title: Text(item.lessonTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                              '${_formatDate(item.completedAt)} • ${item.usageType == 'before_training' ? 'Antes do treino' : 'Depois do treino'}',
-                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                            ),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _items.length,
+                            itemBuilder: (context, i) {
+                              final item = _items[i];
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundColor:
+                                        AppTheme.primary.withValues(alpha: 0.2),
+                                    child: const Icon(Icons.check_circle,
+                                        color: AppTheme.primary),
+                                  ),
+                                  title: Text(item.lessonTitle,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600)),
+                                  subtitle: Text(
+                                    '${_formatDate(item.completedAt)} • ${item.usageType == 'before_training' ? 'Antes do treino' : 'Depois do treino'}',
+                                    style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppTheme.textSecondary),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                            ),
                         ),
                       ],
                     ),

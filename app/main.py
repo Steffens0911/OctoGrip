@@ -147,11 +147,14 @@ app.add_middleware(RequestLoggingMiddleware, log_successful=False)
 
 app.add_middleware(
     CORSMiddleware,
+    # Em produção, use CORS_ORIGINS para listar domínios permitidos (ex.: frontend em produção).
     allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["*"],
+    # Em desenvolvimento, aceitar qualquer porta em localhost/127.0.0.1 (Flutter Web usa porta dinâmica).
+    allow_origin_regex=r"http://localhost(:\d+)?$|http://127\.0\.0\.1(:\d+)?$",
+    # Usamos autenticação via header Authorization: Bearer, então não precisamos de credenciais de cookie.
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
 )
 
 register_exception_handlers(app)

@@ -69,26 +69,17 @@ async def test_criar_trofeu_aluno_proibido(client, aluno_headers, academy, techn
 
 async def test_criar_trofeu_tecnica_outra_academia(client, admin_headers, academy, db):
     """Não pode criar troféu com técnica de outra academia."""
-    from app.models import Academy, Position, Technique
+    from app.models import Academy, Technique
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
     await db.commit()
     await db.refresh(other_academy)
 
-    p1 = Position(academy_id=other_academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=other_academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
-
     other_technique = Technique(
         academy_id=other_academy.id,
         name="Técnica Outra",
         slug=f"tecnica-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
     )
     db.add(other_technique)
     await db.commit()

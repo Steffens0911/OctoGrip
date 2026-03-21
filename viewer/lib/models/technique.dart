@@ -4,8 +4,6 @@ class Technique {
   final String slug;
   final String? description;
   final String? videoUrl;
-  final String fromPositionId;
-  final String toPositionId;
 
   Technique({
     required this.id,
@@ -13,8 +11,6 @@ class Technique {
     required this.slug,
     this.description,
     this.videoUrl,
-    required this.fromPositionId,
-    required this.toPositionId,
   });
 
   factory Technique.fromJson(Map<String, dynamic> json) {
@@ -24,8 +20,6 @@ class Technique {
       slug: json['slug'] as String,
       description: json['description'] as String?,
       videoUrl: json['video_url'] as String?,
-      fromPositionId: json['from_position_id'] as String,
-      toPositionId: json['to_position_id'] as String,
     );
   }
 
@@ -35,7 +29,5 @@ class Technique {
         'slug': slug,
         'description': description,
         'video_url': videoUrl,
-        'from_position_id': fromPositionId,
-        'to_position_id': toPositionId,
       };
 }

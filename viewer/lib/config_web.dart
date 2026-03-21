@@ -1,4 +1,6 @@
 /// Implementação para web: lê a URL da API definida no index.html (mesmo host, porta 8000).
+library;
+
 import 'dart:html' as html;
 
 String getApiBaseUrl() {

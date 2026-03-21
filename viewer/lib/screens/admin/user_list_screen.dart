@@ -79,13 +79,15 @@ class _UserListScreenState extends State<UserListScreen> {
         _api.getAcademies(),
       ]);
       final list = results[0] as List<models.UserModel>;
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _allItems = list;
         _academies = results[1] as List<Academy>;
         _loading = false;
         _loadingAcademies = false;
         _hasMore = list.length >= _pageSize;
       });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingAcademies = false; });
@@ -101,12 +103,14 @@ class _UserListScreenState extends State<UserListScreen> {
       final list = isAdmin
           ? await _api.getUsers(offset: nextOffset, limit: _pageSize)
           : await _api.getUsers(academyId: AuthService().currentUser?.academyId, offset: nextOffset, limit: _pageSize);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _allItems = [..._allItems, ...list];
         _currentPage++;
         _hasMore = list.length >= _pageSize;
         _isLoadingMore = false;
       });
+      }
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() => _isLoadingMore = false);
@@ -189,7 +193,7 @@ class _UserListScreenState extends State<UserListScreen> {
                           if (AuthService().isAdmin())
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: _filterAcademyId,
+                                initialValue: _filterAcademyId,
                                 decoration: const InputDecoration(
                                   labelText: 'Academia',
                                   hintText: 'Todas',
@@ -209,7 +213,7 @@ class _UserListScreenState extends State<UserListScreen> {
                           if (AuthService().isAdmin()) const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _filterGraduation,
+                              initialValue: _filterGraduation,
                               decoration: const InputDecoration(
                                 labelText: 'Graduação',
                                 hintText: 'Todas',
@@ -236,7 +240,7 @@ class _UserListScreenState extends State<UserListScreen> {
                               Expanded(
                                 child: Text(
                                   'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
                                 ),
                               ),
                               TextButton(
@@ -263,7 +267,7 @@ class _UserListScreenState extends State<UserListScreen> {
                         ? Center(
                             child: Text(
                               hasFilters ? 'Nenhum usuário encontrado.' : 'Nenhum usuário. Toque em + para criar.',
-                              style: TextStyle(color: AppTheme.textSecondary),
+                              style: const TextStyle(color: AppTheme.textSecondary),
                             ),
                           )
                         : ListView.builder(

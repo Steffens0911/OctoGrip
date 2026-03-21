@@ -28,16 +28,25 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final data = await _api.getPointsLog(widget.userId, limit: 100);
       final list = data['entries'] as List<dynamic>? ?? [];
-      if (mounted) setState(() {
-        _entries = list.map((e) => e as Map<String, dynamic>).toList();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _entries = list.map((e) => e as Map<String, dynamic>).toList();
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
     }
   }
 
@@ -65,11 +74,14 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
             if (widget.userName != null && widget.userName!.isNotEmpty)
               Text(
                 widget.userName!,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+                style: const TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.normal),
               ),
           ],
         ),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context)),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -80,15 +92,19 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Colors.red.shade700)),
+                        Text(_error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.red.shade700)),
                         const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: const Text('Tentar novamente')),
+                        FilledButton(
+                            onPressed: _load,
+                            child: const Text('Tentar novamente')),
                       ],
                     ),
                   ),
                 )
               : _entries.isEmpty
-                  ? Center(
+                  ? const Center(
                       child: Text(
                         'Nenhum registro de pontuação.',
                         style: TextStyle(color: AppTheme.textSecondary),
@@ -109,20 +125,29 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                backgroundColor:
+                                    AppTheme.primary.withValues(alpha: 0.2),
                                 child: Text(
                                   '+$points',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary),
                                 ),
                               ),
-                              title: Text(description, style: const TextStyle(fontSize: 14)),
+                              title: Text(description,
+                                  style: const TextStyle(fontSize: 14)),
                               subtitle: Text(
                                 _formatDate(date),
-                                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary),
                               ),
                               trailing: source == 'execution'
-                                  ? Icon(Icons.how_to_reg, size: 20, color: Colors.green.shade700)
-                                  : Icon(Icons.flag, size: 20, color: AppTheme.primary),
+                                  ? Icon(Icons.how_to_reg,
+                                      size: 20, color: Colors.green.shade700)
+                                  : const Icon(Icons.flag,
+                                      size: 20, color: AppTheme.primary),
                             ),
                           );
                         },

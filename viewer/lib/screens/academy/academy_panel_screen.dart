@@ -177,7 +177,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     }
 
-    final academyIndex = isManagerOrProfessor ? index - 2 : index;
+    // Três cards fixos no topo (0–2); academias começam no índice 3.
+    final academyIndex = isManagerOrProfessor ? index - 3 : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();
     }

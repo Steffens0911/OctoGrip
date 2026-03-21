@@ -89,7 +89,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       setState(() {
         _academies = academies;
         _loading = false;
-        if (_techniqueId == null && widget.mission != null) _techniqueId = widget.mission!.techniqueId;
+        if (_techniqueId == null && widget.mission != null)
+          _techniqueId = widget.mission!.techniqueId;
       });
       if (_academyId != null) await _loadTechniques(_academyId!);
     } catch (_) {
@@ -100,12 +101,15 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   Future<void> _loadTechniques(String academyId) async {
     try {
       final techniques = await _api.getTechniques(academyId: academyId);
-      if (mounted) setState(() {
-        _techniques = techniques;
-        if (_techniqueId != null && !techniques.any((t) => t.id == _techniqueId)) {
-          _techniqueId = null;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          _techniques = techniques;
+          if (_techniqueId != null &&
+              !techniques.any((t) => t.id == _techniqueId)) {
+            _techniqueId = null;
+          }
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _techniques = []);
     }
@@ -130,14 +134,18 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       return;
     }
     if (_endDate!.isBefore(_startDate!)) {
-      setState(() => _error = 'A data fim deve ser igual ou posterior à data início');
+      setState(() =>
+          _error = 'A data fim deve ser igual ou posterior à data início');
       return;
     }
     final startDate = toApiDate(_startDate!);
     final endDate = toApiDate(_endDate!);
     final mult = int.tryParse(_multiplierCtrl.text.trim());
     final multVal = (mult != null && mult >= 1) ? mult : 1;
-    setState(() { _saving = true; _error = null; });
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
     try {
       if (widget.mission == null) {
         await _api.createMission(
@@ -162,11 +170,16 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Salvo')));
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _saving = false; });
+      if (mounted)
+        setState(() {
+          _error = userFacingMessage(e);
+          _saving = false;
+        });
     }
   }
 
@@ -175,21 +188,27 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.mission == null ? 'Nova missão' : 'Editar missão'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context)),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.primary))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _academyId,
-                    decoration: const InputDecoration(labelText: 'Academia (para escolher técnica)'),
+                    initialValue: _academyId,
+                    decoration: const InputDecoration(
+                        labelText: 'Academia (para escolher técnica)'),
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Global')),
-                      ..._academies.map((a) => DropdownMenuItem(value: a.id, child: Text(a.name))),
+                      const DropdownMenuItem(
+                          value: null, child: Text('Global')),
+                      ..._academies.map((a) =>
+                          DropdownMenuItem(value: a.id, child: Text(a.name))),
                     ],
                     onChanged: (v) async {
                       setState(() {
@@ -202,12 +221,17 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _techniqueId,
+                    initialValue: _techniqueId,
                     decoration: InputDecoration(
                       labelText: 'Técnica',
-                      hintText: _academyId == null ? 'Selecione academia primeiro' : null,
+                      hintText: _academyId == null
+                          ? 'Selecione academia primeiro'
+                          : null,
                     ),
-                    items: _techniques.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
+                    items: _techniques
+                        .map((t) =>
+                            DropdownMenuItem(value: t.id, child: Text(t.name)))
+                        .toList(),
                     onChanged: (v) => setState(() => _techniqueId = v),
                   ),
                   const SizedBox(height: 16),
@@ -234,17 +258,23 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: _level,
+                    initialValue: _level,
                     decoration: const InputDecoration(labelText: 'Nível'),
                     items: const [
-                      DropdownMenuItem(value: 'beginner', child: Text('Iniciante')),
-                      DropdownMenuItem(value: 'intermediate', child: Text('Intermediário')),
-                      DropdownMenuItem(value: 'advanced', child: Text('Avançado')),
+                      DropdownMenuItem(
+                          value: 'beginner', child: Text('Iniciante')),
+                      DropdownMenuItem(
+                          value: 'intermediate', child: Text('Intermediário')),
+                      DropdownMenuItem(
+                          value: 'advanced', child: Text('Avançado')),
                     ],
                     onChanged: (v) => setState(() => _level = v ?? 'beginner'),
                   ),
                   const SizedBox(height: 16),
-                  TextField(controller: _themeCtrl, decoration: const InputDecoration(labelText: 'Tema (opcional)')),
+                  TextField(
+                      controller: _themeCtrl,
+                      decoration:
+                          const InputDecoration(labelText: 'Tema (opcional)')),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _multiplierCtrl,
@@ -252,12 +282,24 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Multiplicador',
                       hintText: '1',
-                      helperText: 'Pontos ao concluir = multiplicador × faixa do usuário',
+                      helperText:
+                          'Pontos ao concluir = multiplicador × faixa do usuário',
                     ),
                   ),
-                  if (_error != null) ...[const SizedBox(height: 16), Text(_error!, style: const TextStyle(color: Colors.red))],
+                  if (_error != null) ...[
+                    const SizedBox(height: 16),
+                    Text(_error!, style: const TextStyle(color: Colors.red))
+                  ],
                   const SizedBox(height: 24),
-                  ElevatedButton(onPressed: _saving ? null : _save, child: _saving ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Salvar')),
+                  ElevatedButton(
+                      onPressed: _saving ? null : _save,
+                      child: _saving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
+                          : const Text('Salvar')),
                 ],
               ),
             ),

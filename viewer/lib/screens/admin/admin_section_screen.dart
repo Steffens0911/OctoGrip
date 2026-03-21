@@ -14,7 +14,7 @@ class AdminSectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RoleGuard(
-      allowedRoles: ['administrador'],
+      allowedRoles: const ['administrador'],
       child: SingleChildScrollView(
       padding: EdgeInsets.all(AppTheme.screenPadding(context)),
       child: Column(
