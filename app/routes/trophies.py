@@ -35,7 +35,7 @@ def _trophy_to_read(t):
         target_count=t.target_count,
         award_kind=getattr(t, "award_kind", "trophy"),
         min_duration_days=getattr(t, "min_duration_days", None),
-        min_points_to_unlock=getattr(t, "min_points_to_unlock", 0),
+        min_reward_level_to_unlock=getattr(t, "min_reward_level_to_unlock", 0),
         min_graduation_to_unlock=getattr(t, "min_graduation_to_unlock", None),
         created_at=t.created_at,
     )
@@ -59,7 +59,7 @@ async def trophy_create(
         target_count=body.target_count,
         award_kind=body.award_kind,
         min_duration_days=body.min_duration_days,
-        min_points_to_unlock=body.min_points_to_unlock,
+        min_reward_level_to_unlock=body.min_reward_level_to_unlock,
         min_graduation_to_unlock=body.min_graduation_to_unlock,
     )
     return _trophy_to_read(trophy)

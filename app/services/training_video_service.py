@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import TrainingVideo, TrainingVideoDailyView, User
 from app.services.execution_service import total_points_for_user
+from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
 
@@ -176,6 +177,7 @@ async def complete_training_video_for_user(
 
     if existing:
         points_total = await total_points_for_user(db, user.id)
+        await refresh_user_level(db, user.id, total_points=points_total)
         return {
             "training_video_id": video.id,
             "has_completed_today": True,
@@ -198,6 +200,7 @@ async def complete_training_video_for_user(
     await db.refresh(view)
 
     points_total = await total_points_for_user(db, user.id)
+    await refresh_user_level(db, user.id, total_points=points_total)
 
     logger.info(
         "complete_training_video_for_user",

@@ -184,9 +184,9 @@ class _TrophyItemState extends State<TrophyItem>
             ),
             if (!widget.shelfTrophy.isUnlocked) ...[
               const SizedBox(height: 2),
-              if (t.minPointsToUnlock > 0)
+              if (t.minRewardLevelToUnlock > 0)
                 Text(
-                  'Desbloqueie com ${t.minPointsToUnlock} pts',
+                  'Nível ${t.minRewardLevelToUnlock} para desbloquear',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,

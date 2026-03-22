@@ -12,7 +12,7 @@ class TrophyEntity extends Equatable {
     required this.awardKind,
     this.techniqueName,
     this.minDurationDays,
-    this.minPointsToUnlock = 0,
+    this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
   });
 
@@ -26,7 +26,7 @@ class TrophyEntity extends Equatable {
   final String awardKind;
   final String? techniqueName;
   final int? minDurationDays;
-  final int minPointsToUnlock;
+  final int minRewardLevelToUnlock;
   final String? minGraduationToUnlock;
 
   TrophyEntity copyWith({
@@ -40,7 +40,7 @@ class TrophyEntity extends Equatable {
     String? awardKind,
     String? techniqueName,
     int? minDurationDays,
-    int? minPointsToUnlock,
+    int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
   }) {
     return TrophyEntity(
@@ -54,7 +54,8 @@ class TrophyEntity extends Equatable {
       awardKind: awardKind ?? this.awardKind,
       techniqueName: techniqueName ?? this.techniqueName,
       minDurationDays: minDurationDays ?? this.minDurationDays,
-      minPointsToUnlock: minPointsToUnlock ?? this.minPointsToUnlock,
+      minRewardLevelToUnlock:
+          minRewardLevelToUnlock ?? this.minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock ?? this.minGraduationToUnlock,
     );
   }

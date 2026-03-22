@@ -19,7 +19,7 @@ class UpdateTrophyUseCase {
     int? targetCount,
     String? awardKind,
     int? minDurationDays,
-    int? minPointsToUnlock,
+    int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
   }) {
     return _repository.update(
@@ -32,7 +32,7 @@ class UpdateTrophyUseCase {
       targetCount: targetCount,
       awardKind: awardKind,
       minDurationDays: minDurationDays,
-      minPointsToUnlock: minPointsToUnlock,
+      minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
     );
   }

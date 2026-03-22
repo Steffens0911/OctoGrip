@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/academy.dart';
@@ -71,7 +72,7 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
       _endDateCtrl.text = toBrDate(_endDate!);
       _level = widget.mission!.level;
       _themeCtrl.text = widget.mission!.theme ?? '';
-      _multiplier = widget.mission!.multiplier;
+      _multiplier = clampRewardPoints(widget.mission!.multiplier);
     } else {
       _startDate = now;
       _endDate = end;
@@ -142,7 +143,14 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
     final startDate = toApiDate(_startDate!);
     final endDate = toApiDate(_endDate!);
     final mult = int.tryParse(_multiplierCtrl.text.trim());
-    final multVal = (mult != null && mult >= 1) ? mult : 1;
+    if (mult == null || !isValidRewardPoints(mult)) {
+      setState(
+        () => _error =
+            'Pontos da missão devem estar entre $minRewardPoints e $maxRewardPoints.',
+      );
+      return;
+    }
+    final multVal = mult;
     setState(() {
       _saving = true;
       _error = null;
@@ -282,10 +290,10 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
                     controller: _multiplierCtrl,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Multiplicador',
-                      hintText: '1',
+                      labelText: 'Pontos ao concluir',
+                      hintText: '10',
                       helperText:
-                          'Pontos ao concluir = multiplicador × faixa do usuário',
+                          'Valor fixo entre $minRewardPoints e $maxRewardPoints',
                     ),
                   ),
                   if (_error != null) ...[

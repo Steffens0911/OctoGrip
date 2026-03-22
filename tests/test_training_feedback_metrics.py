@@ -1,77 +1,60 @@
 """Testes de Training Feedback e Métricas."""
-import pytest
 from uuid import uuid4
 
 
 # ========================== TRAINING FEEDBACK ==========================
 
-async def test_criar_feedback(client, aluno_headers, aluno_user, position_pair):
-    """Criar feedback de treino com sucesso."""
-    p1, _ = position_pair
-    r = await client.post("/training_feedback", headers=aluno_headers, json={
-        "position_id": str(p1.id),
-        "observation": "Tive dificuldade nesta posição",
-    })
+
+async def test_criar_feedback(client, aluno_headers, aluno_user):
+    """Criar feedback de treino com sucesso (sem position_id)."""
+    r = await client.post(
+        "/training_feedback",
+        headers=aluno_headers,
+        json={"observation": "Tive dificuldade nesta posição"},
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["user_id"] == str(aluno_user.id)
-    assert data["position_id"] == str(p1.id)
     assert data["observation"] == "Tive dificuldade nesta posição"
     assert "created_at" in data
 
 
-async def test_criar_feedback_sem_observacao(client, aluno_headers, aluno_user, position_pair):
+async def test_criar_feedback_sem_observacao(client, aluno_headers, aluno_user):
     """Criar feedback sem observação (opcional)."""
-    p1, _ = position_pair
-    r = await client.post("/training_feedback", headers=aluno_headers, json={
-        "position_id": str(p1.id),
-    })
+    r = await client.post("/training_feedback", headers=aluno_headers, json={})
     assert r.status_code == 201
     data = r.json()
-    assert data["position_id"] == str(p1.id)
     assert data["observation"] is None
 
 
-async def test_criar_feedback_posicao_inexistente(client, aluno_headers):
-    """Criar feedback com posição inexistente retorna 404."""
-    fake_position_id = uuid4()
-    r = await client.post("/training_feedback", headers=aluno_headers, json={
-        "position_id": str(fake_position_id),
-        "observation": "Teste",
-    })
-    assert r.status_code == 404
-
-
-async def test_criar_feedback_sem_auth(client, position_pair):
+async def test_criar_feedback_sem_auth(client):
     """Criar feedback sem autenticação retorna 401."""
-    p1, _ = position_pair
-    r = await client.post("/training_feedback", json={
-        "position_id": str(p1.id),
-        "observation": "Teste",
-    })
+    r = await client.post(
+        "/training_feedback",
+        json={"observation": "Teste"},
+    )
     assert r.status_code == 401
 
 
-async def test_criar_feedback_multiplos(client, aluno_headers, aluno_user, position_pair):
+async def test_criar_feedback_multiplos(client, aluno_headers, aluno_user):
     """Usuário pode criar múltiplos feedbacks."""
-    p1, p2 = position_pair
-    
-    # Primeiro feedback
-    r1 = await client.post("/training_feedback", headers=aluno_headers, json={
-        "position_id": str(p1.id),
-        "observation": "Dificuldade 1",
-    })
+    r1 = await client.post(
+        "/training_feedback",
+        headers=aluno_headers,
+        json={"observation": "Dificuldade 1"},
+    )
     assert r1.status_code == 201
 
-    # Segundo feedback
-    r2 = await client.post("/training_feedback", headers=aluno_headers, json={
-        "position_id": str(p2.id),
-        "observation": "Dificuldade 2",
-    })
+    r2 = await client.post(
+        "/training_feedback",
+        headers=aluno_headers,
+        json={"observation": "Dificuldade 2"},
+    )
     assert r2.status_code == 201
 
 
 # ========================== MÉTRICAS ==========================
+
 
 async def test_metricas_uso_basicas(client, db):
     """Obter métricas básicas de uso."""
@@ -91,7 +74,7 @@ async def test_metricas_uso_basicas(client, db):
 
 async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
     """Métricas com dados existentes."""
-    from app.models import Lesson, LessonProgress, Technique, MissionUsage
+    from app.models import Lesson, LessonProgress, MissionUsage, Technique
     from datetime import datetime, timezone, timedelta
 
     technique = Technique(
@@ -103,29 +86,34 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
     await db.commit()
     await db.refresh(technique)
 
-    lesson = Lesson(
+    lesson1 = Lesson(
         technique_id=technique.id,
-        title="Lição Métricas",
-        slug=f"metricas-{uuid4().hex[:6]}",
+        title="Lição Métricas 1",
+        slug=f"metricas-1-{uuid4().hex[:6]}",
         order_index=0,
     )
-    db.add(lesson)
+    lesson2 = Lesson(
+        technique_id=technique.id,
+        title="Lição Métricas 2",
+        slug=f"metricas-2-{uuid4().hex[:6]}",
+        order_index=1,
+    )
+    db.add_all([lesson1, lesson2])
     await db.commit()
-    await db.refresh(lesson)
+    await db.refresh(lesson1)
+    await db.refresh(lesson2)
 
-    # Criar conclusões
-    progress1 = LessonProgress(user_id=aluno_user.id, lesson_id=lesson.id)
+    progress1 = LessonProgress(user_id=aluno_user.id, lesson_id=lesson1.id)
     progress2 = LessonProgress(
         user_id=aluno_user.id,
-        lesson_id=lesson.id,
-        completed_at=datetime.now(timezone.utc) - timedelta(days=3),  # Últimos 7 dias
+        lesson_id=lesson2.id,
+        completed_at=datetime.now(timezone.utc) - timedelta(days=3),
     )
     db.add_all([progress1, progress2])
-    
-    # Criar MissionUsage
+
     usage = MissionUsage(
         user_id=aluno_user.id,
-        lesson_id=lesson.id,
+        lesson_id=lesson1.id,
         usage_type="before_training",
         opened_at=datetime.now(timezone.utc),
         completed_at=datetime.now(timezone.utc),
@@ -167,9 +155,8 @@ async def test_metricas_uso_percentual(client, db, academy, aluno_user):
     await db.refresh(lesson)
 
     now = datetime.now(timezone.utc)
-    
-    # Criar 3 before_training e 7 after_training (30% before)
-    for i in range(3):
+
+    for _ in range(3):
         usage = MissionUsage(
             user_id=aluno_user.id,
             lesson_id=lesson.id,
@@ -178,8 +165,8 @@ async def test_metricas_uso_percentual(client, db, academy, aluno_user):
             completed_at=now,
         )
         db.add(usage)
-    
-    for i in range(7):
+
+    for _ in range(7):
         usage = MissionUsage(
             user_id=aluno_user.id,
             lesson_id=lesson.id,
@@ -188,13 +175,12 @@ async def test_metricas_uso_percentual(client, db, academy, aluno_user):
             completed_at=now,
         )
         db.add(usage)
-    
+
     await db.commit()
 
     r = await client.get("/metrics/usage")
     assert r.status_code == 200
     data = r.json()
-    # Deve calcular aproximadamente 30% (3/10)
     assert data["before_training_percent"] > 0
     assert data["before_training_percent"] <= 100.0
 
@@ -204,31 +190,20 @@ async def test_metricas_uso_sem_dados(client):
     r = await client.get("/metrics/usage")
     assert r.status_code == 200
     data = r.json()
-    # Em um banco limpo, pode retornar zeros ou valores baixos
     assert data["total_completions"] >= 0
     assert data["completions_last_7_days"] >= 0
     assert data["unique_users_completed"] >= 0
 
 
-async def test_metricas_uso_por_academia(client, db, academy, aluno_user):
+async def test_metricas_uso_por_academia(client, db, academy, aluno_user, admin_headers):
     """Métricas por academy_id retornam estrutura igual ao global e respeitam filtro."""
-    from app.models import Lesson, LessonProgress, Technique, MissionUsage
+    from app.models import Lesson, LessonProgress, MissionUsage, Technique
     from datetime import datetime, timezone
-
-    # Criar técnica/posição/lesson vinculadas à academia do aluno
-    p1 = Position(academy_id=academy.id, name="Guarda A", slug=f"guarda-a-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=academy.id, name="Montada A", slug=f"montada-a-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
 
     technique = Technique(
         academy_id=academy.id,
         name="Técnica Métricas Academia",
         slug=f"tecnica-academia-{uuid4().hex[:6]}",
-        from_position_id=p1.id,
-        to_position_id=p2.id,
     )
     db.add(technique)
     await db.commit()
@@ -246,7 +221,6 @@ async def test_metricas_uso_por_academia(client, db, academy, aluno_user):
 
     now = datetime.now(timezone.utc)
 
-    # Criar progressos e usos apenas para essa academia/usuário
     db.add(LessonProgress(user_id=aluno_user.id, lesson_id=lesson.id, completed_at=now))
     db.add(
         MissionUsage(
@@ -259,8 +233,10 @@ async def test_metricas_uso_por_academia(client, db, academy, aluno_user):
     )
     await db.commit()
 
-    # Chamar endpoint filtrado por academy_id
-    r = await client.get(f"/metrics/usage/by_academy?academy_id={academy.id}")
+    r = await client.get(
+        f"/metrics/usage/by_academy?academy_id={academy.id}",
+        headers=admin_headers,
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["total_completions"] >= 1

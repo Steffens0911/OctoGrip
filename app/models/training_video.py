@@ -20,7 +20,7 @@ class TrainingVideo(Base, UUIDMixin):
 
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     youtube_url: Mapped[str] = mapped_column(String(512), nullable=False)
-    points_per_day: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    points_per_day: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     order_index: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)

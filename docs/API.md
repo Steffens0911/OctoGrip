@@ -115,6 +115,8 @@ Base: `/lessons`.
 
 Base: `/missions`. CRUD para painel do professor.
 
+**Pontuação:** `multiplier` da missão (e `points_per_day` dos vídeos de treino) fica na faixa **10–50**. Ao concluir uma missão (`POST /mission_complete`), os pontos creditados ao aluno são **iguais ao `multiplier` da missão** (persistido em `mission_usages.points_awarded`). Em `GET /mission_today` e `GET /mission_today/week`, o `multiplier` devolvido segue o da missão; sem missão real, o fallback exibe **10**.
+
 | Método | Endpoint      | Descrição              |
 |--------|---------------|------------------------|
 | GET    | /missions     | Lista (academy_id?, limit?) |
@@ -132,9 +134,12 @@ Base: `/missions`. CRUD para painel do professor.
   "end_date": "YYYY-MM-DD",
   "level": "beginner | intermediate",
   "theme": "string | null",
-  "academy_id": "uuid | null"
+  "academy_id": "uuid | null",
+  "multiplier": 10
 }
 ```
+
+- `multiplier`: opcional; default **10**; deve estar entre **10** e **50** (pontos ao concluir a missão).
 
 ---
 
@@ -262,6 +267,7 @@ Registra conclusão da missão. **409** se já concluída.
 ```
 
 - `usage_type`: default `after_training`; opcional.
+- **Pontos:** o saldo do usuário aumenta em **`mission.multiplier`** (valor entre 10 e 50), gravado em `mission_usages.points_awarded`.
 
 **Resposta (201):**
 ```json

@@ -37,8 +37,10 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 022 | user_points_adjustment | `users.points_adjustment` (ajuste manual de pontos por admin) |
 | 033 | user_gallery_visible | `users.gallery_visible` (galeria de troféus visível ou privada para outros) |
 | 034 | user_last_login_at | `users.last_login_at` (timestamp do último login bem-sucedido, usado em relatórios de engajamento) |
-| 042 | trophy_min_points_to_unlock | `trophies.min_points_to_unlock` (pontos mínimos do aluno para desbloquear o troféu; 0 = todos) |
+| 042 | trophy_min_points_to_unlock | (legado) `trophies.min_points_to_unlock` — removido na 049; usar nível |
 | 043 | trophy_min_graduation_to_unlock | `trophies.min_graduation_to_unlock` (faixa mínima: white, blue, purple, brown, black; NULL = todos) |
+| 047 | clamp_reward_points_10_50 | Ajusta `training_videos.points_per_day`, `missions.multiplier`, `academies.weekly_multiplier_*` para [10, 50]; defaults de coluna = 10 |
+| 049 | trophy_min_reward_level_to_unlock | `trophies.min_reward_level_to_unlock` (nível mínimo `reward_level` para desbloquear; 0 = sem requisito); remove `min_points_to_unlock` |
 
 ---
 
@@ -68,5 +70,6 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_pos
 - **Migration 021:** missões da academia identificadas por `slot_index` (0, 1, 2); sem dependência de datas. Cada academia cria suas 3 missões; `start_date`/`end_date` opcionais (legado).
 - **Migration 033:** preferência do usuário para exibir ou ocultar a galeria de troféus para outros; quando visível, outros veem apenas itens já conquistados.
 - **Migration 034:** adiciona `users.last_login_at` para registrar o último login bem-sucedido. Relatórios de engajamento e alunos ativos usam este campo para definir quem é considerado "ativo" em uma janela de tempo.
-- **Migration 042:** adiciona `trophies.min_points_to_unlock`. O gerente/professor define quantos pontos o aluno precisa para desbloquear cada troféu; 0 = todos podem competir. Troféus existentes recebem 0 (comportamento anterior mantido).
-- **Migration 043:** adiciona `trophies.min_graduation_to_unlock`. Faixa mínima (white, blue, purple, brown, black) para o aluno poder competir pelo troféu; NULL = sem restrição. Desbloqueio exige pontos e faixa mínimos quando definidos.
+- **Migration 042:** (histórico) adicionava `trophies.min_points_to_unlock`; substituído pela **049**.
+- **Migration 043:** adiciona `trophies.min_graduation_to_unlock`. Faixa mínima (white, blue, purple, brown, black) para o aluno poder competir pelo troféu; NULL = sem restrição. Desbloqueio exige nível (`reward_level`) e faixa mínimos quando definidos.
+- **Migration 049:** substitui desbloqueio por pontos por `trophies.min_reward_level_to_unlock` (0 = sem requisito; N ≥ 1 exige `users.reward_level >= N`). Remove `min_points_to_unlock`. Troféus que tinham barreira por pontos precisam ser reconfigurados manualmente.

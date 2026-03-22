@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:viewer/core/leveling.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
 /// Header da home fantasia: saudação, brasão da academia, nome, barra XP e badge da tarefa diária.
@@ -7,8 +8,9 @@ class HeaderWidget extends StatelessWidget {
     super.key,
     this.userName = 'Perin',
     this.userBelt = 'Preta',
+    this.userLevel = 1,
     this.currentXp = 0,
-    this.maxXp = 519,
+    this.maxXp = kBaseLevelThreshold,
     this.academyLogoUrl,
     this.dailyVideoPoints = 30,
     this.dailyVideoCompleted = false,
@@ -17,6 +19,7 @@ class HeaderWidget extends StatelessWidget {
 
   final String userName;
   final String userBelt;
+  final int userLevel;
   final int currentXp;
   final int maxXp;
   /// URL do brasão da academia (exibido no círculo central).
@@ -119,7 +122,7 @@ class HeaderWidget extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(right: 28),
                       child: Text(
-                        '$currentXp / $maxXp XP',
+                        'Level $userLevel · $currentXp / $maxXp XP',
                         style:
                             Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: FantasyTheme.textPrimary,

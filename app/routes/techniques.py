@@ -44,6 +44,8 @@ async def techniques_list(
     try:
         resolved = _resolve_academy_id(current_user, academy_id)
         return await list_techniques(db, academy_id=resolved)
+    except AppError:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -64,6 +66,8 @@ async def technique_get(
             raise TechniqueNotFoundError()
         return technique
     except TechniqueNotFoundError:
+        raise
+    except AppError:
         raise
     except Exception as e:
         traceback.print_exc()
@@ -88,6 +92,8 @@ async def technique_create(
             video_url=body.video_url or None,
             base_points=body.base_points,
         )
+    except AppError:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -113,6 +119,8 @@ async def technique_update(
             raise TechniqueNotFoundError()
         return updated
     except TechniqueNotFoundError:
+        raise
+    except AppError:
         raise
     except Exception as e:
         traceback.print_exc()
@@ -140,6 +148,8 @@ async def technique_delete(
             await db.rollback()
             raise ConflictError("Não é possível excluir: existem lições ou missões vinculadas a esta técnica.")
     except TechniqueNotFoundError:
+        raise
+    except AppError:
         raise
     except Exception as e:
         traceback.print_exc()

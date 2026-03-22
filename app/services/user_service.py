@@ -117,6 +117,13 @@ async def update_user(
         user.password_hash = await hash_password(password.strip())
     await db.commit()
     await db.refresh(user)
+
+    # Se o admin/gerente alterou pontos manualmente, o level precisa acompanhar.
+    if points_adjustment is not None:
+        from app.services.leveling_service import refresh_user_level
+
+        await refresh_user_level(db, user.id)
+
     logger.info("update_user", extra={"user_id": str(user_id), "role": user.role})
     return user
 

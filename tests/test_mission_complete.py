@@ -36,6 +36,40 @@ async def test_completar_missao(client, aluno_headers, aluno_user, mission_ativa
     assert "completed_at" in data
 
 
+async def test_completar_missao_pontos_iguais_ao_multiplier(
+    client, aluno_headers, aluno_user, db, academy, technique,
+):
+    """Ao concluir, os pontos creditados = mission.multiplier (faixa 10–50)."""
+    from app.models import Mission
+
+    mission = Mission(
+        academy_id=academy.id,
+        technique_id=technique.id,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=6),
+        level="beginner",
+        is_active=True,
+        multiplier=35,
+    )
+    db.add(mission)
+    await db.commit()
+    await db.refresh(mission)
+
+    r0 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
+    assert r0.status_code == 200
+    antes = r0.json()["points"]
+
+    r = await client.post("/mission_complete", headers=aluno_headers, json={
+        "mission_id": str(mission.id),
+        "usage_type": "after_training",
+    })
+    assert r.status_code == 201
+
+    r1 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
+    assert r1.status_code == 200
+    assert r1.json()["points"] == antes + 35
+
+
 async def test_completar_missao_before_training(client, aluno_headers, aluno_user, mission_ativa):
     """Completar missão com usage_type before_training."""
     r = await client.post("/mission_complete", headers=aluno_headers, json={
@@ -92,7 +126,7 @@ async def test_completar_missao_usage_type_invalido(client, aluno_headers, missi
 async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_ativa):
     """Múltiplos usuários podem completar a mesma missão."""
     from app.models import User
-    from app.core.security import create_access_token, hash_password
+    from app.core.security import create_access_token, hash_password_sync
 
     # Criar segundo usuário
     user2 = User(
@@ -101,7 +135,7 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
         role="aluno",
         graduation="white",
         academy_id=academy.id,
-        password_hash=hash_password("aluno123"),
+        password_hash=hash_password_sync("aluno123"),
     )
     db.add(user2)
     await db.commit()
@@ -122,7 +156,7 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
         role="aluno",
         graduation="white",
         academy_id=academy.id,
-        password_hash=hash_password("aluno123"),
+        password_hash=hash_password_sync("aluno123"),
     )
     db.add(user3)
     await db.commit()

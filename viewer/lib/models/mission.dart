@@ -1,3 +1,5 @@
+import 'package:viewer/constants/reward_points.dart';
+
 class Mission {
   final String id;
   final String techniqueId;
@@ -20,7 +22,7 @@ class Mission {
     this.theme,
     this.academyId,
     this.isActive = true,
-    this.multiplier = 1,
+    this.multiplier = minRewardPoints,
   });
 
   factory Mission.fromJson(Map<String, dynamic> json) {
@@ -34,7 +36,7 @@ class Mission {
       theme: json['theme'] as String?,
       academyId: json['academy_id'] as String?,
       isActive: json['is_active'] as bool? ?? true,
-      multiplier: json['multiplier'] as int? ?? 1,
+      multiplier: json['multiplier'] as int? ?? minRewardPoints,
     );
   }
 

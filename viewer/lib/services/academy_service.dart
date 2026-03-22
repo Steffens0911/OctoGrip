@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:viewer/config.dart';
+import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/auth_service.dart';
 
@@ -130,13 +131,19 @@ class AcademyService {
       'weekly_technique_2_id': weeklyTechnique2Id,
       'weekly_technique_3_id': weeklyTechnique3Id,
     };
-    if (weeklyMultiplier1 != null && weeklyMultiplier1 >= 1) {
+    if (weeklyMultiplier1 != null &&
+        weeklyMultiplier1 >= minRewardPoints &&
+        weeklyMultiplier1 <= maxRewardPoints) {
       body['weekly_multiplier_1'] = weeklyMultiplier1;
     }
-    if (weeklyMultiplier2 != null && weeklyMultiplier2 >= 1) {
+    if (weeklyMultiplier2 != null &&
+        weeklyMultiplier2 >= minRewardPoints &&
+        weeklyMultiplier2 <= maxRewardPoints) {
       body['weekly_multiplier_2'] = weeklyMultiplier2;
     }
-    if (weeklyMultiplier3 != null && weeklyMultiplier3 >= 1) {
+    if (weeklyMultiplier3 != null &&
+        weeklyMultiplier3 >= minRewardPoints &&
+        weeklyMultiplier3 <= maxRewardPoints) {
       body['weekly_multiplier_3'] = weeklyMultiplier3;
     }
     final response = await http.patch(

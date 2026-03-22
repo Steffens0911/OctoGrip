@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.points_limits import MAX_REWARD_POINTS, MIN_REWARD_POINTS
+
 
 class AcademyCreate(BaseModel):
     """Criação de academia."""
@@ -31,9 +33,9 @@ class AcademyRead(BaseModel):
     weekly_technique_3_name: str | None = None
     visible_lesson_id: UUID | None = None
     visible_lesson_name: str | None = None
-    weekly_multiplier_1: int = 1
-    weekly_multiplier_2: int = 1
-    weekly_multiplier_3: int = 1
+    weekly_multiplier_1: int = MIN_REWARD_POINTS
+    weekly_multiplier_2: int = MIN_REWARD_POINTS
+    weekly_multiplier_3: int = MIN_REWARD_POINTS
     show_trophies: bool = True
     show_partners: bool = True
     show_schedule: bool = True
@@ -66,9 +68,9 @@ class AcademyUpdate(BaseModel):
     weekly_technique_2_id: UUID | None = None
     weekly_technique_3_id: UUID | None = None
     visible_lesson_id: UUID | None = None
-    weekly_multiplier_1: int | None = None
-    weekly_multiplier_2: int | None = None
-    weekly_multiplier_3: int | None = None
+    weekly_multiplier_1: int | None = Field(None, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
+    weekly_multiplier_2: int | None = Field(None, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
+    weekly_multiplier_3: int | None = Field(None, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
     show_trophies: bool | None = None
     show_partners: bool | None = None
     show_schedule: bool | None = None

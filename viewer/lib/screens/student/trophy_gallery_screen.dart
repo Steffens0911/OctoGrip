@@ -712,7 +712,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                   spacing: 8,
                                                   runSpacing: 4,
                                                   children: [
-                                                    if (t.minPointsToUnlock > 0)
+                                                    if (t.minRewardLevelToUnlock >
+                                                        0)
                                                       Row(
                                                         mainAxisSize:
                                                             MainAxisSize.min,
@@ -727,7 +728,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                           const SizedBox(
                                                               width: 6),
                                                           Text(
-                                                            'Desbloqueie com ${t.minPointsToUnlock} pontos',
+                                                            'Alcance o nível ${t.minRewardLevelToUnlock} para desbloquear',
                                                             style: TextStyle(
                                                               fontSize: 13,
                                                               color: AppTheme

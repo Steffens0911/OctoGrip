@@ -14,7 +14,7 @@ class TrophyMapper {
       awardKind: dto.awardKind,
       techniqueName: dto.techniqueName,
       minDurationDays: dto.minDurationDays,
-      minPointsToUnlock: dto.minPointsToUnlock,
+      minRewardLevelToUnlock: dto.minRewardLevelToUnlock,
       minGraduationToUnlock: dto.minGraduationToUnlock,
     );
   }

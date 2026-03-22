@@ -11,11 +11,11 @@ class TrophyWithEarned {
   /// 'medal' = premiação ordinária; 'trophy' = premiação especial (longo prazo).
   final String awardKind;
   final int? minDurationDays;
-  /// Pontos mínimos para desbloquear este troféu; 0 = todos.
-  final int minPointsToUnlock;
+  /// Nível mínimo (reward_level) para desbloquear; 0 = sem requisito.
+  final int minRewardLevelToUnlock;
   /// Faixa mínima para desbloquear (white, blue, purple, brown, black); null = todos.
   final String? minGraduationToUnlock;
-  /// Se o aluno já atingiu pontos e faixa mínimos para poder competir por este troféu.
+  /// Se o aluno já atingiu nível e faixa mínimos para poder competir por este troféu.
   final bool unlocked;
   final String? earnedTier; // 'gold' | 'silver' | 'bronze' | null
   final int goldCount;
@@ -33,7 +33,7 @@ class TrophyWithEarned {
     required this.targetCount,
     this.awardKind = 'trophy',
     this.minDurationDays,
-    this.minPointsToUnlock = 0,
+    this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
     this.unlocked = true,
     this.earnedTier,
@@ -51,10 +51,11 @@ class TrophyWithEarned {
       techniqueName: json['technique_name'] as String?,
       startDate: json['start_date'] as String,
       endDate: json['end_date'] as String,
-      targetCount: json['target_count'] as int,
+      targetCount: (json['target_count'] as num?)?.toInt() ?? 0,
       awardKind: json['award_kind'] as String? ?? 'trophy',
       minDurationDays: (json['min_duration_days'] as num?)?.toInt(),
-      minPointsToUnlock: (json['min_points_to_unlock'] as num?)?.toInt() ?? 0,
+      minRewardLevelToUnlock:
+          (json['min_reward_level_to_unlock'] as num?)?.toInt() ?? 0,
       minGraduationToUnlock: json['min_graduation_to_unlock'] as String?,
       unlocked: json['unlocked'] as bool? ?? true,
       earnedTier: json['earned_tier'] as String?,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/technique.dart';
@@ -38,9 +39,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   String? _weeklyTechniqueId;
   String? _weeklyTechnique2Id;
   String? _weeklyTechnique3Id;
-  int _weeklyMultiplier1 = 1;
-  int _weeklyMultiplier2 = 1;
-  int _weeklyMultiplier3 = 1;
+  int _weeklyMultiplier1 = minRewardPoints;
+  int _weeklyMultiplier2 = minRewardPoints;
+  int _weeklyMultiplier3 = minRewardPoints;
   late final TextEditingController _mult1Controller;
   late final TextEditingController _mult2Controller;
   late final TextEditingController _mult3Controller;
@@ -72,9 +73,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _weeklyTechniqueId = _academy.weeklyTechniqueId;
     _weeklyTechnique2Id = _academy.weeklyTechnique2Id;
     _weeklyTechnique3Id = _academy.weeklyTechnique3Id;
-    _weeklyMultiplier1 = _academy.weeklyMultiplier1;
-    _weeklyMultiplier2 = _academy.weeklyMultiplier2;
-    _weeklyMultiplier3 = _academy.weeklyMultiplier3;
+    _weeklyMultiplier1 = clampRewardPoints(_academy.weeklyMultiplier1);
+    _weeklyMultiplier2 = clampRewardPoints(_academy.weeklyMultiplier2);
+    _weeklyMultiplier3 = clampRewardPoints(_academy.weeklyMultiplier3);
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
@@ -329,6 +330,30 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   }
 
   Future<void> _saveTheme() async {
+    final e1 = int.tryParse(_mult1Controller.text.trim());
+    final e2 = int.tryParse(_mult2Controller.text.trim());
+    final e3 = int.tryParse(_mult3Controller.text.trim());
+    if (e1 == null ||
+        e2 == null ||
+        e3 == null ||
+        !isValidRewardPoints(e1) ||
+        !isValidRewardPoints(e2) ||
+        !isValidRewardPoints(e3)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pontuação de cada missão semanal deve estar entre '
+            '$minRewardPoints e $maxRewardPoints.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _weeklyMultiplier1 = e1;
+      _weeklyMultiplier2 = e2;
+      _weeklyMultiplier3 = e3;
+    });
     setState(() => _savingTheme = true);
     try {
       final updated = await _api.updateAcademyWeeklyMissions(
@@ -993,7 +1018,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 ),
                 onChanged: (v) {
                   final n = int.tryParse(v);
-                  if (n != null && n >= 1) setState(() => _weeklyMultiplier2 = n);
+                  if (n != null && isValidRewardPoints(n)) {
+                    setState(() => _weeklyMultiplier2 = n);
+                  }
                 },
               ),
               TextFormField(
@@ -1032,7 +1059,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Pontos ao confirmar = pontuação base do slot × faixa do oponente.',
+          'Valor por slot: $minRewardPoints–$maxRewardPoints pontos. '
+          'Concluir missão no app usa esse valor fixo. '
+          'Execuções confirmadas: base × faixa do oponente.',
           style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryOf(context)),
         ),
         AppSpacing.verticalM,

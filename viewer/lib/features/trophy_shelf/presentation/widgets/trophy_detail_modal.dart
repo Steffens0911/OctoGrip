@@ -147,14 +147,14 @@ class TrophyDetailModal extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (t.minPointsToUnlock > 0)
+                if (t.minRewardLevelToUnlock > 0)
                   Row(
                     children: [
                       Icon(Icons.lock_outline, size: 20, color: theme.colorScheme.onSurfaceVariant),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Desbloqueie com ${t.minPointsToUnlock} pontos para competir.',
+                          'Alcance o nível ${t.minRewardLevelToUnlock} para competir.',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -163,7 +163,7 @@ class TrophyDetailModal extends StatelessWidget {
                     ],
                   ),
                 if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty) ...[
-                  if (t.minPointsToUnlock > 0) const SizedBox(height: 8),
+                  if (t.minRewardLevelToUnlock > 0) const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(Icons.shield_outlined, size: 20, color: theme.colorScheme.onSurfaceVariant),

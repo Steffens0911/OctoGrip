@@ -79,7 +79,7 @@ viewer/lib/
 | Galeria de outro, privada | 403 → mensagem "Esta galeria está privada." |
 | Lista vazia | Mensagem "Nenhum troféu nesta galeria." |
 
-Endpoint: `GET /trophies/user/{user_id}` (mesmo da galeria em lista).
+Endpoint: `GET /trophies/user/{user_id}` (mesmo da galeria em lista). Cada item inclui `unlocked`, `min_reward_level_to_unlock` (0 = sem requisito de nível) e `min_graduation_to_unlock`; a API calcula `unlocked` a partir de `users.reward_level` e da faixa do aluno.
 
 ---
 

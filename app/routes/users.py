@@ -21,6 +21,7 @@ from app.services.user_service import (
     update_user,
 )
 from app.services.execution_service import get_points_log, total_points_for_user
+from app.services.leveling_service import refresh_user_level
 
 router = APIRouter()
 
@@ -70,7 +71,19 @@ async def user_points(
     user = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador":
         verify_academy_access(current_user, str(user.academy_id) if user.academy_id else None)
-    return {"user_id": user_id, "points": await total_points_for_user(db, user_id)}
+    total_points = await total_points_for_user(db, user_id)
+    level, level_points, next_threshold = await refresh_user_level(
+        db,
+        user_id,
+        total_points=total_points,
+    )
+    return {
+        "user_id": user_id,
+        "points": total_points,
+        "level": level,
+        "level_points": level_points,
+        "next_level_threshold": next_threshold,
+    }
 
 
 @router.get("/{user_id}/points_log")

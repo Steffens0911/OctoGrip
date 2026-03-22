@@ -4,56 +4,6 @@ from datetime import date, timedelta
 from uuid import uuid4
 
 
-@pytest.fixture
-async def mission_with_lesson(db, technique, academy):
-    """Cria uma missão ativa com lição para testes de execução."""
-    from app.models import Lesson, Mission
-
-    lesson = Lesson(
-        technique_id=technique.id,
-        title="Lição Exec",
-        slug=f"exec-{uuid4().hex[:6]}",
-        order_index=0,
-    )
-    db.add(lesson)
-    await db.commit()
-    await db.refresh(lesson)
-
-    mission = Mission(
-        technique_id=technique.id,
-        academy_id=academy.id,
-        lesson_id=lesson.id,
-        start_date=date.today(),
-        end_date=date.today() + timedelta(days=6),
-        level="beginner",
-        is_active=True,
-    )
-    db.add(mission)
-    await db.commit()
-    await db.refresh(mission)
-    return mission, lesson
-
-
-@pytest.fixture
-async def opponent_user(db, academy):
-    """Cria um adversário na mesma academia."""
-    from app.models import User
-    from app.core.security import hash_password
-
-    user = User(
-        email=f"oponente-{uuid4().hex[:8]}@test.com",
-        name="Adversário",
-        role="aluno",
-        graduation="blue",
-        academy_id=academy.id,
-        password_hash=hash_password("oponente1"),
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-    return user
-
-
 async def test_criar_execucao_por_missao(client, aluno_headers, aluno_user, opponent_user, mission_with_lesson):
     mission, _ = mission_with_lesson
     r = await client.post("/executions", headers=aluno_headers, json={

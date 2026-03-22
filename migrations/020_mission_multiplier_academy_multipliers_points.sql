@@ -12,4 +12,4 @@ COMMENT ON COLUMN academies.weekly_multiplier_3 IS 'Multiplicador slot 3 (sex-do
 
 -- Pontos concedidos ao concluir missão (mission_complete).
 ALTER TABLE mission_usages ADD COLUMN IF NOT EXISTS points_awarded INTEGER NULL;
-COMMENT ON COLUMN mission_usages.points_awarded IS 'Pontos = mission.multiplier × points_for_graduation(user.graduation).';
+COMMENT ON COLUMN mission_usages.points_awarded IS 'Pontos ao concluir a missão (= mission.multiplier, faixa 10–50).';

@@ -151,6 +151,7 @@ app.add_middleware(RequestLoggingMiddleware, log_successful=False)
 app.add_middleware(
     CORSMiddleware,
     # Em produção, use CORS_ORIGINS para listar domínios permitidos (ex.: frontend em produção).
+    # settings já remove "*" (incompatível com Authorization no Flutter Web).
     allow_origins=settings.CORS_ORIGINS,
     # Flutter Web: localhost com porta dinâmica, 127.0.0.1 e ::1 (IPv6).
     allow_origin_regex=(

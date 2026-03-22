@@ -72,7 +72,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
     required int targetCount,
     required String awardKind,
     int? minDurationDays,
-    int minPointsToUnlock = 0,
+    int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
   }) async {
     try {
@@ -85,7 +85,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
         targetCount: targetCount,
         awardKind: awardKind,
         minDurationDays: minDurationDays,
-        minPointsToUnlock: minPointsToUnlock,
+        minRewardLevelToUnlock: minRewardLevelToUnlock,
         minGraduationToUnlock: minGraduationToUnlock,
       );
       await _mergeIntoCache(academyId, dto);
@@ -107,7 +107,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
     int? targetCount,
     String? awardKind,
     int? minDurationDays,
-    int? minPointsToUnlock,
+    int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
   }) async {
     try {
@@ -120,7 +120,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
         targetCount: targetCount,
         awardKind: awardKind,
         minDurationDays: minDurationDays,
-        minPointsToUnlock: minPointsToUnlock,
+        minRewardLevelToUnlock: minRewardLevelToUnlock,
         minGraduationToUnlock: minGraduationToUnlock,
       );
       await _mergeIntoCache(academyId, dto, replaceId: id);

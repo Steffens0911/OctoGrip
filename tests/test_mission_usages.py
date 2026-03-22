@@ -121,19 +121,16 @@ async def test_sync_mission_usages_licao_inexistente(client, aluno_headers):
 
 
 async def test_sync_mission_usages_sem_lesson_id(client, aluno_headers):
-    """Sync ignora usos sem lesson_id."""
+    """Item sem lesson_id falha na validação do body (lesson_id obrigatório)."""
     now = datetime.now(timezone.utc)
     r = await client.post("/mission_usages/sync", headers=aluno_headers, json={
         "usages": [{
             "opened_at": now.isoformat(),
             "completed_at": now.isoformat(),
             "usage_type": "after_training",
-            # Sem lesson_id
         }],
     })
-    assert r.status_code == 200
-    data = r.json()
-    assert data["synced"] == 0
+    assert r.status_code == 422
 
 
 async def test_sync_mission_usages_sem_auth(client, lesson_para_sync):

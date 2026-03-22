@@ -172,7 +172,7 @@ async def test_points_log_usuario_inexistente(client, admin_headers):
 async def test_points_log_aluno_acesso_outro_aluno_proibido(client, aluno_headers, db):
     """Aluno não pode ver log de pontos de outro aluno de outra academia."""
     from app.models import Academy, User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -185,7 +185,7 @@ async def test_points_log_aluno_acesso_outro_aluno_proibido(client, aluno_header
         role="aluno",
         graduation="white",
         academy_id=other_academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
     )
     db.add(other_user)
     await db.commit()
@@ -203,17 +203,9 @@ async def test_points_log_sem_auth(client, aluno_user):
 
 # ========================== MISSION TODAY / WEEK ==========================
 
-async def test_mission_today(client, academy, technique, db):
-    """Obter missão do dia."""
-    from app.models import Mission, Position
-
-    # Criar posições e missão ativa
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]}")
-    p2 = Position(academy_id=academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]}")
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
+async def test_mission_today(client, aluno_headers, academy, technique, db):
+    """Obter missão do dia (requer autenticação)."""
+    from app.models import Mission
 
     mission = Mission(
         academy_id=academy.id,
@@ -226,21 +218,13 @@ async def test_mission_today(client, academy, technique, db):
     db.add(mission)
     await db.commit()
 
-    r = await client.get(f"/mission_today?level=beginner&academy_id={academy.id}")
-    # Pode retornar 200 ou 404 dependendo de ter lição/posição configurada
+    r = await client.get("/mission_today?level=beginner", headers=aluno_headers)
     assert r.status_code in (200, 404)
 
 
 async def test_mission_today_com_auth(client, aluno_headers, academy, technique, db):
     """Missão do dia com autenticação (personalização)."""
-    from app.models import Mission, Position
-
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]})
-    p2 = Position(academy_id=academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]})
-    db.add_all([p1, p2])
-    await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
+    from app.models import Mission
 
     mission = Mission(
         academy_id=academy.id,
@@ -253,28 +237,33 @@ async def test_mission_today_com_auth(client, aluno_headers, academy, technique,
     db.add(mission)
     await db.commit()
 
-    r = await client.get(f"/mission_today?level=beginner&academy_id={academy.id}", headers=aluno_headers)
+    r = await client.get("/mission_today?level=beginner", headers=aluno_headers)
     assert r.status_code in (200, 404)
 
 
-async def test_mission_week(client, academy, technique, db):
-    """Obter missões da semana."""
-    from app.models import Mission, Position
+async def test_mission_week(client, aluno_headers, academy, technique, db):
+    """Obter missões da semana (requer autenticação)."""
+    from app.models import Mission
 
-    p1 = Position(academy_id=academy.id, name="Guarda", slug=f"guarda-{uuid4().hex[:6]})
-    p2 = Position(academy_id=academy.id, name="Montada", slug=f"montada-{uuid4().hex[:6]})
-    db.add_all([p1, p2])
+    mission = Mission(
+        academy_id=academy.id,
+        technique_id=technique.id,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=6),
+        level="beginner",
+        is_active=True,
+        slot_index=0,
+    )
+    db.add(mission)
     await db.commit()
-    await db.refresh(p1)
-    await db.refresh(p2)
 
-    r = await client.get(f"/mission_today/week?level=beginner&academy_id={academy.id}")
+    r = await client.get("/mission_today/week?level=beginner", headers=aluno_headers)
     assert r.status_code == 200
     data = r.json()
-    assert "missions" in data or "week" in data
+    assert "entries" in data
 
 
 async def test_mission_week_com_auth(client, aluno_headers, academy):
     """Missões da semana com autenticação."""
-    r = await client.get(f"/mission_today/week?level=beginner&academy_id={academy.id}", headers=aluno_headers)
+    r = await client.get("/mission_today/week?level=beginner", headers=aluno_headers)
     assert r.status_code == 200

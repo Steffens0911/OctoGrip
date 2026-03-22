@@ -56,9 +56,9 @@ async def test_atualizar_usuario(client, admin_headers, aluno_user):
 
 async def test_excluir_usuario(client, admin_headers, db):
     from app.models import User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
-    u = User(email="deletar@test.com", name="Deletar", role="administrador", password_hash=hash_password("123456"))
+    u = User(email="deletar@test.com", name="Deletar", role="administrador", password_hash=hash_password_sync("123456"))
     db.add(u)
     await db.commit()
     await db.refresh(u)

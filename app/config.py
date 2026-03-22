@@ -73,19 +73,27 @@ class Settings(BaseSettings):
         
         return v
 
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def cors_origins_coerce_empty(cls, v):
+        """Docker/compose pode passar CORS_ORIGINS= vazio — JSON inválido sem isso."""
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return []
+        return v
+
     @field_validator("CORS_ORIGINS")
     @classmethod
     def validate_cors_origins(cls, v: List[str]) -> List[str]:
-        """Valida que CORS não permite '*' em produção."""
+        """Valida CORS; remove '*' (quebra Flutter Web + Authorization: browser exige origem explícita)."""
         is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
-        
+
         if is_production and "*" in v:
             raise ValueError(
                 "CORS_ORIGINS não pode conter '*' em produção. "
                 "Defina origens específicas via variável de ambiente."
             )
-        
-        return v
+
+        return [o for o in v if o and str(o).strip() != "*"]
 
     class Config:
         env_file = ".env"

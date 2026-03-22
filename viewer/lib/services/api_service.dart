@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import 'package:viewer/config.dart';
+import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
@@ -524,7 +525,7 @@ class ApiService {
     required int targetCount,
     required String awardKind,
     int? minDurationDays,
-    int minPointsToUnlock = 0,
+    int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
   }) async {
     final body = <String, dynamic>{
@@ -537,7 +538,9 @@ class ApiService {
       'award_kind': awardKind,
     };
     if (minDurationDays != null) body['min_duration_days'] = minDurationDays;
-    if (minPointsToUnlock != 0) body['min_points_to_unlock'] = minPointsToUnlock;
+    if (minRewardLevelToUnlock != 0) {
+      body['min_reward_level_to_unlock'] = minRewardLevelToUnlock;
+    }
     if (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) body['min_graduation_to_unlock'] = minGraduationToUnlock;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
@@ -560,7 +563,7 @@ class ApiService {
     int? targetCount,
     String? awardKind,
     int? minDurationDays,
-    int? minPointsToUnlock,
+    int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
   }) async {
     final body = <String, dynamic>{};
@@ -571,7 +574,9 @@ class ApiService {
     if (targetCount != null) body['target_count'] = targetCount;
     if (awardKind != null) body['award_kind'] = awardKind;
     if (minDurationDays != null) body['min_duration_days'] = minDurationDays;
-    if (minPointsToUnlock != null) body['min_points_to_unlock'] = minPointsToUnlock;
+    if (minRewardLevelToUnlock != null) {
+      body['min_reward_level_to_unlock'] = minRewardLevelToUnlock;
+    }
     if (minGraduationToUnlock != null) {
       body['min_graduation_to_unlock'] =
           minGraduationToUnlock.isEmpty ? null : minGraduationToUnlock;
@@ -932,7 +937,7 @@ class ApiService {
     String level = 'beginner',
     String? theme,
     String? academyId,
-    int multiplier = 1,
+    int multiplier = minRewardPoints,
   }) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/missions'),
@@ -1324,13 +1329,19 @@ class ApiService {
       'weekly_technique_2_id': weeklyTechnique2Id,
       'weekly_technique_3_id': weeklyTechnique3Id,
     };
-    if (weeklyMultiplier1 != null && weeklyMultiplier1 >= 1) {
+    if (weeklyMultiplier1 != null &&
+        weeklyMultiplier1 >= minRewardPoints &&
+        weeklyMultiplier1 <= maxRewardPoints) {
       body['weekly_multiplier_1'] = weeklyMultiplier1;
     }
-    if (weeklyMultiplier2 != null && weeklyMultiplier2 >= 1) {
+    if (weeklyMultiplier2 != null &&
+        weeklyMultiplier2 >= minRewardPoints &&
+        weeklyMultiplier2 <= maxRewardPoints) {
       body['weekly_multiplier_2'] = weeklyMultiplier2;
     }
-    if (weeklyMultiplier3 != null && weeklyMultiplier3 >= 1) {
+    if (weeklyMultiplier3 != null &&
+        weeklyMultiplier3 >= minRewardPoints &&
+        weeklyMultiplier3 <= maxRewardPoints) {
       body['weekly_multiplier_3'] = weeklyMultiplier3;
     }
     final r = await _req(http.patch(

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
+from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ async def create_mission(
     theme: str | None = None,
     academy_id: UUID | None = None,
     lesson_id: UUID | None = None,
-    multiplier: int = 1,
+    multiplier: int = MIN_REWARD_POINTS,
     *,
     slot_index: int | None = None,
     start_date: date | None = None,
@@ -51,7 +52,7 @@ async def create_mission(
         level_n = "beginner"
     if lesson_id is None:
         lesson_id = await _first_lesson_id_for_technique(db, technique_id)
-    mult = max(1, multiplier) if multiplier is not None else 1
+    mult = clamp_reward_points(multiplier) if multiplier is not None else MIN_REWARD_POINTS
     mission = Mission(
         technique_id=technique_id,
         lesson_id=lesson_id,
@@ -149,8 +150,8 @@ async def update_mission(
         mission.academy_id = academy_id
     if is_active is not None:
         mission.is_active = is_active
-    if multiplier is not None and multiplier >= 1:
-        mission.multiplier = multiplier
+    if multiplier is not None:
+        mission.multiplier = clamp_reward_points(multiplier)
     await db.commit()
     await db.refresh(mission)
     logger.info("update_mission", extra={"mission_id": str(mission_id)})
@@ -307,9 +308,9 @@ async def upsert_academy_week_missions(
         raise AcademyNotFoundError()
 
     t1, t2, t3 = technique_ids
-    m1 = getattr(academy, "weekly_multiplier_1", 1) or 1
-    m2 = getattr(academy, "weekly_multiplier_2", 1) or 1
-    m3 = getattr(academy, "weekly_multiplier_3", 1) or 1
+    m1 = clamp_reward_points(getattr(academy, "weekly_multiplier_1", MIN_REWARD_POINTS) or MIN_REWARD_POINTS)
+    m2 = clamp_reward_points(getattr(academy, "weekly_multiplier_2", MIN_REWARD_POINTS) or MIN_REWARD_POINTS)
+    m3 = clamp_reward_points(getattr(academy, "weekly_multiplier_3", MIN_REWARD_POINTS) or MIN_REWARD_POINTS)
 
     tech_slots = [(t1, m1), (t2, m2), (t3, m3)]
     result: list[Mission] = []

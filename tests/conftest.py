@@ -19,7 +19,7 @@ os.environ.setdefault(
 os.environ["SEED_ON_STARTUP"] = "false"
 
 from app.config import settings  # noqa: E402
-from app.core.security import create_access_token, hash_password  # noqa: E402
+from app.core.security import create_access_token, hash_password_sync  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -73,7 +73,7 @@ async def admin_user(db: AsyncSession):
         email=f"admin-{uuid4().hex[:8]}@test.com",
         name="Admin Teste",
         role="administrador",
-        password_hash=hash_password("admin123"),
+        password_hash=hash_password_sync("admin123"),
     )
     db.add(user)
     await db.commit()
@@ -112,7 +112,7 @@ async def professor_user(db: AsyncSession, academy):
         role="professor",
         graduation="black",
         academy_id=academy.id,
-        password_hash=hash_password("prof1234"),
+        password_hash=hash_password_sync("prof1234"),
     )
     db.add(user)
     await db.commit()
@@ -140,7 +140,7 @@ async def aluno_user(db: AsyncSession, academy):
         role="aluno",
         graduation="white",
         academy_id=academy.id,
-        password_hash=hash_password("aluno123"),
+        password_hash=hash_password_sync("aluno123"),
     )
     db.add(user)
     await db.commit()
@@ -172,3 +172,54 @@ async def technique(db: AsyncSession, academy):
     await db.commit()
     await db.refresh(t)
     return t
+
+
+@pytest.fixture
+async def mission_with_lesson(db, technique, academy):
+    """Missão ativa com lição (execuções / mission_complete)."""
+    from datetime import date, timedelta
+
+    from app.models import Lesson, Mission
+
+    lesson = Lesson(
+        technique_id=technique.id,
+        title="Lição Exec",
+        slug=f"exec-{uuid4().hex[:6]}",
+        order_index=0,
+    )
+    db.add(lesson)
+    await db.commit()
+    await db.refresh(lesson)
+
+    mission = Mission(
+        technique_id=technique.id,
+        academy_id=academy.id,
+        lesson_id=lesson.id,
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=6),
+        level="beginner",
+        is_active=True,
+    )
+    db.add(mission)
+    await db.commit()
+    await db.refresh(mission)
+    return mission, lesson
+
+
+@pytest.fixture
+async def opponent_user(db, academy):
+    """Adversário na mesma academia (execuções)."""
+    from app.models import User
+
+    user = User(
+        email=f"oponente-{uuid4().hex[:8]}@test.com",
+        name="Adversário",
+        role="aluno",
+        graduation="blue",
+        academy_id=academy.id,
+        password_hash=hash_password_sync("oponente1"),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user

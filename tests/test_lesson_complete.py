@@ -44,10 +44,11 @@ async def test_status_licao_concluida(client, aluno_headers, aluno_user, lesson,
 
 
 async def test_status_licao_inexistente(client, aluno_headers):
-    """Verificar status de lição inexistente retorna 404."""
+    """Lição inexistente: status retorna completed=False (sem validar existência da lição)."""
     fake_lesson_id = uuid4()
     r = await client.get(f"/lesson_complete/status?lesson_id={fake_lesson_id}", headers=aluno_headers)
-    assert r.status_code == 404
+    assert r.status_code == 200
+    assert r.json()["completed"] is False
 
 
 async def test_status_licao_sem_auth(client, lesson):
@@ -100,16 +101,13 @@ async def test_completar_licao_sem_auth(client, lesson):
     assert r.status_code == 401
 
 
-async def test_completar_licao_multiplos_usuarios(client, db, lesson):
+async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique):
     """Múltiplos usuários podem completar a mesma lição."""
     from app.models import User
-    from app.core.security import create_access_token, hash_password
-    from app.models import Academy
+    from app.core.security import create_access_token, hash_password_sync
 
-    academy = Academy(name="Academia Teste", slug=f"acad-{uuid4().hex[:6]}")
-    db.add(academy)
-    await db.commit()
-    await db.refresh(academy)
+    # Mesma academia da técnica/lição (obrigatório para alunos)
+    aid = technique.academy_id
 
     # Criar dois usuários
     user1 = User(
@@ -117,16 +115,16 @@ async def test_completar_licao_multiplos_usuarios(client, db, lesson):
         name="Aluno 1",
         role="aluno",
         graduation="white",
-        academy_id=academy.id,
-        password_hash=hash_password("aluno123"),
+        academy_id=aid,
+        password_hash=hash_password_sync("aluno123"),
     )
     user2 = User(
         email=f"aluno2-{uuid4().hex[:8]}@test.com",
         name="Aluno 2",
         role="aluno",
         graduation="white",
-        academy_id=academy.id,
-        password_hash=hash_password("aluno123"),
+        academy_id=aid,
+        password_hash=hash_password_sync("aluno123"),
     )
     db.add_all([user1, user2])
     await db.commit()

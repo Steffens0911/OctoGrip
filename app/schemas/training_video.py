@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.points_limits import MAX_REWARD_POINTS, MIN_REWARD_POINTS
+
 
 class TrainingVideoAdminRead(BaseModel):
     id: UUID
@@ -25,7 +27,7 @@ class TrainingVideoCreate(BaseModel):
 
   title: str = Field(..., min_length=1, max_length=255)
   youtube_url: str = Field(..., max_length=512)
-  points_per_day: int = Field(..., ge=1, le=10000)
+  points_per_day: int = Field(..., ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
   is_active: bool = True
   duration_seconds: int | None = Field(None, ge=1, le=4 * 60 * 60)
 
@@ -35,7 +37,7 @@ class TrainingVideoUpdate(BaseModel):
 
   title: str | None = Field(None, min_length=1, max_length=255)
   youtube_url: str | None = Field(None, max_length=512)
-  points_per_day: int | None = Field(None, ge=1, le=10000)
+  points_per_day: int | None = Field(None, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
   is_active: bool | None = None
   duration_seconds: int | None = Field(None, ge=1, le=4 * 60 * 60)
 

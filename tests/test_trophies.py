@@ -39,6 +39,7 @@ async def test_criar_trofeu_admin(client, admin_headers, academy, technique):
     assert data["academy_id"] == str(academy.id)
     assert data["technique_id"] == str(technique.id)
     assert data["target_count"] == 15
+    assert data.get("min_reward_level_to_unlock") == 0
 
 
 async def test_criar_trofeu_professor(client, professor_headers, academy, technique):
@@ -106,7 +107,7 @@ async def test_criar_trofeu_data_invalida(client, admin_headers, academy, techni
         "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
         "target_count": 10,
     })
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 async def test_criar_trofeu_academia_inexistente(client, admin_headers, technique):
@@ -182,6 +183,40 @@ async def test_galeria_trofeus_usuario(client, aluno_headers, aluno_user, academ
     assert any(t["trophy_id"] == str(trophy.id) for t in data)
 
 
+async def test_galeria_trofeu_desbloqueio_por_nivel(client, aluno_headers, aluno_user, academy, technique, db):
+    """Troféu com nível mínimo alto fica trancado até o usuário atingir reward_level."""
+    from app.models import Trophy
+
+    tr = Trophy(
+        academy_id=academy.id,
+        technique_id=technique.id,
+        name="Troféu Nível 5",
+        start_date=date.today(),
+        end_date=date.today() + timedelta(days=30),
+        target_count=1,
+        min_reward_level_to_unlock=5,
+    )
+    db.add(tr)
+    await db.commit()
+    await db.refresh(tr)
+
+    r = await client.get(f"/trophies/user/{aluno_user.id}", headers=aluno_headers)
+    assert r.status_code == 200
+    item = next((t for t in r.json() if t["trophy_id"] == str(tr.id)), None)
+    assert item is not None
+    assert item["min_reward_level_to_unlock"] == 5
+    assert item["unlocked"] is False
+
+    aluno_user.reward_level = 5
+    await db.commit()
+
+    r2 = await client.get(f"/trophies/user/{aluno_user.id}", headers=aluno_headers)
+    assert r2.status_code == 200
+    item2 = next((t for t in r2.json() if t["trophy_id"] == str(tr.id)), None)
+    assert item2 is not None
+    assert item2["unlocked"] is True
+
+
 async def test_galeria_trofeus_usuario_inexistente(client, admin_headers):
     """Galeria de troféus de usuário inexistente retorna 404."""
     fake_user_id = uuid4()
@@ -192,7 +227,7 @@ async def test_galeria_trofeus_usuario_inexistente(client, admin_headers):
 async def test_galeria_trofeus_aluno_acesso_outro_aluno_proibido(client, aluno_headers, db):
     """Aluno não pode ver galeria de outro aluno de outra academia."""
     from app.models import Academy, User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -205,7 +240,7 @@ async def test_galeria_trofeus_aluno_acesso_outro_aluno_proibido(client, aluno_h
         role="aluno",
         graduation="white",
         academy_id=other_academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
     )
     db.add(other_user)
     await db.commit()
@@ -218,7 +253,7 @@ async def test_galeria_trofeus_aluno_acesso_outro_aluno_proibido(client, aluno_h
 async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_headers, db, academy):
     """Admin pode ver galeria de qualquer usuário."""
     from app.models import User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     other_user = User(
         email=f"outro-{uuid4().hex[:8]}@test.com",
@@ -226,7 +261,7 @@ async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_hea
         role="aluno",
         graduation="white",
         academy_id=academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
     )
     db.add(other_user)
     await db.commit()
@@ -239,7 +274,7 @@ async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_hea
 async def test_galeria_privada_retorna_403(client, aluno_headers, admin_headers, db, academy, trophy):
     """Quando o dono da galeria tem gallery_visible=False, outro usuário recebe 403."""
     from app.models import User
-    from app.core.security import hash_password, create_access_token
+    from app.core.security import create_access_token, hash_password_sync
 
     other_user = User(
         email=f"outro-{uuid4().hex[:8]}@test.com",
@@ -247,7 +282,7 @@ async def test_galeria_privada_retorna_403(client, aluno_headers, admin_headers,
         role="aluno",
         graduation="white",
         academy_id=academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
         gallery_visible=False,
     )
     db.add(other_user)

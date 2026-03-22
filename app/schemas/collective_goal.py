@@ -2,7 +2,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class CollectiveGoalRead(BaseModel):
@@ -27,6 +27,12 @@ class CollectiveGoalCreate(BaseModel):
     target_count: int = Field(..., gt=0)
     start_date: date
     end_date: date
+
+    @model_validator(mode="after")
+    def end_after_start(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date deve ser igual ou posterior a start_date")
+        return self
 
 
 class CollectiveGoalCurrentResponse(BaseModel):

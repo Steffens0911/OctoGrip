@@ -10,7 +10,7 @@ class TrophyDto {
     required this.awardKind,
     this.techniqueName,
     this.minDurationDays,
-    this.minPointsToUnlock = 0,
+    this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
   });
 
@@ -24,7 +24,7 @@ class TrophyDto {
   final String awardKind;
   final String? techniqueName;
   final int? minDurationDays;
-  final int minPointsToUnlock;
+  final int minRewardLevelToUnlock;
   final String? minGraduationToUnlock;
 
   factory TrophyDto.fromJson(Map<String, dynamic> json, {required String academyId}) {
@@ -45,7 +45,8 @@ class TrophyDto {
       awardKind: json['award_kind'] as String? ?? 'trophy',
       techniqueName: json['technique_name'] as String?,
       minDurationDays: (json['min_duration_days'] as num?)?.toInt(),
-      minPointsToUnlock: (json['min_points_to_unlock'] as num?)?.toInt() ?? 0,
+      minRewardLevelToUnlock:
+          (json['min_reward_level_to_unlock'] as num?)?.toInt() ?? 0,
       minGraduationToUnlock: json['min_graduation_to_unlock'] as String?,
     );
   }
@@ -61,11 +62,13 @@ class TrophyDto {
         'award_kind': awardKind,
         'technique_name': techniqueName,
         'min_duration_days': minDurationDays,
-        'min_points_to_unlock': minPointsToUnlock,
+        'min_reward_level_to_unlock': minRewardLevelToUnlock,
         'min_graduation_to_unlock': minGraduationToUnlock,
       };
 
   factory TrophyDto.fromHiveMap(Map<dynamic, dynamic> map) {
+    final fromLevel = (map['min_reward_level_to_unlock'] as num?)?.toInt();
+    final legacyPoints = (map['min_points_to_unlock'] as num?)?.toInt();
     return TrophyDto(
       id: map['id'] as String,
       academyId: map['academy_id'] as String,
@@ -77,7 +80,7 @@ class TrophyDto {
       awardKind: map['award_kind'] as String? ?? 'trophy',
       techniqueName: map['technique_name'] as String?,
       minDurationDays: (map['min_duration_days'] as num?)?.toInt(),
-      minPointsToUnlock: (map['min_points_to_unlock'] as num?)?.toInt() ?? 0,
+      minRewardLevelToUnlock: fromLevel ?? legacyPoints ?? 0,
       minGraduationToUnlock: map['min_graduation_to_unlock'] as String?,
     );
   }

@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.points_limits import clamp_reward_points
 from app.models import Academy, LessonProgress, Mission, MissionUsage, Partner, TechniqueExecution, TrainingFeedback, User
 from app.services.mission_crud_service import upsert_academy_week_missions
 
@@ -200,8 +201,8 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
             setattr(academy, key, value)
         elif key == "visible_lesson_id":
             academy.visible_lesson_id = value
-        elif key in multiplier_keys and value is not None and value >= 1:
-            setattr(academy, key, value)
+        elif key in multiplier_keys and value is not None:
+            setattr(academy, key, clamp_reward_points(int(value)))
         elif key in visibility_keys and value is not None:
             setattr(academy, key, bool(value))
     if (technique_keys | multiplier_keys) & set(kwargs.keys()):

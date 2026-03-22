@@ -10,8 +10,6 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
-from app.services.execution_service import total_points_for_user
-
 logger = logging.getLogger(__name__)
 
 GOLD_GRADUATIONS = ("purple", "brown", "black", "roxa", "marrom", "preta")
@@ -79,7 +77,7 @@ async def create_trophy(
     target_count: int,
     award_kind: str = "trophy",
     min_duration_days: int | None = None,
-    min_points_to_unlock: int = 0,
+    min_reward_level_to_unlock: int = 0,
     min_graduation_to_unlock: str | None = None,
 ) -> Trophy:
     """Cria troféu ou medalha da academia. Valida técnica, datas e duração mínima para troféu."""
@@ -119,7 +117,7 @@ async def create_trophy(
         target_count=target_count,
         award_kind=award_kind,
         min_duration_days=min_duration_days if award_kind == "trophy" else None,
-        min_points_to_unlock=max(0, min_points_to_unlock),
+        min_reward_level_to_unlock=max(0, min_reward_level_to_unlock),
         min_graduation_to_unlock=(min_graduation_to_unlock.strip().lower() if min_graduation_to_unlock and min_graduation_to_unlock.strip() else None),
     )
     db.add(trophy)
@@ -172,7 +170,11 @@ async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Tro
     tc = updates["target_count"] if "target_count" in updates else trophy.target_count
     ak = updates["award_kind"] if "award_kind" in updates else trophy.award_kind
     mdd = updates["min_duration_days"] if "min_duration_days" in updates else trophy.min_duration_days
-    mpu = updates["min_points_to_unlock"] if "min_points_to_unlock" in updates else trophy.min_points_to_unlock
+    mrl = (
+        updates["min_reward_level_to_unlock"]
+        if "min_reward_level_to_unlock" in updates
+        else trophy.min_reward_level_to_unlock
+    )
     if "min_graduation_to_unlock" in updates:
         mgrad = updates["min_graduation_to_unlock"]
         if mgrad is not None and isinstance(mgrad, str) and not mgrad.strip():
@@ -203,7 +205,7 @@ async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Tro
     trophy.target_count = tc
     trophy.award_kind = ak
     trophy.min_duration_days = mdd if ak == "trophy" else None
-    trophy.min_points_to_unlock = max(0, mpu)
+    trophy.min_reward_level_to_unlock = max(0, mrl)
     trophy.min_graduation_to_unlock = (
         mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
     )
@@ -379,7 +381,6 @@ async def list_user_trophies_with_earned(
         return []
 
     trophies = await list_trophies_by_academy(db, user.academy_id)
-    user_points = await total_points_for_user(db, user_id)
     all_executions = await _load_confirmed_executions_for_user(db, user_id)
     all_mission_usages = (
         await db.execute(
@@ -414,13 +415,13 @@ async def list_user_trophies_with_earned(
         if t.end_date < today and tier is None:
             continue
         technique_name = t.technique.name if t.technique else None
-        min_pts = getattr(t, "min_points_to_unlock", 0) or 0
+        min_lvl = getattr(t, "min_reward_level_to_unlock", 0) or 0
         min_grad = getattr(t, "min_graduation_to_unlock", None) or None
         if min_grad and isinstance(min_grad, str) and not min_grad.strip():
             min_grad = None
-        points_ok = user_points >= min_pts
+        level_ok = min_lvl == 0 or (user.reward_level or 1) >= min_lvl
         graduation_ok = meets_minimum_graduation(user.graduation, min_grad)
-        unlocked = points_ok and graduation_ok
+        unlocked = level_ok and graduation_ok
         result.append(
             {
                 "trophy_id": str(t.id),
@@ -433,7 +434,7 @@ async def list_user_trophies_with_earned(
                 "target_count": t.target_count,
                 "award_kind": getattr(t, "award_kind", "trophy"),
                 "min_duration_days": getattr(t, "min_duration_days", None),
-                "min_points_to_unlock": min_pts,
+                "min_reward_level_to_unlock": min_lvl,
                 "min_graduation_to_unlock": min_grad,
                 "unlocked": unlocked,
                 "earned_tier": tier,

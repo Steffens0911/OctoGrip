@@ -6,7 +6,7 @@ from sqlalchemy import or_, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.graduation import points_for_graduation
+from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution
 from app.services.academy_service import ensure_weekly_missions_if_needed
 from app.schemas.mission import (
@@ -151,7 +151,12 @@ async def _mission_to_today_response(
                 )
             )
             already_completed = (await db.execute(stmt)).scalar() or False
-    mult = display_multiplier if display_multiplier is not None else (getattr(mission, "multiplier", 1) or 1)
+    raw_mult = (
+        display_multiplier
+        if display_multiplier is not None
+        else getattr(mission, "multiplier", MIN_REWARD_POINTS)
+    )
+    mult = clamp_reward_points(raw_mult or MIN_REWARD_POINTS)
     return MissionTodayResponse(
         mission_id=mission.id,
         technique_id=technique.id,
@@ -199,7 +204,6 @@ async def get_mission_today_response(
                     weekly_theme = academy.weekly_technique.name
                 elif academy.weekly_theme:
                     weekly_theme = academy.weekly_theme
-        grad_mult = max(1, points_for_graduation(user.graduation) if user else 1)
         logger.info(
             "get_mission_today_response",
             extra={"source": "mission", "mission_id": str(mission.id), "technique_id": str(mission.technique_id)},
@@ -209,7 +213,6 @@ async def get_mission_today_response(
             weekly_theme=weekly_theme,
             db=db,
             user_id=user_id,
-            display_multiplier=grad_mult,
         )
 
     logger.warning("get_mission_today_response using_fallback", extra={"reason": "no_mission_today"})
@@ -271,8 +274,6 @@ async def get_mission_week_response(
             )
         ).unique().scalars().first()
     resolved_academy_id = academy_id or (user.academy_id if user else None)
-
-    grad_mult = max(1, points_for_graduation(user.graduation) if user else 1)
 
     level_n = (level or "beginner").lower().strip()
     if level_n not in ("beginner", "intermediate"):
@@ -380,7 +381,6 @@ async def get_mission_week_response(
                 weekly_theme=weekly_theme,
                 db=None,
                 user_id=user_id,
-                display_multiplier=grad_mult,
                 already_completed_override=mission.id in completed_mission_ids,
             )
             entries.append(MissionWeekSlotResponse(period_label=period_label, mission=payload))

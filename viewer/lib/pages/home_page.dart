@@ -15,9 +15,7 @@ import 'package:viewer/widgets/mission_card.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/schedule_card.dart';
 import 'package:viewer/widgets/today_academy_card.dart';
-
-/// Meta de XP para a barra de progresso (até existir nível/meta na API).
-const int _defaultMaxXp = 519;
+import 'package:viewer/core/leveling.dart';
 
 /// Página inicial no estilo fantasia / academia medieval.
 /// Dados reais: usuário, pontos, brasão da academia, vídeo diário que pontua.
@@ -33,6 +31,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   UserModel? _user;
   int? _userPoints;
+  int? _userLevel;
+  int? _nextLevelThreshold;
   String? _academyLogoUrl;
   TrainingVideo? _dailyVideo;
   int _dailyVideoPoints = 0;
@@ -66,6 +66,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _loading = true;
       _user = null;
       _userPoints = null;
+      _userLevel = null;
+      _nextLevelThreshold = null;
       _academyLogoUrl = null;
       _dailyVideo = null;
       _dailyVideoPoints = 0;
@@ -93,9 +95,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Future<void> _loadUserPointsWith(String userId) async {
     try {
       final res = await _api.getUserPoints(userId);
-      if (mounted) setState(() => _userPoints = res['points'] as int?);
+      final p = levelProgressFromUserPointsMap(res);
+      if (mounted) {
+        setState(() {
+          _userLevel = p.level;
+          _userPoints = p.levelPoints;
+          _nextLevelThreshold = p.nextThreshold;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _userPoints = null);
+      if (mounted) {
+        setState(() {
+          _userPoints = null;
+          _userLevel = null;
+          _nextLevelThreshold = null;
+        });
+      }
     }
   }
 
@@ -232,8 +247,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   HeaderWidget(
                     userName: user?.name ?? 'Perin',
                     userBelt: _faixaLabel(user?.graduation) ?? 'Preta',
+                    userLevel: _userLevel ?? 1,
                     currentXp: _userPoints ?? 0,
-                    maxXp: _defaultMaxXp,
+                    maxXp: _nextLevelThreshold ?? kBaseLevelThreshold,
                     academyLogoUrl: _academyLogoUrl,
                     dailyVideoPoints: _dailyVideoPoints,
                     dailyVideoCompleted: _dailyVideoCompleted,
@@ -247,19 +263,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           flex: 1,
                           child: Column(
                             children: [
-                              MissionCard(
-                                  onTap: () => _openMissions(context)),
+                              MissionCard(onTap: () => _openMissions(context)),
                               const SizedBox(height: 16),
                               PartnersCard(
-                                onTap: academyId != null &&
-                                        academyId.isNotEmpty
-                                    ? () =>
-                                        _openPartners(context, academyId)
+                                onTap: academyId != null && academyId.isNotEmpty
+                                    ? () => _openPartners(context, academyId)
                                     : null,
                               ),
                               const SizedBox(height: 16),
-                              ScheduleCard(
-                                  onTap: () => _openSchedule(context)),
+                              ScheduleCard(onTap: () => _openSchedule(context)),
                             ],
                           ),
                         ),
@@ -274,8 +286,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   else
                     Column(
                       children: [
-                        MissionCard(
-                            onTap: () => _openMissions(context)),
+                        MissionCard(onTap: () => _openMissions(context)),
                         const SizedBox(height: 16),
                         PartnersCard(
                           onTap: academyId != null && academyId.isNotEmpty
@@ -283,8 +294,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               : null,
                         ),
                         const SizedBox(height: 16),
-                        ScheduleCard(
-                            onTap: () => _openSchedule(context)),
+                        ScheduleCard(onTap: () => _openSchedule(context)),
                         const SizedBox(height: 16),
                         TodayAcademyCard(
                             onTap: () => _openTodayAcademy(context)),
@@ -337,15 +347,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       final academy = await _api.getAcademyFresh(academyId);
       final url = academy.scheduleImageUrl;
       if (url != null && url.isNotEmpty && context.mounted) {
-        final fullUrl =
-            url.startsWith('/') ? '${_api.baseUrl}$url' : url;
+        final fullUrl = url.startsWith('/') ? '${_api.baseUrl}$url' : url;
         final uri = Uri.tryParse(
             fullUrl.startsWith('http') ? fullUrl : 'https://$fullUrl');
         if (uri != null && await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Horários não disponíveis no momento.')),
+            const SnackBar(
+                content: Text('Horários não disponíveis no momento.')),
           );
         }
       } else if (context.mounted) {
@@ -370,18 +380,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         shape: RoundedRectangleBorder(
           borderRadius: FantasyTheme.cardBorderRadius,
         ),
-        title: const const Text(
+        title: const Text(
           'Thomas Hobbes — Leviatã',
-          style: yle(color: FantasyTheme.textPrimary),
+          style: TextStyle(color: FantasyTheme.textPrimary),
         ),
-        content: const const SingleChildScrollView(
+        content: const SingleChildScrollView(
           child: Text(
             'No estado de natureza, a vida seria "solitária, pobre, sórdida, '
             'odiosa e curta... Para escapar dessa situação e garantir a '
             'segurança pessoal, o indivíduo concordaria em formar um Estado, '
             'transferindo todos os seus direitos ao soberano (ou Leviatã), '
             'exceto o direito à vida.',
-            style: yle(
+            style: TextStyle(
               color: FantasyTheme.textSecondary,
               height: 1.4,
             ),

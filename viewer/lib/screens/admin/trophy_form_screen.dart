@@ -154,8 +154,9 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
       }
     }
     final targetCount = int.parse(values['targetCount'] as String);
-    final minPointsToUnlock =
-        int.tryParse((values['minPointsToUnlock'] as String?)?.trim() ?? '0') ?? 0;
+    final minRewardLevelToUnlock =
+        int.tryParse((values['minRewardLevelToUnlock'] as String?)?.trim() ?? '0') ??
+            0;
     final minGraduationToUnlock = values['minGraduationToUnlock'] as String?;
     final startDate = toApiDate(startDateValue);
     final endDate = toApiDate(endDateValue);
@@ -176,7 +177,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
           targetCount: targetCount,
           awardKind: kind,
           minDurationDays: kind == 'trophy' ? minDurationDays : null,
-          minPointsToUnlock: minPointsToUnlock < 0 ? 0 : minPointsToUnlock,
+          minRewardLevelToUnlock:
+              minRewardLevelToUnlock < 0 ? 0 : minRewardLevelToUnlock,
           minGraduationToUnlock:
               (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty)
                   ? minGraduationToUnlock
@@ -192,7 +194,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
           targetCount: targetCount,
           awardKind: kind,
           minDurationDays: kind == 'trophy' ? minDurationDays : null,
-          minPointsToUnlock: minPointsToUnlock,
+          minRewardLevelToUnlock: minRewardLevelToUnlock,
           minGraduationToUnlock:
               (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty)
                   ? minGraduationToUnlock
@@ -260,7 +262,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                         'techniqueId': firstTech,
                         'awardKind': 'trophy',
                         'minDurationDays': '30',
-                        'minPointsToUnlock': '0',
+                        'minRewardLevelToUnlock': '0',
                         'minGraduationToUnlock': null,
                         'startDate': DateTime.now(),
                         'endDate': DateTime.now().add(const Duration(days: 30)),
@@ -271,7 +273,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                         'techniqueId': t.techniqueId,
                         'awardKind': t.awardKind,
                         'minDurationDays': (t.minDurationDays ?? 30).toString(),
-                        'minPointsToUnlock': t.minPointsToUnlock.toString(),
+                        'minRewardLevelToUnlock':
+                            t.minRewardLevelToUnlock.toString(),
                         'minGraduationToUnlock': t.minGraduationToUnlock,
                         'startDate': _parseStart(),
                         'endDate': _parseEnd(),
@@ -330,10 +333,10 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                     ),
                     AppSpacing.verticalM,
                     FormBuilderTextField(
-                      name: 'minPointsToUnlock',
+                      name: 'minRewardLevelToUnlock',
                       decoration: const InputDecoration(
-                        labelText: 'Pontos mínimos para desbloquear',
-                        hintText: '0 = todos podem competir',
+                        labelText: 'Nível para desbloquear',
+                        hintText: '0 = sem exigência de nível',
                       ),
                       keyboardType: TextInputType.number,
                       validator: FormBuilderValidators.compose([

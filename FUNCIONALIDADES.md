@@ -72,6 +72,14 @@ Ver documentação detalhada em **[docs/ACADEMIAS.md](docs/ACADEMIAS.md)**.
 - Validação de body (Pydantic); 404 para recurso não encontrado; 409 para conclusão duplicada
 - Exceções de domínio em `app/core/exceptions`; mapeamento para HTTP via exception handlers
 
+### Pontuação de recompensas (10–50)
+
+- **Vídeo de treinamento (diário):** `points_per_day` entre **10** e **50** (pontos por visualização válida no dia).
+- **Missão:** `multiplier` entre **10** e **50**; ao concluir (`POST /mission_complete`), o aluno recebe **pontos = `mission.multiplier`** (valor fixo da missão, não depende da faixa do usuário).
+- **Academia (slots semanais):** `weekly_multiplier_1`, `weekly_multiplier_2`, `weekly_multiplier_3` entre **10** e **50** (usados no cálculo de pontos de execuções confirmadas ligadas ao slot).
+- **Missão do dia / semana (API):** o campo `multiplier` na resposta reflete o da missão (10–50); em fallback sem missão real (só técnica), usa **10** como valor exibido.
+- Migração **`047_clamp_reward_points_10_50.sql`:** ajusta dados antigos para a faixa e define default **10** nas colunas afetadas.
+
 ### Arquitetura
 
 - **Camadas:** routes → services → models
@@ -148,7 +156,7 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
 2. **Academias (aba Academias)**
    - **Listar** academias; toque abre o detalhe.
    - **Detalhe da academia:**
-     - **Troféus:** linha "Troféus" (como "Técnicas") abre **`TrophyListScreen`** → módulo **`features/trophies`** (Riverpod + Hive): busca, criar/editar em formulário completo, excluir (soft delete na API). Ao editar período/técnica/meta, o app pede confirmação (impacto nas conquistas). Ver [`viewer/lib/features/trophies/README.md`](viewer/lib/features/trophies/README.md).
+     - **Troféus:** linha "Troféus" (como "Técnicas") abre **`TrophyListScreen`** → módulo **`features/trophies`** (Riverpod + Hive): busca, criar/editar em formulário completo, excluir (soft delete na API). No formulário: **nível para desbloquear** (`reward_level` do aluno; 0 = sem exigência), faixa mínima opcional, tipo (medalha/troféu) e duração mínima para troféu especial. Ao editar período/técnica/meta, o app pede confirmação (impacto nas conquistas). Ver [`viewer/lib/features/trophies/README.md`](viewer/lib/features/trophies/README.md).
      - **Missões semanais:** 3 dropdowns para selecionar técnica (Missão 1, Missão 2, Missão 3). Se só Missão 1 estiver preenchida, aparece missão apenas no slot 1.
      - **Tema da semana:** campo de texto + **Salvar tema** (PATCH /academies/{id}).
      - **Ranking (últimos 30 dias):** lista legível (posição, nome, conclusões).
@@ -171,7 +179,7 @@ Documentação detalhada para replicar o padrão em lições, missões, etc.: **
 ### Outras telas do app
 
 - **Biblioteca de lições** (aba Lições): lista GET /lessons; toque abre a lição como LessonScreen (e envia POST /lesson_complete ao concluir).
-- **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
+- **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Itens podem aparecer **trancados** até o aluno atingir o **nível mínimo** e a **faixa** definidos no troféu. Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
 - **Reportar dificuldade** (Perfil): GET /positions, escolha da posição e observação opcional; POST /training_feedback.
 - **Histórico de missões** (Progresso): seção "Últimas missões concluídas" com GET /mission_usages/history.
 - **Métricas de uso** (Perfil): GET /metrics/usage com totais e % antes/depois do treino.

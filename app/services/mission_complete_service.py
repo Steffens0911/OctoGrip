@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import UserNotFoundError
-from app.core.graduation import points_for_graduation
+from app.core.points_limits import clamp_reward_points
 from app.models import Mission, MissionUsage, User
+from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ async def complete_mission(
 
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
-    points_awarded = points_for_graduation(user.graduation)
+    points_awarded = clamp_reward_points(mission.multiplier)
     now = datetime.now(timezone.utc)
     usage = MissionUsage(
         user_id=user_id,
@@ -79,5 +80,9 @@ async def complete_mission(
     db.add(usage)
     await db.commit()
     await db.refresh(usage)
+
+    # Atualiza o level imediatamente após pontuar.
+    await refresh_user_level(db, user_id)
+
     logger.info("complete_mission", extra={"user_id": str(user_id), "mission_id": str(mission_id)})
     return usage

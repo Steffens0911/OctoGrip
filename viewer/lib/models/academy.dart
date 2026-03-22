@@ -1,3 +1,5 @@
+import 'package:viewer/constants/reward_points.dart';
+
 class Academy {
   final String id;
   final String name;
@@ -37,9 +39,9 @@ class Academy {
     this.weeklyTechnique3Name,
     this.visibleLessonId,
     this.visibleLessonName,
-    this.weeklyMultiplier1 = 1,
-    this.weeklyMultiplier2 = 1,
-    this.weeklyMultiplier3 = 1,
+    this.weeklyMultiplier1 = minRewardPoints,
+    this.weeklyMultiplier2 = minRewardPoints,
+    this.weeklyMultiplier3 = minRewardPoints,
     this.showTrophies = true,
     this.showPartners = true,
     this.showSchedule = true,
@@ -63,9 +65,9 @@ class Academy {
       weeklyTechnique3Name: json['weekly_technique_3_name'] as String?,
       visibleLessonId: json['visible_lesson_id'] as String?,
       visibleLessonName: json['visible_lesson_name'] as String?,
-      weeklyMultiplier1: json['weekly_multiplier_1'] as int? ?? 1,
-      weeklyMultiplier2: json['weekly_multiplier_2'] as int? ?? 1,
-      weeklyMultiplier3: json['weekly_multiplier_3'] as int? ?? 1,
+      weeklyMultiplier1: json['weekly_multiplier_1'] as int? ?? minRewardPoints,
+      weeklyMultiplier2: json['weekly_multiplier_2'] as int? ?? minRewardPoints,
+      weeklyMultiplier3: json['weekly_multiplier_3'] as int? ?? minRewardPoints,
       showTrophies: json['show_trophies'] as bool? ?? true,
       showPartners: json['show_partners'] as bool? ?? true,
       showSchedule: json['show_schedule'] as bool? ?? true,

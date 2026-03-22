@@ -12,20 +12,20 @@ async def test_criar_usuario_sem_campos_obrigatorios(client, admin_headers):
     assert r.status_code == 422
 
 
-async def test_criar_posicao_sem_academy_id(client, admin_headers):
-    """Criar posição sem academy_id retorna 400."""
+async def test_rota_posicoes_removida(client, admin_headers):
+    """CRUD de posições foi removido da API."""
     r = await client.post("/positions", headers=admin_headers, json={
         "name": "Posição Teste",
     })
-    assert r.status_code == 400
+    assert r.status_code == 404
 
 
 async def test_criar_tecnica_sem_academy_id(client, admin_headers):
-    """Criar técnica sem academy_id retorna 400."""
+    """Criar técnica sem academy_id falha na validação do body (422)."""
     r = await client.post("/techniques", headers=admin_headers, json={
         "name": "Técnica Teste",
     })
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 async def test_uuid_invalido(client, admin_headers):
@@ -41,10 +41,9 @@ async def test_limit_negativo(client, admin_headers, aluno_user):
 
 
 async def test_limit_muito_alto(client, admin_headers, aluno_user):
-    """Limit muito alto é limitado ao máximo."""
+    """Limit acima do máximo do schema (500) retorna 422."""
     r = await client.get(f"/users/{aluno_user.id}/points_log?limit=10000", headers=admin_headers)
-    assert r.status_code == 200
-    # O endpoint deve limitar a 500 (definido no schema)
+    assert r.status_code == 422
 
 
 async def test_offset_negativo(client, admin_headers, aluno_user):
@@ -76,10 +75,24 @@ async def test_criar_missao_tecnica_inexistente(client, admin_headers):
     assert r.status_code == 404
 
 
+async def test_criar_missao_multiplier_fora_intervalo(client, admin_headers, technique):
+    """Multiplicador (pontos) da missão deve estar entre 10 e 50."""
+    base = {
+        "technique_id": str(technique.id),
+        "start_date": date.today().isoformat(),
+        "end_date": (date.today() + timedelta(days=6)).isoformat(),
+        "level": "beginner",
+    }
+    r_low = await client.post("/missions", headers=admin_headers, json={**base, "multiplier": 9})
+    assert r_low.status_code == 422
+    r_high = await client.post("/missions", headers=admin_headers, json={**base, "multiplier": 51})
+    assert r_high.status_code == 422
+
+
 async def test_criar_execucao_oponente_academia_diferente(client, aluno_headers, aluno_user, mission_with_lesson, db):
     """Não pode criar execução com oponente de academia diferente."""
     from app.models import Academy, User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -92,7 +105,7 @@ async def test_criar_execucao_oponente_academia_diferente(client, aluno_headers,
         role="aluno",
         graduation="white",
         academy_id=other_academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
     )
     db.add(other_user)
     await db.commit()
@@ -109,14 +122,14 @@ async def test_criar_execucao_oponente_academia_diferente(client, aluno_headers,
 # ========================== VALIDAÇÕES DE DATAS ==========================
 
 async def test_criar_missao_end_date_anterior_start_date(client, admin_headers, technique):
-    """Não pode criar missão com end_date < start_date."""
+    """Não pode criar missão com end_date < start_date (validação Pydantic → 422)."""
     r = await client.post("/missions", headers=admin_headers, json={
         "technique_id": str(technique.id),
         "start_date": date.today().isoformat(),
         "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
         "level": "beginner",
     })
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 async def test_criar_trofeu_end_date_anterior_start_date(client, admin_headers, academy, technique):
@@ -129,7 +142,7 @@ async def test_criar_trofeu_end_date_anterior_start_date(client, admin_headers, 
         "end_date": (date.today() - timedelta(days=1)).isoformat(),
         "target_count": 10,
     })
-    assert r.status_code == 400
+    assert r.status_code == 422
 
 
 async def test_criar_meta_coletiva_end_date_anterior_start_date(client, admin_headers, academy, technique):
@@ -190,15 +203,6 @@ async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, tech
 
 # ========================== VALIDAÇÕES DE DELEÇÃO ==========================
 
-async def test_deletar_posicao_com_tecnicas(client, admin_headers, academy, position_pair, technique):
-    """Não pode deletar posição com técnicas associadas."""
-    p1, _ = position_pair
-    # technique já usa p1 como from_position_id
-    
-    r = await client.delete(f"/positions/{p1.id}?academy_id={academy.id}", headers=admin_headers)
-    assert r.status_code == 400  # Deve retornar erro de constraint
-
-
 async def test_deletar_tecnica_com_missoes(client, admin_headers, academy, technique, db):
     """Não pode deletar técnica com missões ativas."""
     from app.models import Mission
@@ -214,7 +218,7 @@ async def test_deletar_tecnica_com_missoes(client, admin_headers, academy, techn
     await db.commit()
 
     r = await client.delete(f"/techniques/{technique.id}?academy_id={academy.id}", headers=admin_headers)
-    assert r.status_code == 400  # Deve retornar erro de constraint
+    assert r.status_code == 409
 
 
 # ========================== VALIDAÇÕES DE PERMISSÕES ==========================
@@ -222,7 +226,7 @@ async def test_deletar_tecnica_com_missoes(client, admin_headers, academy, techn
 async def test_aluno_modificar_outro_aluno(client, aluno_headers, db):
     """Aluno não pode modificar outro aluno."""
     from app.models import Academy, User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -235,7 +239,7 @@ async def test_aluno_modificar_outro_aluno(client, aluno_headers, db):
         role="aluno",
         graduation="white",
         academy_id=other_academy.id,
-        password_hash=hash_password("senha123"),
+        password_hash=hash_password_sync("senha123"),
     )
     db.add(other_user)
     await db.commit()

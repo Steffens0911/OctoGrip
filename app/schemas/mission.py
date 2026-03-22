@@ -1,7 +1,9 @@
 from datetime import date
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.points_limits import MAX_REWARD_POINTS, MIN_REWARD_POINTS
 
 
 class MissionCreate(BaseModel):
@@ -16,7 +18,13 @@ class MissionCreate(BaseModel):
     level: str = "beginner"
     theme: str | None = None
     academy_id: UUID | None = None
-    multiplier: int = 1
+    multiplier: int = Field(default=MIN_REWARD_POINTS, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
+
+    @model_validator(mode="after")
+    def end_after_start(self):
+        if self.end_date < self.start_date:
+            raise ValueError("end_date deve ser igual ou posterior a start_date")
+        return self
 
 
 class MissionUpdate(BaseModel):
@@ -33,7 +41,7 @@ class MissionUpdate(BaseModel):
     theme: str | None = None
     academy_id: UUID | None = None
     is_active: bool | None = None
-    multiplier: int | None = None
+    multiplier: int | None = Field(None, ge=MIN_REWARD_POINTS, le=MAX_REWARD_POINTS)
 
 
 class MissionRead(BaseModel):
@@ -50,7 +58,7 @@ class MissionRead(BaseModel):
     theme: str | None
     academy_id: UUID | None
     is_active: bool = True
-    multiplier: int = 1
+    multiplier: int = MIN_REWARD_POINTS
 
     class Config:
         from_attributes = True
@@ -73,7 +81,7 @@ class MissionTodayResponse(BaseModel):
     weekly_theme: str | None = None
     is_review: bool = False
     already_completed: bool = False
-    multiplier: int = 1
+    multiplier: int = MIN_REWARD_POINTS
 
 
 class MissionWeekSlotResponse(BaseModel):

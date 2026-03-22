@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -19,7 +20,7 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
   final _api = ApiService();
   final _titleCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
-  final _pointsCtrl = TextEditingController(text: '1');
+  final _pointsCtrl = TextEditingController(text: '$minRewardPoints');
   final _durationCtrl = TextEditingController();
   bool _isActive = true;
   bool _saving = false;
@@ -149,6 +150,8 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Pontos por dia',
+                helperText:
+                    'Entre $minRewardPoints e $maxRewardPoints (padrão do app)',
               ),
             ),
             const SizedBox(height: 16),

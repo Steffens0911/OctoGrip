@@ -19,6 +19,18 @@ class User(Base, UUIDMixin):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="Hash pbkdf2_sha256 da senha para login.")
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     points_adjustment: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    reward_level: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+        comment="Nível do usuário baseado no total de pontos (level-up). Nível 1 começa em 0 e avança ao atingir 50 pontos.",
+    )
+    reward_level_points: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Pontos acumulados dentro do nível atual (carry over quando o usuário sobe).",
+    )
     graduation: Mapped[str | None] = mapped_column(
         String(32),
         nullable=True,

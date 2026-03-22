@@ -7,7 +7,7 @@ from uuid import uuid4
 async def professor_user_2(db, academy):
     """Cria um segundo professor para testes."""
     from app.models import User
-    from app.core.security import hash_password
+    from app.core.security import hash_password_sync
 
     user = User(
         email=f"prof2-{uuid4().hex[:8]}@test.com",
@@ -15,7 +15,7 @@ async def professor_user_2(db, academy):
         role="professor",
         graduation="black",
         academy_id=academy.id,
-        password_hash=hash_password("prof1234"),
+        password_hash=hash_password_sync("prof1234"),
     )
     db.add(user)
     await db.commit()

@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
+from app.core.points_limits import clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution, User
 
 logger = logging.getLogger(__name__)
@@ -384,8 +385,8 @@ async def _get_base_points_for_execution(
                         academy.weekly_multiplier_2,
                         academy.weekly_multiplier_3,
                     )
-                    if slot_idx < len(mults) and mults[slot_idx] >= 1:
-                        return mults[slot_idx]
+                    if slot_idx < len(mults):
+                        return clamp_reward_points(mults[slot_idx] or 0)
         
         # Fallback: base_points da lição da missão
         if mission.lesson and getattr(mission.lesson, "base_points", None) is not None:
@@ -432,6 +433,12 @@ async def confirm_execution(
     execution.confirmed_by = confirmed_by_user_id
     await db.commit()
     await db.refresh(execution)
+
+    # Atualiza o level do usuário após conceder pontos.
+    from app.services.leveling_service import refresh_user_level
+
+    await refresh_user_level(db, execution.user_id)
+
     logger.info(
         "confirm_execution",
         extra={"execution_id": str(execution_id), "outcome": outcome, "points": points},

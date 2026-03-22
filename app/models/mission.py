@@ -54,8 +54,8 @@ class Mission(Base, UUIDMixin):
     multiplier: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        default=1,
-        comment="Multiplicador: pontos = multiplier × faixa (1-5) ao concluir.",
+        default=10,
+        comment="Pontos fixos ao concluir a missão (10–50).",
     )
 
     academy: Mapped["Academy | None"] = relationship(

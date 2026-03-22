@@ -18,7 +18,7 @@ class CreateTrophyUseCase {
     required int targetCount,
     required String awardKind,
     int? minDurationDays,
-    int minPointsToUnlock = 0,
+    int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
   }) {
     return _repository.create(
@@ -30,7 +30,7 @@ class CreateTrophyUseCase {
       targetCount: targetCount,
       awardKind: awardKind,
       minDurationDays: minDurationDays,
-      minPointsToUnlock: minPointsToUnlock,
+      minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
     );
   }

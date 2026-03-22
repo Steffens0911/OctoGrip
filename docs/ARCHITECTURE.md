@@ -68,7 +68,7 @@ Novas exceções de domínio devem herdar de `AppError` (ou `NotFoundError` para
 
 ### P0: Segurança e configuração
 - ✅ **JWT Secret:** Configuração via variável de ambiente com aviso para produção
-- ✅ **CORS:** Configurável via `CORS_ORIGINS` no `.env`, padrão `["*"]` em desenvolvimento
+- ✅ **CORS:** Configurável via `CORS_ORIGINS` (JSON); em dev, lista vazia + `allow_origin_regex` para `localhost`/`127.0.0.1` com qualquer porta (Flutter Web). `["*"]` é ignorado (incompatível com `Authorization`).
 - ✅ **Rate Limiting:** Implementado com `slowapi` no endpoint de login (`LOGIN_RATE_LIMIT`)
 
 ### P1: Migrações de banco de dados

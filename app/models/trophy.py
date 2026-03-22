@@ -35,7 +35,12 @@ class Trophy(Base, UUIDMixin):
     target_count: Mapped[int] = mapped_column(Integer, nullable=False)
     award_kind: Mapped[str] = mapped_column(String(32), nullable=False, default="trophy", index=True)
     min_duration_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    min_points_to_unlock: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    min_reward_level_to_unlock: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Nível mínimo (reward_level) para desbloquear; 0 = sem requisito.",
+    )
     min_graduation_to_unlock: Mapped[str | None] = mapped_column(String(32), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),

@@ -35,7 +35,7 @@ async def test_listar_licoes(client, admin_headers, technique, db):
     assert isinstance(r.json(), list)
 
 
-async def test_obter_licao_por_id(client, technique, db):
+async def test_obter_licao_por_id(client, admin_headers, technique, db):
     from app.models import Lesson
 
     lesson = Lesson(
@@ -48,7 +48,7 @@ async def test_obter_licao_por_id(client, technique, db):
     await db.commit()
     await db.refresh(lesson)
 
-    r = await client.get(f"/lessons/{lesson.id}")
+    r = await client.get(f"/lessons/{lesson.id}", headers=admin_headers)
     assert r.status_code == 200
     assert r.json()["title"] == "Lição Única"
 
@@ -179,7 +179,7 @@ async def test_excluir_missao(client, admin_headers, technique, db):
     assert r.status_code == 204
 
 
-async def test_missao_do_dia(client, technique, academy, db):
+async def test_missao_do_dia(client, aluno_headers, technique, academy, db):
     from app.models import Mission
 
     m = Mission(
@@ -193,6 +193,5 @@ async def test_missao_do_dia(client, technique, academy, db):
     db.add(m)
     await db.commit()
 
-    r = await client.get(f"/mission_today?level=beginner&academy_id={academy.id}")
-    # Pode retornar 200 ou 404 dependendo de ter lição/posição configurada
+    r = await client.get("/mission_today?level=beginner", headers=aluno_headers)
     assert r.status_code in (200, 404)

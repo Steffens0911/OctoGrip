@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/core/leveling.dart';
 import 'dart:math';
 
 import 'package:viewer/models/mission_today.dart';
@@ -38,11 +39,12 @@ class StudentHomeScreen extends StatefulWidget {
 
 class _StudentHomeScreenState extends State<StudentHomeScreen>
     with WidgetsBindingObserver {
-  static const int _defaultMaxXp = 519;
   final _api = ApiService();
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
   int? _userPoints;
+  int? _userLevel;
+  int? _nextLevelThreshold;
   Map<String, dynamic>? _collectiveGoal;
   int _pendingConfirmationsCount = 0;
   TrainingVideo? _dailyVideo;
@@ -268,9 +270,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Future<void> _loadUserPointsWith(String userId) async {
     try {
       final res = await _api.getUserPoints(userId);
-      if (mounted) setState(() => _userPoints = res['points'] as int?);
+      final p = levelProgressFromUserPointsMap(res);
+      if (mounted) {
+        setState(() {
+          _userLevel = p.level;
+          _userPoints = p.levelPoints;
+          _nextLevelThreshold = p.nextThreshold;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _userPoints = null);
+      if (mounted) {
+        setState(() {
+          _userPoints = null;
+          _userLevel = null;
+          _nextLevelThreshold = null;
+        });
+      }
     }
   }
 
@@ -323,9 +338,22 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (_selectedUser == null) return;
     try {
       final res = await _api.getUserPoints(_selectedUser!.id);
-      if (mounted) setState(() => _userPoints = res['points'] as int?);
+      final p = levelProgressFromUserPointsMap(res);
+      if (mounted) {
+        setState(() {
+          _userLevel = p.level;
+          _userPoints = p.levelPoints;
+          _nextLevelThreshold = p.nextThreshold;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() => _userPoints = null);
+      if (mounted) {
+        setState(() {
+          _userPoints = null;
+          _userLevel = null;
+          _nextLevelThreshold = null;
+        });
+      }
     }
   }
 
@@ -453,8 +481,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   HeaderWidget(
                     userName: u?.name ?? u?.email ?? 'Perin',
                     userBelt: _faixaLabel(u?.graduation),
+                    userLevel: _userLevel ?? 1,
                     currentXp: _userPoints ?? 0,
-                    maxXp: _defaultMaxXp,
+                    maxXp: _nextLevelThreshold ?? kBaseLevelThreshold,
                     academyLogoUrl: _academyLogoUrl != null &&
                             _academyLogoUrl!.isNotEmpty
                         ? (_academyLogoUrl!.startsWith('/')

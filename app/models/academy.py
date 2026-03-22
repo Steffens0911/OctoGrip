@@ -56,9 +56,9 @@ class Academy(Base, UUIDMixin):
         index=True,
         comment="Lição em destaque visível para os alunos da academia.",
     )
-    weekly_multiplier_1: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    weekly_multiplier_2: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    weekly_multiplier_3: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    weekly_multiplier_1: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    weekly_multiplier_2: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    weekly_multiplier_3: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     show_trophies: Mapped[bool] = mapped_column(
         default=True,
         server_default=text("true"),

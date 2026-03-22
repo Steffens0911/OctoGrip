@@ -19,7 +19,7 @@ abstract class TrophyRepository {
     required int targetCount,
     required String awardKind,
     int? minDurationDays,
-    int minPointsToUnlock = 0,
+    int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
   });
 
@@ -33,7 +33,7 @@ abstract class TrophyRepository {
     int? targetCount,
     String? awardKind,
     int? minDurationDays,
-    int? minPointsToUnlock,
+    int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
   });
 
