@@ -27,6 +27,23 @@ logger = logging.getLogger(__name__)
 
 _IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
 
+# CORS: em dev, Flutter Web acessível pelo IP da LAN (ex.: celular em http://192.168.x.x:8080).
+_CORS_LOCALHOST_REGEX = (
+    r"http://localhost(:\d+)?$"
+    r"|http://127\.0\.0\.1(:\d+)?$"
+    r"|http://\[::1\](:\d+)?$"
+)
+_CORS_LAN_DEV_REGEX = (
+    r"|http://192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$"
+    r"|http://10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$"
+    r"|http://172\.(?:1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$"
+)
+_CORS_ORIGIN_REGEX = (
+    _CORS_LOCALHOST_REGEX + _CORS_LAN_DEV_REGEX
+    if not _IS_PRODUCTION
+    else _CORS_LOCALHOST_REGEX
+)
+
 
 def register_exception_handlers(application: FastAPI) -> None:
     """Mapeia exceções de domínio e erros não tratados para respostas HTTP (com CORS)."""
@@ -153,12 +170,8 @@ app.add_middleware(
     # Em produção, use CORS_ORIGINS para listar domínios permitidos (ex.: frontend em produção).
     # settings já remove "*" (incompatível com Authorization no Flutter Web).
     allow_origins=settings.CORS_ORIGINS,
-    # Flutter Web: localhost com porta dinâmica, 127.0.0.1 e ::1 (IPv6).
-    allow_origin_regex=(
-        r"http://localhost(:\d+)?$"
-        r"|http://127\.0\.0\.1(:\d+)?$"
-        r"|http://\[::1\](:\d+)?$"
-    ),
+    # Flutter Web: localhost / loopback; em não-produção também IPs da rede local (celular no Wi‑Fi).
+    allow_origin_regex=_CORS_ORIGIN_REGEX,
     # Usamos autenticação via header Authorization: Bearer, então não precisamos de credenciais de cookie.
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],

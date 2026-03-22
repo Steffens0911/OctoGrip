@@ -1,0 +1,18 @@
+# Caddy na frente do docker-compose (viewer + API).
+# Domínios vêm das variáveis APP_DOMAIN e API_DOMAIN (passadas pelo compose).
+#
+# Produção: use DNS real apontando para a VPS (ex.: app.seudominio.com e api.seudominio.com).
+# TLS (Let's Encrypt) é emitido automaticamente pela Caddy.
+#
+# Build do viewer: API_BASE_URL deve ser a URL pública da API (ex.: https://api.seudominio.com)
+# e CORS_ORIGINS deve incluir a origem do app (ex.: ["https://app.seudominio.com"]).
+
+{$APP_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy viewer:80
+}
+
+{$API_DOMAIN} {
+	encode gzip zstd
+	reverse_proxy api:8000
+}

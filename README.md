@@ -33,6 +33,24 @@ Para subir API e Viewer (sem rebuild do Postgres):
 docker compose up -d --build api viewer
 ```
 
+### HTTPS na VPS (Caddy)
+
+Com domínios apontando para a máquina, use o override que adiciona **Caddy** (TLS automático com Let’s Encrypt) na frente do viewer e da API:
+
+1. No `.env`: `APP_DOMAIN` (app web), `API_DOMAIN` (API), `API_BASE_URL=https://<API_DOMAIN>`, `CORS_ORIGINS` com a origem `https://<APP_DOMAIN>`, além de `JWT_SECRET`, `POSTGRES_PASSWORD`, `ENVIRONMENT=production`, `SEED_ON_STARTUP=false`.
+2. Suba tudo:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+```
+
+| Serviço | URL pública        |
+|---------|--------------------|
+| Viewer  | `https://$APP_DOMAIN` |
+| API     | `https://$API_DOMAIN`  |
+
+Configuração: `deploy/caddy/Caddyfile` e `docker-compose.caddy.yml`.
+
 ## Seed (dados de teste)
 
 Para popular o banco com 1 usuário, 2 posições, 1 técnica e 1 lição (e testar os endpoints no /docs):

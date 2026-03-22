@@ -39,147 +39,166 @@ class HeaderWidget extends StatelessWidget {
         ? 'Tarefa concluída · Ver de novo'
         : '+ $dailyVideoPoints XP Completar tarefa!';
 
+    final screenW = MediaQuery.sizeOf(context).width;
+    final badgeMaxW = (screenW - 32).clamp(160.0, 280.0);
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-      child: Stack(
-        clipBehavior: Clip.none,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Olá, $userName!',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: FantasyTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Aqui estão suas missões e atividades da semana',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: FantasyTheme.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 44,
-                backgroundColor: FantasyTheme.gold,
-                child: CircleAvatar(
-                  radius: 41,
-                  backgroundColor: FantasyTheme.cardSurfaceTop,
-                  backgroundImage: academyLogoUrl != null &&
-                          academyLogoUrl!.isNotEmpty
-                      ? NetworkImage(academyLogoUrl!)
-                      : null,
-                  child: academyLogoUrl == null || academyLogoUrl!.isEmpty
-                      ? const Icon(
-                          Icons.shield_outlined,
-                          size: 40,
-                          color: FantasyTheme.textSecondary,
-                        )
-                      : null,
+          Text(
+            'Olá, $userName!',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: FantasyTheme.textPrimary,
+                  fontWeight: FontWeight.bold,
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                displayName,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: FantasyTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: FantasyTheme.cardSurfaceTop,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: FantasyTheme.textMuted.withValues(alpha: 0.3),
-                        ),
-                      ),
-                    ),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: SizedBox(
-                        height: 28,
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.transparent,
-                          valueColor: const AlwaysStoppedAnimation<Color>(
-                            FantasyTheme.xpGreen,
-                          ),
-                          minHeight: 28,
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 28),
-                      child: Text(
-                        'Level $userLevel · $currentXp / $maxXp XP',
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: FantasyTheme.textPrimary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                      ),
-                    ),
-                    const Positioned(
-                      right: 8,
-                      child: Icon(
-                        Icons.workspace_premium,
-                        size: 20,
-                        color: FantasyTheme.gold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
-          if (showBadge)
-            Positioned(
-              top: -4,
-              right: 0,
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: onDailyVideoTap,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Opacity(
-                    opacity: dailyVideoCompleted ? 0.85 : 1.0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: FantasyTheme.cardSurfaceTop.withValues(alpha: 0.95),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: dailyVideoCompleted
-                              ? FantasyTheme.textMuted.withValues(alpha: 0.5)
-                              : FantasyTheme.xpGreen.withValues(alpha: 0.5),
+          const SizedBox(height: 4),
+          Text(
+            'Aqui estão suas missões e atividades da semana',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: FantasyTheme.textSecondary,
+                ),
+          ),
+          if (showBadge) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: badgeMaxW),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onDailyVideoTap,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Opacity(
+                      opacity: dailyVideoCompleted ? 0.85 : 1.0,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                      ),
-                      child: Text(
-                        badgeLabel,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: dailyVideoCompleted
-                                  ? FantasyTheme.textSecondary
-                                  : FantasyTheme.xpGreen,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        decoration: BoxDecoration(
+                          color: FantasyTheme.cardSurfaceTop
+                              .withValues(alpha: 0.95),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: dailyVideoCompleted
+                                ? FantasyTheme.textMuted
+                                    .withValues(alpha: 0.5)
+                                : FantasyTheme.xpGreen
+                                    .withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Text(
+                          badgeLabel,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          softWrap: true,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: dailyVideoCompleted
+                                        ? FantasyTheme.textSecondary
+                                        : FantasyTheme.xpGreen,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.25,
+                                  ),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
+          ],
+          const SizedBox(height: 20),
+          Center(
+            child: CircleAvatar(
+              radius: 44,
+              backgroundColor: FantasyTheme.gold,
+              child: CircleAvatar(
+                radius: 41,
+                backgroundColor: FantasyTheme.cardSurfaceTop,
+                backgroundImage: academyLogoUrl != null &&
+                        academyLogoUrl!.isNotEmpty
+                    ? NetworkImage(academyLogoUrl!)
+                    : null,
+                child: academyLogoUrl == null || academyLogoUrl!.isEmpty
+                    ? const Icon(
+                        Icons.shield_outlined,
+                        size: 40,
+                        color: FantasyTheme.textSecondary,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            displayName,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: FantasyTheme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: FantasyTheme.cardSurfaceTop,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: FantasyTheme.textMuted.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    height: 28,
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: Colors.transparent,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        FantasyTheme.xpGreen,
+                      ),
+                      minHeight: 28,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 8, right: 28),
+                  child: Text(
+                    'Level $userLevel · $currentXp / $maxXp XP',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: FantasyTheme.textPrimary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ),
+                const Positioned(
+                  right: 8,
+                  child: Icon(
+                    Icons.workspace_premium,
+                    size: 20,
+                    color: FantasyTheme.gold,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

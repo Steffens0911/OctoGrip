@@ -1,0 +1,45 @@
+# Uso: docker compose -f docker-compose.yml -f docker-compose.caddy.yml up -d --build
+#
+# Defina no .env (ou ambiente):
+#   APP_DOMAIN   — host do Flutter Web (ex.: app.seudominio.com)
+#   API_DOMAIN   — host da API (ex.: api.seudominio.com)
+#   API_BASE_URL — https://<API_DOMAIN> (para o build do viewer)
+#   CORS_ORIGINS — JSON com a origem do app, ex.: ["https://app.seudominio.com"]
+#
+# Portas 80/443 ficam na Caddy; 8000/8080 continuam mapeadas pelo compose base
+# (úteis para debug). Em produção restrinja no firewall ou remova os ports no override.
+
+services:
+  api:
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: jjb_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - viewer
+
+volumes:
+  caddy_data:
+  caddy_config:
