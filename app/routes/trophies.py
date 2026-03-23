@@ -61,6 +61,7 @@ async def trophy_create(
         min_duration_days=body.min_duration_days,
         min_reward_level_to_unlock=body.min_reward_level_to_unlock,
         min_graduation_to_unlock=body.min_graduation_to_unlock,
+        audit_user_id=current_user.id,
     )
     return _trophy_to_read(trophy)
 
@@ -89,7 +90,7 @@ async def trophy_update(
         raise TrophyNotFoundError()
     verify_academy_access(current_user, str(trophy.academy_id))
     payload = body.model_dump(exclude_unset=True)
-    updated = await update_trophy(db, trophy_id, payload)
+    updated = await update_trophy(db, trophy_id, payload, audit_user_id=current_user.id)
     return _trophy_to_read(updated)
 
 
@@ -104,7 +105,7 @@ async def trophy_delete(
     if not trophy or trophy.deleted_at is not None:
         raise TrophyNotFoundError()
     verify_academy_access(current_user, str(trophy.academy_id))
-    await soft_delete_trophy(db, trophy_id)
+    await soft_delete_trophy(db, trophy_id, audit_user_id=current_user.id)
 
 
 @router.get("/user/{user_id}", response_model=list[UserTrophyEarned])

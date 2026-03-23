@@ -9,9 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.base import UUIDMixin
+from app.models.soft_delete import SoftDeleteMixin
 
 
-class Mission(Base, UUIDMixin):
+class Mission(Base, UUIDMixin, SoftDeleteMixin):
     """
     Missão da academia: vincula uma Técnica a um slot (slot_index 0, 1, 2).
     Conclusão por missão (MissionUsage.mission_id). academy_id + slot_index identificam o slot.

@@ -41,7 +41,7 @@ async def sync_mission_usages(
             await db.execute(
                 select(Lesson)
                 .options(selectinload(Lesson.technique))
-                .where(Lesson.id == lesson_id)
+                .where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
             )
         ).scalar_one_or_none()
         if not lesson:

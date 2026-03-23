@@ -25,15 +25,23 @@ router = APIRouter()
 async def missions_list(
     academy_id: UUID | None = None,
     limit: int = 100,
+    include_deleted: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Lista missões (opcionalmente por academia)."""
+    """Lista missões (opcionalmente por academia). Administradores podem incluir soft-deletadas."""
+    if include_deleted and current_user.role != "administrador":
+        raise ForbiddenError("Apenas administradores podem listar missões removidas.")
     if current_user.role != "administrador" and academy_id:
         verify_academy_access(current_user, str(academy_id))
     elif current_user.role != "administrador":
         academy_id = current_user.academy_id
-    return await list_missions(db, academy_id=academy_id, limit=limit)
+    return await list_missions(
+        db,
+        academy_id=academy_id,
+        limit=limit,
+        include_deleted=include_deleted,
+    )
 
 
 @router.get("/panel", response_class=HTMLResponse)
@@ -84,6 +92,7 @@ async def missions_create(
         academy_id=academy_id,
         lesson_id=body.lesson_id,
         multiplier=body.multiplier,
+        audit_user_id=current_user.id,
     )
     return mission
 
@@ -114,6 +123,7 @@ async def missions_update(
         mission_id,
         _set_academy_id_none=set_academy_none,
         academy_id=academy_id if not set_academy_none else None,
+        audit_user_id=current_user.id,
         **payload,
     )
     if not mission:
@@ -128,7 +138,7 @@ async def missions_delete(
     current_user: User = Depends(require_write_access),
 ):
     """Remove uma missão."""
-    if not await delete_mission(db, mission_id):
+    if not await delete_mission(db, mission_id, audit_user_id=current_user.id):
         raise MissionNotFoundError()
     return None
 

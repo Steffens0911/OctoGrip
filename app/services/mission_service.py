@@ -47,6 +47,7 @@ async def get_today_mission(
                     Mission.academy_id == academy_id,
                     Mission.level == level_normalized,
                     Mission.slot_index.isnot(None),
+                    Mission.deleted_at.is_(None),
                 )
                 .options(*options)
                 .order_by(Mission.slot_index.asc())
@@ -64,6 +65,7 @@ async def get_today_mission(
                     Mission.end_date.isnot(None),
                     Mission.start_date <= today,
                     Mission.end_date >= today,
+                    Mission.deleted_at.is_(None),
                 )
                 .options(*options)
                 .order_by(Mission.start_date.asc())
@@ -223,6 +225,7 @@ async def get_mission_today_response(
         .options(
             selectinload(Technique.lessons),
         )
+        .where(Technique.deleted_at.is_(None))
         .order_by(Technique.name.asc())
     )
     if academy_id is not None:
@@ -308,6 +311,7 @@ async def get_mission_week_response(
                     Mission.academy_id == resolved_academy_id,
                     Mission.level == level_n,
                     Mission.slot_index.in_((0, 1, 2)),
+                    Mission.deleted_at.is_(None),
                 )
                 .options(*options)
             )
@@ -327,6 +331,7 @@ async def get_mission_week_response(
                         Mission.academy_id == resolved_academy_id,
                         Mission.level == level_n,
                         Mission.slot_index.in_((0, 1, 2)),
+                        Mission.deleted_at.is_(None),
                     )
                     .options(*options)
                 )

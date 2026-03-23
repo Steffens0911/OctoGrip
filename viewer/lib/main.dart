@@ -37,7 +37,8 @@ class ViewerApp extends StatefulWidget {
 }
 
 class _ViewerAppState extends State<ViewerApp> {
-  ThemeMode _themeMode = ThemeMode.system;
+  /// Padrão escuro até carregar preferência (login e primeiro frame).
+  ThemeMode _themeMode = ThemeMode.dark;
   bool _useGameFont = true;
 
   @override

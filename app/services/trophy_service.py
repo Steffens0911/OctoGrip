@@ -10,7 +10,17 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
+
 logger = logging.getLogger(__name__)
+
+_ENTITY_TROPHY = "Trophy"
 
 GOLD_GRADUATIONS = ("purple", "brown", "black", "roxa", "marrom", "preta")
 SILVER_GRADUATIONS = ("blue", "azul")
@@ -79,6 +89,7 @@ async def create_trophy(
     min_duration_days: int | None = None,
     min_reward_level_to_unlock: int = 0,
     min_graduation_to_unlock: str | None = None,
+    audit_user_id: UUID | None = None,
 ) -> Trophy:
     """Cria troféu ou medalha da academia. Valida técnica, datas e duração mínima para troféu."""
     logger.debug(
@@ -93,7 +104,14 @@ async def create_trophy(
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         raise AcademyNotFoundError("Academia não encontrada.")
-    technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
+    technique = (
+        await db.execute(
+            select(Technique).where(
+                Technique.id == technique_id,
+                Technique.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     if technique.academy_id != academy_id:
@@ -121,6 +139,16 @@ async def create_trophy(
         min_graduation_to_unlock=(min_graduation_to_unlock.strip().lower() if min_graduation_to_unlock and min_graduation_to_unlock.strip() else None),
     )
     db.add(trophy)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_TROPHY,
+        entity_id=trophy.id,
+        old_data=None,
+        new_data=entity_snapshot_row(trophy),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(trophy)
     logger.info(
@@ -157,11 +185,17 @@ async def get_trophy(db: AsyncSession, trophy_id: UUID) -> Trophy | None:
     return result.scalar_one_or_none()
 
 
-async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Trophy:
+async def update_trophy(
+    db: AsyncSession,
+    trophy_id: UUID,
+    updates: dict,
+    audit_user_id: UUID | None = None,
+) -> Trophy:
     """Atualiza troféu com campos presentes em ``updates`` (model_dump exclude_unset). Valida como no create."""
     trophy = await get_trophy(db, trophy_id)
     if not trophy or trophy.deleted_at is not None:
         raise TrophyNotFoundError()
+    before = entity_snapshot_row(trophy)
     academy_id = trophy.academy_id
     tid = updates["technique_id"] if "technique_id" in updates else trophy.technique_id
     nm = updates["name"].strip() if "name" in updates else trophy.name
@@ -182,7 +216,14 @@ async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Tro
     else:
         mgrad = trophy.min_graduation_to_unlock
 
-    technique = (await db.execute(select(Technique).where(Technique.id == tid))).scalar_one_or_none()
+    technique = (
+        await db.execute(
+            select(Technique).where(
+                Technique.id == tid,
+                Technique.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     if technique.academy_id != academy_id:
@@ -210,6 +251,18 @@ async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Tro
         mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
     )
 
+    after = entity_snapshot_row(trophy)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_TROPHY,
+            entity_id=trophy.id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
+
     await db.commit()
     await db.refresh(trophy)
     trophy = (await get_trophy(db, trophy_id)) or trophy
@@ -220,12 +273,25 @@ async def update_trophy(db: AsyncSession, trophy_id: UUID, updates: dict) -> Tro
     return trophy
 
 
-async def soft_delete_trophy(db: AsyncSession, trophy_id: UUID) -> None:
+async def soft_delete_trophy(
+    db: AsyncSession, trophy_id: UUID, audit_user_id: UUID | None = None
+) -> None:
     """Marca troféu como removido (soft delete)."""
     trophy = await get_trophy(db, trophy_id)
     if not trophy or trophy.deleted_at is not None:
         raise TrophyNotFoundError()
-    trophy.deleted_at = datetime.now(timezone.utc)
+    before = entity_snapshot_row(trophy)
+    now = datetime.now(timezone.utc)
+    trophy.deleted_at = now
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_TROPHY,
+        entity_id=trophy.id,
+        old_data=before,
+        new_data={"deleted_at": now.isoformat()},
+        user_id=audit_user_id,
+    )
     await db.commit()
     logger.info("soft_delete_trophy", extra={"trophy_id": str(trophy_id)})
 

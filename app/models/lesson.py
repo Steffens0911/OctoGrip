@@ -7,9 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.base import UUIDMixin
+from app.models.soft_delete import SoftDeleteMixin
 
 
-class Lesson(Base, UUIDMixin):
+class Lesson(Base, UUIDMixin, SoftDeleteMixin):
     """Aula vinculada a uma técnica (conteúdo de estudo). academy_id derivado da técnica."""
 
     __tablename__ = "lessons"

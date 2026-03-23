@@ -1,6 +1,8 @@
 """Models SQLAlchemy — importar todos para registro no Base (Alembic/create_all)."""
 from app.database import Base
+from app.models.audit_log import AuditLog
 from app.models.base import UUIDMixin
+from app.models.soft_delete import SoftDeleteMixin
 from app.models.academy import Academy
 from app.models.professor import Professor
 from app.models.user import User
@@ -19,6 +21,8 @@ from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 __all__ = [
     "Base",
     "UUIDMixin",
+    "SoftDeleteMixin",
+    "AuditLog",
     "Academy",
     "Professor",
     "User",

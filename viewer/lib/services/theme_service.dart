@@ -22,8 +22,11 @@ class ThemeService {
         return ThemeMode.light;
       case 'dark':
         return ThemeMode.dark;
-      default:
+      case 'system':
         return ThemeMode.system;
+      default:
+        // Sem preferência salva: tema escuro (login e novos usuários).
+        return ThemeMode.dark;
     }
   }
 

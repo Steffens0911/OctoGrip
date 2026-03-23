@@ -91,6 +91,7 @@ async def technique_create(
             description=body.description,
             video_url=body.video_url or None,
             base_points=body.base_points,
+            audit_user_id=current_user.id,
         )
     except AppError:
         raise
@@ -114,7 +115,9 @@ async def technique_update(
         if not technique or technique.academy_id != academy_id:
             raise TechniqueNotFoundError()
         payload = body.model_dump(exclude_unset=True)
-        updated = await update_technique(db, technique_id, **payload)
+        updated = await update_technique(
+            db, technique_id, audit_user_id=current_user.id, **payload
+        )
         if not updated:
             raise TechniqueNotFoundError()
         return updated
@@ -141,7 +144,9 @@ async def technique_delete(
         if not technique or technique.academy_id != academy_id:
             raise TechniqueNotFoundError()
         try:
-            if not await delete_technique(db, technique_id):
+            if not await delete_technique(
+                db, technique_id, audit_user_id=current_user.id
+            ):
                 raise TechniqueNotFoundError()
             return None
         except IntegrityError:

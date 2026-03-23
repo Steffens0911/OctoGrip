@@ -34,9 +34,33 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <!-- URL da API = mesmo host da página, porta 8000 (funciona no celular ao acessar por IP) -->
+  <!--
+    API: por defeito mesmo host + porta 8000 (LAN / Docker local).
+    Ngrok (dois túneis): abra o site com ?api_base=URL_ENCODED_DO_TUNEL_API
+    Ex.: ?api_base=https%3A%2F%2Fxxxx.ngrok-free.app
+    O valor fica em sessionStorage para não perder ao navegar no SPA.
+  -->
   <script>
-    window.__API_BASE_URL__ = window.location.protocol + '//' + window.location.hostname + ':8000';
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var q = params.get('api_base');
+      if (q) {
+        try {
+          q = decodeURIComponent(q);
+        } catch (e) {}
+        q = String(q).trim().replace(/\/+$/, '');
+        if (q) {
+          sessionStorage.setItem('jjb_api_base_url', q);
+        }
+      }
+      var stored = sessionStorage.getItem('jjb_api_base_url');
+      if (stored) {
+        window.__API_BASE_URL__ = stored;
+      } else {
+        window.__API_BASE_URL__ =
+          window.location.protocol + '//' + window.location.hostname + ':8000';
+      }
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

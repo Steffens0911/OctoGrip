@@ -7,9 +7,10 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.base import UUIDMixin
+from app.models.soft_delete import SoftDeleteMixin
 
 
-class Technique(Base, UUIDMixin):
+class Technique(Base, UUIDMixin, SoftDeleteMixin):
     """Técnica da academia (sem dependência de posição). Cada academia tem seu portfólio."""
 
     __tablename__ = "techniques"

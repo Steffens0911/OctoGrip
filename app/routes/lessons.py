@@ -53,7 +53,7 @@ async def post_lesson(
     current_user: User = Depends(require_write_access),
 ):
     """Cria uma nova aula."""
-    return await create_lesson(db, data)
+    return await create_lesson(db, data, audit_user_id=current_user.id)
 
 
 @router.put("/{lesson_id}", response_model=LessonRead)
@@ -64,7 +64,7 @@ async def put_lesson(
     current_user: User = Depends(require_write_access),
 ):
     """Atualiza uma aula."""
-    return await update_lesson(db, lesson_id, data)
+    return await update_lesson(db, lesson_id, data, audit_user_id=current_user.id)
 
 
 @router.delete("/{lesson_id}", status_code=204)
@@ -74,4 +74,4 @@ async def remove_lesson(
     current_user: User = Depends(require_write_access),
 ):
     """Remove uma aula."""
-    await delete_lesson(db, lesson_id)
+    await delete_lesson(db, lesson_id, audit_user_id=current_user.id)

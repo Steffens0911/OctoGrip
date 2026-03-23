@@ -1,6 +1,6 @@
 """CRUD de Mission para painel do professor (T-01). Missão = técnica + slot da academia (sem datas)."""
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select, delete as sa_delete
@@ -10,8 +10,17 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_MISSION = "Mission"
 
 
 async def _first_lesson_id_for_technique(db: AsyncSession, technique_id: UUID) -> UUID | None:
@@ -19,7 +28,10 @@ async def _first_lesson_id_for_technique(db: AsyncSession, technique_id: UUID) -
     first = (
         await db.execute(
             select(Lesson)
-            .where(Lesson.technique_id == technique_id)
+            .where(
+                Lesson.technique_id == technique_id,
+                Lesson.deleted_at.is_(None),
+            )
             .order_by(Lesson.order_index.asc())
         )
     ).scalars().first()
@@ -38,9 +50,17 @@ async def create_mission(
     slot_index: int | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    audit_user_id: UUID | None = None,
 ) -> Mission:
     """Cria uma missão (técnica + slot da academia). Se lesson_id não for informado, usa a primeira lição da técnica."""
-    technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
+    technique = (
+        await db.execute(
+            select(Technique).where(
+                Technique.id == technique_id,
+                Technique.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     if academy_id is not None:
@@ -66,6 +86,16 @@ async def create_mission(
         multiplier=mult,
     )
     db.add(mission)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_MISSION,
+        entity_id=mission.id,
+        old_data=None,
+        new_data=entity_snapshot_row(mission),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(mission)
     logger.info(
@@ -79,15 +109,22 @@ async def create_mission(
     return mission
 
 
-async def get_mission(db: AsyncSession, mission_id: UUID) -> Mission | None:
-    """Retorna uma missão por ID."""
-    return (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
+async def get_mission(
+    db: AsyncSession, mission_id: UUID, *, include_deleted: bool = False
+) -> Mission | None:
+    """Retorna uma missão por ID. Por padrão ignora soft-deletadas."""
+    stmt = select(Mission).where(Mission.id == mission_id)
+    if not include_deleted:
+        stmt = stmt.where(Mission.deleted_at.is_(None))
+    return (await db.execute(stmt)).scalar_one_or_none()
 
 
 async def list_missions(
     db: AsyncSession,
     academy_id: UUID | None = None,
     limit: int = 100,
+    *,
+    include_deleted: bool = False,
 ) -> list[Mission]:
     """Lista missões, opcionalmente filtradas por academia (eager load technique para technique_name)."""
     stmt = (
@@ -96,6 +133,8 @@ async def list_missions(
         .order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc())
         .limit(limit)
     )
+    if not include_deleted:
+        stmt = stmt.where(Mission.deleted_at.is_(None))
     if academy_id is not None:
         stmt = stmt.where(Mission.academy_id == academy_id)
     return (await db.execute(stmt)).unique().scalars().all()
@@ -116,15 +155,24 @@ async def update_mission(
     is_active: bool | None = None,
     multiplier: int | None = None,
     _set_academy_id_none: bool = False,
+    audit_user_id: UUID | None = None,
 ) -> Mission | None:
     """Atualiza uma missão (campos opcionais). Use _set_academy_id_none=True para limpar academia."""
     mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
-    if not mission:
+    if not mission or mission.deleted_at is not None:
         return None
+    before = entity_snapshot_row(mission)
     if lesson_id is not None:
         mission.lesson_id = lesson_id
     if technique_id is not None and technique_id != mission.technique_id:
-        technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
+        technique = (
+            await db.execute(
+                select(Technique).where(
+                    Technique.id == technique_id,
+                    Technique.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
         if not technique:
             return None
         result = await db.execute(sa_delete(MissionUsage).where(MissionUsage.mission_id == mission_id))
@@ -152,18 +200,42 @@ async def update_mission(
         mission.is_active = is_active
     if multiplier is not None:
         mission.multiplier = clamp_reward_points(multiplier)
+    after = entity_snapshot_row(mission)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_MISSION,
+            entity_id=mission.id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(mission)
     logger.info("update_mission", extra={"mission_id": str(mission_id)})
     return mission
 
 
-async def delete_mission(db: AsyncSession, mission_id: UUID) -> bool:
-    """Remove uma missão. Retorna True se removeu."""
+async def delete_mission(
+    db: AsyncSession, mission_id: UUID, audit_user_id: UUID | None = None
+) -> bool:
+    """Soft delete de uma missão. Retorna True se marcou como removida."""
     mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
-    if not mission:
+    if not mission or mission.deleted_at is not None:
         return False
-    await db.delete(mission)
+    before = entity_snapshot_row(mission)
+    now = datetime.now(timezone.utc)
+    mission.deleted_at = now
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_MISSION,
+        entity_id=mission.id,
+        old_data=before,
+        new_data={"deleted_at": now.isoformat()},
+        user_id=audit_user_id,
+    )
     await db.commit()
     logger.info("delete_mission", extra={"mission_id": str(mission_id)})
     return True
@@ -180,7 +252,14 @@ async def _upsert_slot_missions(
     Cria ou atualiza missões para um slot específico (beginner e intermediate).
     Retorna lista de missões criadas/atualizadas.
     """
-    technique = (await db.execute(select(Technique).where(Technique.id == tech_id))).scalar_one_or_none()
+    technique = (
+        await db.execute(
+            select(Technique).where(
+                Technique.id == tech_id,
+                Technique.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
     
@@ -193,6 +272,7 @@ async def _upsert_slot_missions(
                         Mission.academy_id == academy_id,
                         Mission.level == level,
                         Mission.slot_index == slot_idx,
+                        Mission.deleted_at.is_(None),
                     )
                 )
             ).scalar_one_or_none()
@@ -263,11 +343,22 @@ async def _cleanup_empty_slots(
                                 Mission.academy_id == academy_id,
                                 Mission.level == level,
                                 Mission.slot_index == slot_idx,
+                                Mission.deleted_at.is_(None),
                             )
                         )
                     ).scalar_one_or_none()
                     if old:
-                        await db.delete(old)
+                        before = entity_snapshot_row(old)
+                        old.deleted_at = datetime.now(timezone.utc)
+                        await write_audit_log(
+                            db,
+                            action=AUDIT_ACTION_DELETE,
+                            entity_label=_ENTITY_MISSION,
+                            entity_id=old.id,
+                            old_data=before,
+                            new_data={"deleted_at": old.deleted_at.isoformat()},
+                            user_id=None,
+                        )
                         await db.commit()
         else:
             # Remover apenas slots específicos vazios
@@ -281,11 +372,22 @@ async def _cleanup_empty_slots(
                                 Mission.academy_id == academy_id,
                                 Mission.level == level,
                                 Mission.slot_index == slot_idx,
+                                Mission.deleted_at.is_(None),
                             )
                         )
                     ).scalar_one_or_none()
                     if old:
-                        await db.delete(old)
+                        before = entity_snapshot_row(old)
+                        old.deleted_at = datetime.now(timezone.utc)
+                        await write_audit_log(
+                            db,
+                            action=AUDIT_ACTION_DELETE,
+                            entity_label=_ENTITY_MISSION,
+                            entity_id=old.id,
+                            old_data=before,
+                            new_data={"deleted_at": old.deleted_at.isoformat()},
+                            user_id=None,
+                        )
                         await db.commit()
     except Exception:
         await db.rollback()

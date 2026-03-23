@@ -2,16 +2,17 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Date, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.base import UUIDMixin
+from app.models.soft_delete import SoftDeleteMixin
 
 
-class Trophy(Base, UUIDMixin):
+class Trophy(Base, UUIDMixin, SoftDeleteMixin):
     """
     Troféu criado pela academia: nome (ex. Arm Lock), técnica, período e meta de execuções.
     O usuário conquista ouro/prata/bronze conforme a faixa dos adversários nas execuções confirmadas.
@@ -42,11 +43,6 @@ class Trophy(Base, UUIDMixin):
         comment="Nível mínimo (reward_level) para desbloquear; 0 = sem requisito.",
     )
     min_graduation_to_unlock: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-        index=True,
-    )
 
     academy: Mapped["Academy"] = relationship(
         "Academy",

@@ -25,7 +25,7 @@ async def complete_lesson(db: AsyncSession, user_id: UUID, lesson_id: UUID) -> L
         await db.execute(
             select(Lesson)
             .options(selectinload(Lesson.technique))
-            .where(Lesson.id == lesson_id)
+            .where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
         )
     ).scalar_one_or_none()
     if not lesson:

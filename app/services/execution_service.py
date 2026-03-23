@@ -64,7 +64,14 @@ async def _create_technique_execution(
     usage_type: str,
 ) -> TechniqueExecution:
     """Cria execução para technique_id."""
-    technique = (await db.execute(select(Technique).where(Technique.id == technique_id))).scalar_one_or_none()
+    technique = (
+        await db.execute(
+            select(Technique).where(
+                Technique.id == technique_id,
+                Technique.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not technique:
         raise NotFoundError("Técnica não encontrada.")
     if technique.academy_id != academy_id:
@@ -99,7 +106,7 @@ async def _create_mission_execution(
         await db.execute(
             select(Mission)
             .options(selectinload(Mission.technique))
-            .where(Mission.id == mission_id)
+            .where(Mission.id == mission_id, Mission.deleted_at.is_(None))
         )
     ).unique().scalars().first()
     if not mission:
@@ -173,7 +180,7 @@ async def _create_lesson_execution(
         await db.execute(
             select(Lesson)
             .options(selectinload(Lesson.technique))
-            .where(Lesson.id == lesson_id)
+            .where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
         )
     ).unique().scalars().first()
     if not lesson:

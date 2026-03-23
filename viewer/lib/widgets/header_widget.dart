@@ -65,7 +65,7 @@ class HeaderWidget extends StatelessWidget {
           if (showBadge) ...[
             const SizedBox(height: 12),
             Align(
-              alignment: Alignment.centerRight,
+              alignment: Alignment.center,
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: badgeMaxW),
                 child: Material(

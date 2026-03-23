@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.routes import (
     academies,
     admin,
+    admin_audit,
     auth,
     executions,
     health,
@@ -31,6 +32,7 @@ from app.routes import (
 api_router = APIRouter()
 
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(academies.router, prefix="/academies", tags=["academies"])

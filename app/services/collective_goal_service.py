@@ -84,6 +84,7 @@ async def count_executions_for_goal(
         .where(
             TechniqueExecution.status == "confirmed",
             Mission.technique_id == goal.technique_id,
+            Mission.deleted_at.is_(None),
             TechniqueExecution.created_at >= start_dt,
             TechniqueExecution.created_at < end_next,
         )

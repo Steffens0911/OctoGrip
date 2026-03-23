@@ -30,7 +30,14 @@ async def complete_mission(
         logger.info("complete_mission user_not_found", extra={"user_id": str(user_id)})
         raise UserNotFoundError("Usuário não encontrado.")
 
-    mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
+    mission = (
+        await db.execute(
+            select(Mission).where(
+                Mission.id == mission_id,
+                Mission.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
     if not mission:
         from app.core.exceptions import NotFoundError
 

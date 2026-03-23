@@ -33,6 +33,8 @@ async def ensure_unique_slug(
         stmt = select(model_class).where(getattr(model_class, slug_attr) == slug)
         if academy_id is not None:
             stmt = stmt.where(getattr(model_class, academy_attr) == academy_id)
+        if hasattr(model_class, "deleted_at"):
+            stmt = stmt.where(model_class.deleted_at.is_(None))
         result = (await db.execute(stmt)).scalar_one_or_none()
         if result is None:
             break
