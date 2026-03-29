@@ -6,6 +6,8 @@ import 'package:viewer/screens/admin/training_video_form_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class TrainingVideoListScreen extends StatefulWidget {
   final bool localOnly;
@@ -127,14 +129,18 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     try {
       await _api.deleteTrainingVideo(video.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vídeo excluído.')),
+      AppFeedback.show(
+        context,
+        message: 'Vídeo excluído.',
+        type: AppFeedbackType.success,
       );
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e))),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -143,13 +149,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
   Widget build(BuildContext context) {
     final canEdit = AuthService().canEditResources();
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Vídeos de treinamento'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: const AppStandardAppBar(title: 'Vídeos de treinamento'),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primary))

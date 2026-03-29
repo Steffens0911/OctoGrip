@@ -31,6 +31,13 @@ Acesse: **http://localhost:8080**
 - **Emulador Android:** use `http://10.0.2.2:8000`
 - **Dispositivo físico:** use o IP da máquina em `viewer/lib/config_stub.dart` (ex.: `http://192.168.0.14:8000`). Para todas as configurações (Android, cleartext, firewall, APK), veja [ANDROID_APK_LOCAL.md](ANDROID_APK_LOCAL.md).
 
+### Login e mensagens de erro
+
+- Se o Chrome mostra **401** em `POST /auth/login`, a API está a responder: o problema é normalmente **e-mail ou senha incorretos**, não “API desligada”.
+- **Ambiente Docker com seed** (conforme scripts de arranque do projeto): credenciais típicas `admin@jjb.com` / `saas`.
+- Após **restaurar um backup** (`POST /admin/backup/restore`), os utilizadores e hashes vêm do ficheiro SQL: use as credenciais **desse** banco, não as do seed.
+- O viewer (`userFacingMessage` em `lib/utils/error_message.dart`) distingue falhas de rede reais de `ApiException`; em 401 mostra o detalhe da API e a dica acima.
+
 ---
 
 ## Navegação
@@ -38,7 +45,7 @@ Acesse: **http://localhost:8080**
 | Menu      | Descrição                                                                 |
 |-----------|---------------------------------------------------------------------------|
 | **Início** | Tela inicial do aluno (3 missões semanais) ou painel admin               |
-| **Administração** | CRUD de Academias, Usuários, Lições, Técnicas, Posições, Missões + Relatórios |
+| **Administração** | CRUD de Academias, Usuários, vídeos, relatórios, auditoria, **backup SQL** da base |
 
 ---
 
@@ -128,9 +135,16 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 - CRUD de missões (lição/técnica, datas, nível, tema, academia).
 - Botão + para criar; toque para editar; menu ⋮ para excluir.
 
+### DatabaseBackupScreen (Backup do banco de dados)
+
+- Acesso via **Administração → Backup do banco de dados**.
+- **Exportar:** botão principal — `GET /admin/backup/archive` → arquivo **.zip** (`database.sql` + pasta `media/`) via `file_saver`, timeout longo (~10 min), **usuário real** (sem `X-Impersonate-User`).
+- **Exportar (avançado):** `GET /admin/backup/database` → só `.sql` (sem mídia).
+- **Restaurar:** diálogo exige digitar `RESTAURAR`; depois `FilePicker` (`.zip`). `POST /admin/backup/restore` em multipart; timeout do cliente ~2 h 15 min (alinha com `psql` longo no servidor). O pedido inteiro (upload + espera da resposta) está dentro de um único `Future.timeout`. Na **web** usa-se `withData: true` (arquivo em memória); em **IO** usa-se `path` quando disponível (`backup_multipart_io.dart` / `backup_multipart_web.dart`). Após sucesso, `ApiService.invalidateCache()` limpa cache HTTP. A API valida `SELECT 1` após o restore para evitar ligações mortas ao Postgres.
+
 ### Outras telas admin
 
-- `AcademiesScreen`, `UserListScreen`, `LessonListScreen`, `TechniqueListScreen`, `PositionListScreen`: listas + formulários CRUD.
+- `AcademyListScreen`, `UserListScreen`, `TrainingVideoListScreen`, listas de lições/técnicas/posições/missões: CRUD conforme o ecrã.
 
 ---
 
@@ -162,6 +176,7 @@ viewer/lib/
     │   └── report_difficulty_screen.dart
     ├── admin/                # Telas de administração
     │   ├── academy_detail_screen.dart
+    │   ├── database_backup_screen.dart  # ZIP/SQL + restaurar (admin)
     │   ├── user_list_screen.dart       # Ação "Ver galeria" por usuário
     │   └── ...
     └── academy/              # Painel de academia
@@ -197,5 +212,8 @@ Principais métodos em `ApiService`:
 | `getPositions`                 | GET /positions               |
 | `postTrainingFeedback`         | POST /training_feedback      |
 | `getUsageMetrics`              | GET /metrics/usage           |
+| `downloadBackupArchive`        | GET /admin/backup/archive      |
+| `downloadDatabaseBackup`       | GET /admin/backup/database   |
+| `restoreBackupZip`             | POST /admin/backup/restore     |
 | `getTrophiesForUser(userId)`   | GET /trophies/user/{user_id} |
 | `patchMeGalleryVisible(bool)`  | PATCH /auth/me (galeria visível) |

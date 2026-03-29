@@ -7,6 +7,8 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class MissionFormScreen extends StatefulWidget {
   final Mission? mission;
@@ -179,8 +181,11 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Salvo')));
+        AppFeedback.show(
+          context,
+          message: 'Salvo',
+          type: AppFeedbackType.success,
+        );
         Navigator.pop(context);
       }
     } catch (e) {
@@ -196,11 +201,8 @@ class _MissionFormScreenState extends State<MissionFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.mission == null ? 'Nova missão' : 'Editar missão'),
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context)),
+      appBar: AppStandardAppBar(
+        title: widget.mission == null ? 'Nova missão' : 'Editar missão',
       ),
       body: _loading
           ? const Center(

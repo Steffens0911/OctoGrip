@@ -6,6 +6,7 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/role_guard.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class EngagementReportsScreen extends StatefulWidget {
   const EngagementReportsScreen({super.key});
@@ -118,8 +119,8 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
     return RoleGuard(
       allowedRoles: const ['administrador'],
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Relatórios de engajamento'),
+        appBar: const AppStandardAppBar(
+          title: 'Relatórios de engajamento',
         ),
         body: RefreshIndicator(
           onRefresh: () async {

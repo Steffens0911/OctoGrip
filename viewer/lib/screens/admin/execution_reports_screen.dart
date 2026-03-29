@@ -5,6 +5,7 @@ import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/role_guard.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class ExecutionReportsScreen extends StatefulWidget {
   const ExecutionReportsScreen({super.key});
@@ -87,8 +88,8 @@ class _ExecutionReportsScreenState extends State<ExecutionReportsScreen> {
     return RoleGuard(
       allowedRoles: const ['administrador'],
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Relatórios de execuções'),
+        appBar: const AppStandardAppBar(
+          title: 'Relatórios de execuções',
         ),
         body: RefreshIndicator(
           onRefresh: _loadInitial,

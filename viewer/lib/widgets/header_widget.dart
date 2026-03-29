@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/core/leveling.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
 /// Header da home fantasia: saudação, brasão da academia, nome, barra XP e badge da tarefa diária.
@@ -36,14 +37,14 @@ class HeaderWidget extends StatelessWidget {
     final displayName = userBelt.isNotEmpty ? '$userName — $userBelt' : userName;
     final showBadge = dailyVideoPoints > 0 || dailyVideoCompleted;
     final badgeLabel = dailyVideoCompleted
-        ? 'Tarefa concluída · Ver de novo'
-        : '+ $dailyVideoPoints XP Completar tarefa!';
+        ? 'Tarefa concluída · Revisar fortalece sua técnica'
+        : '+ $dailyVideoPoints XP · Complete a tarefa diária';
 
     final screenW = MediaQuery.sizeOf(context).width;
     final badgeMaxW = (screenW - 32).clamp(160.0, 280.0);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -55,15 +56,15 @@ class HeaderWidget extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                 ),
           ),
-          const SizedBox(height: 4),
+          AppSpacing.verticalS,
           Text(
-            'Aqui estão suas missões e atividades da semana',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            'Construa consistência e evolua sua técnica esta semana',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: FantasyTheme.textSecondary,
                 ),
           ),
           if (showBadge) ...[
-            const SizedBox(height: 12),
+            AppSpacing.verticalM,
             Align(
               alignment: Alignment.center,
               child: ConstrainedBox(
@@ -99,8 +100,7 @@ class HeaderWidget extends StatelessWidget {
                           maxLines: 2,
                           softWrap: true,
                           overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: dailyVideoCompleted
                                         ? FantasyTheme.textSecondary
                                         : FantasyTheme.xpGreen,
@@ -115,9 +115,11 @@ class HeaderWidget extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(height: 20),
-          Center(
-            child: CircleAvatar(
+          AppSpacing.verticalM,
+          Semantics(
+            label: 'Brasão da academia',
+            child: Center(
+              child: CircleAvatar(
               radius: 44,
               backgroundColor: FantasyTheme.gold,
               child: CircleAvatar(
@@ -135,9 +137,10 @@ class HeaderWidget extends StatelessWidget {
                       )
                     : null,
               ),
+              ),
             ),
           ),
-          const SizedBox(height: 12),
+          AppSpacing.verticalS,
           Text(
             displayName,
             textAlign: TextAlign.center,
@@ -146,7 +149,7 @@ class HeaderWidget extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
           ),
-          const SizedBox(height: 10),
+          AppSpacing.verticalS,
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Stack(
@@ -162,17 +165,21 @@ class HeaderWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: SizedBox(
-                    height: 28,
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.transparent,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        FantasyTheme.xpGreen,
+                Semantics(
+                  label: 'Progresso de experiência',
+                  value: 'Level $userLevel, $currentXp de $maxXp XP',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: SizedBox(
+                      height: 28,
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        backgroundColor: Colors.transparent,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          FantasyTheme.xpGreen,
+                        ),
+                        minHeight: 28,
                       ),
-                      minHeight: 28,
                     ),
                   ),
                 ),

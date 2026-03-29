@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.metrics import get_metrics_response
-from app.core.role_deps import require_admin_or_manager, verify_academy_access
+from app.core.role_deps import require_admin, require_admin_or_manager, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.metrics import UsageMetricsResponse
@@ -15,8 +15,12 @@ router = APIRouter()
 
 
 @router.get("/usage", response_model=UsageMetricsResponse)
-async def metrics_usage(db: AsyncSession = Depends(get_db)):
+async def metrics_usage(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     """Métricas básicas de uso globais: conclusões de lição e retenção."""
+    _ = current_user
     return await get_usage_metrics(db)
 
 
@@ -37,8 +41,9 @@ async def metrics_usage_by_academy(
 
 
 @router.get("/prometheus")
-async def metrics_prometheus():
+async def metrics_prometheus(current_user: User = Depends(require_admin)):
     """Endpoint Prometheus para scraping de métricas."""
+    _ = current_user
     if not settings.ENABLE_METRICS:
         from app.core.exceptions import NotFoundError
         raise NotFoundError("Métricas desabilitadas")

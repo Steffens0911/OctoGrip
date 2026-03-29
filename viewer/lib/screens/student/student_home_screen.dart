@@ -24,6 +24,7 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 import 'package:viewer/widgets/header_widget.dart';
+import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/partners_card.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
@@ -494,9 +495,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     dailyVideoCompleted: _dailyVideoCompleted,
                     onDailyVideoTap: _onDailyVideoTap,
                   ),
-                  const SizedBox(height: 12),
-                  if (_collectiveGoal != null) _buildCollectiveGoalCard(),
-                  if (_collectiveGoal != null) const SizedBox(height: 16),
+                  const SizedBox(height: 10),
+                  if (_collectiveGoal != null) ...[
+                    _buildCollectiveGoalCard(),
+                    const SizedBox(height: 14),
+                  ] else if (_missionWeek != null) ...[
+                    _buildWeeklyMilestoneCard(),
+                    const SizedBox(height: 14),
+                  ],
                   if (u != null &&
                       (u.academyId == null || u.academyId!.isEmpty))
                     Container(
@@ -702,6 +708,64 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildWeeklyMilestoneCard() {
+    final entries = _missionWeek?.entries ?? const <MissionWeekSlot>[];
+    final total = entries.length;
+    final completed =
+        entries.where((e) => e.mission?.alreadyCompleted ?? false).length;
+    final progress = total > 0 ? (completed / total).clamp(0.0, 1.0) : 0.0;
+    final remaining = total > 0 ? (total - completed) : 0;
+
+    final headline = total == 0
+        ? 'Milestone semanal'
+        : completed >= total
+            ? 'Ciclo semanal concluído'
+            : 'Você já concluiu $completed de $total missões';
+    final message = total == 0
+        ? 'Quando as missões da semana estiverem disponíveis, acompanhe sua evolução aqui.'
+        : completed >= total
+            ? 'Excelente consistência! Seu progresso da semana está completo.'
+            : 'Faltam $remaining missão(ões) para concluir seu ciclo desta semana.';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderOf(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            headline,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: AppTheme.textPrimaryOf(context),
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondaryOf(context),
+                ),
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: AppTheme.borderOf(context),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+              minHeight: 8,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -990,7 +1054,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       title: 'Confirmações e solicitações',
       showAlert: hasConfirmationsAlert,
       children: [
-        _ShortcutTile(
+        AppNavigationTile(
           icon: Icons.list_alt,
           title: 'Log de pontuação',
           subtitle: 'Histórico de pontos ganhos',
@@ -1005,7 +1069,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
         ),
         const SizedBox(height: 8),
-        _ShortcutTile(
+        AppNavigationTile(
           icon: Icons.how_to_reg,
           title: 'Confirmações pendentes',
           subtitle: 'Confirmar execuções em você',
@@ -1021,7 +1085,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ).then((_) => _loadPendingConfirmationsWith()),
         ),
         const SizedBox(height: 8),
-        _ShortcutTile(
+        AppNavigationTile(
           icon: Icons.send_outlined,
           title: 'Minhas solicitações',
           subtitle: 'Status das confirmações que você pediu',
@@ -1043,7 +1107,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     final hasAcademy = u.academyId != null && u.academyId!.isNotEmpty;
 
     final children = <Widget>[
-      _ShortcutTile(
+      AppNavigationTile(
         icon: Icons.emoji_events_outlined,
         title: 'Galeria de troféus',
         subtitle: 'Troféus conquistados (ouro, prata, bronze)',
@@ -1062,7 +1126,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (hasAcademy) {
       children.addAll([
         const SizedBox(height: 8),
-        _ShortcutTile(
+        AppNavigationTile(
           icon: Icons.people_outline,
           title: 'Galeria dos colegas',
           subtitle: 'Troféus e medalhas dos colegas da academia',
@@ -1220,99 +1284,3 @@ class _RandomPartnerDialog extends StatelessWidget {
   }
 }
 
-class _ShortcutTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final bool showAlertBadge;
-  final VoidCallback onTap;
-
-  const _ShortcutTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.showAlertBadge = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: AppTheme.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.borderOf(context)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: AppTheme.primary, size: 22),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              title,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(
-                                    color: AppTheme.textPrimaryOf(context),
-                                  ),
-                            ),
-                          ),
-                          if (showAlertBadge) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.amber,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Icon(Icons.warning_amber_rounded,
-                                  size: 16, color: Colors.amber.shade900),
-                            ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.textSecondaryOf(context),
-                              fontSize: 13,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14, color: AppTheme.textMutedOf(context)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

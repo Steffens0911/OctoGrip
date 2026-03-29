@@ -7,6 +7,8 @@ import 'package:viewer/screens/admin/partner_form_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Lista de parceiros da academia (CRUD pelo gestor/admin).
 class PartnerListScreen extends StatefulWidget {
@@ -52,8 +54,10 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e))),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -117,11 +121,19 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
       await _api.deletePartner(partner.id, widget.academy.id);
       if (mounted) _load();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Parceiro excluído')));
+        AppFeedback.show(
+          context,
+          message: 'Parceiro excluído',
+          type: AppFeedbackType.success,
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
       }
     }
   }
@@ -129,12 +141,9 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Parceiros — ${widget.academy.name}'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: 'Parceiros',
+        subtitle: widget.academy.name,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))

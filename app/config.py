@@ -40,6 +40,17 @@ class Settings(BaseSettings):
     # Rate limiting (login)
     LOGIN_RATE_LIMIT: str = "5/minute"
 
+    # Download de backup SQL (admin); em testes use env mais folgada (ver conftest)
+    BACKUP_DOWNLOAD_RATE_LIMIT: str = "3/hour"
+
+    # Restauração de backup ZIP (admin): tamanho máximo do upload (slowapi não decora POST /restore)
+    BACKUP_RESTORE_MAX_MB: int = 512
+    BACKUP_RESTORE_RATE_LIMIT: str = "2/hour"  # legado / futuro; restore não usa este valor hoje
+    # Restore: um único psql -f (preamble + database.sql); dumps grandes precisam de timeout alto
+    BACKUP_PSQL_RESTORE_TIMEOUT_SEC: int = 7200
+    BACKUP_PSQL_CONNECT_RETRIES: int = 5
+    BACKUP_PSQL_CONNECT_RETRY_DELAY_SEC: float = 2.0
+
     # Account lockout
     ACCOUNT_LOCKOUT_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_MINUTES: int = 15

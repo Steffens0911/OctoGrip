@@ -6,7 +6,9 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/audit_history.dart';
 import 'package:viewer/services/admin_audit_service.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/role_guard.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 const _entityChoices = <MapEntry<String, String>>[
   MapEntry('mission', 'Missão'),
@@ -130,8 +132,10 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
     try {
       await _service.restore(entity: entityApiKey, entityId: entityId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registro reativado.')),
+        AppFeedback.show(
+          context,
+          message: 'Registro reativado.',
+          type: AppFeedbackType.success,
         );
       }
       await _reloadFeedAfterRestore();
@@ -168,8 +172,10 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
         auditLogId: auditLogId,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Versão restaurada a partir do log.')),
+        AppFeedback.show(
+          context,
+          message: 'Versão restaurada a partir do log.',
+          type: AppFeedbackType.success,
         );
       }
       await _reloadFeedAfterRestore();
@@ -255,8 +261,8 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
     return RoleGuard(
       allowedRoles: const ['administrador'],
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Auditoria e recuperação'),
+        appBar: const AppStandardAppBar(
+          title: 'Auditoria e recuperação',
         ),
         body: _buildFeedTab(context),
       ),

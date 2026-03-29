@@ -7,6 +7,8 @@ import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class AcademyFormScreen extends StatefulWidget {
   final Academy? academy;
@@ -69,8 +71,11 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
         if (widget.academy == null) {
           await _api.createAcademy(name: name.trim());
           if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('Academia criada')));
+            AppFeedback.show(
+              context,
+              message: 'Academia criada',
+              type: AppFeedbackType.success,
+            );
             Navigator.pop(context);
           }
         } else {
@@ -85,8 +90,11 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
             final msg = weeklyTechniqueId != null
                 ? 'Academia atualizada. Missão do dia definida para todos os alunos.'
                 : 'Academia atualizada';
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text(msg)));
+            AppFeedback.show(
+              context,
+              message: msg,
+              type: AppFeedbackType.success,
+            );
             Navigator.pop(context);
           }
         }
@@ -105,12 +113,8 @@ class _AcademyFormScreenState extends State<AcademyFormScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.academy != null;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? 'Editar academia' : 'Nova academia'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: isEdit ? 'Editar academia' : 'Nova academia',
       ),
       body: _loading && isEdit
           ? const Center(child: CircularProgressIndicator())

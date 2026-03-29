@@ -5,6 +5,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Tela de parceiros da academia para divulgação aos alunos.
 class PartnersScreen extends StatefulWidget {
@@ -64,9 +65,7 @@ class _PartnersScreenState extends State<PartnersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Nossos parceiros'),
-      ),
+      appBar: const AppStandardAppBar(title: 'Nossos parceiros'),
       body: Padding(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         child: _loading

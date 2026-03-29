@@ -1,9 +1,19 @@
 -- Migration 030: Adicionar índices faltantes para otimização de queries
 -- Índices em foreign keys e campos frequentemente consultados
 
--- TrainingFeedback: adicionar índices em user_id e position_id
+-- TrainingFeedback: índices em user_id e position_id (se a coluna ainda existir — 045 remove position_id)
 CREATE INDEX IF NOT EXISTS idx_training_feedback_user_id ON training_feedback(user_id);
-CREATE INDEX IF NOT EXISTS idx_training_feedback_position_id ON training_feedback(position_id);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'training_feedback'
+      AND column_name = 'position_id'
+  ) THEN
+    CREATE INDEX IF NOT EXISTS idx_training_feedback_position_id ON training_feedback(position_id);
+  END IF;
+END $$;
 
 -- LessonProgress: adicionar índice em lesson_id (user_id já tem índice composto)
 -- Nota: PostgreSQL cria índice automaticamente para unique constraints, mas vamos criar explícito para garantir

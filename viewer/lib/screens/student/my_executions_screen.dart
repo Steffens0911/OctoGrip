@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Lista de execuções criadas pelo usuário (executor). Mostra status e mensagem quando o adversário não aceitou.
 class MyExecutionsScreen extends StatefulWidget {
@@ -113,12 +114,7 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Minhas solicitações'),
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context)),
-      ),
+      appBar: const AppStandardAppBar(title: 'Minhas solicitações'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

@@ -25,6 +25,8 @@ services:
       - "8000:8000"
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Cliente libpq (pg_dump/psql): em Postgres interno sem TLS, preferível a falhas de negociação SSL
+      PGSSLMODE: ${PGSSLMODE:-disable}
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
       # JSON. Padrão [] — localhost com porta dinâmica: regex em app/main.py. ["*"] é ignorado (Flutter Web + JWT).

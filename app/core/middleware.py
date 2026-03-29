@@ -8,8 +8,9 @@ from contextvars import ContextVar
 from typing import Callable
 
 from fastapi import Request, Response
+from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.metrics import http_errors_total, http_request_duration_seconds, http_requests_total
 
@@ -43,10 +44,12 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         self.log_successful = log_successful
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        start_time = time.time()
+        start_time = time.perf_counter()
         method = request.method
         path = request.url.path
         query_params = dict(request.query_params)
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
 
         # Normalizar path para métricas (remover IDs dinâmicos)
         normalized_path = self._normalize_path(path)
@@ -60,11 +63,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = request_id_var.get()
 
         # Processar requisição
-        error_type = None
         try:
             response = await call_next(request)
             status_code = response.status_code
-            duration_seconds = time.time() - start_time
+            duration_seconds = time.perf_counter() - start_time
             duration_ms = duration_seconds * 1000
 
             # Registrar métricas Prometheus
@@ -83,14 +85,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 logger.info(
                     "HTTP request",
                     extra={
+                        "event": "http_request",
                         "request_id": request_id,
                         "method": method,
                         "path": path,
+                        "normalized_path": normalized_path,
                         "status_code": status_code,
                         "duration_ms": round(duration_ms, 2),
                         "user_id": user_id,
                         "academy_id": academy_id,
                         "query_params": sanitized_params if sanitized_params else None,
+                        "client_ip": client_ip,
+                        "user_agent": user_agent,
                     },
                 )
             else:
@@ -98,20 +104,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 logger.debug(
                     "HTTP request",
                     extra={
+                        "event": "http_request",
                         "request_id": request_id,
                         "method": method,
                         "path": path,
+                        "normalized_path": normalized_path,
                         "status_code": status_code,
                         "duration_ms": round(duration_ms, 2),
                         "user_id": user_id,
                         "academy_id": academy_id,
+                        "client_ip": client_ip,
+                        "user_agent": user_agent,
                     },
                 )
 
             return response
 
         except Exception as e:
-            duration_seconds = time.time() - start_time
+            duration_seconds = time.perf_counter() - start_time
             duration_ms = duration_seconds * 1000
             error_type = type(e).__name__
             
@@ -124,14 +134,18 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             logger.error(
                 "HTTP request error",
                 extra={
+                    "event": "http_request_error",
                     "request_id": request_id,
                     "method": method,
                     "path": path,
+                    "normalized_path": normalized_path,
                     "duration_ms": round(duration_ms, 2),
                     "user_id": user_id,
                     "academy_id": academy_id,
                     "error": str(e),
                     "error_type": error_type,
+                    "client_ip": client_ip,
+                    "user_agent": user_agent,
                 },
                 exc_info=True,
             )
@@ -149,6 +163,49 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         """Remove parâmetros sensíveis dos logs."""
         sensitive_keys = {"password", "token", "secret", "authorization", "api_key"}
         return {k: "***" if k.lower() in sensitive_keys else v for k, v in params.items()}
+
+
+class CorsFallbackMiddleware:
+    """
+    ASGI externo: se a resposta ainda não tiver Access-Control-Allow-Origin e o Origin
+    for permitido pelo checker, adiciona o header. Cobre falhas de pipeline (ex.: 500 sem
+    passar pelo CORSMiddleware) em pedidos cross-origin longos como restore multipart.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        origin_allowed_checker: Callable[[str], bool],
+    ) -> None:
+        self.app = app
+        self.origin_allowed_checker = origin_allowed_checker
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        origin: str | None = None
+        for k, v in scope.get("headers") or []:
+            if k.lower() == b"origin":
+                try:
+                    origin = v.decode("latin-1")
+                except Exception:
+                    origin = None
+                break
+        if not origin or not self.origin_allowed_checker(origin):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_fallback(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                message.setdefault("headers", [])
+                hdrs = MutableHeaders(raw=message["headers"])
+                if "access-control-allow-origin" not in hdrs:
+                    hdrs["access-control-allow-origin"] = origin
+                    hdrs.add_vary_header("Origin")
+            await send(message)
+
+        await self.app(scope, receive, send_with_fallback)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

@@ -9,6 +9,8 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Formulário criar/editar troféu. Ao editar regras sensíveis, avisa impacto nas conquistas.
 class TrophyFormScreen extends StatefulWidget {
@@ -115,8 +117,10 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
   Future<void> _save() async {
     if (_formKey.currentState?.saveAndValidate() != true) return;
     if (_techniques.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cadastre técnicas antes.')),
+      AppFeedback.show(
+        context,
+        message: 'Cadastre técnicas antes.',
+        type: AppFeedbackType.warning,
       );
       return;
     }
@@ -132,8 +136,10 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
     final startDateValue = values['startDate'] as DateTime;
     final endDateValue = values['endDate'] as DateTime;
     if (endDateValue.isBefore(startDateValue)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A data fim deve ser igual ou posterior à data início.')),
+      AppFeedback.show(
+        context,
+        message: 'A data fim deve ser igual ou posterior à data início.',
+        type: AppFeedbackType.error,
       );
       return;
     }
@@ -143,12 +149,10 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
       minDurationDays = int.tryParse((values['minDurationDays'] as String?) ?? '30') ?? 30;
       final durationDays = endDateValue.difference(startDateValue).inDays;
       if (durationDays < minDurationDays) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Troféu exige duração mínima de $minDurationDays dias. Período informado: $durationDays dias.',
-            ),
-          ),
+        AppFeedback.show(
+          context,
+          message: 'Troféu exige duração mínima de $minDurationDays dias. Período informado: $durationDays dias.',
+          type: AppFeedbackType.error,
         );
         return;
       }
@@ -205,10 +209,10 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
       final entity = TrophyMapper.toEntity(
         TrophyDto.fromJson(map, academyId: widget.academyId),
       );
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.trophy == null ? 'Premiação criada.' : 'Alterações salvas.'),
-        ),
+      AppFeedback.show(
+        context,
+        message: widget.trophy == null ? 'Premiação criada.' : 'Alterações salvas.',
+        type: AppFeedbackType.success,
       );
       Navigator.pop(context, entity);
     } catch (e) {
@@ -247,8 +251,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
     final firstTech = _techniques.isNotEmpty ? _techniques.first.id : '';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(t == null ? 'Novo troféu' : 'Editar troféu'),
+      appBar: AppStandardAppBar(
+        title: t == null ? 'Novo troféu' : 'Editar troféu',
       ),
       body: _loadingTech
           ? const Center(child: CircularProgressIndicator())

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Lista de execuções pendentes de confirmação (o usuário é o adversário).
 class PendingConfirmationsScreen extends StatefulWidget {
@@ -84,18 +86,18 @@ class _PendingConfirmationsScreenState
         outcome: outcome,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Confirmação registrada!'),
-            backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: 'Confirmação registrada!',
+        type: AppFeedbackType.success,
       );
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(userFacingMessage(e)),
-            backgroundColor: Colors.red.shade700),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -125,19 +127,18 @@ class _PendingConfirmationsScreenState
         reason: 'dont_remember',
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('O colega foi notificado de que você não confirmou.'),
-          backgroundColor: AppTheme.primary,
-        ),
+      AppFeedback.show(
+        context,
+        message: 'O colega foi notificado de que você não confirmou.',
+        type: AppFeedbackType.info,
       );
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(userFacingMessage(e)),
-            backgroundColor: Colors.red.shade700),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -145,23 +146,12 @@ class _PendingConfirmationsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Confirmações pendentes'),
-            if (widget.userName != null && widget.userName!.isNotEmpty)
-              Text(
-                'Para: ${widget.userName!}',
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.normal),
-              ),
-          ],
-        ),
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context)),
+      appBar: AppStandardAppBar(
+        title: 'Confirmações pendentes',
+        subtitle:
+            (widget.userName != null && widget.userName!.isNotEmpty)
+                ? 'Para: ${widget.userName!}'
+                : null,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

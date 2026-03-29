@@ -6,9 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import LessonNotFoundError, TechniqueNotFoundError
+from app.core.exceptions import ConflictError, LessonNotFoundError, TechniqueNotFoundError
 from app.core.slug import ensure_unique_slug, make_slug
-from app.models import Lesson, Technique
+from app.models import Academy, Lesson, Mission, Technique
 from app.schemas.lesson import LessonCreate, LessonUpdate
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -188,6 +188,25 @@ async def delete_lesson(
 ) -> None:
     """Soft delete de uma aula. Levanta LessonNotFoundError se não existir."""
     lesson = await get_lesson_by_id(db, lesson_id)
+    academy_using_lesson = (
+        await db.execute(select(Academy).where(Academy.visible_lesson_id == lesson_id))
+    ).scalar_one_or_none()
+    if academy_using_lesson:
+        raise ConflictError(
+            "Não é possível excluir: esta lição está definida como lição visível de uma academia."
+        )
+    mission_using_lesson = (
+        await db.execute(
+            select(Mission).where(
+                Mission.lesson_id == lesson_id,
+                Mission.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if mission_using_lesson:
+        raise ConflictError(
+            "Não é possível excluir: existem missões ativas vinculadas a esta lição."
+        )
     before = entity_snapshot_row(lesson)
     now = datetime.now(timezone.utc)
     lesson.deleted_at = now

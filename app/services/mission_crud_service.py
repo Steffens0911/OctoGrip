@@ -7,7 +7,7 @@ from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import AcademyNotFoundError, TechniqueNotFoundError
+from app.core.exceptions import AcademyNotFoundError, AppError, LessonNotFoundError, TechniqueNotFoundError
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
 from app.services.audit_service import (
@@ -21,6 +21,55 @@ from app.services.audit_service import (
 logger = logging.getLogger(__name__)
 
 _ENTITY_MISSION = "Mission"
+
+
+def _normalize_level_or_raise(level: str | None) -> str:
+    level_n = (level or "beginner").lower().strip()
+    if level_n not in ("beginner", "intermediate"):
+        raise AppError(
+            "Nível inválido. Use 'beginner' ou 'intermediate'.",
+            status_code=400,
+        )
+    return level_n
+
+
+def _validate_slot_index(slot_index: int | None) -> None:
+    if slot_index is not None and slot_index not in (0, 1, 2):
+        raise AppError("slot_index inválido. Use 0, 1 ou 2.", status_code=400)
+
+
+def _validate_date_range(start_date: date | None, end_date: date | None) -> None:
+    if start_date and end_date and end_date < start_date:
+        raise AppError("end_date deve ser igual ou posterior a start_date.", status_code=400)
+
+
+async def _validate_lesson_for_mission(
+    db: AsyncSession,
+    *,
+    lesson_id: UUID,
+    technique_id: UUID,
+    academy_id: UUID | None,
+) -> None:
+    lesson = (
+        await db.execute(
+            select(Lesson).where(
+                Lesson.id == lesson_id,
+                Lesson.deleted_at.is_(None),
+            )
+        )
+    ).scalar_one_or_none()
+    if not lesson:
+        raise LessonNotFoundError("Lição não encontrada para vincular à missão.")
+    if lesson.technique_id != technique_id:
+        raise AppError(
+            "A lição informada não pertence à técnica da missão.",
+            status_code=400,
+        )
+    if academy_id is not None and lesson.academy_id not in (None, academy_id):
+        raise AppError(
+            "A lição informada não pertence à academia da missão.",
+            status_code=400,
+        )
 
 
 async def _first_lesson_id_for_technique(db: AsyncSession, technique_id: UUID) -> UUID | None:
@@ -53,6 +102,8 @@ async def create_mission(
     audit_user_id: UUID | None = None,
 ) -> Mission:
     """Cria uma missão (técnica + slot da academia). Se lesson_id não for informado, usa a primeira lição da técnica."""
+    _validate_slot_index(slot_index)
+    _validate_date_range(start_date, end_date)
     technique = (
         await db.execute(
             select(Technique).where(
@@ -67,11 +118,21 @@ async def create_mission(
         academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
         if not academy:
             raise AcademyNotFoundError()
-    level_n = (level or "beginner").lower().strip()
-    if level_n not in ("beginner", "intermediate"):
-        level_n = "beginner"
+        if technique.academy_id is not None and technique.academy_id != academy_id:
+            raise AppError(
+                "A técnica informada não pertence à academia da missão.",
+                status_code=400,
+            )
+    level_n = _normalize_level_or_raise(level)
     if lesson_id is None:
         lesson_id = await _first_lesson_id_for_technique(db, technique_id)
+    else:
+        await _validate_lesson_for_mission(
+            db,
+            lesson_id=lesson_id,
+            technique_id=technique_id,
+            academy_id=academy_id,
+        )
     mult = clamp_reward_points(multiplier) if multiplier is not None else MIN_REWARD_POINTS
     mission = Mission(
         technique_id=technique_id,
@@ -161,9 +222,19 @@ async def update_mission(
     mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission or mission.deleted_at is not None:
         return None
+    _validate_slot_index(slot_index)
+    effective_start = start_date if start_date is not None else mission.start_date
+    effective_end = end_date if end_date is not None else mission.end_date
+    _validate_date_range(effective_start, effective_end)
+
     before = entity_snapshot_row(mission)
-    if lesson_id is not None:
-        mission.lesson_id = lesson_id
+    next_technique_id = technique_id if technique_id is not None else mission.technique_id
+    next_academy_id = mission.academy_id
+    if _set_academy_id_none:
+        next_academy_id = None
+    elif academy_id is not None:
+        next_academy_id = academy_id
+
     if technique_id is not None and technique_id != mission.technique_id:
         technique = (
             await db.execute(
@@ -174,7 +245,12 @@ async def update_mission(
             )
         ).scalar_one_or_none()
         if not technique:
-            return None
+            raise TechniqueNotFoundError("Técnica não encontrada.")
+        if next_academy_id is not None and technique.academy_id not in (None, next_academy_id):
+            raise AppError(
+                "A técnica informada não pertence à academia da missão.",
+                status_code=400,
+            )
         result = await db.execute(sa_delete(MissionUsage).where(MissionUsage.mission_id == mission_id))
         deleted = result.rowcount
         if deleted:
@@ -182,6 +258,14 @@ async def update_mission(
         mission.technique_id = technique_id
         if lesson_id is None:
             mission.lesson_id = await _first_lesson_id_for_technique(db, technique_id)
+    if lesson_id is not None:
+        await _validate_lesson_for_mission(
+            db,
+            lesson_id=lesson_id,
+            technique_id=next_technique_id,
+            academy_id=next_academy_id,
+        )
+        mission.lesson_id = lesson_id
     if start_date is not None:
         mission.start_date = start_date
     if end_date is not None:
@@ -189,12 +273,28 @@ async def update_mission(
     if slot_index is not None:
         mission.slot_index = slot_index
     if level is not None:
-        mission.level = level if level.lower() in ("beginner", "intermediate") else "beginner"
+        mission.level = _normalize_level_or_raise(level)
     if theme is not None:
         mission.theme = theme
     if _set_academy_id_none:
         mission.academy_id = None
     elif academy_id is not None:
+        academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
+        if not academy:
+            raise AcademyNotFoundError()
+        current_technique = (
+            await db.execute(
+                select(Technique).where(
+                    Technique.id == mission.technique_id,
+                    Technique.deleted_at.is_(None),
+                )
+            )
+        ).scalar_one_or_none()
+        if current_technique and current_technique.academy_id not in (None, academy_id):
+            raise AppError(
+                "A técnica atual da missão não pertence à academia informada.",
+                status_code=400,
+            )
         mission.academy_id = academy_id
     if is_active is not None:
         mission.is_active = is_active

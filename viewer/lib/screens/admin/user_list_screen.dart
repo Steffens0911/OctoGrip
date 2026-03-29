@@ -9,6 +9,10 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
 import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_list_scaffold.dart';
+import 'package:viewer/widgets/app_screen_state.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -27,7 +31,6 @@ class _UserListScreenState extends State<UserListScreen> {
   String? _filterAcademyId;
   String? _filterGraduation;
   bool _loading = true;
-  bool _loadingAcademies = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
   int _currentPage = 0;
@@ -84,13 +87,12 @@ class _UserListScreenState extends State<UserListScreen> {
         _allItems = list;
         _academies = results[1] as List<Academy>;
         _loading = false;
-        _loadingAcademies = false;
         _hasMore = list.length >= _pageSize;
       });
       }
       _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; _loadingAcademies = false; });
+      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -114,7 +116,13 @@ class _UserListScreenState extends State<UserListScreen> {
       _applyFilters();
     } catch (e) {
       if (mounted) setState(() => _isLoadingMore = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
     }
   }
 
@@ -142,9 +150,21 @@ class _UserListScreenState extends State<UserListScreen> {
     try {
       await _api.deleteUser(u.id);
       if (mounted) _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usuário excluído')));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: 'Usuário excluído',
+          type: AppFeedbackType.success,
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
     }
   }
 
@@ -152,16 +172,19 @@ class _UserListScreenState extends State<UserListScreen> {
   Widget build(BuildContext context) {
     final hasFilters = _searchController.text.isNotEmpty || _filterAcademyId != null || _filterGraduation != null;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Usuários'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
-      ),
-      body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _allItems.isEmpty ? const Center(child: Text('Nenhum usuário. Toque em + para criar.'))
-          : Column(
-              children: [
-                Padding(
+      appBar: const AppStandardAppBar(title: 'Usuários'),
+      body: _loading
+          ? const AppScreenState.loading()
+          : _error != null
+              ? AppScreenState.error(message: _error!, onRetry: _load)
+              : _allItems.isEmpty
+                  ? const AppScreenState.empty(
+                      message: 'Nenhum usuário. Toque em + para criar.',
+                    )
+                  : AppScreenState.content(
+                      child: Column(
+                        children: [
+                          Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
@@ -260,76 +283,94 @@ class _UserListScreenState extends State<UserListScreen> {
                     ],
                   ),
                 ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    child: _filteredItems.isEmpty
-                        ? Center(
-                            child: Text(
-                              hasFilters ? 'Nenhum usuário encontrado.' : 'Nenhum usuário. Toque em + para criar.',
-                              style: const TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: EdgeInsets.symmetric(horizontal: AppTheme.screenPadding(context)),
-                            itemCount: _filteredItems.length + (_hasMore && !_isLoadingMore ? 1 : 0) + (_isLoadingMore ? 1 : 0),
-                            itemBuilder: (context, i) {
-                              if (i == _filteredItems.length) {
-                                // Botão "Carregar mais" ou indicador de loading
-                                if (_isLoadingMore) {
-                                  return const Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: Center(child: CircularProgressIndicator()),
-                                  );
-                                }
-                                if (_hasMore) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: FilledButton(
-                                      onPressed: _loadMore,
-                                      child: const Text('Carregar mais'),
+                          Expanded(
+                            child: _filteredItems.isEmpty
+                                ? const AppScreenState.empty(
+                                    message: 'Nenhum usuário encontrado.',
+                                  )
+                                : AppListScaffold(
+                                    onRefresh: _load,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: AppTheme.screenPadding(context),
+                                      vertical: 12,
                                     ),
-                                  );
-                                }
-                                return const SizedBox.shrink();
-                              }
-                              final u = _filteredItems[i];
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  title: Text(u.email),
-                                  subtitle: Text(u.name ?? '—'),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.emoji_events_outlined),
-                                        tooltip: 'Ver galeria de troféus',
-                                        onPressed: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => TrophyShelfPage(
-                                              userId: u.id,
-                                              userName: u.name ?? u.email,
+                                      ...List.generate(_filteredItems.length,
+                                          (i) {
+                                        final u = _filteredItems[i];
+                                        return Card(
+                                          margin:
+                                              const EdgeInsets.only(bottom: 8),
+                                          child: ListTile(
+                                            title: Text(u.email),
+                                            subtitle: Text(u.name ?? '—'),
+                                            trailing: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons
+                                                      .emoji_events_outlined),
+                                                  tooltip:
+                                                      'Ver galeria de troféus',
+                                                  onPressed: () =>
+                                                      Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          TrophyShelfPage(
+                                                        userId: u.id,
+                                                        userName:
+                                                            u.name ?? u.email,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                if (AuthService()
+                                                    .canEditResources()) ...[
+                                                  IconButton(
+                                                      icon: const Icon(
+                                                          Icons.edit,
+                                                          color:
+                                                              AppTheme.primary),
+                                                      onPressed: () =>
+                                                          _openForm(u)),
+                                                  IconButton(
+                                                      icon: Icon(
+                                                          Icons.delete_outline,
+                                                          color: Theme.of(
+                                                                  context)
+                                                              .colorScheme
+                                                              .error),
+                                                      onPressed: () =>
+                                                          _delete(u)),
+                                                ],
+                                              ],
                                             ),
+                                            onTap: () => _openForm(u),
+                                          ),
+                                        );
+                                      }),
+                                      if (_isLoadingMore)
+                                        const Padding(
+                                          padding: EdgeInsets.all(16),
+                                          child: Center(
+                                            child: CircularProgressIndicator(),
                                           ),
                                         ),
-                                      ),
-                                      if (AuthService().canEditResources()) ...[
-                                        IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
-                                        IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(u)),
-                                      ],
+                                      if (_hasMore && !_isLoadingMore)
+                                        Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: FilledButton(
+                                            onPressed: _loadMore,
+                                            child: const Text('Carregar mais'),
+                                          ),
+                                        ),
                                     ],
                                   ),
-                                  onTap: () => _openForm(u),
-                                ),
-                              );
-                            },
                           ),
-                  ),
-                ),
-              ],
-            ),
+                        ],
+                      ),
+                    ),
       floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
     );
   }

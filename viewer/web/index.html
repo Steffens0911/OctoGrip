@@ -36,9 +36,9 @@
 <body>
   <!--
     API: por defeito mesmo host + porta 8000 (LAN / Docker local).
-    Ngrok (dois túneis): abra o site com ?api_base=URL_ENCODED_DO_TUNEL_API
-    Ex.: ?api_base=https%3A%2F%2Fxxxx.ngrok-free.app
-    O valor fica em sessionStorage para não perder ao navegar no SPA.
+    trycloudflare.com: o Chrome bloqueia chamadas de páginas HTTPS públicas para 127.0.0.1. É obrigatório
+    um segundo túnel na API (uvicorn :8000) e abrir o viewer com ?api_base=URL_HTTPS_DO_TUNEL_DA_API (fica em sessionStorage).
+    Ex.: cloudflared tunnel --url http://127.0.0.1:8000 → use a URL trycloudflare na query api_base.
   -->
   <script>
     (function () {
@@ -54,11 +54,29 @@
         }
       }
       var stored = sessionStorage.getItem('jjb_api_base_url');
+      var h = window.location.hostname;
+      if (stored && h.endsWith('.trycloudflare.com')) {
+        if (/\.trycloudflare\.com:8000\b/.test(stored) ||
+            /^https?:\/\/127\.0\.0\.1:8000/.test(stored) ||
+            /^https?:\/\/localhost:8000/.test(stored)) {
+          try {
+            sessionStorage.removeItem('jjb_api_base_url');
+          } catch (e) {}
+          stored = null;
+        }
+      }
       if (stored) {
         window.__API_BASE_URL__ = stored;
       } else {
-        window.__API_BASE_URL__ =
-          window.location.protocol + '//' + window.location.hostname + ':8000';
+        if (h === 'localhost' || h === '127.0.0.1') {
+          window.__API_BASE_URL__ =
+            window.location.protocol + '//' + h + ':8000';
+        } else if (h.endsWith('.trycloudflare.com')) {
+          window.__API_BASE_URL__ = '';
+        } else {
+          window.__API_BASE_URL__ =
+            window.location.protocol + '//' + h + ':8000';
+        }
       }
     })();
   </script>

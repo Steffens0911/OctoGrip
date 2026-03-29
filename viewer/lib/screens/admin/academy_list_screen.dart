@@ -6,6 +6,10 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/academy_form_screen.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_list_scaffold.dart';
+import 'package:viewer/widgets/app_screen_state.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class AcademyListScreen extends StatefulWidget {
   const AcademyListScreen({super.key});
@@ -109,21 +113,29 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
     try {
       await _api.deleteAcademy(a.id);
       if (mounted) _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Academia excluída')));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: 'Academia excluída',
+          type: AppFeedbackType.success,
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Academias'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: 'Academias',
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
@@ -162,95 +174,93 @@ class _AcademyListScreenState extends State<AcademyListScreen> {
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+          ? const AppScreenState.loading()
           : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(_error!, textAlign: TextAlign.center),
-                      const SizedBox(height: 16),
-                      ElevatedButton(onPressed: _load, child: const Text('Tentar novamente')),
-                    ],
-                  ),
-                )
+              ? AppScreenState.error(message: _error!, onRetry: _load)
               : _allItems.isEmpty
-                  ? const Center(child: Text('Nenhuma academia. Toque em + para criar.'))
-                  : Column(
-                      children: [
-                        if (_searchController.text.isNotEmpty || _filteredItems.length != _allItems.length)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            color: AppTheme.primary.withValues(alpha: 0.1),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _applyFilters();
-                                  },
-                                  child: const Text('Limpar filtros'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _load,
-                            child: _filteredItems.isEmpty
-                                ? Center(
-                                    child: Text(
-                                      _searchController.text.isNotEmpty
-                                          ? 'Nenhuma academia encontrada.'
-                                          : 'Nenhuma academia. Toque em + para criar.',
-                                      style: const TextStyle(color: AppTheme.textSecondary),
+                  ? const AppScreenState.empty(
+                      message: 'Nenhuma academia. Toque em + para criar.',
+                    )
+                  : AppScreenState.content(
+                      child: AppListScaffold(
+                        onRefresh: _load,
+                        topFilters: (_searchController.text.isNotEmpty ||
+                                _filteredItems.length != _allItems.length)
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 8),
+                                color: AppTheme.primary.withValues(alpha: 0.1),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppTheme.textSecondary,
+                                            ),
+                                      ),
                                     ),
-                                  )
-                                : ListView.builder(
-                                    padding: const EdgeInsets.all(16),
-                                    itemCount: _filteredItems.length,
-                                    itemBuilder: (context, i) {
-                                      final a = _filteredItems[i];
-                                      return Card(
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        child: ListTile(
-                                          leading: CircleAvatar(
-                                            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                            child: const Icon(Icons.school, color: AppTheme.primary),
-                                          ),
-                                          title: Text(a.name),
-                                          subtitle: Text(
-                                            a.weeklyTheme ?? '',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          trailing: AuthService().canEditResources() ? Row(
+                                    TextButton(
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        _applyFilters();
+                                      },
+                                      child: const Text('Limpar filtros'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : null,
+                        children: _filteredItems.isEmpty
+                            ? [
+                                const SizedBox(height: 120),
+                                const AppScreenState.empty(
+                                  message: 'Nenhuma academia encontrada.',
+                                ),
+                              ]
+                            : _filteredItems.map((a) {
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor:
+                                          AppTheme.primary.withValues(alpha: 0.2),
+                                      child: const Icon(Icons.school,
+                                          color: AppTheme.primary),
+                                    ),
+                                    title: Text(a.name),
+                                    subtitle: Text(
+                                      a.weeklyTheme ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    trailing: AuthService().canEditResources()
+                                        ? Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               IconButton(
-                                                icon: const Icon(Icons.edit, color: AppTheme.primary),
+                                                icon: const Icon(Icons.edit,
+                                                    color: AppTheme.primary),
                                                 onPressed: () => _openForm(a),
                                               ),
                                               IconButton(
-                                                icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+                                                icon: Icon(Icons.delete_outline,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .error),
                                                 onPressed: () => _delete(a),
                                               ),
                                             ],
-                                          ) : null,
-                                          onTap: () => _openDetail(a),
-                                        ),
-                                      );
-                                    },
+                                          )
+                                        : null,
+                                    onTap: () => _openDetail(a),
                                   ),
-                          ),
-                        ),
-                      ],
+                                );
+                              }).toList(),
+                      ),
                     ),
       floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(
         onPressed: () => _openForm(),

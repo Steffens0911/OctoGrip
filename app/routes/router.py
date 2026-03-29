@@ -8,11 +8,13 @@ from app.routes import (
     academies,
     admin,
     admin_audit,
+    admin_backup,
     auth,
     executions,
     health,
     lesson_complete,
     lessons,
+    me_training_videos,
     metrics,
     mission,
     mission_complete,
@@ -22,16 +24,16 @@ from app.routes import (
     professors,
     reports,
     techniques,
-    trophies,
     training_feedback,
     training_videos,
-    me_training_videos,
+    trophies,
     users,
 )
 
 api_router = APIRouter()
 
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_backup.router, prefix="/admin", tags=["admin-backup"])
 api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])

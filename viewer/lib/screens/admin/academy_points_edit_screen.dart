@@ -3,6 +3,8 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Tela para editar o ajuste de pontos dos alunos de uma academia.
 class AcademyPointsEditScreen extends StatefulWidget {
@@ -93,16 +95,19 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
         });
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ajuste salvo')),
+        AppFeedback.show(
+          context,
+          message: 'Ajuste salvo',
+          type: AppFeedbackType.success,
         );
       }
     } catch (e) {
       if (mounted) setState(() => _savingIds.remove(user.id));
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(userFacingMessage(e)), backgroundColor: Colors.red),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -111,23 +116,9 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Editar pontos dos alunos'),
-            Text(
-              widget.academyName,
-              style:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-            ),
-          ],
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: 'Editar pontos dos alunos',
+        subtitle: widget.academyName,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

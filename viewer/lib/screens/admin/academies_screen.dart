@@ -5,6 +5,7 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 
 /// Lista e CRUD de academias (seção professor).
 class AcademiesScreen extends StatefulWidget {
@@ -73,8 +74,10 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -139,8 +142,10 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
               onPressed: () async {
                 final name = nameController.text.trim();
                 if (name.isEmpty) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Informe o nome da academia.')),
+                  AppFeedback.show(
+                    ctx,
+                    message: 'Informe o nome da academia.',
+                    type: AppFeedbackType.warning,
                   );
                   return;
                 }
@@ -158,8 +163,10 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                   if (mounted) _load();
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(userFacingMessage(e))),
+                    AppFeedback.show(
+                      context,
+                      message: userFacingMessage(e),
+                      type: AppFeedbackType.error,
                     );
                   }
                 }
@@ -282,11 +289,11 @@ class _AcademiesScreenState extends State<AcademiesScreen> {
                         title: Text('Editar'),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: ListTile(
-leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
-                title: Text('Excluir', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+                        leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
+                        title: Text('Excluir', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
                       ),
                     ),
                   ],

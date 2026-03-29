@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Reportar dificuldade: descrever em texto livre onde teve mais dificuldade no treino.
 class ReportDifficultyScreen extends StatefulWidget {
@@ -68,10 +70,10 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
             : _observationController.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Dificuldade registrada.'),
-            backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: 'Dificuldade registrada.',
+        type: AppFeedbackType.success,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -86,7 +88,7 @@ class _ReportDifficultyScreenState extends State<ReportDifficultyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Reportar dificuldade')),
+      appBar: const AppStandardAppBar(title: 'Reportar dificuldade'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

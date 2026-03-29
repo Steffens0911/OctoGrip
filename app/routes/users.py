@@ -25,6 +25,8 @@ from app.services.leveling_service import refresh_user_level
 
 router = APIRouter()
 
+_ALLOWED_NON_ADMIN_CREATE_ROLE = "aluno"
+
 
 @router.get("", response_model=list[UserRead])
 async def users_list(
@@ -115,16 +117,18 @@ async def user_create(
         raise ConflictError("E-mail já cadastrado.")
     if current_user.role == "administrador":
         academy_id = body.academy_id
+        role = body.role
     else:
         if current_user.academy_id is None:
             raise ForbiddenError("Você precisa estar vinculado a uma academia para cadastrar usuários.")
         academy_id = current_user.academy_id
+        role = _ALLOWED_NON_ADMIN_CREATE_ROLE
     return await create_user(
         db,
         email=body.email.strip().lower(),
         name=body.name,
         graduation=body.graduation,
-        role=body.role,
+        role=role,
         academy_id=academy_id,
         password=body.password,
     )
@@ -144,7 +148,11 @@ async def user_update(
             raise ForbiddenError("Acesso negado. Você só pode editar usuários da sua academia.")
     payload = body.model_dump(exclude_unset=True)
     if current_user.role != "administrador":
+        # Endurecimento RBAC: não-admin não pode elevar privilégios nem alterar campos sensíveis.
+        payload.pop("role", None)
         payload.pop("academy_id", None)
+        payload.pop("points_adjustment", None)
+        payload.pop("password", None)
     updated = await update_user(
         db,
         user_id,

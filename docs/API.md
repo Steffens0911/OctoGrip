@@ -10,6 +10,7 @@ Documentação completa dos endpoints da API REST.
 O frontend em **outra origem** (ex.: `http://localhost:55767` → API `http://localhost:8000`) dispara pedidos **OPTIONS** (preflight). O `CORSMiddleware` deve responder **200** com os cabeçalhos `Access-Control-*` corretos.
 
 - **`allow_headers=["*"]`** com **`allow_credentials=False`**: o Starlette espelha no preflight os headers pedidos pelo browser (`Authorization`, `X-Impersonate-User`, etc.), evitando **400 Disallowed CORS headers** que bloqueava CRUD no Flutter Web. Não combinar `allow_headers=["*"]` com `allow_credentials=True` (restrição do Starlette).
+- **`CorsFallbackMiddleware`** (camada ASGI externa): se a resposta ainda não tiver `Access-Control-Allow-Origin` e o `Origin` for permitido pelo mesmo regex que o `CORSMiddleware`, o header é acrescentado — reduz falsos positivos de CORS no browser em respostas longas ou atípicas (ex.: `POST /admin/backup/restore`).
 - **Produção**: definir **`CORS_ORIGINS`** com as origens do frontend (ver `app/config.py`).
 
 Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
@@ -31,7 +32,8 @@ Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
 11. [Feedback de treino](#feedback-de-treino)
 12. [Métricas](#métricas)
 13. [Relatórios](#relatórios)
-14. [Exceções HTTP](#exceções-http)
+14. [Admin — backup da base](#admin--backup-da-base)
+15. [Exceções HTTP](#exceções-http)
 
 ---
 
@@ -85,6 +87,54 @@ Base: `/users`.
 | GET    | /users/{id}   | Detalhe do usuário  |
 | PATCH  | /users/{id}   | Atualiza usuário    |
 | DELETE | /users/{id}   | Exclui usuário      |
+| GET    | /users/{id}/points_log | Histórico de pontuação do usuário |
+
+### GET /users/{id}/points_log
+
+Retorna o histórico de pontuação unificado (execuções confirmadas, conclusões de missão e vídeo diário).
+
+**Query params:**
+| Parâmetro | Tipo | Padrão | Descrição |
+|-----------|------|--------|-----------|
+| limit     | int  | 100    | Limite de itens (1..500 recomendado) |
+| offset    | int  | 0      | Paginação por deslocamento |
+
+**Resposta (200):**
+```json
+{
+  "user_id": "uuid",
+  "entries": [
+    {
+      "date": "2026-03-23T10:15:00Z",
+      "points": 20,
+      "source": "execution",
+      "description": "Execução confirmada: raspagem",
+      "impact_level": "medium",
+      "quality_score": 0.63
+    }
+  ]
+}
+```
+
+**Contrato recomendado para gamificação saudável:**
+- `impact_level` (opcional): `low | medium | high`
+- `quality_score` (opcional): `0.0 .. 1.0`
+
+Quando os campos opcionais não forem informados, o frontend deve manter fallback por `source` e `points`.
+
+**Mapeamento sugerido no backend (v1):**
+- `execution`: usar `points_awarded` e contexto da confirmação.
+  - `high`: `>= 30`, `medium`: `>= 15`, `low`: `< 15`
+- `mission`: `impact_level = medium` por padrão (ou calcular por dificuldade/multiplier).
+- `training_video`: `impact_level = low` com foco em consistência.
+- `quality_score`:
+  - `execution`: normalizar `points_awarded` para 0..1 (cap em 50 pontos).
+  - `mission`: base em `multiplier / 50`.
+  - `training_video`: base em `points_per_day / 50`.
+
+**Observações de compatibilidade:**
+- Adição de `impact_level` e `quality_score` é backward compatible.
+- Evitar remover/renomear `date`, `points`, `source`, `description`.
 
 ---
 
@@ -442,6 +492,50 @@ id,name,email,graduation,academy_id,academy_name,last_login_at
 
 ---
 
+## Admin — backup da base
+
+### GET /admin/backup/database
+
+- **Autenticação:** Bearer JWT obrigatório.
+- **Autorização:** apenas role `administrador`.
+- **Impersonação:** este endpoint deve ser chamado **sem** o header `X-Impersonate-User` (o usuário efetivo no token deve ser admin). Caso contrário a API devolve **403**.
+- **Resposta (200):** corpo em **SQL plain** (dump PostgreSQL via `pg_dump`), `Content-Type: application/sql`, `Content-Disposition: attachment` com nome sugerido `jjb_backup_<UTC>.sql`.
+- **Conteúdo:** banco de dados **completo** (todas as academias). **Não** inclui arquivos do volume `app_media` (logos, imagens).
+- **Rate limit:** por defeito **3 pedidos/hora** por IP (`BACKUP_DOWNLOAD_RATE_LIMIT` em `app/config.py`; nos testes usa-se limite mais folgada).
+- **Erros:**
+  - **503** se `pg_dump`/`psql` falhar (ex.: inexistente no PATH, **versão major diferente do servidor** Postgres, ou falha de conexão). No Docker Compose, a imagem da API usa `postgresql-client-16` alinhado ao serviço `postgres:16` e define `PGSSLMODE=disable` por defeito para o cliente libpq (sobrescreva com `PGSSLMODE` no ambiente se usar TLS obrigatório).
+- **Segurança:** o arquivo contém dados sensíveis (senhas em hash, e-mails, etc.); tratar como secreto.
+
+**Restaurar só o SQL (exemplo, fora do app):**
+
+```bash
+psql -h HOST -U USER -d DBNAME -f jjb_backup_YYYYMMDD_HHMM.sql
+```
+
+### GET /admin/backup/archive
+
+- Mesma autenticação, autorização, impersonação e rate limit que `GET /admin/backup/database`.
+- **Resposta (200):** arquivo **ZIP**, `Content-Type: application/zip`, nome sugerido `jjb_backup_<UTC>.zip`.
+- **Conteúdo do ZIP:**
+  - `database.sql` — mesmo dump que o endpoint só-SQL.
+  - `media/` — cópia recursiva de `app_media` (ex.: `academy_logos/`, `academy_schedules/`).
+
+### POST /admin/backup/restore
+
+- **Autenticação / autorização / impersonação:** iguais aos GET acima (sem `X-Impersonate-User`).
+- **Body:** `multipart/form-data`, campo **`file`**: arquivo `.zip` produzido por `GET /admin/backup/archive` (ou com a mesma estrutura: `database.sql` na raiz).
+- **Comportamento (destrutivo):**
+  1. Extrai o ZIP com proteção contra path traversal.
+  2. **Fecha os pools SQLAlchemy** (sync + async) deste processo **antes** do `psql`, para não manter sessões abertas que **bloqueiam** `DROP SCHEMA public CASCADE` (sem isto, o reset pode atingir timeout à espera de locks).
+  3. Gera um script SQL temporário: `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`, `ALTER/GRANT` básicos do schema, seguido do conteúdo de `database.sql` (cópia em stream). Executa **um único** `psql -f` com `ON_ERROR_STOP=1`. **Não** usa `pg_terminate_backend` no script — terminava ligações do pool asyncpg ainda ligadas ao pedido e causava `InterfaceError` no rollback ao fechar a sessão. Antes do `psql`, a API chama `dispose()` nos engines SQLAlchemy; pings `SELECT 1` com retry (`BACKUP_PSQL_CONNECT_RETRIES`, …). Timeout: `BACKUP_PSQL_RESTORE_TIMEOUT_SEC` (default 7200s).
+  4. Se existir pasta `media/` no ZIP **com pelo menos um arquivo**, substitui o conteúdo atual de `app_media` (remove entradas de primeiro nível e copia as do ZIP). Se não houver `media/` ou estiver vazia de arquivos, **não altera** `app_media`.
+- **Resposta (200):** JSON `{ "ok": true, "restored_media": true | false }`. Após sucesso, a API **volta a descartar os pools**, valida `SELECT 1` no engine async e executa um passo defensivo para garantir `public` + `search_path` consistente.
+- **Erros:** **400** (ZIP inválido ou estrutura incorreta), **413** (tamanho acima de `BACKUP_RESTORE_MAX_MB`, default 512), **422** (nome do arquivo não termina em `.zip`), **503** (`psql` indisponível ou falha na restauração / cópia de mídia), **507** (falha ao gravar o upload temporário, ex.: disco cheio).
+- **Rate limit:** o endpoint **não** usa slowapi (upload multipart longo + limiter causava 500 opaco no browser); proteção por **tamanho máximo** (`BACKUP_RESTORE_MAX_MB`) e **só administrador**.
+- **Nota:** durante a restauração outras requisições podem falhar; preferir janela de manutenção. Em caso de erro no restore, a API tenta auto-reparar `public/search_path` antes de responder 503, para evitar loop de reinício no startup.
+
+---
+
 ## Exceções HTTP
 
 | Código | Exceção              | Quando                         |
@@ -449,5 +543,25 @@ id,name,email,graduation,academy_id,academy_name,last_login_at
 | 404    | NotFoundError        | Recurso não encontrado         |
 | 409    | AlreadyCompletedError| Lição/missão já concluída      |
 | 400    | AppError             | Erro genérico de validação     |
+| 422    | RequestValidationError | Payload/parametros inválidos |
+| 413    | AppError             | Upload de restauração acima do limite (`BACKUP_RESTORE_MAX_MB`) |
+| 429    | RateLimitExceeded    | Limite de requisições excedido |
+| 503    | AppError             | Serviço indisponível (ex.: backup quando `pg_dump` falha) |
+| 500    | Exception            | Falha interna não tratada       |
 
-Mensagens em `detail` no JSON de resposta.
+As respostas de erro seguem formato padronizado e mantêm compatibilidade com `detail`:
+
+```json
+{
+  "detail": "Mensagem amigavel ou lista de erros",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "type": "RequestValidationError",
+    "message": "Dados de entrada inválidos.",
+    "status_code": 422
+  },
+  "request_id": "uuid-ou-header-x-request-id",
+  "path": "/rota/chamada",
+  "timestamp": "2026-03-23T12:00:00.000000+00:00"
+}
+```

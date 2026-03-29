@@ -5,6 +5,8 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
@@ -143,8 +145,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       if (!mounted) return;
       final message =
           res['message'] as String? ?? 'Aguardando confirmação do adversário.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: message,
+        type: AppFeedbackType.info,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -171,8 +175,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       if (!mounted) return;
       final message =
           res['message'] as String? ?? 'Aguardando confirmação do adversário.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: message,
+        type: AppFeedbackType.info,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -200,10 +206,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         usageType: usageType,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Missão concluída!'),
-            backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: 'Missão concluída!',
+        type: AppFeedbackType.success,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -240,12 +246,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     try {
       await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Missão fora do período; registrada como visualização da lição.'),
-          backgroundColor: AppTheme.primary,
-        ),
+      AppFeedback.show(
+        context,
+        message: 'Missão fora do período; registrada como visualização da lição.',
+        type: AppFeedbackType.info,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -293,10 +297,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     try {
       await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Lição concluída!'),
-            backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: 'Lição concluída!',
+        type: AppFeedbackType.success,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -318,7 +322,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
   Widget build(BuildContext context) {
     final d = widget.data;
     return Scaffold(
-      appBar: AppBar(title: const Text('Lição')),
+      appBar: const AppStandardAppBar(title: 'Lição'),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         child: Column(

@@ -25,9 +25,13 @@ class AppNavigationTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final primary = colorScheme.primary;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    return Semantics(
+      button: true,
+      label: title,
+      hint: subtitle,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
         onTap: onTap,
         borderRadius: AppRadius.cardRadius,
         child: Container(
@@ -101,6 +105,7 @@ class AppNavigationTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

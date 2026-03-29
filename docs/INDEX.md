@@ -53,6 +53,8 @@
 |-----------|-----------|
 | [AVALIACAO_ENTERPRISE.md](AVALIACAO_ENTERPRISE.md) | Avaliação segundo padrões enterprise: Segurança, Escalabilidade, Manutenibilidade, Performance, Clareza (0–10) |
 | [ANALISE_COMPLETA_PROJETO.md](ANALISE_COMPLETA_PROJETO.md) | Análise detalhada: problemas críticos, médios, melhorias e pontos positivos |
+| [CHECKLIST_MELHORIAS_APPBABY.md](CHECKLIST_MELHORIAS_APPBABY.md) | Checklist operacional de melhorias por prioridade, com status, responsável, prazo e evidência |
+| [AVALIACAO_GAMIFICACAO_APPBABY.md](AVALIACAO_GAMIFICACAO_APPBABY.md) | Avaliação da gamificação do app com base em loops, validações e riscos éticos |
 | [RESUMO_EXECUTIVO.md](RESUMO_EXECUTIVO.md) | Resumo visual rápido do status do projeto (score 8.0/10) |
 | [CHECKLIST_DEPLOY.md](CHECKLIST_DEPLOY.md) | Checklist prático para usar antes do deploy em produção |
 | [BOAS_PRATICAS.md](BOAS_PRATICAS.md) | Análise de padrões do framework, tipagem e linter/formatter |

@@ -6,6 +6,8 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
 class TrainingVideoViewScreen extends StatefulWidget {
@@ -71,11 +73,10 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
       final points = res.pointsGranted ?? _video.pointsPerDay;
       final fullMessage =
           !alreadyToday ? '$baseMessage (+$points pts)' : baseMessage;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(fullMessage),
-          backgroundColor: AppTheme.primary,
-        ),
+      AppFeedback.show(
+        context,
+        message: fullMessage,
+        type: alreadyToday ? AppFeedbackType.info : AppFeedbackType.success,
       );
       Navigator.pop(context);
     } catch (e) {
@@ -95,9 +96,7 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
         '${v.pointsPerDay} ponto${v.pointsPerDay == 1 ? '' : 's'} por dia';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Campo de treinamento'),
-      ),
+      appBar: const AppStandardAppBar(title: 'Campo de treinamento'),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         child: Column(

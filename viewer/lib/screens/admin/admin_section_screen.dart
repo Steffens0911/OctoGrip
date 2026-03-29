@@ -4,8 +4,10 @@ import 'package:viewer/screens/admin/academy_list_screen.dart';
 import 'package:viewer/screens/admin/engagement_reports_screen.dart';
 import 'package:viewer/screens/admin/execution_reports_screen.dart';
 import 'package:viewer/screens/admin/audit_recovery_screen.dart';
+import 'package:viewer/screens/admin/database_backup_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
 /// Tela principal da seção Administração — estilo Lovable.
@@ -36,11 +38,10 @@ class AdminSectionScreen extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 32),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.school_rounded,
             title: 'Academias',
             subtitle: 'Criar, editar e gerenciar academias',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -49,11 +50,10 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.ondemand_video_rounded,
             title: 'Vídeos de treinamento',
             subtitle: 'Cadastrar vídeos do YouTube com pontos diários',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -62,11 +62,10 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.people_rounded,
             title: 'Usuários',
             subtitle: 'Gerenciar usuários e suas faixas',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -75,11 +74,10 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.bar_chart_rounded,
             title: 'Relatórios de execuções',
             subtitle: 'Premeditadas vs naturais por academia',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -88,11 +86,10 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.insights_rounded,
             title: 'Relatórios de engajamento',
             subtitle: 'Semana e mês · % de alunos ativos',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -101,11 +98,10 @@ class AdminSectionScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          _AdminTile(
+          AppNavigationTile(
             icon: Icons.history_rounded,
             title: 'Auditoria e recuperação',
             subtitle: 'Histórico de alterações, reativar e restaurar versões',
-            color: AppTheme.primary,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -113,89 +109,20 @@ class AdminSectionScreen extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          AppNavigationTile(
+            icon: Icons.backup_rounded,
+            title: 'Backup do banco de dados',
+            subtitle: 'Baixar dump SQL completo (PostgreSQL)',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const DatabaseBackupScreen(),
+              ),
+            ),
+          ),
         ],
       ),
-      ),
-    );
-  }
-}
-
-class _AdminTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _AdminTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceOf(context),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderOf(context)),
-            boxShadow: [
-              BoxShadow(
-                color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.03),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 24),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textPrimaryOf(context),
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textMutedOf(context),
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 14,
-                color: AppTheme.textMutedOf(context),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

@@ -5,6 +5,8 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/youtube_utils.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class TrainingVideoFormScreen extends StatefulWidget {
   final TrainingVideo? video;
@@ -102,8 +104,10 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vídeo de treinamento salvo.')),
+      AppFeedback.show(
+        context,
+        message: 'Vídeo de treinamento salvo.',
+        type: AppFeedbackType.success,
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -118,12 +122,10 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.video == null
-              ? 'Novo vídeo de treinamento'
-              : 'Editar vídeo de treinamento',
-        ),
+      appBar: AppStandardAppBar(
+        title: widget.video == null
+            ? 'Novo vídeo de treinamento'
+            : 'Editar vídeo de treinamento',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

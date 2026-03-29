@@ -7,6 +7,8 @@ import 'package:viewer/models/trophy.dart';
 import 'package:viewer/services/api_service.dart' show ApiException, ApiService;
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 
 /// Galeria de troféus e medalhas do usuário: premiações da academia com tier conquistado (ouro/prata/bronze) ou "A conquistar".
@@ -106,8 +108,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _galleryVisible = !value);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -192,9 +196,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     final academyId = t.academyId;
     if (academyId == null || academyId.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Academia não definida para este troféu.')),
+        AppFeedback.show(
+          context,
+          message: 'Academia não definida para este troféu.',
+          type: AppFeedbackType.warning,
         );
       }
       return;
@@ -218,14 +223,18 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       if (!mounted) return;
       final message =
           res['message'] as String? ?? 'Aguardando confirmação do adversário.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppTheme.primary),
+      AppFeedback.show(
+        context,
+        message: message,
+        type: AppFeedbackType.info,
       );
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -279,24 +288,12 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Galeria de troféus e medalhas'),
-            if (widget.userName != null && widget.userName!.isNotEmpty)
-              Text(
-                widget.userName!,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.normal),
-              ),
-          ],
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: 'Galeria de troféus e medalhas',
+        subtitle:
+            (widget.userName != null && widget.userName!.isNotEmpty)
+                ? widget.userName
+                : null,
         actions: [
           IconButton(
             icon: const Icon(Icons.view_agenda_outlined),

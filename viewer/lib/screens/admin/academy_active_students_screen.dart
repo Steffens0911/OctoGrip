@@ -8,6 +8,7 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/role_guard.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class AcademyActiveStudentsScreen extends StatefulWidget {
   final Academy academy;
@@ -84,8 +85,9 @@ class _AcademyActiveStudentsScreenState
     return RoleGuard(
       allowedRoles: const ['administrador', 'gerente_academia', 'supervisor'],
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Alunos ativos · ${widget.academy.name}'),
+        appBar: AppStandardAppBar(
+          title: 'Alunos ativos',
+          subtitle: widget.academy.name,
         ),
         body: RefreshIndicator(
           onRefresh: _load,

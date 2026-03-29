@@ -4,6 +4,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Todas as missões concluídas do usuário (GET /mission_usages/history).
 class ProgressScreen extends StatefulWidget {
@@ -61,7 +62,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Meu progresso')),
+      appBar: const AppStandardAppBar(title: 'Meu progresso'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

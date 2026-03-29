@@ -5,6 +5,8 @@ import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class LessonFormScreen extends StatefulWidget {
   final Lesson? lesson;
@@ -127,8 +129,11 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Salvo')));
+        AppFeedback.show(
+          context,
+          message: 'Salvo',
+          type: AppFeedbackType.success,
+        );
         Navigator.pop(context);
       }
     } catch (e) {
@@ -144,11 +149,8 @@ class _LessonFormScreenState extends State<LessonFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.lesson == null ? 'Nova lição' : 'Editar lição'),
-        leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => Navigator.pop(context)),
+      appBar: AppStandardAppBar(
+        title: widget.lesson == null ? 'Nova lição' : 'Editar lição',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

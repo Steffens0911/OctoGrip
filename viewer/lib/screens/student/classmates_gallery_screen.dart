@@ -5,6 +5,7 @@ import 'package:viewer/models/user.dart' as models;
 import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Lista colegas da academia para o aluno ver a galeria de troféus de cada um (quando visível).
 class ClassmatesGalleryScreen extends StatefulWidget {
@@ -78,13 +79,7 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Galeria dos colegas'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: const AppStandardAppBar(title: 'Galeria dos colegas'),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

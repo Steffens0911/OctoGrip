@@ -9,6 +9,9 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/widgets/app_list_scaffold.dart';
+import 'package:viewer/widgets/app_screen_state.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Lista de lições (GET /lessons). Se [academyId] for passado, a lição visível da academia aparece em destaque.
 class LibraryScreen extends StatefulWidget {
@@ -32,7 +35,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
   List<Technique> _techniques = [];
   String? _filterTechniqueId;
   bool _loading = true;
-  bool _loadingTechniques = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
   int _currentPage = 0;
@@ -122,7 +124,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
           }
           _loading = false;
           _isLoadingMore = false;
-          _loadingTechniques = false;
         });
       }
       _applyFilters();
@@ -131,7 +132,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
         setState(() {
           _loading = false;
           _isLoadingMore = false;
-          _loadingTechniques = false;
           _error = userFacingMessage(e);
         });
       }
@@ -303,33 +303,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Biblioteca de lições')),
+      appBar: const AppStandardAppBar(title: 'Biblioteca de lições'),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppScreenState.loading()
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_error!,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.red.shade700)),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                            onPressed: _load,
-                            child: const Text('Tentar novamente')),
-                      ],
-                    ),
-                  ),
-                )
+              ? AppScreenState.error(message: _error!, onRetry: _load)
               : _allLessons.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Nenhuma lição cadastrada.',
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
+                  ? const AppScreenState.empty(
+                      message: 'Nenhuma lição cadastrada.',
                     )
                   : Column(
                       children: [
@@ -413,22 +394,14 @@ class _LibraryScreenState extends State<LibraryScreen> {
                         Expanded(
                           child: _filteredFeaturedLessons.isEmpty &&
                                   _filteredAllLessons.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    _searchController.text.isNotEmpty ||
-                                            _filterTechniqueId != null
-                                        ? 'Nenhuma lição encontrada.'
-                                        : 'Nenhuma lição cadastrada.',
-                                    style: const TextStyle(
-                                        color: AppTheme.textSecondary),
+                              ? const AppScreenState.empty(
+                                  message: 'Nenhuma lição encontrada.')
+                              : AppListScaffold(
+                                  onRefresh: () => _load(),
+                                  children: List.generate(
+                                    _getTotalItemCount(),
+                                    (index) => _buildListItem(context, index),
                                   ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  itemCount: _getTotalItemCount(),
-                                  itemBuilder: (context, index) {
-                                    return _buildListItem(context, index);
-                                  },
                                 ),
                         ),
                       ],

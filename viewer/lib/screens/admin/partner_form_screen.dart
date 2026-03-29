@@ -5,6 +5,8 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Formulário criar/editar parceiro da academia.
 class PartnerFormScreen extends StatefulWidget {
@@ -82,8 +84,10 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
         );
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.partner != null ? 'Parceiro atualizado' : 'Parceiro criado')),
+        AppFeedback.show(
+          context,
+          message: widget.partner != null ? 'Parceiro atualizado' : 'Parceiro criado',
+          type: AppFeedbackType.success,
         );
         Navigator.pop(context);
       }
@@ -101,12 +105,8 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
   Widget build(BuildContext context) {
     final isEdit = widget.partner != null;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEdit ? 'Editar parceiro' : 'Novo parceiro'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+      appBar: AppStandardAppBar(
+        title: isEdit ? 'Editar parceiro' : 'Novo parceiro',
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),

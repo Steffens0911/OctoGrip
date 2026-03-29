@@ -8,6 +8,8 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class UserFormScreen extends StatefulWidget {
   final models.UserModel? user;
@@ -104,8 +106,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
             academyId: academyId,
           );
           if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(const SnackBar(content: Text('Usuário criado')));
+            AppFeedback.show(
+              context,
+              message: 'Usuário criado',
+              type: AppFeedbackType.success,
+            );
             Navigator.pop(context);
           }
         } else {
@@ -118,8 +123,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
             academyId: isAdmin ? (values['academyId'] as String?) : null,
           );
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Usuário atualizado')));
+            AppFeedback.show(
+              context,
+              message: 'Usuário atualizado',
+              type: AppFeedbackType.success,
+            );
             Navigator.pop(context);
           }
         }
@@ -141,11 +149,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final fixedAcademyId =
         isEdit ? widget.user!.academyId : AuthService().currentUser?.academyId;
     return Scaffold(
-      appBar: AppBar(
-          title: Text(isEdit ? 'Editar usuário' : 'Novo usuário'),
-          leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context))),
+      appBar: AppStandardAppBar(
+        title: isEdit ? 'Editar usuário' : 'Novo usuário',
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: FormBuilder(

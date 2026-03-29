@@ -17,6 +17,8 @@ os.environ.setdefault(
     "postgresql://jjb:jjb_secret@localhost:5432/jjb_db_test",
 )
 os.environ["SEED_ON_STARTUP"] = "false"
+# Evita 429 no endpoint GET /admin/backup/database (SlowAPI) ao correr a suíte de testes.
+os.environ["BACKUP_DOWNLOAD_RATE_LIMIT"] = "200/minute"
 
 from app.config import settings  # noqa: E402
 from app.core.security import create_access_token, hash_password_sync  # noqa: E402

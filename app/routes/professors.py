@@ -111,6 +111,10 @@ async def professor_delete(
     current_user: User = Depends(require_admin_or_academy_access),
 ):
     """Remove um professor."""
+    professor = await get_professor(db, professor_id)
+    if not professor:
+        raise ProfessorNotFoundError()
+    verify_academy_access(current_user, str(professor.academy_id) if professor.academy_id else None)
     if not await delete_professor(db, professor_id):
         raise ProfessorNotFoundError()
     return None

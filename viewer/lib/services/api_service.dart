@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -21,6 +22,8 @@ import 'package:viewer/models/usage_metrics.dart';
 import 'dart:typed_data';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/backup_multipart_io.dart'
+    if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart' as backup_multipart;
 
 class ApiException implements Exception {
   final int statusCode;
@@ -164,7 +167,12 @@ class ApiService {
   Future<dynamic> _decodeResponse(http.Response r) async {
     final body = r.body;
     if (body.isEmpty) return null;
-    return jsonDecode(body);
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      // Resposta não-JSON (proxy, HTML); _throwIfNotOk usa statusCode + reasonPhrase
+      return null;
+    }
   }
 
   /// Formata `detail` do FastAPI (string, lista de erros de validação, etc.).
@@ -200,8 +208,15 @@ class ApiService {
       AuthService().logout(notifyInvalidated: true);
     }
     String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
-    if (data is Map && data['detail'] != null) {
-      msg = formatApiDetail(data['detail']);
+    if (data is Map) {
+      if (data['detail'] != null) {
+        msg = formatApiDetail(data['detail']);
+      } else {
+        final err = data['error'];
+        if (err is Map && err['message'] != null) {
+          msg = '${err['message']}';
+        }
+      }
     }
     if (r.statusCode == 404) {
       msg = 'Não encontrado (404). Verifique se a API está rodando em $baseUrl';
@@ -1541,6 +1556,128 @@ class ApiService {
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/training_videos');
+  }
+
+  static const _backupDownloadTimeout = Duration(minutes: 10);
+  /// Alinhar com BACKUP_PSQL_RESTORE_TIMEOUT_SEC (até 2h) + upload de ZIP grande.
+  static const _restoreBackupTimeout = Duration(hours: 2, minutes: 15);
+
+  /// Dump SQL completo do PostgreSQL (apenas administrador).
+  /// Sem impersonação no header (necessário durante "Atuar como").
+  Future<Uint8List> downloadDatabaseBackup() async {
+    final uri = Uri.parse('$baseUrl/admin/backup/database');
+    final r = await http
+        .get(uri, headers: await _headers(auth: true, realUserOnly: true))
+        .timeout(_backupDownloadTimeout);
+    if (r.statusCode >= 200 && r.statusCode < 300) {
+      return r.bodyBytes;
+    }
+    dynamic data;
+    try {
+      if (r.body.isNotEmpty) {
+        data = jsonDecode(r.body);
+      }
+    } catch (_) {
+      data = null;
+    }
+    _throwIfNotOk(r, data);
+    throw ApiException(r.statusCode, r.reasonPhrase ?? 'Erro ao baixar backup');
+  }
+
+  /// ZIP com database.sql + pasta media/ (logos, horários).
+  Future<Uint8List> downloadBackupArchive() async {
+    final uri = Uri.parse('$baseUrl/admin/backup/archive');
+    final r = await http
+        .get(uri, headers: await _headers(auth: true, realUserOnly: true))
+        .timeout(_backupDownloadTimeout);
+    if (r.statusCode >= 200 && r.statusCode < 300) {
+      return r.bodyBytes;
+    }
+    dynamic data;
+    try {
+      if (r.body.isNotEmpty) {
+        data = jsonDecode(r.body);
+      }
+    } catch (_) {
+      data = null;
+    }
+    _throwIfNotOk(r, data);
+    throw ApiException(r.statusCode, r.reasonPhrase ?? 'Erro ao baixar arquivo ZIP');
+  }
+
+  /// Restaura banco (destrutivo) e opcionalmente mídia. Web: [bytes]; nativo: [filePath] ou [bytes].
+  ///
+  /// O timeout cobre envio do ZIP + tempo do `psql` no servidor (pode demorar muito).
+  Future<Map<String, dynamic>> restoreBackupZip({
+    List<int>? bytes,
+    String? filePath,
+    required String filename,
+  }) {
+    final minutes = _restoreBackupTimeout.inMinutes;
+    return Future(() async {
+      final uri = Uri.parse('$baseUrl/admin/backup/restore');
+      final request = http.MultipartRequest('POST', uri);
+      request.headers.addAll(await _headers(auth: true, realUserOnly: true));
+      await backup_multipart.attachRestoreZip(
+        request,
+        bytes: bytes,
+        path: filePath,
+        filename: filename,
+      );
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        invalidateCache();
+        if (response.body.isEmpty) {
+          return <String, dynamic>{
+            'ok': true,
+            'restored_media': null,
+            'note': 'Resposta vazia; confirme login e dados após recarregar.',
+          };
+        }
+        dynamic decoded;
+        try {
+          decoded = jsonDecode(response.body);
+        } catch (_) {
+          throw ApiException(
+            response.statusCode,
+            'A API devolveu uma resposta que não é JSON após a restauração. '
+            'Reinicie a API (docker compose restart api), recarregue a página e faça login.',
+          );
+        }
+        if (decoded is! Map) {
+          throw ApiException(response.statusCode, 'Resposta inesperada após restauração.');
+        }
+        return Map<String, dynamic>.from(decoded);
+      }
+      dynamic data;
+      try {
+        if (response.body.isNotEmpty) {
+          data = jsonDecode(response.body);
+        }
+      } catch (_) {
+        data = null;
+      }
+      if (response.body.isEmpty && response.statusCode >= 400) {
+        throw ApiException(
+          response.statusCode,
+          'Resposta vazia do servidor (a API pode ter reiniciado ou caído durante o restore). '
+          'Aguarde 1–2 min, execute docker compose restart api e tente de novo.',
+        );
+      }
+      _throwIfNotOk(response, data);
+      throw ApiException(response.statusCode, response.reasonPhrase ?? 'Erro na restauração');
+    }).timeout(
+      _restoreBackupTimeout,
+      onTimeout: () {
+        throw TimeoutException(
+          'Tempo esgotado após $minutes minutos. O servidor pode ainda estar a restaurar bases grandes. '
+          'Aguarde 2–5 minutos, reinicie a API (docker compose restart api), recarregue a página e tente entrar. '
+          'Consulte os logs: docker compose logs api',
+          _restoreBackupTimeout,
+        );
+      },
+    );
   }
 }
 

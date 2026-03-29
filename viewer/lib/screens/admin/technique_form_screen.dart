@@ -5,6 +5,8 @@ import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class TechniqueFormScreen extends StatefulWidget {
   final String academyId;
@@ -109,7 +111,11 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
           );
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Salvo')));
+          AppFeedback.show(
+            context,
+            message: 'Salvo',
+            type: AppFeedbackType.success,
+          );
           Navigator.pop(context, saved);
         }
       } catch (e) {
@@ -121,9 +127,8 @@ class _TechniqueFormScreenState extends State<TechniqueFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.technique == null ? 'Nova técnica' : 'Editar técnica'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+      appBar: AppStandardAppBar(
+        title: widget.technique == null ? 'Nova técnica' : 'Editar técnica',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),

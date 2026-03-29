@@ -14,6 +14,8 @@ import 'package:viewer/screens/admin/trophy_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Detalhe da academia: missão do dia (técnica), ranking, dificuldades, relatório semanal.
 class AcademyDetailScreen extends StatefulWidget {
@@ -49,7 +51,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _savingTheme = false;
   bool _resetting = false;
   Map<String, dynamic>? _ranking;
-  Map<String, dynamic>? _difficulties;
   AcademyWeeklyReport? _weeklyReport;
   bool _loadingExtra = true;
   String? _errorExtra;
@@ -124,12 +125,11 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     });
     try {
       final ranking = await _api.getAcademyRanking(_academy.id);
-      final difficulties = await _api.getAcademyDifficulties(_academy.id);
+      await _api.getAcademyDifficulties(_academy.id);
       final report = await _api.getAcademyWeeklyReport(_academy.id);
       if (mounted) {
         setState(() {
         _ranking = ranking;
-        _difficulties = difficulties;
         _weeklyReport = report;
         _loadingExtra = false;
       });
@@ -198,19 +198,20 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _logoUrlController.text = updated.logoUrl ?? '';
         _uploadingLogo = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Brasão da academia atualizado.'),
-          backgroundColor: AppTheme.primary,
-        ),
+      AppFeedback.show(
+        context,
+        message: 'Brasão da academia atualizado.',
+        type: AppFeedbackType.success,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _uploadingLogo = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e))),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -248,19 +249,20 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _scheduleImageCacheBuster = DateTime.now().millisecondsSinceEpoch;
       });
       _api.invalidateCache('GET:${_api.baseUrl}/academies');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Quadro de horários atualizado.'),
-          backgroundColor: AppTheme.primary,
-        ),
+      AppFeedback.show(
+        context,
+        message: 'Quadro de horários atualizado.',
+        type: AppFeedbackType.success,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _uploadingScheduleImage = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e))),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -313,18 +315,20 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _showGlobalSupporters = updated.showGlobalSupporters;
         _savingVisibility = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Visibilidade atualizada na tela do aluno.'),
-        ),
+      AppFeedback.show(
+        context,
+        message: 'Visibilidade atualizada na tela do aluno.',
+        type: AppFeedbackType.success,
       );
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _savingVisibility = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(userFacingMessage(e))),
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
       );
     }
   }
@@ -339,13 +343,11 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         !isValidRewardPoints(e1) ||
         !isValidRewardPoints(e2) ||
         !isValidRewardPoints(e3)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Pontuação de cada missão semanal deve estar entre '
-            '$minRewardPoints e $maxRewardPoints.',
-          ),
-        ),
+      AppFeedback.show(
+        context,
+        message:
+            'Pontuação de cada missão semanal deve estar entre $minRewardPoints e $maxRewardPoints.',
+        type: AppFeedbackType.warning,
       );
       return;
     }
@@ -381,19 +383,21 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           _savingTheme = false;
         });
         widget.onUpdated();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(_weeklyTechniqueId != null || _weeklyTechnique2Id != null || _weeklyTechnique3Id != null
-                ? 'Missões semanais atualizadas para todos os alunos.'
-                : 'Tema salvo.'),
-          ),
+        AppFeedback.show(
+          context,
+          message: _weeklyTechniqueId != null || _weeklyTechnique2Id != null || _weeklyTechnique3Id != null
+              ? 'Missões semanais atualizadas para todos os alunos.'
+              : 'Tema salvo.',
+          type: AppFeedbackType.success,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _savingTheme = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -427,16 +431,20 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (mounted) {
         setState(() => _resetting = false);
         final msg = result['message'] as String? ?? 'Missões reiniciadas. Pontuação preservada.';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: AppTheme.primary),
+        AppFeedback.show(
+          context,
+          message: msg,
+          type: AppFeedbackType.success,
         );
         _loadRankingAndReport();
       }
     } catch (e) {
       if (mounted) {
         setState(() => _resetting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e)), backgroundColor: Theme.of(context).colorScheme.error),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -467,8 +475,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (mounted) widget.onDeleted();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -477,8 +487,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_academy.name),
+      appBar: AppStandardAppBar(
+        title: _academy.name,
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -536,8 +546,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             }
                           } catch (e) {
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(userFacingMessage(e))),
+                              AppFeedback.show(
+                                context,
+                                message: userFacingMessage(e),
+                                type: AppFeedbackType.error,
                               );
                             }
                           }

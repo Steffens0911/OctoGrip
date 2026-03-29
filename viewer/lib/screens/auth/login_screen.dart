@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/utils/api_base_persist.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_error_message.dart';
@@ -20,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _apiTunnelController = TextEditingController();
   bool _loading = false;
   String? _error;
 
@@ -27,11 +30,12 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _apiTunnelController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_loading) return;
+    if (_loading || kApiBaseUrl.isEmpty) return;
     setState(() {
       _error = null;
       _loading = true;
@@ -45,10 +49,11 @@ class _LoginScreenState extends State<LoginScreen> {
       AuthService().setLoggedIn(result.token, result.user);
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _error = userFacingMessage(e);
-          _loading = false;
-        });
+        setState(() => _error = userFacingMessage(e));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
       }
     }
   }
@@ -63,12 +68,19 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 360),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceOf(context).withValues(alpha: 0.96),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppTheme.borderOf(context)),
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                       const Icon(
                       Icons.sports_martial_arts_rounded,
                       size: 64,
@@ -91,7 +103,50 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 32),
+                      if (kApiBaseUrl.isEmpty) ...[
+                        const SizedBox(height: 20),
+                        const AppErrorMessage(
+                          message: kWebTrycloudflareMissingApiBaseMessage,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _apiTunnelController,
+                          keyboardType: TextInputType.url,
+                          textInputAction: TextInputAction.done,
+                          decoration: const InputDecoration(
+                            labelText: 'URL do túnel da API',
+                            hintText: 'https://….trycloudflare.com',
+                            prefixIcon: Icon(Icons.link),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.tonal(
+                          onPressed: () {
+                            final u = _apiTunnelController.text.trim();
+                            if (u.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cole a URL do cloudflared da API.'),
+                                ),
+                              );
+                              return;
+                            }
+                            if (!u.startsWith('https://') && !u.startsWith('http://')) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('A URL deve começar por https:// ou http://'),
+                                ),
+                              );
+                              return;
+                            }
+                            persistApiBaseAndReload(u);
+                          },
+                          child: const Text('Guardar URL da API e recarregar'),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
                       TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -106,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (v == null || v.trim().isEmpty) return 'Informe o e-mail';
                         return validateEmail(v);
                       },
-                        enabled: !_loading,
+                        enabled: !_loading && kApiBaseUrl.isNotEmpty,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -123,15 +178,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         if (v == null || v.isEmpty) return 'Informe a senha';
                         return null;
                       },
-                        enabled: !_loading,
+                        enabled: !_loading && kApiBaseUrl.isNotEmpty,
                       ),
                       if (_error != null) ...[
                       const SizedBox(height: 16),
                       AppErrorMessage(message: _error!),
                       ],
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       FilledButton(
-                      onPressed: _loading ? null : () {
+                      onPressed: _loading || kApiBaseUrl.isEmpty
+                          ? null
+                          : () {
                         if (_formKey.currentState?.validate() ?? false) _login();
                       },
                       style: FilledButton.styleFrom(
@@ -146,7 +203,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             )
                           : const Text('Entrar'),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

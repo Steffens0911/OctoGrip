@@ -4,6 +4,7 @@ import 'package:viewer/models/professor.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 
 /// Lista e CRUD de professores (seção professor).
 class ProfessorsScreen extends StatefulWidget {
@@ -72,8 +73,10 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingMessage(e))),
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
         );
       }
     }
@@ -122,15 +125,19 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
               final name = nameController.text.trim();
               final email = emailController.text.trim();
               if (name.isEmpty || email.isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  const SnackBar(content: Text('Preencha nome e e-mail.')),
+                AppFeedback.show(
+                  ctx,
+                  message: 'Preencha nome e e-mail.',
+                  type: AppFeedbackType.warning,
                 );
                 return;
               }
               final emailErr = validateEmail(email);
               if (emailErr != null) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(emailErr)),
+                AppFeedback.show(
+                  ctx,
+                  message: emailErr,
+                  type: AppFeedbackType.warning,
                 );
                 return;
               }
@@ -144,8 +151,10 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
                 if (mounted) _load();
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(userFacingMessage(e))),
+                  AppFeedback.show(
+                    context,
+                    message: userFacingMessage(e),
+                    type: AppFeedbackType.error,
                   );
                 }
               }
@@ -250,7 +259,7 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
                         title: Text('Editar'),
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: ListTile(
                         leading: Icon(Icons.delete, color: Theme.of(ctx).colorScheme.error),
@@ -265,11 +274,10 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
           },
         ),
       ),
-    ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
-    )
+    );
   }
 }

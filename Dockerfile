@@ -31,6 +31,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=builder /root/.local /home/app/.local
 RUN chown -R app:app /home/app/.local
 
+# Cliente PostgreSQL 16 (pg_dump/psql) — mesma major que o serviço postgres no compose (evita "server version mismatch")
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && wget -qO /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-16 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copiar código (ownership para app) e garantir permissão de escrita em /app/app_media
 COPY --chown=app:app . .
 RUN mkdir -p /app/app_media && chown -R app:app /app

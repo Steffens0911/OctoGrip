@@ -5,6 +5,8 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/mission_form_screen.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -96,118 +98,128 @@ class _MissionListScreenState extends State<MissionListScreen> {
     try {
       await _api.deleteMission(m.id);
       if (mounted) _load();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Missão excluída')));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: 'Missão excluída',
+          type: AppFeedbackType.success,
+        );
+      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(userFacingMessage(e))));
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Missões'), leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context))),
-      body: _loading ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
-          : _error != null ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-          : _allItems.isEmpty ? const Center(child: Text('Nenhuma missão. Toque em + para criar.'))
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
+      appBar: const AppStandardAppBar(title: 'Missões'),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+          : _error != null
+              ? Center(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      TextField(
-                        controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Buscar por tema ou técnica',
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _applyFilters();
-                                  },
-                                )
-                              : null,
-                        ),
-                        onChanged: (_) => _applyFilters(),
-                      ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        initialValue: _filterLevel,
-                        decoration: const InputDecoration(
-                          labelText: 'Nível',
-                          hintText: 'Todos',
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                          isDense: true,
-                        ),
-                        items: [
-                          const DropdownMenuItem(value: null, child: Text('Todos')),
-                          ..._levels.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
-                        ],
-                        onChanged: (v) {
-                          setState(() => _filterLevel = v);
-                          _applyFilters();
-                        },
-                      ),
-                      if (_searchController.text.isNotEmpty || _filterLevel != null)
+                      Text(_error!),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _load, child: const Text('Tentar novamente')),
+                    ],
+                  ),
+                )
+              : _allItems.isEmpty
+                  ? const Center(child: Text('Nenhuma missão. Toque em + para criar.'))
+                  : Column(
+                      children: [
                         Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Row(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                              TextField(
+                                controller: _searchController,
+                                decoration: InputDecoration(
+                                  hintText: 'Buscar por tema ou técnica',
+                                  prefixIcon: const Icon(Icons.search),
+                                  suffixIcon: _searchController.text.isNotEmpty
+                                      ? IconButton(
+                                          icon: const Icon(Icons.clear),
+                                          onPressed: () {
+                                            _searchController.clear();
+                                            _applyFilters();
+                                          },
+                                        )
+                                      : null,
                                 ),
+                                onChanged: (_) => _applyFilters(),
                               ),
-                              TextButton(
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() => _filterLevel = null);
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _filterLevel,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nível',
+                                  hintText: 'Todos',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                  isDense: true,
+                                ),
+                                items: [
+                                  const DropdownMenuItem(value: null, child: Text('Todos')),
+                                  ..._levels.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _filterLevel = v);
                                   _applyFilters();
                                 },
-                                child: const Text('Limpar filtros'),
                               ),
                             ],
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  floatingActionButton: AuthService().canEditResources() ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add)) : null,
-                  child: RefreshIndicator(
-                    onRefresh: _load,
-                    child: _filteredItems.isEmpty
-                        ? Center(
-                            child: Text(
-                              _searchController.text.isNotEmpty || _filterLevel != null
-                                  ? 'Nenhuma missão encontrada.'
-                                  : 'Nenhuma missão. Toque em + para criar.',
-                              style: const const const TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _filteredItems.length,
-                            itemBuilder: (context, i) {
-                              final m = _filteredItems[i];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      title: Text(_missionTitle(m)),
-                      subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
-                      trailing: AuthService().canEditResources() ? Row(mainAxisSize: MainAxisSize.min, children: [
-                        IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),
-                        IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(m)),
-                      ]) : null,
-                      onTap: () => _openForm(m),
+                        Expanded(
+                          child: RefreshIndicator(
+                            onRefresh: _load,
+                            child: _filteredItems.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'Nenhuma missão encontrada.',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  )
+                                : ListView.builder(
+                                    padding: const EdgeInsets.all(16),
+                                    itemCount: _filteredItems.length,
+                                    itemBuilder: (context, i) {
+                                      final m = _filteredItems[i];
+                                      return Card(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        child: ListTile(
+                                          title: Text(_missionTitle(m)),
+                                          subtitle: Text('${m.startDate} – ${m.endDate} · ${m.level}${m.theme != null && m.theme!.isNotEmpty ? " · ${m.theme}" : ""}'),
+                                          trailing: AuthService().canEditResources()
+                                              ? Row(mainAxisSize: MainAxisSize.min, children: [
+                                                  IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(m)),
+                                                  IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(m)),
+                                                ])
+                                              : null,
+                                          onTap: () => _openForm(m),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              ),
-            ),
+      floatingActionButton: AuthService().canEditResources()
+          ? FloatingActionButton(
+              onPressed: () => _openForm(),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }
