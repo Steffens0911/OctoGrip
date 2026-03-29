@@ -142,6 +142,8 @@ class _MainShellState extends State<MainShell> {
   int _selected = 0;
   int _inicioRefreshKey = 0;
   String? _lastEffectiveUserId;
+  /// Último contador vindo da [StudentHomeScreen] (badge na aba Missões).
+  int _pendingConfirmationsNavBadge = 0;
 
   @override
   void initState() {
@@ -159,15 +161,25 @@ class _MainShellState extends State<MainShell> {
     return ['Missões', 'Painel'];
   }
 
+  Widget _missionsHome() {
+    return StudentHomeScreen(
+      refreshTrigger: _inicioRefreshKey,
+      onPendingConfirmationsCountChanged: (count) {
+        if (!mounted) return;
+        setState(() => _pendingConfirmationsNavBadge = count);
+      },
+    );
+  }
+
   Widget _currentBody(AuthService auth, List<String> tabs) {
     if (_selected == 0) {
-      return StudentHomeScreen(refreshTrigger: _inicioRefreshKey);
+      return _missionsHome();
     } else if (_selected == 1) {
       return const AcademyPanelScreen();
     } else if (_selected == 2) {
       return const AdminSectionScreen();
     }
-    return StudentHomeScreen(refreshTrigger: _inicioRefreshKey);
+    return _missionsHome();
   }
 
   void _showImpersonateDialog() {
@@ -226,6 +238,7 @@ class _MainShellState extends State<MainShell> {
           setState(() {
           _lastEffectiveUserId = effectiveId;
           _inicioRefreshKey++;
+          _pendingConfirmationsNavBadge = 0;
         });
         }
       });
@@ -341,6 +354,9 @@ class _MainShellState extends State<MainShell> {
                     icon: Icons.emoji_events_rounded,
                     label: 'Missões',
                     selected: _selected == 0,
+                    badgeCount: _pendingConfirmationsNavBadge > 0
+                        ? _pendingConfirmationsNavBadge
+                        : null,
                     onTap: () => setState(() {
                       _selected = 0;
                       _inicioRefreshKey++;
@@ -374,12 +390,15 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  /// Se não nulo e > 0, exibe [Badge] no ícone (ex.: confirmações pendentes).
+  final int? badgeCount;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
+    this.badgeCount,
   });
 
   @override
@@ -387,6 +406,21 @@ class _NavItem extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final primary = colorScheme.primary;
     final onSurfaceVariant = colorScheme.onSurfaceVariant;
+    Widget iconWidget = Icon(
+      icon,
+      size: 24,
+      color: selected ? primary : onSurfaceVariant,
+    );
+    final bc = badgeCount;
+    if (bc != null && bc > 0) {
+      iconWidget = Badge(
+        label: Text(
+          bc > 99 ? '99+' : '$bc',
+          style: const TextStyle(fontSize: 10),
+        ),
+        child: iconWidget,
+      );
+    }
     return Expanded(
       child: Material(
         color: Colors.transparent,
@@ -403,11 +437,7 @@ class _NavItem extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  size: 24,
-                  color: selected ? primary : onSurfaceVariant,
-                ),
+                iconWidget,
                 const SizedBox(height: 4),
                 Text(
                   label,

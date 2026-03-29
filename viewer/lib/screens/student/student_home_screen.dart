@@ -23,16 +23,25 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
+import 'package:viewer/widgets/gamification/streak_widget.dart';
+import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/partners_card.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
-  const StudentHomeScreen({super.key, this.refreshTrigger = 0});
+  const StudentHomeScreen({
+    super.key,
+    this.refreshTrigger = 0,
+    this.onPendingConfirmationsCountChanged,
+  });
 
   /// Incrementado ao tocar na aba Início; em didUpdateWidget dispara _load() para atualizar missões.
   final int refreshTrigger;
+
+  /// Notifica o shell (ex.: badge na aba Missões) quando o contador de confirmações pendentes muda.
+  final ValueChanged<int>? onPendingConfirmationsCountChanged;
 
   @override
   State<StudentHomeScreen> createState() => _StudentHomeScreenState();
@@ -48,6 +57,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   int? _nextLevelThreshold;
   Map<String, dynamic>? _collectiveGoal;
   int _pendingConfirmationsCount = 0;
+  /// Esconde o banner até o contador mudar de valor (nova carga da API).
+  bool _pendingBannerDismissed = false;
+  /// Bottom sheet de lembrete só uma vez por vida do State (sessão na aba Missões).
+  bool _pendingBottomSheetShownThisSession = false;
   TrainingVideo? _dailyVideo;
   int _dailyVideoPoints = 0;
   bool _dailyVideoCompleted = false;
@@ -60,6 +73,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _showPartners = true;
   bool _showSchedule = true;
   bool _showGlobalSupporters = true;
+  /// Missão recém-concluída (pulso no [WeeklyMissionPath]); limpo após animar.
+  String? _celebrateMissionId;
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
   static String _levelFromGraduation(String? g) {
@@ -135,6 +150,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     setState(() {
       _loading = true;
       _error = null;
+      _celebrateMissionId = null;
       _missionWeek = null;
       _academyLogoUrl = null;
       _academyScheduleImageUrl = null;
@@ -160,6 +176,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loading = false;
         _pendingConfirmationsCount = 0;
       });
+      widget.onPendingConfirmationsCountChanged?.call(0);
       return;
     }
     try {
@@ -174,7 +191,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       ]);
       if (mounted) {
         setState(() => _loading = false);
-        _maybeShowRandomPartnerHighlight();
+        await _runPostLoadNudges();
       }
     } catch (e) {
       if (mounted) {
@@ -184,6 +201,69 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         });
       }
     }
+  }
+
+  /// Parceiro em destaque (se houver) e depois lembrete de confirmações pendentes (sheet único por sessão).
+  Future<void> _runPostLoadNudges() async {
+    await _maybeShowRandomPartnerHighlight();
+    await _maybeShowPendingConfirmationsBottomSheet();
+  }
+
+  Future<void> _maybeShowPendingConfirmationsBottomSheet() async {
+    if (!mounted) return;
+    if (_pendingBottomSheetShownThisSession) return;
+    if (_pendingConfirmationsCount <= 0) return;
+    _pendingBottomSheetShownThisSession = true;
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted || _pendingConfirmationsCount <= 0) return;
+    final n = _pendingConfirmationsCount;
+    final u = _selectedUser;
+    if (u == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final bottomInset = MediaQuery.paddingOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Confirmações pendentes',
+                style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                n == 1
+                    ? 'Há 1 execução aguardando sua confirmação. Confirme para o colega ganhar os pontos.'
+                    : 'Há $n execuções aguardando sua confirmação. Confirme para os colegas ganharem os pontos.',
+                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textSecondaryOf(ctx),
+                    ),
+              ),
+              const SizedBox(height: 24),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _openPendingConfirmationsScreen();
+                },
+                icon: const Icon(Icons.how_to_reg_rounded),
+                label: const Text('Ir confirmar'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Depois'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _maybeShowRandomPartnerHighlight() async {
@@ -306,9 +386,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Future<void> _loadPendingConfirmationsWith() async {
     try {
       final count = await _api.getPendingConfirmationsCount();
-      if (mounted) setState(() => _pendingConfirmationsCount = count);
+      if (!mounted) return;
+      final prev = _pendingConfirmationsCount;
+      setState(() {
+        if (count != prev) _pendingBannerDismissed = false;
+        _pendingConfirmationsCount = count;
+      });
+      widget.onPendingConfirmationsCountChanged?.call(count);
     } catch (_) {
-      if (mounted) setState(() => _pendingConfirmationsCount = 0);
+      if (!mounted) return;
+      setState(() => _pendingConfirmationsCount = 0);
+      widget.onPendingConfirmationsCountChanged?.call(0);
     }
   }
 
@@ -373,15 +461,60 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   void _openLesson(LessonViewData data) async {
+    final openedMissionId = data.missionId;
+    final trackCelebrate =
+        openedMissionId != null && openedMissionId.isNotEmpty && !data.alreadyCompleted;
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => LessonViewScreen(data: data),
       ),
     );
-    _loadMissionWeek();
-    _loadUserPoints();
-    _loadCollectiveGoal();
+    await _loadMissionWeek();
+    await _loadUserPoints();
+    await _loadCollectiveGoal();
+    if (!mounted) return;
+    if (trackCelebrate) {
+      MissionToday? hit;
+      for (final e in _missionWeek?.entries ?? const <MissionWeekSlot>[]) {
+        if (e.mission?.missionId == openedMissionId) {
+          hit = e.mission;
+          break;
+        }
+      }
+      if (hit != null && hit.alreadyCompleted) {
+        setState(() => _celebrateMissionId = openedMissionId);
+        Future<void>.delayed(const Duration(milliseconds: 1200), () {
+          if (!mounted) return;
+          setState(() {
+            if (_celebrateMissionId == openedMissionId) {
+              _celebrateMissionId = null;
+            }
+          });
+        });
+      }
+    }
+  }
+
+  void _openMissionFromPath(MissionToday m, String _) {
+    final u = _selectedUser;
+    if (u == null) return;
+    _openLesson(
+      LessonViewData(
+        lessonId: m.lessonId,
+        missionId: m.missionId,
+        title: m.lessonTitle.isNotEmpty ? m.lessonTitle : m.techniqueName,
+        description: m.description,
+        videoUrl: m.videoUrl,
+        userId: u.id,
+        academyId: u.academyId,
+        techniqueName: m.techniqueName,
+        positionName: m.positionName,
+        multiplier: m.multiplier,
+        estimatedDurationSeconds: m.estimatedDurationSeconds,
+        alreadyCompleted: m.alreadyCompleted,
+      ),
+    );
   }
 
   /// Vídeo do dia que pontua: primeiro da lista getTrainingVideosToday da academia do usuário.
@@ -495,12 +628,25 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     dailyVideoCompleted: _dailyVideoCompleted,
                     onDailyVideoTap: _onDailyVideoTap,
                   ),
+                  if (_pendingConfirmationsCount > 0 &&
+                      !_pendingBannerDismissed &&
+                      u != null) ...[
+                    const SizedBox(height: 10),
+                    _buildPendingConfirmationsBanner(),
+                  ],
+                  const SizedBox(height: 10),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: StreakWidget(showPlaceholder: true),
+                  ),
                   const SizedBox(height: 10),
                   if (_collectiveGoal != null) ...[
                     _buildCollectiveGoalCard(),
                     const SizedBox(height: 14),
-                  ] else if (_missionWeek != null) ...[
-                    _buildWeeklyMilestoneCard(),
+                  ],
+                  if (_missionWeek != null &&
+                      _missionWeek!.entries.isNotEmpty) ...[
+                    _buildWeeklyMissionPathSection(),
                     const SizedBox(height: 14),
                   ],
                   if (u != null &&
@@ -548,6 +694,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _buildScheduleCard(),
                   ],
                   if (_showGlobalSupporters) const GlobalSupportersSection(),
+                  if (u != null) ...[
+                    const SizedBox(height: 16),
+                    _buildConfirmationsAndRequestsSection(),
+                  ],
                 ],
               ),
             ),
@@ -657,6 +807,95 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
+  void _openPendingConfirmationsScreen() {
+    final u = _selectedUser;
+    if (u == null) return;
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => PendingConfirmationsScreen(
+          userId: u.id,
+          userName: _selectedUser?.name ?? _selectedUser?.email,
+        ),
+      ),
+    ).then((_) => _loadPendingConfirmationsWith());
+  }
+
+  /// Banner sob o header: confirmações pendentes (fechar só oculta até o contador mudar).
+  Widget _buildPendingConfirmationsBanner() {
+    final n = _pendingConfirmationsCount;
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: scheme.tertiaryContainer.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: scheme.tertiary.withValues(alpha: 0.45),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.notifications_active_rounded,
+              color: scheme.onTertiaryContainer,
+              size: 26,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    n == 1
+                        ? '1 confirmação pendente'
+                        : '$n confirmações pendentes',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: scheme.onTertiaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Confirme execuções em que você foi indicado como parceiro.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: scheme.onTertiaryContainer.withValues(alpha: 0.9),
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      TextButton(
+                        onPressed: _openPendingConfirmationsScreen,
+                        child: const Text('Abrir'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Ocultar',
+              onPressed: () =>
+                  setState(() => _pendingBannerDismissed = true),
+              icon: Icon(
+                Icons.close_rounded,
+                color: scheme.onTertiaryContainer,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildCollectiveGoalCard() {
     final g = _collectiveGoal!;
     final goal = g['goal'] as Map<String, dynamic>?;
@@ -712,243 +951,54 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildWeeklyMilestoneCard() {
-    final entries = _missionWeek?.entries ?? const <MissionWeekSlot>[];
-    final total = entries.length;
-    final completed =
-        entries.where((e) => e.mission?.alreadyCompleted ?? false).length;
-    final progress = total > 0 ? (completed / total).clamp(0.0, 1.0) : 0.0;
-    final remaining = total > 0 ? (total - completed) : 0;
-
-    final headline = total == 0
-        ? 'Milestone semanal'
-        : completed >= total
-            ? 'Ciclo semanal concluído'
-            : 'Você já concluiu $completed de $total missões';
-    final message = total == 0
-        ? 'Quando as missões da semana estiverem disponíveis, acompanhe sua evolução aqui.'
-        : completed >= total
-            ? 'Excelente consistência! Seu progresso da semana está completo.'
-            : 'Faltam $remaining missão(ões) para concluir seu ciclo desta semana.';
-
+  /// Caminho ●──●──● no scroll principal (técnicas + toque → lição); sem título duplicado.
+  Widget _buildWeeklyMissionPathSection() {
+    final week = _missionWeek;
+    final u = _selectedUser;
+    if (week == null || u == null) return const SizedBox.shrink();
+    final entries = week.entries;
+    if (entries.isEmpty) return const SizedBox.shrink();
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
       decoration: BoxDecoration(
         color: AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.borderOf(context)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            headline,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppTheme.textPrimaryOf(context),
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondaryOf(context),
-                ),
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              backgroundColor: AppTheme.borderOf(context),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
-              minHeight: 8,
-            ),
-          ),
-        ],
+      child: WeeklyMissionPath(
+        slots: entries,
+        onMissionTap: _openMissionFromPath,
+        celebrateMissionId: _celebrateMissionId,
+        onCelebrateComplete: () {
+          if (mounted) {
+            setState(() => _celebrateMissionId = null);
+          }
+        },
       ),
     );
   }
 
-  Widget _buildMissionWeekSection() {
-    final entries = _missionWeek!.entries;
-    if (entries.isEmpty) return const SizedBox.shrink();
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceOf(context),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderOf(context)),
-          ),
-          child: ExpansionTile(
-            initiallyExpanded: false,
-            tilePadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            leading: const Icon(Icons.flag, color: AppTheme.primary, size: 28),
-            title: Text(
-              'Missões da semana',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppTheme.textPrimaryOf(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-            children: [
-              for (int i = 0; i < entries.length; i++) ...[
-                if (i > 0) const SizedBox(height: 12),
-                _buildMissionCard(entries[i].periodLabel, entries[i].mission),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMissionCard(String periodLabel, MissionToday? m) {
-    if (m == null) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppTheme.surfaceOf(context),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderOf(context)),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.flag_outlined, color: Colors.grey.shade400, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    periodLabel,
-                    style: TextStyle(
-                      color: AppTheme.textSecondaryOf(context),
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Nenhuma missão neste período',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    final data = LessonViewData(
-      lessonId: m.lessonId,
-      missionId: m.missionId,
-      title: m.lessonTitle.isNotEmpty ? m.lessonTitle : m.techniqueName,
-      description: m.description,
-      videoUrl: m.videoUrl,
-      userId: _selectedUser!.id,
-      academyId: _selectedUser!.academyId,
-      techniqueName: m.techniqueName,
-      positionName: m.positionName,
-      multiplier: m.multiplier,
-      estimatedDurationSeconds: m.estimatedDurationSeconds,
-      alreadyCompleted: m.alreadyCompleted,
-    );
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderOf(context)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.flag, color: AppTheme.primary, size: 28),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  m.techniqueName.isNotEmpty ? m.techniqueName : periodLabel,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: AppTheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
-              if (m.alreadyCompleted)
-                Icon(Icons.check_circle,
-                    color: Colors.green.shade700, size: 22),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            m.missionTitle.isNotEmpty ? m.missionTitle : m.lessonTitle,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppTheme.textPrimaryOf(context),
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          if (m.techniqueName.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              m.positionName.isNotEmpty
-                  ? '${m.techniqueName} ${m.positionName}'
-                  : m.techniqueName,
-              style: TextStyle(
-                  color: AppTheme.textSecondaryOf(context), fontSize: 14),
-            ),
-          ],
-          if (m.estimatedDurationSeconds != null &&
-              m.estimatedDurationSeconds! > 0) ...[
-            const SizedBox(height: 4),
-            Text(
-              '~${m.estimatedDurationSeconds! ~/ 60} min',
-              style: TextStyle(
-                  color: AppTheme.textSecondaryOf(context), fontSize: 12),
-            ),
-          ],
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () => _openLesson(data),
-            icon: Icon(
-                m.alreadyCompleted
-                    ? Icons.visibility_rounded
-                    : Icons.play_arrow_rounded,
-                size: 20),
-            label: Text(m.alreadyCompleted ? 'Ver novamente' : 'Começar'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Acordeom pai que agrupa Missões da semana, Troféus e Confirmações e solicitações.
+  /// Acordeom pai: Troféus (confirmações no fim do scroll; missões no [WeeklyMissionPath] acima).
   Widget _buildMainAccordion() {
-    final missionWidget = _missionWeek != null
-        ? _buildMissionWeekSection()
-        : (_missionWeek == null && !_loading && _selectedUser != null
-            ? Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceOf(context),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.borderOf(context)),
-                ),
-                child: Text(
-                  _selectedUser!.academyId == null ||
-                          _selectedUser!.academyId!.isEmpty
-                      ? 'Configure a academia do usuário para ver as missões.'
-                      : 'Nenhuma missão da semana no momento.',
-                  style: TextStyle(color: AppTheme.textSecondaryOf(context)),
-                ),
-              )
-            : const SizedBox.shrink());
+    final missionHint = _missionWeek == null &&
+            !_loading &&
+            _selectedUser != null
+        ? Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceOf(context),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderOf(context)),
+            ),
+            child: Text(
+              _selectedUser!.academyId == null ||
+                      _selectedUser!.academyId!.isEmpty
+                  ? 'Configure a academia do usuário para ver as missões.'
+                  : 'Nenhuma missão da semana no momento.',
+              style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+            ),
+          )
+        : null;
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ClipRRect(
@@ -974,11 +1024,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   ),
             ),
             children: [
-              missionWidget,
-              const SizedBox(height: 16),
+              if (missionHint != null) ...[
+                missionHint,
+                const SizedBox(height: 16),
+              ],
               if (_showTrophies) _buildTrophiesSection(),
-              const SizedBox(height: 16),
-              _buildConfirmationsAndRequestsSection(),
             ],
           ),
         ),
@@ -1074,15 +1124,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           title: 'Confirmações pendentes',
           subtitle: 'Confirmar execuções em você',
           showAlertBadge: hasConfirmationsAlert,
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PendingConfirmationsScreen(
-                userId: userId,
-                userName: _selectedUser?.name ?? _selectedUser?.email,
-              ),
-            ),
-          ).then((_) => _loadPendingConfirmationsWith()),
+          onTap: _openPendingConfirmationsScreen,
         ),
         const SizedBox(height: 8),
         AppNavigationTile(

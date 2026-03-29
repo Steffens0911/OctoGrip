@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/constants/reward_points.dart';
+import 'package:viewer/core/leveling.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/gamification/animated_button.dart';
+import 'package:viewer/widgets/gamification/reward_screen.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
@@ -61,6 +65,61 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     } catch (_) {
       // Ignora; botão continua habilitado se não souber
     }
+  }
+
+  /// Fallback se a resposta JSON não trouxer `points_awarded` (API antiga).
+  /// Alinhado ao backend: [clampRewardPoints] sobre o multiplicador da missão.
+  int _estimatedXpForMission() => clampRewardPoints(widget.data.multiplier);
+
+  int _estimatedXpForLessonOnly() => minRewardPoints;
+
+  int? _pointsAwardedFrom(Map<String, dynamic> body) {
+    final v = body['points_awarded'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return null;
+  }
+
+  /// Após POST bem-sucedido: busca pontos reais, mostra [RewardScreen], fecha a lição.
+  Future<void> _showRewardThenPopLesson({
+    required Map<String, dynamic> completeResponse,
+    required int xpFallback,
+    required String title,
+    String? subtitle,
+  }) async {
+    if (!mounted) return;
+    setState(() => _completing = false);
+
+    final fromApi = _pointsAwardedFrom(completeResponse);
+    final xpGained = fromApi ?? xpFallback;
+    final xpFootnote = fromApi == null
+        ? 'Estimativa no app; atualize a API para ver o valor exato.'
+        : null;
+
+    Map<String, dynamic> pointsMap;
+    try {
+      pointsMap = await _api.getUserPoints(widget.data.userId);
+    } catch (_) {
+      pointsMap = {'points': 0};
+    }
+    if (!mounted) return;
+    final prog = levelProgressFromUserPointsMap(pointsMap);
+    final fraction = prog.nextThreshold > 0
+        ? (prog.levelPoints / prog.nextThreshold).clamp(0.0, 1.0)
+        : 0.0;
+
+    await RewardScreen.show(
+      context,
+      title: title,
+      subtitle: subtitle,
+      xpGained: xpGained,
+      level: prog.level,
+      levelProgressFraction: fraction,
+      levelPointsInLevel: prog.levelPoints,
+      nextThreshold: prog.nextThreshold,
+      xpFootnote: xpFootnote,
+    );
+    if (mounted) Navigator.of(context).pop();
   }
 
   Future<void> _fetchLessonCompletedStatus() async {
@@ -201,17 +260,17 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       _error = null;
     });
     try {
-      await _api.postMissionComplete(
+      final res = await _api.postMissionComplete(
         missionId: missionId,
         usageType: usageType,
       );
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: 'Missão concluída!',
-        type: AppFeedbackType.success,
+      await _showRewardThenPopLesson(
+        completeResponse: res,
+        xpFallback: _estimatedXpForMission(),
+        title: 'Missão concluída!',
+        subtitle: 'Ótimo treino!',
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       if (_isMissionNotActiveError(e) && widget.data.lessonId != null) {
@@ -244,14 +303,15 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     final lessonId = widget.data.lessonId;
     if (lessonId == null) return;
     try {
-      await _api.postLessonComplete(lessonId: lessonId);
+      final res = await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: 'Missão fora do período; registrada como visualização da lição.',
-        type: AppFeedbackType.info,
+      await _showRewardThenPopLesson(
+        completeResponse: res,
+        xpFallback: _estimatedXpForLessonOnly(),
+        title: 'Registrado',
+        subtitle:
+            'Missão fora do período; registrada como visualização da lição.',
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -295,14 +355,14 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
       _error = null;
     });
     try {
-      await _api.postLessonComplete(lessonId: lessonId);
+      final res = await _api.postLessonComplete(lessonId: lessonId);
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: 'Lição concluída!',
-        type: AppFeedbackType.success,
+      await _showRewardThenPopLesson(
+        completeResponse: res,
+        xpFallback: _estimatedXpForLessonOnly(),
+        title: 'Lição concluída!',
+        subtitle: 'Parabéns!',
       );
-      Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
       final msg = e.toString();
@@ -386,40 +446,48 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               const SizedBox(height: 12),
             ],
             if (widget.data.missionId != null || widget.data.lessonId != null)
-              FilledButton.icon(
+              AnimatedButton(
                 onPressed: _alreadyCompleted ||
                         _completing ||
                         _pendingOpponentAcceptance
                     ? null
                     : _complete,
-                icon: _alreadyCompleted
-                    ? const Icon(Icons.check_circle)
-                    : _pendingOpponentAcceptance
-                        ? const Icon(Icons.schedule)
-                        : _completing
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.check_circle),
-                label: Text(
-                  _alreadyCompleted
-                      ? (widget.data.missionId != null
-                          ? 'Missão concluída'
-                          : 'Lição concluída')
+                child: FilledButton.icon(
+                  onPressed: _alreadyCompleted ||
+                          _completing ||
+                          _pendingOpponentAcceptance
+                      ? null
+                      : _complete,
+                  icon: _alreadyCompleted
+                      ? const Icon(Icons.check_circle)
                       : _pendingOpponentAcceptance
-                          ? 'Aguardando aceite do oponente'
+                          ? const Icon(Icons.schedule)
                           : _completing
-                              ? 'Registrando...'
-                              : 'Concluir',
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.check_circle),
+                  label: Text(
+                    _alreadyCompleted
+                        ? (widget.data.missionId != null
+                            ? 'Missão concluída'
+                            : 'Lição concluída')
+                        : _pendingOpponentAcceptance
+                            ? 'Aguardando aceite do oponente'
+                            : _completing
+                                ? 'Registrando...'
+                                : 'Concluir',
+                  ),
+                  style: _alreadyCompleted
+                      ? FilledButton.styleFrom(
+                          backgroundColor: Colors.green.shade700)
+                      : _pendingOpponentAcceptance
+                          ? FilledButton.styleFrom(
+                              backgroundColor: Colors.grey)
+                          : null,
                 ),
-                style: _alreadyCompleted
-                    ? FilledButton.styleFrom(
-                        backgroundColor: Colors.green.shade700)
-                    : _pendingOpponentAcceptance
-                        ? FilledButton.styleFrom(backgroundColor: Colors.grey)
-                        : null,
               ),
           ],
         ),

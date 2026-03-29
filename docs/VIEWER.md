@@ -47,16 +47,26 @@ Acesse: **http://localhost:8080**
 | **Início** | Tela inicial do aluno (3 missões semanais) ou painel admin               |
 | **Administração** | CRUD de Academias, Usuários, vídeos, relatórios, auditoria, **backup SQL** da base |
 
+### MainShell (`lib/main.dart`)
+
+- Aba **Missões** pode mostrar **badge** com o número de confirmações pendentes (`StudentHomeScreen` notifica via `onPendingConfirmationsCountChanged`). O valor mantém-se ao mudar para **Painel** até nova carga na home zerar o contador.
+- Ao trocar de utilizador efetivo (ex.: impersonação), o badge é reposto a zero até a home voltar a carregar.
+
 ---
 
 ## Telas do aluno
 
 ### StudentHomeScreen
 
+- Abaixo do cabeçalho, cartão **`StreakWidget(showPlaceholder: true)`** indica que a sequência de treinos virá quando a API expuser o dado.
 - Carrega `GET /mission_today/week` (3 missões semanais).
-- Exibe 3 cards: **Missão 1**, **Missão 2**, **Missão 3**.
-- Cada card mostra a técnica ou fica vazio se não houver missão no slot.
-- Toque em um card → navega para `LessonViewScreen` com a missão selecionada.
+- **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal (cartão sem título “Missões da semana”), com ✓ / play / cadeado, **nome da técnica** por slot, haptic, alvos **48×48**, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
+- **Removidos** da home: cartão “Você já concluiu X de Y missões” + barra linear; acordeão **Missões da semana** com os três cards “Começar”.
+- Se não houver dados da semana (ou academia não configurada), mensagem continua dentro do acordeão **Centro de treinamento** (antes de Troféus). O acordeão **Confirmações e solicitações** (log de pontuação, confirmações pendentes, minhas solicitações) fica no **fim do scroll**, depois de horários e apoiantes globais — fora do Centro de treinamento.
+- **Confirmações pendentes** (`GET` contador via `ApiService.getPendingConfirmationsCount`):
+  - **Banner** sob o cabeçalho quando `count > 0`: texto + **Abrir** → `PendingConfirmationsScreen`; **X** oculta o banner até o contador mudar (nova resposta da API).
+  - **Bottom sheet** uma vez por montagem da tela (após o fluxo de parceiro em destaque, se houver): resume o número de pendentes, **Ir confirmar** ou **Depois**.
+  - Parâmetro opcional `onPendingConfirmationsCountChanged` para o `MainShell` atualizar o badge da aba **Missões**.
 
 ### LessonViewScreen
 
@@ -68,6 +78,16 @@ Acesse: **http://localhost:8080**
     - **Depois do treino**
   - Se lição (biblioteca): envia `POST /lesson_complete` diretamente.
 - Em 409 (já concluído): troca botão para conclusão e desabilita.
+- Após **`POST /mission_complete`** ou **`POST /lesson_complete`** com sucesso (fluxo sem oponente / sem execução pendente): abre **`RewardScreen`** com o campo **`points_awarded`** da resposta JSON; a barra de nível usa **`GET /users/{id}/points`** depois do POST. Se a resposta não trouxer `points_awarded` (API antiga), o app usa estimativa (`clampRewardPoints(multiplicador)` na missão; lição = `minRewardPoints`) e mostra nota no diálogo.
+
+### Widgets de gamificação (`lib/widgets/gamification/`)
+
+- **`animated_button.dart`**: micro-escala ao premir (respeita *reduce motion*).
+- **`xp_bar.dart`**: barra de progresso reutilizável.
+- **`reward_screen.dart`**: diálogo pós-conclusão.
+- **`streak_widget.dart`**: sequência de dias; com `streakDays == null` não ocupa espaço; `showPlaceholder: true` mostra "em breve" até existir campo na API.
+- **`weekly_mission_path.dart`**: caminho das 3 missões; técnicas por coluna; haptic; animação de conclusão; constante `kWeeklyPathMinTapSize` (48).
+- **`gamification.dart`**: export barrel.
 
 ### LibraryScreen
 

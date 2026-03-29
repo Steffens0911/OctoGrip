@@ -165,7 +165,7 @@ Base: `/lessons`.
 
 Base: `/missions`. CRUD para painel do professor.
 
-**Pontuação:** `multiplier` da missão (e `points_per_day` dos vídeos de treino) fica na faixa **10–50**. Ao concluir uma missão (`POST /mission_complete`), os pontos creditados ao aluno são **iguais ao `multiplier` da missão** (persistido em `mission_usages.points_awarded`). Em `GET /mission_today` e `GET /mission_today/week`, o `multiplier` devolvido segue o da missão; sem missão real, o fallback exibe **10**.
+**Pontuação:** `multiplier` da missão (e `points_per_day` dos vídeos de treino) fica na faixa **10–50**. Ao concluir uma missão (`POST /mission_complete`), os pontos creditados ao aluno são **iguais ao `multiplier` da missão** (persistido em `mission_usages.points_awarded`). Ao concluir uma lição pela biblioteca (`POST /lesson_complete`), credita-se o mínimo da faixa (10), em `lesson_progress.points_awarded`. O total em `GET /users/{id}/points` inclui execuções confirmadas (missão), `mission_usages`, `lesson_progress`, vídeos diários e `points_adjustment`. Em `GET /mission_today` e `GET /mission_today/week`, o `multiplier` devolvido segue o da missão; sem missão real, o fallback exibe **10**.
 
 | Método | Endpoint      | Descrição              |
 |--------|---------------|------------------------|
@@ -293,9 +293,12 @@ Registra conclusão da lição. **409** se já concluída.
 {
   "lesson_id": "uuid",
   "user_id": "uuid",
-  "completed_at": "datetime"
+  "completed_at": "datetime",
+  "points_awarded": 10
 }
 ```
+
+- **`points_awarded`:** pontos creditados nesta conclusão (valor fixo mínimo da gamificação, alinhado a `MIN_REWARD_POINTS` no servidor) e incluídos no total do utilizador.
 
 ---
 
@@ -324,9 +327,12 @@ Registra conclusão da missão. **409** se já concluída.
 {
   "user_id": "uuid",
   "mission_id": "uuid",
-  "completed_at": "datetime"
+  "completed_at": "datetime",
+  "points_awarded": 10
 }
 ```
+
+- **`points_awarded`:** igual ao valor gravado em `mission_usages.points_awarded` (multiplicador da missão limitado à faixa 10–50).
 
 ---
 

@@ -34,6 +34,7 @@ async def test_completar_missao(client, aluno_headers, aluno_user, mission_ativa
     assert data["user_id"] == str(aluno_user.id)
     assert data["mission_id"] == str(mission_ativa.id)
     assert "completed_at" in data
+    assert data["points_awarded"] == 10
 
 
 async def test_completar_missao_pontos_iguais_ao_multiplier(
@@ -64,6 +65,7 @@ async def test_completar_missao_pontos_iguais_ao_multiplier(
         "usage_type": "after_training",
     })
     assert r.status_code == 201
+    assert r.json()["points_awarded"] == 35
 
     r1 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
     assert r1.status_code == 200

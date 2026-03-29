@@ -18,6 +18,7 @@ class LessonCompleteResponse(BaseModel):
     lesson_id: UUID
     user_id: UUID
     completed_at: datetime
+    points_awarded: int
 
     class Config:
         from_attributes = True

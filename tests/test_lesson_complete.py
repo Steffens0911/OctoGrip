@@ -59,6 +59,10 @@ async def test_status_licao_sem_auth(client, lesson):
 
 async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
     """Completar lição com sucesso."""
+    r0 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
+    assert r0.status_code == 200
+    antes = r0.json()["points"]
+
     r = await client.post("/lesson_complete", headers=aluno_headers, json={
         "lesson_id": str(lesson.id),
     })
@@ -67,6 +71,11 @@ async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
     assert data["user_id"] == str(aluno_user.id)
     assert data["lesson_id"] == str(lesson.id)
     assert "completed_at" in data
+    assert data["points_awarded"] == 10
+
+    r1 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
+    assert r1.status_code == 200
+    assert r1.json()["points"] == antes + 10
 
 
 async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, lesson):

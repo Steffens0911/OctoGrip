@@ -39,4 +39,5 @@ async def lesson_complete(
         lesson_id=progress.lesson_id,
         user_id=progress.user_id,
         completed_at=progress.completed_at,
+        points_awarded=int(progress.points_awarded),
     )

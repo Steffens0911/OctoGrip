@@ -6,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import AlreadyCompletedError, LessonNotFoundError, UserNotFoundError
+from app.core.points_limits import MIN_REWARD_POINTS
 from app.models import Lesson, LessonProgress, User
+from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +59,24 @@ async def complete_lesson(db: AsyncSession, user_id: UUID, lesson_id: UUID) -> L
         logger.info("complete_lesson already_completed", extra={"user_id": str(user_id), "lesson_id": str(lesson_id)})
         raise AlreadyCompletedError("Esta lição já foi concluída por este usuário.")
 
-    progress = LessonProgress(user_id=user_id, lesson_id=lesson_id)
+    progress = LessonProgress(
+        user_id=user_id,
+        lesson_id=lesson_id,
+        points_awarded=MIN_REWARD_POINTS,
+    )
     db.add(progress)
     await db.commit()
     await db.refresh(progress)
+    await refresh_user_level(db, user_id)
 
-    logger.info("complete_lesson", extra={"user_id": str(user_id), "lesson_id": str(lesson_id)})
+    logger.info(
+        "complete_lesson",
+        extra={
+            "user_id": str(user_id),
+            "lesson_id": str(lesson_id),
+            "points_awarded": progress.points_awarded,
+        },
+    )
     return progress
 
 

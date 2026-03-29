@@ -1050,19 +1050,23 @@ class ApiService {
     return map['completed'] as bool? ?? false;
   }
 
-  Future<void> postLessonComplete({required String lessonId}) async {
+  /// Corpo da resposta inclui `points_awarded` (pontos creditados nesta conclusão).
+  Future<Map<String, dynamic>> postLessonComplete({required String lessonId}) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/lesson_complete'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'lesson_id': lessonId}),
     ));
-    _throwIfNotOk(r, await _decodeResponse(r));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/mission_today');
     invalidateCache('GET:$baseUrl/executions');
+    return data! as Map<String, dynamic>;
   }
 
   /// Conclusão por missão (missão do dia). usageType: before_training | after_training.
-  Future<void> postMissionComplete({
+  /// Resposta inclui `points_awarded`.
+  Future<Map<String, dynamic>> postMissionComplete({
     required String missionId,
     String usageType = 'after_training',
   }) async {
@@ -1071,9 +1075,11 @@ class ApiService {
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'mission_id': missionId, 'usage_type': usageType}),
     ));
-    _throwIfNotOk(r, await _decodeResponse(r));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/mission_today');
     invalidateCache('GET:$baseUrl/executions');
+    return data! as Map<String, dynamic>;
   }
 
   // ---------- Executions (gamificação) ----------

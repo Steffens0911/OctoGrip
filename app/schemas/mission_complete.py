@@ -20,3 +20,4 @@ class MissionCompleteResponse(BaseModel):
     user_id: UUID
     mission_id: UUID
     completed_at: datetime
+    points_awarded: int

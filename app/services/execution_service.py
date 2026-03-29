@@ -10,7 +10,16 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
 from app.core.points_limits import clamp_reward_points
-from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution, User
+from app.models import (
+    Academy,
+    Lesson,
+    LessonProgress,
+    Mission,
+    MissionUsage,
+    Technique,
+    TechniqueExecution,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -477,6 +486,7 @@ async def reject_execution(
 async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
     """Soma dos points_awarded de execuções confirmadas (apenas posições da semana, mission_id)
     + conclusões de missão (MissionUsage)
+    + conclusões de lição (LessonProgress)
     + vídeos de treinamento diários
     + points_adjustment."""
     exec_points = await db.scalar(
@@ -499,12 +509,18 @@ async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
             TrainingVideoDailyView.user_id == user_id,
         )
     )
+    lesson_points = await db.scalar(
+        select(func.coalesce(func.sum(LessonProgress.points_awarded), 0)).where(
+            LessonProgress.user_id == user_id,
+        )
+    )
     user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
     adjustment = (user.points_adjustment if user else 0) or 0
     return (
         int(exec_points or 0)
         + int(mission_points or 0)
         + int(training_video_points or 0)
+        + int(lesson_points or 0)
         + adjustment
     )
 
@@ -512,8 +528,8 @@ async def total_points_for_user(db: AsyncSession, user_id: UUID) -> int:
 async def batch_total_points_for_users(
     db: AsyncSession, user_ids: list[UUID]
 ) -> dict[UUID, int]:
-    """Retorna mapa user_id -> total de pontos (apenas posições da semana: execuções com mission_id
-    + MissionUsage + vídeos de treinamento diários + adjustment)."""
+    """Retorna mapa user_id -> total de pontos (execuções com mission_id confirmadas
+    + MissionUsage + LessonProgress + vídeos de treinamento diários + adjustment)."""
     if not user_ids:
         return {}
     exec_rows = (
@@ -553,6 +569,16 @@ async def batch_total_points_for_users(
             .group_by(TrainingVideoDailyView.user_id)
         )
     ).all()
+    lesson_rows = (
+        await db.execute(
+            select(
+                LessonProgress.user_id,
+                func.coalesce(func.sum(LessonProgress.points_awarded), 0).label("pts"),
+            )
+            .where(LessonProgress.user_id.in_(user_ids))
+            .group_by(LessonProgress.user_id)
+        )
+    ).all()
     user_rows = (
         await db.execute(
             select(User.id, func.coalesce(User.points_adjustment, 0).label("adj")).where(
@@ -566,6 +592,8 @@ async def batch_total_points_for_users(
     for uid, pts in mission_rows:
         result[uid] = result.get(uid, 0) + int(pts or 0)
     for uid, pts in training_rows:
+        result[uid] = result.get(uid, 0) + int(pts or 0)
+    for uid, pts in lesson_rows:
         result[uid] = result.get(uid, 0) + int(pts or 0)
     for uid, adj in user_rows:
         result[uid] = result.get(uid, 0) + int(adj or 0)

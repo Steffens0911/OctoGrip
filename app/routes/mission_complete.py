@@ -26,4 +26,5 @@ async def mission_complete(
         user_id=usage.user_id,
         mission_id=usage.mission_id,
         completed_at=usage.completed_at,
+        points_awarded=int(usage.points_awarded or 0),
     )
