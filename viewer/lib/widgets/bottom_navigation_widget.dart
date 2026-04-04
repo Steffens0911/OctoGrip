@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
-/// Barra de navegação inferior: Início, Missões, Painel.
+/// Barra de navegação inferior: Início, Campo de treinamento, Academia.
 class BottomNavigationWidget extends StatelessWidget {
   const BottomNavigationWidget({
     super.key,
@@ -39,13 +39,13 @@ class BottomNavigationWidget extends StatelessWidget {
               ),
               _NavItem(
                 icon: Icons.emoji_events_rounded,
-                label: 'Missões',
+                label: 'Campo de treinamento',
                 selected: currentIndex == 1,
                 onTap: () => onTap(1),
               ),
               _NavItem(
                 icon: Icons.dashboard_rounded,
-                label: 'Painel',
+                label: 'Academia',
                 selected: currentIndex == 2,
                 onTap: () => onTap(2),
               ),

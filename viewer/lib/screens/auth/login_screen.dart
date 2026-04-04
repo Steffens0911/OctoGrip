@@ -47,6 +47,16 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
       AuthService().setLoggedIn(result.token, result.user);
+      if (mounted && result.streakBonusPoints > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '+${result.streakBonusPoints} pts — bónus por dias seguidos de login!',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _error = userFacingMessage(e));

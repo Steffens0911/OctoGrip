@@ -142,7 +142,7 @@ class _MainShellState extends State<MainShell> {
   int _selected = 0;
   int _inicioRefreshKey = 0;
   String? _lastEffectiveUserId;
-  /// Último contador vindo da [StudentHomeScreen] (badge na aba Missões).
+  /// Último contador vindo da [StudentHomeScreen] (badge na aba Campo de treinamento).
   int _pendingConfirmationsNavBadge = 0;
 
   @override
@@ -154,15 +154,16 @@ class _MainShellState extends State<MainShell> {
   }
 
   List<String> _availableTabs(AuthService auth) {
-    final role = auth.currentUser?.role ?? 'aluno';
+    final role = (auth.currentUser?.role ?? 'aluno').trim().toLowerCase();
+    // Aba Admin só com papel **efetivo** administrador global (não basta ser admin real em «Atuar como» gerente/aluno).
     if (role == 'administrador') {
-      return ['Missões', 'Painel', 'Admin'];
+      return ['Campo de treinamento', 'Academia', 'Admin'];
     }
     // Aluno não usa o painel da academia na navegação inferior.
     if (role == 'aluno') {
-      return ['Missões'];
+      return ['Campo de treinamento'];
     }
-    return ['Missões', 'Painel'];
+    return ['Campo de treinamento', 'Academia'];
   }
 
   Widget _missionsHome() {
@@ -175,15 +176,26 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  /// Índice de aba seguro: evita um frame com índice inválido quando a lista de abas
+  /// encolhe (ex.: sair da simulação ou papel sem Admin) — antes `_selected` podia apontar
+  /// para uma aba que deixou de existir.
+  int _safeTabIndex(List<String> tabs) {
+    if (tabs.isEmpty) return 0;
+    if (_selected < 0 || _selected >= tabs.length) return 0;
+    return _selected;
+  }
+
   Widget _currentBody(AuthService auth, List<String> tabs) {
-    if (_selected == 0) {
-      return _missionsHome();
-    } else if (_selected == 1) {
-      return const AcademyPanelScreen();
-    } else if (_selected == 2) {
-      return const AdminSectionScreen();
+    final i = _safeTabIndex(tabs);
+    switch (tabs[i]) {
+      case 'Academia':
+        return const AcademyPanelScreen();
+      case 'Admin':
+        return const AdminSectionScreen();
+      case 'Campo de treinamento':
+      default:
+        return _missionsHome();
     }
-    return _missionsHome();
   }
 
   void _showImpersonateDialog() {
@@ -248,6 +260,7 @@ class _MainShellState extends State<MainShell> {
       });
     }
 
+    final tabIndex = _safeTabIndex(tabs);
     if (_selected >= tabs.length) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _selected = 0);
@@ -256,7 +269,7 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_selected < tabs.length ? tabs[_selected] : tabs[0]),
+        title: Text(tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento'),
         actions: [
           if (auth.isRealUserAdmin)
             IconButton(
@@ -353,32 +366,32 @@ class _MainShellState extends State<MainShell> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                if (tabs.contains('Missões'))
+                if (tabs.contains('Campo de treinamento'))
                   _NavItem(
                     icon: Icons.emoji_events_rounded,
-                    label: 'Missões',
-                    selected: _selected == 0,
+                    label: 'Campo de treinamento',
+                    selected: tabIndex == tabs.indexOf('Campo de treinamento'),
                     badgeCount: _pendingConfirmationsNavBadge > 0
                         ? _pendingConfirmationsNavBadge
                         : null,
                     onTap: () => setState(() {
-                      _selected = 0;
+                      _selected = tabs.indexOf('Campo de treinamento');
                       _inicioRefreshKey++;
                     }),
                   ),
-                if (tabs.contains('Painel'))
+                if (tabs.contains('Academia'))
                   _NavItem(
                     icon: Icons.dashboard_rounded,
-                    label: 'Painel',
-                    selected: _selected == 1,
-                    onTap: () => setState(() => _selected = 1),
+                    label: 'Academia',
+                    selected: tabIndex == tabs.indexOf('Academia'),
+                    onTap: () => setState(() => _selected = tabs.indexOf('Academia')),
                   ),
                 if (tabs.contains('Admin'))
                   _NavItem(
                     icon: Icons.settings_rounded,
                     label: 'Admin',
-                    selected: _selected == 2,
-                    onTap: () => setState(() => _selected = 2),
+                    selected: tabIndex == tabs.indexOf('Admin'),
+                    onTap: () => setState(() => _selected = tabs.indexOf('Admin')),
                   ),
               ],
             ),
@@ -445,10 +458,14 @@ class _NavItem extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     color: selected ? primary : onSurfaceVariant,
+                    height: 1.15,
                   ),
                 ),
               ],

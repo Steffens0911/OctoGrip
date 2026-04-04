@@ -6,7 +6,7 @@
 #   API_BASE_URL — https://<API_DOMAIN> (para o build do viewer)
 #   CORS_ORIGINS — JSON com a origem do app, ex.: ["https://app.seudominio.com"]
 #
-# Portas 80/443 ficam na Caddy; 8000/8080 continuam mapeadas pelo compose base
+# Portas 80/443 ficam na Caddy; 8001 (API no host)/8080 continuam mapeadas pelo compose base
 # (úteis para debug). Em produção restrinja no firewall ou remova os ports no override.
 
 services:

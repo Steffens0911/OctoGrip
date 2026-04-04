@@ -16,6 +16,8 @@ from app.database import get_db
 from app.models import User
 from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import MeUpdate, UserRead
+from app.services.leveling_service import refresh_user_level
+from app.services.login_streak_service import apply_login_streak_bonus, user_read_with_login_streak
 from app.services.user_service import get_user_by_email, update_user
 
 logger = logging.getLogger(__name__)
@@ -87,9 +89,12 @@ async def login(
 
     _clear_failed_attempts(body.email)
 
-    # Atualiza last_login_at para métricas de engajamento
+    # Atualiza last_login_at, regista dia UTC e aplica bónus de sequência (múltiplos de 7 dias) se aplicável
     user.last_login_at = datetime.now(timezone.utc)
+    streak_bonus_points = await apply_login_streak_bonus(db, user, now=user.last_login_at)
     await db.commit()
+    if streak_bonus_points > 0:
+        await refresh_user_level(db, user.id)
 
     security_events_total.labels(event_type="login_success").inc()
     logger.info(
@@ -99,16 +104,20 @@ async def login(
             "email": body.email,
             "client_ip": client_ip,
             "role": user.role,
+            "streak_bonus_points": streak_bonus_points,
         },
     )
     token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=token, streak_bonus_points=streak_bonus_points)
 
 
 @router.get("/me", response_model=UserRead)
-async def me(current_user: User = Depends(get_current_user)):
-    """Retorna o usuário autenticado."""
-    return current_user
+async def me(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna o usuário autenticado (inclui login_streak_days)."""
+    return await user_read_with_login_streak(db, current_user)
 
 
 @router.patch("/me", response_model=UserRead)
@@ -120,10 +129,10 @@ async def patch_me(
     """Atualiza preferências do usuário autenticado (ex.: galeria visível para outros)."""
     payload = body.model_dump(exclude_unset=True)
     if not payload:
-        return current_user
+        return await user_read_with_login_streak(db, current_user)
     updated = await update_user(
         db,
         current_user.id,
         gallery_visible=payload.get("gallery_visible"),
     )
-    return updated if updated else current_user
+    return await user_read_with_login_streak(db, updated if updated else current_user)

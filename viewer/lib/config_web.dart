@@ -1,5 +1,5 @@
 /// Implementação para web: `?api_base=` (ngrok / Cloudflare), depois `index.html`,
-/// depois mesmo host + porta 8000.
+/// depois mesmo host + porta 8001 (API Docker no host; uvicorn local costuma usar 8000).
 /// Em `*.trycloudflare.com` sem `api_base`, devolve string vazia: o browser bloqueia HTTPS→127.0.0.1 (PNA).
 library;
 
@@ -46,12 +46,15 @@ String getApiBaseUrl() {
     }
   } catch (_) {}
 
+  // Porta no host: docker-compose mapeia API em 8001:8000.
+  const localApiPort = 8001;
+
   final host = Uri.base.host;
   if (host == 'localhost' || host == '127.0.0.1') {
-    return '${Uri.base.scheme}://$host:8000';
+    return '${Uri.base.scheme}://$host:$localApiPort';
   }
   if (host.endsWith('.trycloudflare.com')) {
     return '';
   }
-  return '${Uri.base.scheme}://$host:8000';
+  return '${Uri.base.scheme}://$host:$localApiPort';
 }

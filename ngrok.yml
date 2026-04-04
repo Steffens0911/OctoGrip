@@ -1,10 +1,10 @@
-# Uso: na raiz do repositório, com Docker expondo 8000 (API) e 8080 (viewer):
+# Uso: na raiz do repositório, com Docker expondo 8001 (API no host) e 8080 (viewer):
 #   ngrok start --all --config .\ngrok.yml
 # Token: ngrok config add-authtoken <seu_token> (não coloque o token neste ficheiro)
 version: "2"
 tunnels:
   api:
-    addr: 8000
+    addr: 8001
     proto: http
   web:
     addr: 8080

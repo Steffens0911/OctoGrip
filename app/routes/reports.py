@@ -5,7 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.role_deps import require_admin_or_manager, verify_academy_access
+from app.core.exceptions import ForbiddenError
+from app.core.role_deps import require_admin_manager_or_supervisor, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.metrics import (
@@ -16,7 +17,6 @@ from app.services.metrics_service import (
     get_active_students_report,
     get_engagement_report,
 )
-
 
 router = APIRouter()
 
@@ -33,7 +33,7 @@ async def reports_engagement(
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_or_manager),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
 ):
     """
     Relatório de engajamento: % de alunos ativos semanal e mensal.
@@ -41,6 +41,8 @@ async def reports_engagement(
     - Se `academy_id` for informado, retorna engajamento apenas dessa academia (visão local).
     - Se omitido, retorna engajamento considerando todas as academias (visão geral).
     """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
     if academy_id is not None:
         verify_academy_access(current_user, str(academy_id))
 
@@ -64,7 +66,7 @@ async def reports_active_students(
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_or_manager),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
 ):
     """
     Relatório detalhado de alunos ativos (lista de alunos) na janela de 7 dias.
@@ -72,6 +74,8 @@ async def reports_active_students(
     - Ativo = logou pelo menos uma vez (last_login_at) nos últimos 7 dias em relação a `reference_date`.
     - Se `academy_id` for informado, filtra para a academia; senão, considera todas.
     """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
     if academy_id is not None:
         verify_academy_access(current_user, str(academy_id))
 
@@ -95,13 +99,15 @@ async def reports_active_students_csv(
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin_or_manager),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
 ):
     """
     Exporta CSV com alunos ativos na janela de 7 dias.
 
     Colunas: id, nome, email, graduation, academy_id, academy_name, last_login_at (ISO).
     """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
     if academy_id is not None:
         verify_academy_access(current_user, str(academy_id))
 

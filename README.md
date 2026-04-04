@@ -17,8 +17,8 @@ Na primeira execução o build do **viewer** (Flutter web) pode levar alguns min
 | Serviço    | URL                          |
 |-----------|------------------------------|
 | **Viewer** (app web) | http://localhost:8080        |
-| **API**    | http://localhost:8000        |
-| **Docs**   | http://localhost:8000/docs   |
+| **API**    | http://localhost:8001        |
+| **Docs**   | http://localhost:8001/docs   |
 | **PostgreSQL** | localhost:5432 (user `jjb`, db `jjb_db`) |
 
 Para subir só a API e o Postgres (sem o viewer):
@@ -73,7 +73,7 @@ O **app Flutter (bjj_app)** é para **alunos**. O professor usa o **painel web**
 
 2. **Abra no navegador** (Chrome, Edge, etc.):
    ```
-   http://localhost:8000/missions/panel
+   http://localhost:8001/missions/panel
    ```
    Se a API estiver em outra máquina/porta, use a mesma URL base (ex.: `http://192.168.1.10:8000/missions/panel`).
 
@@ -82,7 +82,7 @@ O **app Flutter (bjj_app)** é para **alunos**. O professor usa o **painel web**
    - A lista de **lições** e **academias** é carregada da API; as datas padrão são a semana atual.
 
 4. **Listar / editar / excluir** missões pela **documentação interativa**:
-   - Abra **http://localhost:8000/docs**
+   - Abra **http://localhost:8001/docs**
    - Use **GET /missions** para listar (opcional: `academy_id` para filtrar).
    - Use **GET /missions/{mission_id}** para ver uma missão.
    - Use **PATCH /missions/{mission_id}** para editar (envie só os campos que quer alterar).
@@ -142,7 +142,7 @@ app/
 
 ## Variáveis de ambiente
 
-Copie `.env.example` para `.env` e ajuste se precisar. O `docker-compose.yml` já usa valores padrão (jjb/jjb_secret/jjb_db). Para o viewer, a URL da API no build é `API_BASE_URL` (padrão `http://localhost:8000`); se a API estiver em outro host/porta, defina no `.env` antes do `docker compose build`.
+Copie `.env.example` para `.env` e ajuste se precisar. O `docker-compose.yml` já usa valores padrão (jjb/jjb_secret/jjb_db). Para o viewer, a URL da API no build é `API_BASE_URL` (padrão `http://localhost:8001`); se a API estiver em outro host/porta, defina no `.env` antes do `docker compose build`.
 
 ## Rodar só a API (sem Docker)
 

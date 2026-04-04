@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Rate limiting (login)
     LOGIN_RATE_LIMIT: str = "5/minute"
 
+    # Bónus de sequência de login (UTC): a cada N dias consecutivos no login, +X pts (points_adjustment).
+    LOGIN_STREAK_BONUS_POINTS: int = 50
+    LOGIN_STREAK_BONUS_INTERVAL_DAYS: int = 7
+
     # Download de backup SQL (admin); em testes use env mais folgada (ver conftest)
     BACKUP_DOWNLOAD_RATE_LIMIT: str = "3/hour"
 

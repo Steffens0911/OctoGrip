@@ -68,6 +68,36 @@ def test_safe_extract_zip_rejects_path_traversal():
                 safe_extract_zip(zf, Path(tmp))
 
 
+def test_build_full_backup_zip_includes_media_files(monkeypatch: pytest.MonkeyPatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        media_root = tmp_path / "app_media"
+        media_file = media_root / "academy_logos" / "academy-1.png"
+        media_file.parent.mkdir(parents=True, exist_ok=True)
+        media_file.write_bytes(b"fake-image")
+
+        dump_path_holder = {"path": None}
+
+        def _fake_pg_dump(out_path: str) -> None:
+            out = Path(out_path)
+            out.write_text("-- fake dump", encoding="utf-8")
+            dump_path_holder["path"] = out
+
+        monkeypatch.setattr(admin_backup, "_MEDIA_ROOT", media_root)
+        monkeypatch.setattr(admin_backup, "_run_pg_dump_sync", _fake_pg_dump)
+
+        zip_out = tmp_path / "backup.zip"
+        admin_backup._build_full_backup_zip_sync(str(zip_out))
+
+        with zipfile.ZipFile(zip_out, "r") as zf:
+            names = set(zf.namelist())
+            assert "database.sql" in names
+            assert "media/academy_logos/academy-1.png" in names
+            assert zf.read("media/academy_logos/academy-1.png") == b"fake-image"
+        # Garantir que usamos o dump temporário criado pelo fluxo.
+        assert dump_path_holder["path"] is not None
+
+
 @pytest.mark.asyncio
 async def test_backup_database_admin_returns_sql_when_pg_dump_available(
     client: AsyncClient, admin_headers: dict

@@ -97,7 +97,7 @@ async def create_trophy(
         extra={
             "academy_id": str(academy_id),
             "technique_id": str(technique_id),
-            "name": name,
+            "trophy_name": name,
             "award_kind": award_kind,
         },
     )
@@ -157,7 +157,7 @@ async def create_trophy(
             "trophy_id": str(trophy.id),
             "academy_id": str(academy_id),
             "technique_id": str(technique_id),
-            "name": trophy.name,
+            "trophy_name": trophy.name,
         },
     )
     return trophy

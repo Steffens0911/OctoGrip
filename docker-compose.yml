@@ -22,7 +22,8 @@ services:
     container_name: jjb_api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      # Host 8001 evita conflito com uvicorn local na 8000; dentro do contentor continua 8000.
+      - "8001:8000"
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       # Cliente libpq (pg_dump/psql): em Postgres interno sem TLS, preferível a falhas de negociação SSL
@@ -55,7 +56,7 @@ services:
       context: ./viewer
       dockerfile: Dockerfile
       args:
-        API_BASE_URL: ${API_BASE_URL:-http://localhost:8000}
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
     container_name: jjb_viewer
     restart: unless-stopped
     ports:

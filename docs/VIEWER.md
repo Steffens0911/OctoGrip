@@ -6,7 +6,7 @@ App Flutter para **alunos** e **professores** de jiu-jitsu. Interface web respon
 
 ## Como rodar
 
-1. API rodando em `http://localhost:8000`.
+1. API Docker no host: `http://localhost:8001` (uvicorn só no PC: `http://localhost:8000` e `?api_base=...` se precisar).
 2. Na pasta `viewer`:
 
 ```bash
@@ -49,8 +49,10 @@ Acesse: **http://localhost:8080**
 
 ### MainShell (`lib/main.dart`)
 
-- **Aluno** (`role == aluno`): barra inferior só com a aba **Missões** (sem **Painel**). **Professor** e outros papéis não administradores mantêm **Missões** + **Painel**; **administrador** tem **Missões**, **Painel** e **Admin**.
-- Aba **Missões** pode mostrar **badge** de confirmações pendentes (`onPendingConfirmationsCountChanged`). Quando existir aba **Painel**, o valor do badge mantém-se ao mudar de aba até a home recarregar e zerar o contador.
+- **Aluno** (`role == aluno`): barra inferior só com a aba **Campo de treinamento** (sem **Academia**). **Professor**, **gerente** e **supervisor** mantêm **Campo de treinamento** + **Academia**. Apenas **administrador** (admin global) tem também a aba **Admin** (CRUD global, relatórios completos, auditoria, backup).
+- Com **Atuar como**, as abas seguem o **papel efetivo** (`GET /auth/me` com `X-Impersonate-User`): ao simular um **gerente** ou **aluno**, o admin real **deixa de ver** a aba **Admin** (só volta ao sair da simulação ou ao atuar como outro administrador). O botão **Atuar como** na AppBar continua visível para quem fez login como administrador real (`isRealUserAdmin`), graças a `_currentUser` preenchido com `getAuthMeAsRealUser` no arranque e em `setImpersonating`. **Supervisor** em simulação mantém **Academia** (via `isRealUserSupervisor` no `RoleGuard` do painel), mas **não** a aba **Admin**.
+- A secção **Admin** e os ecrãs aí ligados exigem papel efetivo **administrador** (sem exceção “admin real em simulação”). **Backup** e **auditoria** idem.
+- Aba **Campo de treinamento** pode mostrar **badge** de confirmações pendentes (`onPendingConfirmationsCountChanged`). Quando existir aba **Academia**, o valor do badge mantém-se ao mudar de aba até a home recarregar e zerar o contador.
 - Ao trocar de utilizador efetivo (ex.: impersonação), o badge é reposto a zero até a home voltar a carregar.
 
 ---
@@ -61,7 +63,7 @@ Acesse: **http://localhost:8080**
 
 - **Tema claro/escuro:** o fundo atrás do scroll (`_FantasyBackground` → `FantasyTheme.missionHomeBackgroundDecoration`) e os cartões da home fantasia (`FantasyTheme.cardBoxDecoration`, `textPrimaryOf`, `insetSurfaceOf`, etc.) usam o `Brightness` atual: em **claro**, fundo alinhado ao scaffold e cartões ao `ColorScheme.surface`; em **escuro**, mantém o gradiente espacial e cartões roxos como antes.
 - **`HeaderWidget`**: saudação *Olá, …* no topo; **sob o brasão** só o texto **Faixa** + graduação (ex. Faixa Preta), sem repetir o nome nessa linha.
-- Abaixo do cabeçalho, cartão **`StreakWidget(showPlaceholder: true)`** indica que a sequência de treinos virá quando a API expuser o dado.
+- Abaixo do cabeçalho, cartão **`StreakWidget(streakDays: …, onOpenPointsRules: …)`** com `login_streak_days` de **`GET /auth/me`**: sequência (flame + dias) e, **no mesmo cartão** à direita, **`LoginBonusRing`** (`login_bonus_ring.dart`) — progresso até ao próximo múltiplo de 7 dias, centro **+50 PTS** (`gamification_constants.dart`); toque no anel abre **Como funcionam os pontos** (`showPointsRulesSheet` em `points_rules_sheet.dart`).
 - Carrega `GET /mission_today/week` (3 missões semanais).
 - **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal, com título **Missões da semana** acima do cartão; ✓ / play / cadeado, **nome da técnica** por slot, haptic, alvos **48×48**, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
 - **Removidos** da home: cartão “Você já concluiu X de Y missões” + barra linear; acordeão **Missões da semana** com os três cards “Começar”.
@@ -71,7 +73,7 @@ Acesse: **http://localhost:8080**
 - **Confirmações pendentes** (`GET` contador via `ApiService.getPendingConfirmationsCount`):
   - **Banner** sob o cabeçalho quando `count > 0`: texto + **Abrir** → `PendingConfirmationsScreen`; **X** oculta o banner até o contador mudar (nova resposta da API).
   - **Bottom sheet** uma vez por montagem da tela (após o fluxo de parceiro em destaque, se houver): resume o número de pendentes, **Ir confirmar** ou **Depois**.
-  - Parâmetro opcional `onPendingConfirmationsCountChanged` para o `MainShell` atualizar o badge da aba **Missões**.
+  - Parâmetro opcional `onPendingConfirmationsCountChanged` para o `MainShell` atualizar o badge da aba **Campo de treinamento**.
 
 ### LessonViewScreen
 
@@ -90,7 +92,7 @@ Acesse: **http://localhost:8080**
 - **`animated_button.dart`**: micro-escala ao premir (respeita *reduce motion*).
 - **`xp_bar.dart`**: barra de progresso reutilizável.
 - **`reward_screen.dart`**: diálogo pós-conclusão.
-- **`streak_widget.dart`**: sequência de dias; com `streakDays == null` não ocupa espaço; `showPlaceholder: true` mostra "em breve" até existir campo na API.
+- **`streak_widget.dart`**: dias seguidos com login; `streakDays == null` não renderiza; `0` usa ícone outline e texto para reforçar o hábito; `n >= 1` mostra contagem e “dia(s) seguido(s)”.
 - **`weekly_mission_path.dart`**: caminho das 3 missões; técnicas por coluna; haptic; animação de conclusão; constante `kWeeklyPathMinTapSize` (48).
 - **`gamification.dart`**: export barrel.
 
@@ -170,6 +172,7 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 ### Outras telas admin
 
 - `AcademyListScreen`, `UserListScreen`, `TrainingVideoListScreen`, listas de lições/técnicas/posições/missões: CRUD conforme o ecrã.
+- **`TrophyFormScreen`** (`admin/trophy_form_screen.dart`): novo registo abre com tipo **Medalha (ordinária)** por defeito (períodos curtos sem validação de 30 dias no servidor). **Troféu (especial)** continua a exigir duração mínima configurável (cliente + API).
 
 ---
 

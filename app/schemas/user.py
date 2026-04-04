@@ -13,6 +13,10 @@ class UserRead(BaseModel):
     academy_id: UUID | None = None
     points_adjustment: int = 0
     gallery_visible: bool = True
+    login_streak_days: int = Field(
+        0,
+        description="Dias consecutivos com login (UTC); valor correto em GET/PATCH /auth/me.",
+    )
 
     class Config:
         from_attributes = True

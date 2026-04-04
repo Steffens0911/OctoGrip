@@ -16,3 +16,7 @@ class TokenResponse(BaseModel):
 
     access_token: str
     token_type: str = "bearer"
+    streak_bonus_points: int = Field(
+        0,
+        description="Pontos extra por sequência de login (múltiplos de 7 dias UTC); 0 se não aplicou.",
+    )

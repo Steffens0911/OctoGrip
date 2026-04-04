@@ -23,6 +23,7 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
+import 'package:viewer/widgets/gamification/points_rules_sheet.dart';
 import 'package:viewer/widgets/gamification/streak_widget.dart';
 import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
@@ -41,7 +42,7 @@ class StudentHomeScreen extends StatefulWidget {
   /// Incrementado ao tocar na aba Início; em didUpdateWidget dispara _load() para atualizar missões.
   final int refreshTrigger;
 
-  /// Notifica o shell (ex.: badge na aba Missões) quando o contador de confirmações pendentes muda.
+  /// Notifica o shell (ex.: badge na aba Campo de treinamento) quando o contador de confirmações pendentes muda.
   final ValueChanged<int>? onPendingConfirmationsCountChanged;
 
   @override
@@ -60,7 +61,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   int _pendingConfirmationsCount = 0;
   /// Esconde o banner até o contador mudar de valor (nova carga da API).
   bool _pendingBannerDismissed = false;
-  /// Bottom sheet de lembrete só uma vez por vida do State (sessão na aba Missões).
+  /// Bottom sheet de lembrete só uma vez por vida do State (sessão na aba Campo de treinamento).
   bool _pendingBottomSheetShownThisSession = false;
   TrainingVideo? _dailyVideo;
   int _dailyVideoPoints = 0;
@@ -636,10 +637,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _buildPendingConfirmationsBanner(),
                   ],
                   const SizedBox(height: 10),
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: StreakWidget(showPlaceholder: true),
-                  ),
+                  if (u != null)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: StreakWidget(
+                        streakDays: u.loginStreakDays,
+                        onOpenPointsRules: () => showPointsRulesSheet(context),
+                      ),
+                    ),
                   const SizedBox(height: 10),
                   if (_collectiveGoal != null) ...[
                     _buildCollectiveGoalCard(),
@@ -1203,7 +1208,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
 }
 
-/// Fundo da home Missões: gradiente espacial no escuro; claro alinhado ao scaffold.
+/// Fundo da home Campo de treinamento: gradiente espacial no escuro; claro alinhado ao scaffold.
 class _FantasyBackground extends StatelessWidget {
   const _FantasyBackground();
 

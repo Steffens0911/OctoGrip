@@ -32,7 +32,7 @@ class AdminSectionScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Gerencie academias e usuários',
+            'Apenas administradores globais. Gerencie academias e usuários',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondaryOf(context),
                 ),

@@ -7,6 +7,8 @@ class UserModel {
   final String? academyId;
   final int pointsAdjustment;
   final bool galleryVisible;
+  /// Dias seguidos com login (UTC); vem de GET/PATCH /auth/me.
+  final int loginStreakDays;
 
   UserModel({
     required this.id,
@@ -17,6 +19,7 @@ class UserModel {
     this.academyId,
     this.pointsAdjustment = 0,
     this.galleryVisible = true,
+    this.loginStreakDays = 0,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +32,7 @@ class UserModel {
       academyId: json['academy_id'] as String?,
       pointsAdjustment: json['points_adjustment'] as int? ?? 0,
       galleryVisible: json['gallery_visible'] as bool? ?? true,
+      loginStreakDays: json['login_streak_days'] as int? ?? 0,
     );
   }
 
@@ -41,5 +45,6 @@ class UserModel {
         'academy_id': academyId,
         'points_adjustment': pointsAdjustment,
         'gallery_visible': galleryVisible,
+        'login_streak_days': loginStreakDays,
       };
 }

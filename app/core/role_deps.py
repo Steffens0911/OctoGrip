@@ -42,6 +42,26 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def require_admin_or_supervisor(current_user: User = Depends(get_current_user)) -> User:
+    """Administrador ou supervisor (leitura de métricas globais / relatórios)."""
+    if current_user.role not in ("administrador", "supervisor"):
+        _log_access_denied(current_user, "administrador|supervisor")
+        raise ForbiddenError(
+            "Acesso negado. Apenas administradores ou supervisores podem acessar este recurso."
+        )
+    return current_user
+
+
+def require_admin_manager_or_supervisor(current_user: User = Depends(get_current_user)) -> User:
+    """Administrador, gerente de academia ou supervisor (métricas por academia, relatórios)."""
+    if current_user.role not in ("administrador", "gerente_academia", "supervisor"):
+        _log_access_denied(current_user, "administrador|gerente_academia|supervisor")
+        raise ForbiddenError(
+            "Acesso negado. Apenas administradores, gerentes de academia ou supervisores."
+        )
+    return current_user
+
+
 def require_admin_or_manager(current_user: User = Depends(get_current_user)) -> User:
     """Exige administrador ou gerente_academia."""
     if current_user.role not in ("administrador", "gerente_academia"):
@@ -59,10 +79,14 @@ def require_admin_or_professor(current_user: User = Depends(get_current_user)) -
 
 
 def require_admin_or_academy_access(current_user: User = Depends(get_current_user)) -> User:
-    """Exige administrador, gerente_academia ou professor."""
-    if current_user.role not in ("administrador", "gerente_academia", "professor"):
-        _log_access_denied(current_user, "administrador|gerente_academia|professor")
-        raise ForbiddenError("Acesso negado. Apenas administradores, gerentes de academia ou professores.")
+    """Exige administrador, gerente_academia, professor ou supervisor (lista de academias filtrada na rota)."""
+    if current_user.role not in ("administrador", "gerente_academia", "professor", "supervisor"):
+        _log_access_denied(
+            current_user, "administrador|gerente_academia|professor|supervisor"
+        )
+        raise ForbiddenError(
+            "Acesso negado. Apenas administradores, gerentes de academia, professores ou supervisores."
+        )
     return current_user
 
 
@@ -101,6 +125,26 @@ def verify_academy_access(
 ) -> None:
     """Verifica se o usuário tem acesso ao recurso da academia especificada."""
     if current_user.role == "administrador":
+        return
+
+    # Supervisor com academia vinculada: mesmo alcance local que gerente (só a própria academia).
+    if current_user.role == "supervisor":
+        if resource_academy_id is None:
+            if not allow_none:
+                raise ForbiddenError("Acesso negado. Recurso não vinculado a uma academia.")
+            return
+        if current_user.academy_id is None:
+            raise ForbiddenError("Acesso negado. Você não está vinculado a uma academia.")
+        if str(resource_academy_id) != str(current_user.academy_id):
+            logger.warning(
+                "Tentativa de acesso cross-academy (supervisor)",
+                extra={
+                    "user_id": str(current_user.id),
+                    "user_academy_id": str(current_user.academy_id),
+                    "target_academy_id": str(resource_academy_id),
+                },
+            )
+            raise ForbiddenError("Acesso negado. Você só pode acessar recursos da sua academia.")
         return
 
     if resource_academy_id is None:

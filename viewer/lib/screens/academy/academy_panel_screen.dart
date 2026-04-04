@@ -211,6 +211,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         'professor',
         'supervisor'
       ],
+      allowWhenRealUserIsAdmin: true,
+      allowWhenRealUserIsSupervisor: true,
       child: Scaffold(
         body: _loading
             ? const Center(child: CircularProgressIndicator())

@@ -31,7 +31,13 @@ class AuthService extends ChangeNotifier {
   bool get isImpersonating => _impersonatedUserId != null;
   String? get impersonatedUserId => _impersonatedUserId;
 
-  bool get isRealUserAdmin => _currentUser?.role == 'administrador';
+  static String _normRole(String? r) => (r ?? '').trim().toLowerCase();
+
+  /// Conta que fez login (ignora "Atuar como"). Usa [_currentUser], reidratado em [init] com [getAuthMeAsRealUser] quando há impersonação.
+  bool get isRealUserAdmin => _normRole(_currentUser?.role) == 'administrador';
+
+  /// Supervisor real (JWT), ignorando papel efetivo na simulação.
+  bool get isRealUserSupervisor => _normRole(_currentUser?.role) == 'supervisor';
 
   bool get randomPartnerShown => _randomPartnerShown;
 
@@ -76,8 +82,11 @@ class AuthService extends ChangeNotifier {
   void setLoggedIn(String token, UserModel user) {
     _token = token;
     _currentUser = user;
+    _impersonatedUserId = null;
+    _effectiveUser = null;
     _randomPartnerShown = false;
     _saveToStorage(token, user);
+    SharedPreferences.getInstance().then((p) => p.remove(_keyImpersonate));
     notifyListeners();
   }
 
@@ -108,6 +117,13 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyImpersonate, userId);
     try {
+      if (_token != null) {
+        try {
+          final real = await ApiService().getAuthMeAsRealUser();
+          _currentUser = real;
+          await _saveToStorage(_token!, real);
+        } catch (_) {}
+      }
       final user = await ApiService().getAuthMe();
       _effectiveUser = user;
     } catch (_) {

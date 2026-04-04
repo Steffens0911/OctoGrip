@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_BASE_DIR = Path(__file__).resolve().parent.parent
+# Mesma raiz usada por app.main e rotas de academias: <repo>/app_media.
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT = _BASE_DIR / "app_media"
 
 
@@ -124,6 +125,7 @@ def _run_pg_dump_sync(out_path: str) -> None:
 def _build_full_backup_zip_sync(zip_out_path: str) -> None:
     """Gera ZIP com database.sql + pasta media/ (cópia de app_media)."""
     work = Path(tempfile.mkdtemp(prefix="jjb_backup_zip_"))
+    media_files = 0
     try:
         sql_path = work / "dump.sql"
         _run_pg_dump_sync(str(sql_path))
@@ -135,6 +137,23 @@ def _build_full_backup_zip_sync(zip_out_path: str) -> None:
                         fp = Path(root) / fname
                         arc = Path("media") / fp.relative_to(_MEDIA_ROOT)
                         zf.write(fp, arc.as_posix())
+                        media_files += 1
+        if not _MEDIA_ROOT.exists():
+            logger.warning(
+                "Backup ZIP: pasta app_media não existe em %s — arquivo só terá database.sql.",
+                _MEDIA_ROOT,
+            )
+        elif media_files == 0:
+            logger.warning(
+                "Backup ZIP: app_media em %s existe mas não tem ficheiros — arquivo só terá database.sql.",
+                _MEDIA_ROOT,
+            )
+        else:
+            logger.info(
+                "Backup ZIP: incluídos %s ficheiro(s) em media/ (origem %s).",
+                media_files,
+                _MEDIA_ROOT,
+            )
     finally:
         shutil.rmtree(work, ignore_errors=True)
 

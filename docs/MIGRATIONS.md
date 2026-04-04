@@ -41,6 +41,7 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 043 | trophy_min_graduation_to_unlock | `trophies.min_graduation_to_unlock` (faixa mínima: white, blue, purple, brown, black; NULL = todos) |
 | 047 | clamp_reward_points_10_50 | Ajusta `training_videos.points_per_day`, `missions.multiplier`, `academies.weekly_multiplier_*` para [10, 50]; defaults de coluna = 10 |
 | 049 | trophy_min_reward_level_to_unlock | `trophies.min_reward_level_to_unlock` (nível mínimo `reward_level` para desbloquear; 0 = sem requisito); remove `min_points_to_unlock` |
+| 052 | user_login_days | Tabela `user_login_days` (user_id, login_day UTC); streak de login em `/auth/me`; backfill a partir de `users.last_login_at` |
 
 ---
 
@@ -73,3 +74,4 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_pos
 - **Migration 042:** (histórico) adicionava `trophies.min_points_to_unlock`; substituído pela **049**.
 - **Migration 043:** adiciona `trophies.min_graduation_to_unlock`. Faixa mínima (white, blue, purple, brown, black) para o aluno poder competir pelo troféu; NULL = sem restrição. Desbloqueio exige nível (`reward_level`) e faixa mínimos quando definidos.
 - **Migration 049:** substitui desbloqueio por pontos por `trophies.min_reward_level_to_unlock` (0 = sem requisito; N ≥ 1 exige `users.reward_level >= N`). Remove `min_points_to_unlock`. Troféus que tinham barreira por pontos precisam ser reconfigurados manualmente.
+- **Migration 052:** regista dias UTC com login bem-sucedido (`POST /auth/login`); `login_streak_days` em `GET/PATCH /auth/me` conta dias consecutivos (âncora hoje ou ontem em UTC). O backfill insere apenas a data do último `last_login_at` por utilizador.

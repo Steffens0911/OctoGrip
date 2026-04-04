@@ -126,8 +126,11 @@ class ApiService {
   }
 
   // ---------- Auth ----------
-  /// Login. Retorna (token, user). Lança ApiException em erro.
-  Future<({String token, UserModel user})> login(String email, String password) async {
+  /// Login. Retorna (token, user, streakBonusPoints). Lança ApiException em erro.
+  Future<({String token, UserModel user, int streakBonusPoints})> login(
+    String email,
+    String password,
+  ) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: await _jsonHeaders(),
@@ -137,8 +140,9 @@ class ApiService {
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
     final token = map['access_token'] as String;
+    final streakBonusPoints = map['streak_bonus_points'] as int? ?? 0;
     final user = await getAuthMe(token);
-    return (token: token, user: user);
+    return (token: token, user: user, streakBonusPoints: streakBonusPoints);
   }
 
   /// Retorna o usuário logado (requer token).
@@ -146,6 +150,15 @@ class ApiService {
     final h = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : await _jsonHeaders(auth: true);
+    final r = await _req(http.get(Uri.parse('$baseUrl/auth/me'), headers: h));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// [GET /auth/me] **sem** `X-Impersonate-User`: conta que assina o JWT (admin real durante «Atuar como»).
+  Future<UserModel> getAuthMeAsRealUser() async {
+    final h = await _jsonHeaders(auth: true, realUserOnly: true);
     final r = await _req(http.get(Uri.parse('$baseUrl/auth/me'), headers: h));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1201,8 +1214,12 @@ class ApiService {
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
+  /// Métricas globais (admin/supervisor). Exige JWT; [realUserOnly] evita 403 em «Atuar como» aluno.
   Future<UsageMetrics> getMetricsUsage() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/metrics/usage')));
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/metrics/usage'),
+      headers: await _headers(auth: true, realUserOnly: true),
+    ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UsageMetrics.fromJson(data! as Map<String, dynamic>);
@@ -1212,7 +1229,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/metrics/usage/by_academy')
         .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1231,7 +1248,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/engagement')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1250,7 +1267,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/active_students')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);

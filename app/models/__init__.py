@@ -6,6 +6,7 @@ from app.models.soft_delete import SoftDeleteMixin
 from app.models.academy import Academy
 from app.models.professor import Professor
 from app.models.user import User
+from app.models.user_login_day import UserLoginDay
 from app.models.technique import Technique
 from app.models.lesson import Lesson
 from app.models.lesson_progress import LessonProgress
@@ -26,6 +27,7 @@ __all__ = [
     "Academy",
     "Professor",
     "User",
+    "UserLoginDay",
     "Technique",
     "Lesson",
     "LessonProgress",

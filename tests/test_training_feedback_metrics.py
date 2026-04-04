@@ -56,9 +56,9 @@ async def test_criar_feedback_multiplos(client, aluno_headers, aluno_user):
 # ========================== MÉTRICAS ==========================
 
 
-async def test_metricas_uso_basicas(client, db):
+async def test_metricas_uso_basicas(client, db, admin_headers):
     """Obter métricas básicas de uso."""
-    r = await client.get("/metrics/usage")
+    r = await client.get("/metrics/usage", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
     assert "total_completions" in data
@@ -72,7 +72,7 @@ async def test_metricas_uso_basicas(client, db):
     assert isinstance(data["unique_users_completed"], int)
 
 
-async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
+async def test_metricas_uso_com_dados(client, db, academy, aluno_user, admin_headers):
     """Métricas com dados existentes."""
     from app.models import Lesson, LessonProgress, MissionUsage, Technique
     from datetime import datetime, timezone, timedelta
@@ -121,7 +121,7 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
     db.add(usage)
     await db.commit()
 
-    r = await client.get("/metrics/usage")
+    r = await client.get("/metrics/usage", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["total_completions"] >= 2
@@ -130,7 +130,7 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user):
     assert data["before_training_count"] >= 1
 
 
-async def test_metricas_uso_percentual(client, db, academy, aluno_user):
+async def test_metricas_uso_percentual(client, db, academy, aluno_user, admin_headers):
     """Métricas calculam percentual corretamente."""
     from app.models import Lesson, MissionUsage, Technique
     from datetime import datetime, timezone
@@ -178,16 +178,16 @@ async def test_metricas_uso_percentual(client, db, academy, aluno_user):
 
     await db.commit()
 
-    r = await client.get("/metrics/usage")
+    r = await client.get("/metrics/usage", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["before_training_percent"] > 0
     assert data["before_training_percent"] <= 100.0
 
 
-async def test_metricas_uso_sem_dados(client):
+async def test_metricas_uso_sem_dados(client, admin_headers):
     """Métricas sem dados retornam zeros."""
-    r = await client.get("/metrics/usage")
+    r = await client.get("/metrics/usage", headers=admin_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["total_completions"] >= 0

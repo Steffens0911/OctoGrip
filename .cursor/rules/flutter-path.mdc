@@ -24,4 +24,4 @@ cd viewer
 C:\Users\steffens\scoop\apps\flutter\3.41.4\bin\flutter.bat build web
 ```
 
-**Cloudflare quick tunnel (viewer + API):** o Chrome bloqueia HTTPS público → `127.0.0.1`. São necessários dois `cloudflared` (frontend estático, ex. `python -m http.server` em `viewer/build/web`; API na porta 8000) e abrir o viewer com `?api_base=https://URL_DO_TUNEL_DA_API.trycloudflare.com`.
+**Cloudflare quick tunnel (viewer + API):** o Chrome bloqueia HTTPS público → `127.0.0.1`. São necessários dois `cloudflared` (frontend estático, ex. `python -m http.server` em `viewer/build/web`; API na porta publicada no host, ex. **8001** com Docker) e abrir o viewer com `?api_base=https://URL_DO_TUNEL_DA_API.trycloudflare.com`.

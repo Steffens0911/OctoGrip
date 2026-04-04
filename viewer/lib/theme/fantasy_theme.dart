@@ -55,7 +55,7 @@ class FantasyTheme {
   static bool _isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;
 
-  /// Fundo da área Missões (stack atrás do scroll): escuro = gradiente; claro = scaffold.
+  /// Fundo da área Campo de treinamento (stack atrás do scroll): escuro = gradiente; claro = scaffold.
   static BoxDecoration missionHomeBackgroundDecoration(BuildContext context) {
     final theme = Theme.of(context);
     if (_isDark(context)) {

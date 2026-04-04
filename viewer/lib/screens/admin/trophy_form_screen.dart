@@ -34,7 +34,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
   bool _loadingTech = true;
   bool _saving = false;
   String? _error;
-  String _awardKind = 'trophy';
+  /// Novo registo: padrão medalha (período curto permitido). Troféu especial exige duração mínima.
+  String _awardKind = 'medal';
 
   String? _initialTechniqueId;
   String? _initialStartIso;
@@ -55,6 +56,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
       _initialAwardKind = t.awardKind;
       _initialMinDuration = t.minDurationDays;
       _awardKind = t.awardKind;
+    } else {
+      _awardKind = 'medal';
     }
     _loadTechniques();
   }
@@ -264,7 +267,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                     ? {
                         'name': '',
                         'techniqueId': firstTech,
-                        'awardKind': 'trophy',
+                        'awardKind': 'medal',
                         'minDurationDays': '30',
                         'minRewardLevelToUnlock': '0',
                         'minGraduationToUnlock': null,

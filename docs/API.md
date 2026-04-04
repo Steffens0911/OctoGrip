@@ -21,19 +21,20 @@ Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
 
 1. [Health](#health)
 2. [Academias](#academias)
-3. [Usuários](#usuários)
-4. [Lições](#lições)
-5. [Técnicas e Posições](#técnicas-e-posições)
-6. [Missões](#missões)
-7. [Missão do dia / Semana](#missão-do-dia--semana)
-8. [Conclusão de lição](#conclusão-de-lição)
-9. [Conclusão de missão](#conclusão-de-missão)
-10. [Histórico de missões](#histórico-de-missões)
-11. [Feedback de treino](#feedback-de-treino)
-12. [Métricas](#métricas)
-13. [Relatórios](#relatórios)
-14. [Admin — backup da base](#admin--backup-da-base)
-15. [Exceções HTTP](#exceções-http)
+3. [Autenticação (perfil)](#autenticação-perfil)
+4. [Usuários](#usuários)
+5. [Lições](#lições)
+6. [Técnicas e Posições](#técnicas-e-posições)
+7. [Missões](#missões)
+8. [Missão do dia / Semana](#missão-do-dia--semana)
+9. [Conclusão de lição](#conclusão-de-lição)
+10. [Conclusão de missão](#conclusão-de-missão)
+11. [Histórico de missões](#histórico-de-missões)
+12. [Feedback de treino](#feedback-de-treino)
+13. [Métricas](#métricas)
+14. [Relatórios](#relatórios)
+15. [Admin — backup da base](#admin--backup-da-base)
+16. [Exceções HTTP](#exceções-http)
 
 ---
 
@@ -73,6 +74,24 @@ Base: `/academies`. Detalhes em [ACADEMIAS.md](ACADEMIAS.md).
   "weekly_technique_3_id": "uuid | null"
 }
 ```
+
+---
+
+## Autenticação (perfil)
+
+Base: `/auth`.
+
+| Método | Endpoint   | Descrição |
+|--------|------------|-----------|
+| POST   | /auth/login | Login e JWT |
+| GET    | /auth/me   | Utilizador autenticado |
+| PATCH  | /auth/me   | Preferências do próprio (ex.: `gallery_visible`) |
+
+**POST /auth/login** — resposta (200), além de `access_token` e `token_type`:
+
+- **`streak_bonus_points`** (inteiro, default `0`): pontos extra creditados neste login quando a sequência de dias consecutivos (UTC) atinge um múltiplo configurado (por defeito **7**, **14**, **21**…). Os pontos somam-se em `points_adjustment` e o nível é recalculado. Variáveis de ambiente: `LOGIN_STREAK_BONUS_POINTS` (default `50`), `LOGIN_STREAK_BONUS_INTERVAL_DAYS` (default `7`). O bónus só corre quando o contador de sequência **sobe exatamente 1** neste login (evita duplicar no segundo pedido no mesmo dia).
+
+**`login_streak_days`** (inteiro) em **GET/PATCH /auth/me**: dias consecutivos com login bem-sucedido (calendário **UTC**). Cada `POST /auth/login` regista o dia atual. Se hoje ainda não houve login mas ontem houve, a sequência mantém-se até ao fim do dia UTC. Em **GET /users** e **GET /users/{id}** o mesmo campo pode aparecer como **0** porque o valor não é calculado nessas listagens — o viewer do aluno deve usar **`/auth/me`**.
 
 ---
 

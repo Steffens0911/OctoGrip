@@ -11,6 +11,7 @@ async def test_login_sucesso(client, admin_user):
     data = r.json()
     assert "access_token" in data
     assert data["token_type"] == "bearer"
+    assert data.get("streak_bonus_points", -1) >= 0
 
 
 async def test_login_email_invalido(client):
@@ -40,6 +41,8 @@ async def test_me_com_token(client, admin_user, admin_headers):
     data = r.json()
     assert data["email"] == admin_user.email
     assert data["role"] == "administrador"
+    assert "login_streak_days" in data
+    assert isinstance(data["login_streak_days"], int)
 
 
 async def test_me_token_invalido(client):
