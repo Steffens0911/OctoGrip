@@ -30,14 +30,7 @@ class TodayAcademyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: FantasyTheme.cardGradient,
-        borderRadius: FantasyTheme.cardBorderRadius,
-        boxShadow: FantasyTheme.cardShadow,
-        border: Border.all(
-          color: FantasyTheme.textMuted.withValues(alpha: 0.15),
-        ),
-      ),
+      decoration: FantasyTheme.cardBoxDecoration(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -45,20 +38,20 @@ class TodayAcademyCard extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: FantasyTheme.textPrimary,
+                  color: FantasyTheme.textPrimaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 16),
           Divider(
-            color: FantasyTheme.textMuted.withValues(alpha: 0.4),
+            color: FantasyTheme.textMutedOf(context).withValues(alpha: 0.4),
             height: 1,
           ),
           const SizedBox(height: 12),
           Text(
             philosopherName,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: FantasyTheme.textPrimary,
+                  color: FantasyTheme.textPrimaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
           ),
@@ -66,7 +59,7 @@ class TodayAcademyCard extends StatelessWidget {
           Text(
             years,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: FantasyTheme.textSecondary,
+                  color: FantasyTheme.textSecondaryOf(context),
                   fontSize: 12,
                 ),
           ),
@@ -74,20 +67,20 @@ class TodayAcademyCard extends StatelessWidget {
           Text(
             work,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: FantasyTheme.textSecondary,
+                  color: FantasyTheme.textSecondaryOf(context),
                   fontSize: 12,
                 ),
           ),
           const SizedBox(height: 12),
           Divider(
-            color: FantasyTheme.textMuted.withValues(alpha: 0.4),
+            color: FantasyTheme.textMutedOf(context).withValues(alpha: 0.4),
             height: 1,
           ),
           const SizedBox(height: 12),
           Text(
             quote,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: FantasyTheme.textSecondary,
+                  color: FantasyTheme.textSecondaryOf(context),
                   fontSize: 13,
                   height: 1.4,
                 ),
@@ -121,7 +114,7 @@ class TodayAcademyCard extends StatelessWidget {
                       buttonLabel,
                       style:
                           Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: FantasyTheme.backgroundTop,
+                                color: FantasyTheme.goldButtonForeground,
                                 fontWeight: FontWeight.w600,
                               ),
                     ),

@@ -376,15 +376,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: FantasyTheme.cardSurfaceTop,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: FantasyTheme.cardBorderRadius,
         ),
-        title: const Text(
+        title: Text(
           'Thomas Hobbes — Leviatã',
-          style: TextStyle(color: FantasyTheme.textPrimary),
+          style: TextStyle(
+            color: FantasyTheme.textPrimaryOf(context),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Text(
             'No estado de natureza, a vida seria "solitária, pobre, sórdida, '
             'odiosa e curta... Para escapar dessa situação e garantir a '
@@ -392,7 +395,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             'transferindo todos os seus direitos ao soberano (ou Leviatã), '
             'exceto o direito à vida.',
             style: TextStyle(
-              color: FantasyTheme.textSecondary,
+              color: FantasyTheme.textSecondaryOf(context),
               height: 1.4,
             ),
           ),
@@ -420,12 +423,10 @@ class _FantasyBackground extends StatelessWidget {
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
-      errorBuilder: (_, __, ___) => Container(
+      errorBuilder: (ctx, __, ___) => Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: FantasyTheme.backgroundGradient,
-        ),
+        decoration: FantasyTheme.missionHomeBackgroundDecoration(ctx),
       ),
     );
   }

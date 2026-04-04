@@ -3,7 +3,7 @@ import 'package:viewer/core/leveling.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
-/// Header da home fantasia: saudação, brasão da academia, nome, barra XP e badge da tarefa diária.
+/// Header da home fantasia: saudação, brasão da academia, faixa (sob o brasão), barra XP e badge da tarefa diária.
 class HeaderWidget extends StatelessWidget {
   const HeaderWidget({
     super.key,
@@ -34,7 +34,9 @@ class HeaderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = maxXp > 0 ? (currentXp / maxXp).clamp(0.0, 1.0) : 0.0;
-    final displayName = userBelt.isNotEmpty ? '$userName — $userBelt' : userName;
+    final beltUnderCrest = userBelt.isNotEmpty
+        ? 'Faixa $userBelt'
+        : 'Faixa —';
     final showBadge = dailyVideoPoints > 0 || dailyVideoCompleted;
     final badgeLabel = dailyVideoCompleted
         ? 'Tarefa concluída · Revisar fortalece sua técnica'
@@ -52,7 +54,7 @@ class HeaderWidget extends StatelessWidget {
           Text(
             'Olá, $userName!',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: FantasyTheme.textPrimary,
+                  color: FantasyTheme.textPrimaryOf(context),
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -60,7 +62,7 @@ class HeaderWidget extends StatelessWidget {
           Text(
             'Construa consistência e evolua sua técnica esta semana',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: FantasyTheme.textSecondary,
+                  color: FantasyTheme.textSecondaryOf(context),
                 ),
           ),
           if (showBadge) ...[
@@ -83,12 +85,12 @@ class HeaderWidget extends StatelessWidget {
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: FantasyTheme.cardSurfaceTop
+                          color: FantasyTheme.insetSurfaceOf(context)
                               .withValues(alpha: 0.95),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: dailyVideoCompleted
-                                ? FantasyTheme.textMuted
+                                ? FantasyTheme.textMutedOf(context)
                                     .withValues(alpha: 0.5)
                                 : FantasyTheme.xpGreen
                                     .withValues(alpha: 0.5),
@@ -102,7 +104,7 @@ class HeaderWidget extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: dailyVideoCompleted
-                                        ? FantasyTheme.textSecondary
+                                        ? FantasyTheme.textSecondaryOf(context)
                                         : FantasyTheme.xpGreen,
                                     fontWeight: FontWeight.w600,
                                     height: 1.25,
@@ -124,16 +126,16 @@ class HeaderWidget extends StatelessWidget {
               backgroundColor: FantasyTheme.gold,
               child: CircleAvatar(
                 radius: 41,
-                backgroundColor: FantasyTheme.cardSurfaceTop,
+                backgroundColor: FantasyTheme.insetSurfaceOf(context),
                 backgroundImage: academyLogoUrl != null &&
                         academyLogoUrl!.isNotEmpty
                     ? NetworkImage(academyLogoUrl!)
                     : null,
                 child: academyLogoUrl == null || academyLogoUrl!.isEmpty
-                    ? const Icon(
+                    ? Icon(
                         Icons.shield_outlined,
                         size: 40,
-                        color: FantasyTheme.textSecondary,
+                        color: FantasyTheme.textSecondaryOf(context),
                       )
                     : null,
               ),
@@ -142,10 +144,10 @@ class HeaderWidget extends StatelessWidget {
           ),
           AppSpacing.verticalS,
           Text(
-            displayName,
+            beltUnderCrest,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: FantasyTheme.textPrimary,
+                  color: FantasyTheme.textPrimaryOf(context),
                   fontWeight: FontWeight.w600,
                 ),
           ),
@@ -158,10 +160,11 @@ class HeaderWidget extends StatelessWidget {
                 Container(
                   height: 28,
                   decoration: BoxDecoration(
-                    color: FantasyTheme.cardSurfaceTop,
+                    color: FantasyTheme.insetSurfaceOf(context),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: FantasyTheme.textMuted.withValues(alpha: 0.3),
+                      color: FantasyTheme.textMutedOf(context)
+                          .withValues(alpha: 0.3),
                     ),
                   ),
                 ),
@@ -190,7 +193,7 @@ class HeaderWidget extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: FantasyTheme.textPrimary,
+                          color: FantasyTheme.textPrimaryOf(context),
                           fontWeight: FontWeight.w600,
                         ),
                   ),

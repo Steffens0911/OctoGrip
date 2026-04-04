@@ -49,7 +49,8 @@ Acesse: **http://localhost:8080**
 
 ### MainShell (`lib/main.dart`)
 
-- Aba **Missões** pode mostrar **badge** com o número de confirmações pendentes (`StudentHomeScreen` notifica via `onPendingConfirmationsCountChanged`). O valor mantém-se ao mudar para **Painel** até nova carga na home zerar o contador.
+- **Aluno** (`role == aluno`): barra inferior só com a aba **Missões** (sem **Painel**). **Professor** e outros papéis não administradores mantêm **Missões** + **Painel**; **administrador** tem **Missões**, **Painel** e **Admin**.
+- Aba **Missões** pode mostrar **badge** de confirmações pendentes (`onPendingConfirmationsCountChanged`). Quando existir aba **Painel**, o valor do badge mantém-se ao mudar de aba até a home recarregar e zerar o contador.
 - Ao trocar de utilizador efetivo (ex.: impersonação), o badge é reposto a zero até a home voltar a carregar.
 
 ---
@@ -58,11 +59,15 @@ Acesse: **http://localhost:8080**
 
 ### StudentHomeScreen
 
+- **Tema claro/escuro:** o fundo atrás do scroll (`_FantasyBackground` → `FantasyTheme.missionHomeBackgroundDecoration`) e os cartões da home fantasia (`FantasyTheme.cardBoxDecoration`, `textPrimaryOf`, `insetSurfaceOf`, etc.) usam o `Brightness` atual: em **claro**, fundo alinhado ao scaffold e cartões ao `ColorScheme.surface`; em **escuro**, mantém o gradiente espacial e cartões roxos como antes.
+- **`HeaderWidget`**: saudação *Olá, …* no topo; **sob o brasão** só o texto **Faixa** + graduação (ex. Faixa Preta), sem repetir o nome nessa linha.
 - Abaixo do cabeçalho, cartão **`StreakWidget(showPlaceholder: true)`** indica que a sequência de treinos virá quando a API expuser o dado.
 - Carrega `GET /mission_today/week` (3 missões semanais).
-- **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal (cartão sem título “Missões da semana”), com ✓ / play / cadeado, **nome da técnica** por slot, haptic, alvos **48×48**, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
+- **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal, com título **Missões da semana** acima do cartão; ✓ / play / cadeado, **nome da técnica** por slot, haptic, alvos **48×48**, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
 - **Removidos** da home: cartão “Você já concluiu X de Y missões” + barra linear; acordeão **Missões da semana** com os três cards “Começar”.
-- Se não houver dados da semana (ou academia não configurada), mensagem continua dentro do acordeão **Centro de treinamento** (antes de Troféus). O acordeão **Confirmações e solicitações** (log de pontuação, confirmações pendentes, minhas solicitações) fica no **fim do scroll**, depois de horários e apoiantes globais — fora do Centro de treinamento.
+- **Centro de treinamento**: acordeão só aparece quando não há `missionWeek` (mensagem para configurar academia ou “nenhuma missão”). Com missões carregadas o acordeão **não** é mostrado.
+- **`TrophiesHomeSection`** (`lib/widgets/trophies_home_section.dart`): título **Troféus** + cartão com o mesmo `FantasyTheme.cardBoxDecoration` que **Parceiros** (gradiente no escuro, superfície clara no tema claro), linhas para **Galeria de troféus** e, com academia, **Galeria dos colegas**. Respeita `academy.showTrophies` (`_showTrophies`). Fica no scroll **após** o Centro de treinamento (se visível) e **antes** de Parceiros.
+- O acordeão **Confirmações e solicitações** fica no **fim do scroll**, depois de horários e apoiantes globais.
 - **Confirmações pendentes** (`GET` contador via `ApiService.getPendingConfirmationsCount`):
   - **Banner** sob o cabeçalho quando `count > 0`: texto + **Abrir** → `PendingConfirmationsScreen`; **X** oculta o banner até o contador mudar (nova resposta da API).
   - **Bottom sheet** uma vez por montagem da tela (após o fluxo de parceiro em destaque, se houver): resume o número de pendentes, **Ir confirmar** ou **Depois**.

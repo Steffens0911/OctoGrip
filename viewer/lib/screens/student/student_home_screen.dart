@@ -28,6 +28,7 @@ import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/partners_card.dart';
+import 'package:viewer/widgets/trophies_home_section.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -605,7 +606,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           const _FantasyBackground(),
           RefreshIndicator(
             onRefresh: _load,
-            color: FantasyTheme.gold,
+            color: Theme.of(context).colorScheme.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(screenPadding, 0, screenPadding, 24),
@@ -682,6 +683,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     const SizedBox(height: 16),
                   if (u != null) ...[
                     _buildMainAccordion(),
+                    if (_showTrophies) ...[
+                      const SizedBox(height: 16),
+                      _buildTrophiesHomeSection(),
+                    ],
                     if (u.academyId != null && u.academyId!.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       if (_showPartners) _buildPartnersSection(),
@@ -951,34 +956,48 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  /// Caminho ●──●──● no scroll principal (técnicas + toque → lição); sem título duplicado.
+  /// Título **Missões da semana** + caminho ●──●──● (técnicas + toque → lição).
   Widget _buildWeeklyMissionPathSection() {
     final week = _missionWeek;
     final u = _selectedUser;
     if (week == null || u == null) return const SizedBox.shrink();
     final entries = week.entries;
     if (entries.isEmpty) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
-      decoration: BoxDecoration(
-        color: AppTheme.surfaceOf(context),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderOf(context)),
-      ),
-      child: WeeklyMissionPath(
-        slots: entries,
-        onMissionTap: _openMissionFromPath,
-        celebrateMissionId: _celebrateMissionId,
-        onCelebrateComplete: () {
-          if (mounted) {
-            setState(() => _celebrateMissionId = null);
-          }
-        },
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Missões da semana',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppTheme.textPrimaryOf(context),
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: WeeklyMissionPath(
+            slots: entries,
+            onMissionTap: _openMissionFromPath,
+            celebrateMissionId: _celebrateMissionId,
+            onCelebrateComplete: () {
+              if (mounted) {
+                setState(() => _celebrateMissionId = null);
+              }
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  /// Acordeom pai: Troféus (confirmações no fim do scroll; missões no [WeeklyMissionPath] acima).
+  /// Acordeom **Centro de treinamento** só quando há mensagem de missões ausentes.
+  /// Com `missionWeek` carregado não há filhos aqui; troféus em [TrophiesHomeSection].
   Widget _buildMainAccordion() {
     final missionHint = _missionWeek == null &&
             !_loading &&
@@ -999,6 +1018,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             ),
           )
         : null;
+    if (missionHint == null) return const SizedBox.shrink();
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ClipRRect(
@@ -1023,13 +1043,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            children: [
-              if (missionHint != null) ...[
-                missionHint,
-                const SizedBox(height: 16),
-              ],
-              if (_showTrophies) _buildTrophiesSection(),
-            ],
+            children: [missionHint],
           ),
         ),
       ),
@@ -1142,53 +1156,33 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildTrophiesSection() {
+  Widget _buildTrophiesHomeSection() {
     final u = _selectedUser;
     if (u == null) return const SizedBox.shrink();
     final userId = u.id;
     final hasAcademy = u.academyId != null && u.academyId!.isNotEmpty;
-
-    final children = <Widget>[
-      AppNavigationTile(
-        icon: Icons.emoji_events_outlined,
-        title: 'Galeria de troféus',
-        subtitle: 'Troféus conquistados (ouro, prata, bronze)',
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => TrophyGalleryScreen(
-              userId: userId,
-              userName: _selectedUser?.name ?? _selectedUser?.email,
-            ),
+    return TrophiesHomeSection(
+      onOpenGallery: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(
+          builder: (context) => TrophyGalleryScreen(
+            userId: userId,
+            userName: _selectedUser?.name ?? _selectedUser?.email,
           ),
         ),
       ),
-    ];
-
-    if (hasAcademy) {
-      children.addAll([
-        const SizedBox(height: 8),
-        AppNavigationTile(
-          icon: Icons.people_outline,
-          title: 'Galeria dos colegas',
-          subtitle: 'Troféus e medalhas dos colegas da academia',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ClassmatesGalleryScreen(
-                academyId: u.academyId!,
-                currentUserId: userId,
-              ),
-            ),
-          ),
-        ),
-      ]);
-    }
-
-    return _buildHomeAccordion(
-      icon: Icons.emoji_events,
-      title: 'Troféus',
-      children: children,
+      onOpenClassmates: hasAcademy
+          ? () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (context) => ClassmatesGalleryScreen(
+                    academyId: u.academyId!,
+                    currentUserId: userId,
+                  ),
+                ),
+              )
+          : null,
+      showClassmatesRow: hasAcademy,
     );
   }
 
@@ -1209,7 +1203,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
 }
 
-/// Fundo espacial/gradiente usado também na home fantasia.
+/// Fundo da home Missões: gradiente espacial no escuro; claro alinhado ao scaffold.
 class _FantasyBackground extends StatelessWidget {
   const _FantasyBackground();
 
@@ -1218,9 +1212,7 @@ class _FantasyBackground extends StatelessWidget {
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: FantasyTheme.backgroundGradient,
-      ),
+      decoration: FantasyTheme.missionHomeBackgroundDecoration(context),
     );
   }
 }

@@ -158,6 +158,10 @@ class _MainShellState extends State<MainShell> {
     if (role == 'administrador') {
       return ['Missões', 'Painel', 'Admin'];
     }
+    // Aluno não usa o painel da academia na navegação inferior.
+    if (role == 'aluno') {
+      return ['Missões'];
+    }
     return ['Missões', 'Painel'];
   }
 

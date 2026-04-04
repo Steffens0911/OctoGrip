@@ -21,14 +21,7 @@ class MissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: FantasyTheme.cardGradient,
-        borderRadius: FantasyTheme.cardBorderRadius,
-        boxShadow: FantasyTheme.cardShadow,
-        border: Border.all(
-          color: FantasyTheme.textMuted.withValues(alpha: 0.15),
-        ),
-      ),
+      decoration: FantasyTheme.cardBoxDecoration(context),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -54,7 +47,7 @@ class MissionCard extends StatelessWidget {
                 Text(
                   title,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: FantasyTheme.textPrimary,
+                        color: FantasyTheme.textPrimaryOf(context),
                         fontWeight: FontWeight.w600,
                       ),
                 ),
@@ -62,7 +55,7 @@ class MissionCard extends StatelessWidget {
                 Text(
                   description,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: FantasyTheme.textSecondary,
+                        color: FantasyTheme.textSecondaryOf(context),
                         fontSize: 13,
                       ),
                 ),
@@ -97,15 +90,15 @@ class MissionCard extends StatelessWidget {
                                 .textTheme
                                 .labelLarge
                                 ?.copyWith(
-                                  color: FantasyTheme.backgroundTop,
+                                  color: FantasyTheme.goldButtonForeground,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
                           const SizedBox(width: 6),
-                          const const const Icon(
+                          const Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
-                            color: FantasyTheme.backgroundTop,
+                            color: FantasyTheme.goldButtonForeground,
                           ),
                         ],
                       ),
