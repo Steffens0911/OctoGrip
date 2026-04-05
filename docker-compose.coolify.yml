@@ -1,0 +1,70 @@
+# Stack para Coolify (e outros hosts onde o proxy gere tráfego externo).
+# Igual ao docker-compose.yml, mas sem publicar portas no host — evita
+# "Bind for 0.0.0.0:8080 failed: port is already allocated" quando 8080/8001/5432
+# já estão em uso (ex.: Traefik/Coolify na mesma VPS).
+#
+# No Coolify: Build Pack Docker Compose → Docker Compose Location: /docker-compose.coolify.yml
+# Domínios: viewer → porta 80 no contentor; api → porta 8000 no contentor.
+#
+# Desenvolvimento local: continua a usar docker-compose.yml (portas 8080, 8001, 5432).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jjb_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-jjb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jjb_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-jjb_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-jjb} -d ${POSTGRES_DB:-jjb_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: jjb_api
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENABLE_METRICS: ${ENABLE_METRICS:-true}
+      ACCOUNT_LOCKOUT_ATTEMPTS: ${ACCOUNT_LOCKOUT_ATTEMPTS:-5}
+      ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - api_media:/app/app_media
+
+  viewer:
+    build:
+      context: ./viewer
+      dockerfile: Dockerfile
+      args:
+        API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
+    container_name: jjb_viewer
+    restart: unless-stopped
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  api_media:
