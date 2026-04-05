@@ -1,11 +1,11 @@
 {
-    "name": "viewer",
-    "short_name": "viewer",
+    "name": "FlowRoll",
+    "short_name": "FlowRoll",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#262433",
+    "theme_color": "#D4A017",
+    "description": "Treino, academia e progresso no Jiu-Jitsu.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

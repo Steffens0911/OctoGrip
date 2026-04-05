@@ -23,20 +23,20 @@ void main() async {
     ProviderScope(
       child: ChangeNotifierProvider<AuthService>.value(
         value: AuthService(),
-        child: const ViewerApp(),
+        child: const FlowRollApp(),
       ),
     ),
   );
 }
 
-class ViewerApp extends StatefulWidget {
-  const ViewerApp({super.key});
+class FlowRollApp extends StatefulWidget {
+  const FlowRollApp({super.key});
 
   @override
-  State<ViewerApp> createState() => _ViewerAppState();
+  State<FlowRollApp> createState() => _FlowRollAppState();
 }
 
-class _ViewerAppState extends State<ViewerApp> {
+class _FlowRollAppState extends State<FlowRollApp> {
   /// Padrão escuro até carregar preferência (login e primeiro frame).
   ThemeMode _themeMode = ThemeMode.dark;
   bool _useGameFont = true;
@@ -71,7 +71,7 @@ class _ViewerAppState extends State<ViewerApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'JJB Viewer',
+      title: 'FlowRoll',
       theme: _useGameFont ? AppTheme.memoLight : AppTheme.memoLightSans,
       darkTheme: _useGameFont ? AppTheme.memoDark : AppTheme.memoDarkSans,
       themeMode: _themeMode,

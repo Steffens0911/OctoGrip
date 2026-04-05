@@ -26,7 +26,7 @@ void main() {
     await tester.pumpWidget(
       ChangeNotifierProvider<AuthService>.value(
         value: AuthService(),
-        child: const ViewerApp(),
+        child: const FlowRollApp(),
       ),
     );
     expect(find.byType(MaterialApp), findsOneWidget);

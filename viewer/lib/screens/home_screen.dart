@@ -13,10 +13,15 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.sports_martial_arts, size: 80, color: Colors.grey.shade400),
+            Image.asset(
+              'assets/branding/flowroll_app_icon.png',
+              width: 96,
+              height: 96,
+              filterQuality: FilterQuality.high,
+            ),
             const SizedBox(height: 24),
             Text(
-              'JJB Viewer',
+              'FlowRoll',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: AppTheme.textPrimary,
                     fontWeight: FontWeight.bold,

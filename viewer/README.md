@@ -1,6 +1,24 @@
-# JJB Viewer (Flutter)
+# FlowRoll (Flutter)
 
-App Flutter com **seção de administração** para o usuário administrador gerenciar academias, usuários, lições, técnicas, posições e missões.
+App **FlowRoll** para alunos e equipa da academia: campo de treino, painel da academia e administração (academias, usuários, técnicas, missões, etc.).
+
+## Ícone e PWA (web)
+
+O ícone (livro aberto — estudo/aprendizagem; âmbar com fundo transparente) e os PNG do PWA são gerados por script:
+
+```bash
+cd viewer
+python scripts/generate_flowroll_icons.py
+```
+
+**Favicon e ícones PWA** (barra do browser / instalação) devem seguir a wordmark do login:
+
+```bash
+cd viewer
+python scripts/generate_pwa_icons_from_wordmark.py
+```
+
+Saídas do primeiro script: `assets/branding/flowroll_app_icon.png` (ícone livro, ex. home). Saídas do segundo: `web/favicon.png` e `web/icons/Icon-*.png` a partir de **`assets/branding/flowroll_wordmark.png`**. O login usa a mesma wordmark com fundo transparente no cartão.
 
 ## Como rodar
 

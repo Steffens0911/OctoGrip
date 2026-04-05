@@ -1,4 +1,4 @@
-# Viewer — App Flutter (JJB)
+# FlowRoll — App Flutter (viewer)
 
 App Flutter para **alunos** e **professores** de jiu-jitsu. Interface web responsiva e tema estilo Duolingo.
 
@@ -33,6 +33,7 @@ Acesse: **http://localhost:8080**
 
 ### Login e mensagens de erro
 
+- **`login_screen.dart`**: layout tipo landing com fundo roxo-carvão, cartão centrado, campos preenchidos em tom escuro e botão dourado; a marca é **`assets/branding/flowroll_wordmark.png`** (texto branco + cinto no “O”, fundo transparente sobre o cartão). O **favicon** e os **ícones PWA** (`web/favicon.png`, `web/icons/Icon-*.png`) são gerados a partir da mesma wordmark com `python scripts/generate_pwa_icons_from_wordmark.py` (fundo `#262433` para contraste na barra do browser).
 - Se o Chrome mostra **401** em `POST /auth/login`, a API está a responder: o problema é normalmente **e-mail ou senha incorretos**, não “API desligada”.
 - **Ambiente Docker com seed** (conforme scripts de arranque do projeto): credenciais típicas `admin@jjb.com` / `saas`.
 - Após **restaurar um backup** (`POST /admin/backup/restore`), os utilizadores e hashes vêm do ficheiro SQL: use as credenciais **desse** banco, não as do seed.
