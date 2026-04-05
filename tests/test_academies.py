@@ -1,4 +1,6 @@
 """Testes de CRUD de academias."""
+from datetime import datetime, timezone
+
 import pytest
 
 
@@ -82,6 +84,43 @@ async def test_relatorio_semanal_csv(client, admin_headers, academy):
     r = await client.get(f"/academies/{academy.id}/report/weekly/csv", headers=admin_headers)
     assert r.status_code == 200
     assert "rank;user_id;name;completions_count" in r.text
+
+
+async def test_relatorio_semanal_inclui_execucoes_confirmadas(
+    client,
+    admin_headers,
+    db,
+    academy,
+    aluno_user,
+    opponent_user,
+):
+    from app.models import TechniqueExecution
+
+    execucao = TechniqueExecution(
+        user_id=aluno_user.id,
+        mission_id=None,
+        lesson_id=None,
+        technique_id=None,
+        opponent_id=opponent_user.id,
+        usage_type="after_training",
+        status="confirmed",
+        outcome="executed_successfully",
+        points_awarded=10,
+        confirmed_at=datetime.now(timezone.utc),
+        confirmed_by=opponent_user.id,
+    )
+    db.add(execucao)
+    await db.commit()
+
+    r = await client.get(f"/academies/{academy.id}/report/weekly", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    assert data["completions_count"] >= 1
+    assert data["active_users_count"] >= 1
+    assert any(
+        e["user_id"] == str(aluno_user.id) and e["completions_count"] >= 1
+        for e in data["entries"]
+    )
 
 
 async def test_professor_ve_apenas_propria_academia(client, professor_headers, academy):

@@ -515,6 +515,44 @@ Mesma informação de `/reports/active_students`, porém exportada em **CSV**, p
 id,name,email,graduation,academy_id,academy_name,last_login_at
 ```
 
+### GET /reports/weekly_panel_logins
+
+Relatório semanal (semana ISO) de logins (tabela `user_login_days`).
+
+- Universo: `administrador`, `gerente_academia`, `professor`, `supervisor` e `aluno`.
+- Visão por academia (`academy_id` informado): apenas usuários vinculados à academia.
+- Visão global (`academy_id` omitido): todos os usuários elegíveis.
+- Em escopo por academia, administradores globais sem `academy_id` ficam no global.
+
+**Query params:**
+
+| Parâmetro      | Tipo | Obrigatório | Descrição                                                                 |
+|----------------|------|------------|---------------------------------------------------------------------------|
+| reference_date | date | sim        | Data de referência (YYYY-MM-DD) para determinar a semana ISO.            |
+| academy_id     | UUID | não        | Se informado, limita à academia; se omitido, considera visão global.      |
+
+**Resposta (200):**
+```json
+{
+  "academy_id": "uuid-or-null",
+  "week_start": "2026-03-30",
+  "week_end": "2026-04-05",
+  "eligible_users_count": 12,
+  "users_logged_at_least_once": 5,
+  "users": [
+    {
+      "user_id": "uuid",
+      "name": "Professor A",
+      "email": "professor@flowroll.app",
+      "role": "professor",
+      "academy_id": "uuid-or-null",
+      "distinct_login_days_in_week": 3,
+      "login_days": ["2026-03-31", "2026-04-02", "2026-04-05"]
+    }
+  ]
+}
+```
+
 ---
 
 ## Admin — backup da base

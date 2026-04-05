@@ -19,6 +19,7 @@ import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
+import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'dart:typed_data';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -51,6 +52,9 @@ class ApiService {
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort = 30; // mission_today, week, pending count
   static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, users
+
+  /// Evita vários GET simultâneos ao mesmo endpoint (reduz pressão no browser / ERR_INSUFFICIENT_RESOURCES).
+  Future<List<TrainingVideo>>? _inFlightTrainingVideosToday;
 
   ApiService._() {
     baseUrl = kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
@@ -258,14 +262,44 @@ class ApiService {
   }
 
   /// Retorna a academia sem usar cache (para o brasão na home do aluno aparecer logo após o admin salvar).
+  ///
+  /// Em 403, chama `AuthService().refreshMe()` e tenta de novo com o `academy_id` atual do servidor
+  /// (evita brasão vazio quando o utilizador em cache ficou desatualizado).
   Future<Academy> getAcademyFresh(String id) async {
-    final r = await _req(http.get(
-      Uri.parse('$baseUrl/academies/$id'),
-      headers: await _headers(auth: true),
-    ));
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    return Academy.fromJson(data! as Map<String, dynamic>);
+    Future<Academy> fetchOnce(String academyId) async {
+      final r = await _req(http.get(
+        Uri.parse('$baseUrl/academies/$academyId'),
+        headers: await _headers(auth: true),
+      ));
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+      return Academy.fromJson(data! as Map<String, dynamic>);
+    }
+
+    try {
+      return await fetchOnce(id);
+    } on ApiException catch (e) {
+      if (e.statusCode != 403) rethrow;
+      try {
+        await AuthService().refreshMe();
+      } catch (_) {
+        rethrow;
+      }
+      final fresh = AuthService().currentUser?.academyId?.trim();
+      if (fresh != null && fresh.isNotEmpty && fresh != id) {
+        invalidateCache('GET:$baseUrl/academies');
+        return await fetchOnce(fresh);
+      }
+      // Fallback adicional: em alguns cenários (token/impersonação recém-trocados),
+      // o id em memória pode não bater; usa a academia visível para o usuário atual.
+      try {
+        final mine = await getAcademies();
+        if (mine.isNotEmpty) {
+          return mine.first;
+        }
+      } catch (_) {}
+      rethrow;
+    }
   }
 
   /// Resolve URL de horários: se for post do Instagram, retorna thumbnail para exibição; senão retorna a própria URL.
@@ -285,11 +319,32 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>?> getCollectiveGoalCurrent(String academyId) async {
-    final r = await _getWithCache(Uri.parse('$baseUrl/academies/$academyId/collective_goals/current'), _cacheTtlShort);
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    if (data == null) return null;
-    return data as Map<String, dynamic>;
+    Future<Map<String, dynamic>?> fetchOnce(String id) async {
+      final r = await _getWithCache(
+        Uri.parse('$baseUrl/academies/$id/collective_goals/current'),
+        _cacheTtlShort,
+      );
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+      if (data == null) return null;
+      return data as Map<String, dynamic>;
+    }
+
+    try {
+      return await fetchOnce(academyId);
+    } on ApiException catch (e) {
+      if (e.statusCode != 403) rethrow;
+      try {
+        await AuthService().refreshMe();
+      } catch (_) {
+        rethrow;
+      }
+      final fresh = AuthService().currentUser?.academyId?.trim();
+      if (fresh != null && fresh.isNotEmpty && fresh != academyId) {
+        return await fetchOnce(fresh);
+      }
+      rethrow;
+    }
   }
 
   Future<Academy> createAcademy({required String name, String? slug}) async {
@@ -1274,6 +1329,25 @@ class ApiService {
     return ActiveStudentsReport.fromJson(data! as Map<String, dynamic>);
   }
 
+  Future<WeeklyPanelLoginsReport> getWeeklyPanelLoginsReport({
+    required DateTime referenceDate,
+    String? academyId,
+  }) async {
+    final params = <String, String>{
+      'reference_date':
+          '${referenceDate.year.toString().padLeft(4, '0')}-${referenceDate.month.toString().padLeft(2, '0')}-${referenceDate.day.toString().padLeft(2, '0')}',
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/weekly_panel_logins')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return WeeklyPanelLoginsReport.fromJson(data! as Map<String, dynamic>);
+  }
+
   // ---------- Academy extras (ranking, dificuldades, relatório, reset, missões semanais) ----------
 
   Future<Map<String, dynamic>> getAcademyRanking(
@@ -1474,6 +1548,21 @@ class ApiService {
   /// Lista vídeos de treinamento disponíveis hoje para o aluno logado.
   /// Endpoint esperado: GET /me/training_videos/today
   Future<List<TrainingVideo>> getTrainingVideosToday() async {
+    final existing = _inFlightTrainingVideosToday;
+    if (existing != null) return await existing;
+
+    final future = _fetchTrainingVideosTodayBody();
+    _inFlightTrainingVideosToday = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_inFlightTrainingVideosToday, future)) {
+        _inFlightTrainingVideosToday = null;
+      }
+    }
+  }
+
+  Future<List<TrainingVideo>> _fetchTrainingVideosTodayBody() async {
     final uri = Uri.parse('$baseUrl/me/training_videos/today');
     final r = await _req(
       http.get(uri, headers: await _headers(auth: true)),

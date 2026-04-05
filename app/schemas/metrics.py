@@ -65,3 +65,31 @@ class ActiveStudentsReportResponse(BaseModel):
     active_students: int
     active_rate: float
     students: list[ActiveStudentItem]
+
+
+class WeeklyPanelLoginUserItem(BaseModel):
+    """Usuário elegível (staff ou aluno) e seus dias de login na semana ISO."""
+
+    user_id: str
+    name: Optional[str] = None
+    email: str
+    role: str
+    academy_id: Optional[str] = None
+    distinct_login_days_in_week: int
+    login_days: list[date]
+
+
+class WeeklyPanelLoginsReportResponse(BaseModel):
+    """
+    Relatório semanal de logins (staff e alunos).
+
+    - Escopo global quando academy_id é null.
+    - Escopo por academia quando academy_id é informado.
+    """
+
+    academy_id: Optional[str] = None
+    week_start: date
+    week_end: date
+    eligible_users_count: int
+    users_logged_at_least_once: int
+    users: list[WeeklyPanelLoginUserItem]

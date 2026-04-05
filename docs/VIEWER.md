@@ -39,6 +39,12 @@ Acesse: **http://localhost:8080**
 - Após **restaurar um backup** (`POST /admin/backup/restore`), os utilizadores e hashes vêm do ficheiro SQL: use as credenciais **desse** banco, não as do seed.
 - O viewer (`userFacingMessage` em `lib/utils/error_message.dart`) distingue falhas de rede reais de `ApiException`; em 401 mostra o detalhe da API e a dica acima.
 
+### Sincronização de academia e vídeos do dia
+
+- **`ApiService.getAcademyFresh`**: se `GET /academies/{id}` devolver **403**, o cliente chama `AuthService().refreshMe()` e repete o pedido com o `academy_id` atual de `/auth/me` (corrige utilizador em cache desatualizado após mudança de academia no servidor).
+- **`getTrainingVideosToday`**: pedidos em voo ao mesmo endpoint são **coalescidos** (uma única requisição HTTP partilhada), para aliviar rajadas paralelas na home e reduzir erros tipo `ERR_INSUFFICIENT_RESOURCES` no Chrome.
+- **`StudentHomeScreen` / `HomePage`**: após o `Future.wait` inicial, o estado local do utilizador é **realinhado** com `AuthService().currentUser`; o filtro do vídeo diário usa o `academy_id` lido **depois** de `getTrainingVideosToday()`, para coincidir com o perfil já sincronizado.
+
 ---
 
 ## Navegação
@@ -66,7 +72,7 @@ Acesse: **http://localhost:8080**
 - **`HeaderWidget`**: saudação *Olá, …* no topo; **sob o brasão** só o texto **Faixa** + graduação (ex. Faixa Preta), sem repetir o nome nessa linha.
 - Abaixo do cabeçalho, cartão **`StreakWidget(streakDays: …, onOpenPointsRules: …)`** com `login_streak_days` de **`GET /auth/me`**: sequência (flame + dias) e, **no mesmo cartão** à direita, **`LoginBonusRing`** (`login_bonus_ring.dart`) — progresso até ao próximo múltiplo de 7 dias, centro **+50 PTS** (`gamification_constants.dart`); toque no anel abre **Como funcionam os pontos** (`showPointsRulesSheet` em `points_rules_sheet.dart`).
 - Carrega `GET /mission_today/week` (3 missões semanais).
-- **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal, com título **Missões da semana** acima do cartão; ✓ / play / cadeado, **nome da técnica** por slot, haptic, alvos **48×48**, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
+- **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal, com título **Missões da semana** acima do cartão; ✓ / play / cadeado; **três filas** partilham a mesma grelha `Row`: colunas com largura **`kWeeklyPathNodeColumnWidth`** (48 + padding do nó) e **`Expanded`** entre colunas, para o play, o **nome da técnica** (uma linha, centrado sob o nó, reticências; **`Tooltip`** com o nome completo) e o estado (**Treinar** / Feito) ficarem alinhados na vertical; haptic, alvos tocáveis **48×48** dentro da coluna, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
 - **Removidos** da home: cartão “Você já concluiu X de Y missões” + barra linear; acordeão **Missões da semana** com os três cards “Começar”.
 - **Centro de treinamento**: acordeão só aparece quando não há `missionWeek` (mensagem para configurar academia ou “nenhuma missão”). Com missões carregadas o acordeão **não** é mostrado.
 - **`TrophiesHomeSection`** (`lib/widgets/trophies_home_section.dart`): título **Troféus** + cartão com o mesmo `FantasyTheme.cardBoxDecoration` que **Parceiros** (gradiente no escuro, superfície clara no tema claro), linhas para **Galeria de troféus** e, com academia, **Galeria dos colegas**. Respeita `academy.showTrophies` (`_showTrophies`). Fica no scroll **após** o Centro de treinamento (se visível) e **antes** de Parceiros.
@@ -94,7 +100,7 @@ Acesse: **http://localhost:8080**
 - **`xp_bar.dart`**: barra de progresso reutilizável.
 - **`reward_screen.dart`**: diálogo pós-conclusão.
 - **`streak_widget.dart`**: dias seguidos com login; `streakDays == null` não renderiza; `0` usa ícone outline e texto para reforçar o hábito; `n >= 1` mostra contagem e “dia(s) seguido(s)”.
-- **`weekly_mission_path.dart`**: caminho das 3 missões; técnicas por coluna; haptic; animação de conclusão; constante `kWeeklyPathMinTapSize` (48).
+- **`weekly_mission_path.dart`**: caminho das 3 missões; grelha alinhada (`kWeeklyPathNodeColumnWidth` + `Expanded` entre colunas nas três filas); haptic; animação de conclusão; `kWeeklyPathMinTapSize` (48) para área mínima de toque do nó.
 - **`gamification.dart`**: export barrel.
 
 ### LibraryScreen
@@ -131,6 +137,7 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 - **Ranking:** últimos 30 dias.
 - **Dificuldades reportadas:** posições mais marcadas.
 - **Relatório semanal:** período, total de conclusões, ativos, ranking.
+- **Logins na semana:** seção separada com total de utilizadores (staff e alunos) que logaram ao menos 1 dia e lista por utilizador com quantidade de dias.
 - **Execuções focadas em troféu/medalha/posição:** usa `/metrics/usage/by_academy` para mostrar premeditadas vs naturais.
 
 ### ExecutionReportsScreen (Relatórios de execuções)
@@ -150,12 +157,14 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 - Usa:
   - `GET /reports/engagement` — resumo de engajamento **semanal** e **mensal**.
   - `GET /reports/active_students` — lista de alunos ativos na janela de 7 dias (apenas backend; CSV via `/reports/active_students/csv`).
+  - `GET /reports/weekly_panel_logins` — logins semanais de staff e alunos (global ou por academia).
 - Definição usada na tela:
   - **Aluno ativo** = fez pelo menos **1 login** no app nos **últimos 7 dias** em relação à data de referência.
 - Componentes principais:
   - **Visão global** (todas as academias): cards com:
     - Semana: `% de alunos ativos`, `ativos / total`, intervalo de datas.
     - Mês: `% de alunos ativos`, `ativos / total`, intervalo de datas.
+    - Logins na semana (staff e alunos): `logaram ao menos 1 dia / elegíveis` e amostra da lista.
   - **Filtro por academia**: dropdown com academias; ao selecionar, aparece card “Visão da academia X” com os mesmos dados.
 
 ### MissionListScreen / MissionFormScreen

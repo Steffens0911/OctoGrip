@@ -12,10 +12,12 @@ from app.models import User
 from app.schemas.metrics import (
     ActiveStudentsReportResponse,
     EngagementReportResponse,
+    WeeklyPanelLoginsReportResponse,
 )
 from app.services.metrics_service import (
     get_active_students_report,
     get_engagement_report,
+    get_weekly_panel_logins_report,
 )
 
 router = APIRouter()
@@ -47,6 +49,39 @@ async def reports_engagement(
         verify_academy_access(current_user, str(academy_id))
 
     result = await get_engagement_report(
+        db,
+        reference_date=reference_date,
+        academy_id=academy_id,
+    )
+    return result
+
+
+@router.get("/weekly_panel_logins", response_model=WeeklyPanelLoginsReportResponse)
+async def reports_weekly_panel_logins(
+    reference_date: date = Query(
+        ...,
+        description="Data de referência para semana ISO.",
+    ),
+    academy_id: UUID
+    | None = Query(
+        None,
+        description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
+):
+    """
+    Relatório semanal de logins (staff e alunos), com base em user_login_days.
+
+    - Se `academy_id` for informado, retorna apenas usuários vinculados à academia.
+    - Se omitido, retorna visão global.
+    """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+
+    result = await get_weekly_panel_logins_report(
         db,
         reference_date=reference_date,
         academy_id=academy_id,

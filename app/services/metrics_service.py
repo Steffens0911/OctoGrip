@@ -6,9 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import LessonProgress, MissionUsage, User
+from app.models import LessonProgress, MissionUsage, User, UserLoginDay
 
 logger = logging.getLogger(__name__)
+
+_PANEL_ROLES = ("administrador", "gerente_academia", "professor", "supervisor")
+# Relatório semanal de logins: painel + alunos (mesma fonte user_login_days).
+_WEEKLY_LOGIN_REPORT_ROLES = (*_PANEL_ROLES, "aluno")
 
 
 def _build_usage_metrics_result(
@@ -292,6 +296,104 @@ async def get_active_students_report(
             "academy_id": result["academy_id"],
             "active_students": result["active_students"],
             "active_rate": result["active_rate"],
+        },
+    )
+    return result
+
+
+async def get_weekly_panel_logins_report(
+    db: AsyncSession,
+    *,
+    reference_date: date,
+    academy_id: uuid.UUID | None,
+) -> dict:
+    """
+    Relatório semanal (ISO) de logins (user_login_days).
+
+    Regras:
+    - Roles elegíveis: administrador, gerente_academia, professor, supervisor e aluno.
+    - Escopo por academia: apenas usuários com User.academy_id == academy_id.
+      (admins globais sem academy_id aparecem somente na visão global).
+    - Escopo global: todos os usuários elegíveis.
+    """
+    iso_year, iso_week, _ = reference_date.isocalendar()
+    monday = datetime.fromisocalendar(iso_year, iso_week, 1).date()
+    week_start = monday
+    week_end = monday + timedelta(days=6)
+
+    eligible_users_query = select(User).where(
+        User.role.in_(_WEEKLY_LOGIN_REPORT_ROLES)
+    ).order_by(User.email)
+    if academy_id is not None:
+        eligible_users_query = eligible_users_query.where(User.academy_id == academy_id)
+    eligible_users = (await db.execute(eligible_users_query)).scalars().all()
+    if not eligible_users:
+        return {
+            "academy_id": str(academy_id) if academy_id is not None else None,
+            "week_start": week_start,
+            "week_end": week_end,
+            "eligible_users_count": 0,
+            "users_logged_at_least_once": 0,
+            "users": [],
+        }
+
+    eligible_user_ids = [u.id for u in eligible_users]
+    login_rows = (
+        await db.execute(
+            select(UserLoginDay.user_id, UserLoginDay.login_day)
+            .where(
+                UserLoginDay.user_id.in_(eligible_user_ids),
+                UserLoginDay.login_day >= week_start,
+                UserLoginDay.login_day <= week_end,
+            )
+            .order_by(UserLoginDay.login_day.asc())
+        )
+    ).all()
+
+    login_days_by_user: dict[uuid.UUID, list[date]] = {}
+    for user_id, login_day in login_rows:
+        login_days_by_user.setdefault(user_id, []).append(login_day)
+
+    users = []
+    for u in eligible_users:
+        days = login_days_by_user.get(u.id, [])
+        if not days:
+            continue
+        users.append(
+            {
+                "user_id": str(u.id),
+                "name": u.name,
+                "email": u.email,
+                "role": u.role,
+                "academy_id": str(u.academy_id) if u.academy_id is not None else None,
+                "distinct_login_days_in_week": len(days),
+                "login_days": days,
+            }
+        )
+
+    users.sort(
+        key=lambda item: (
+            -item["distinct_login_days_in_week"],
+            (item.get("name") or item["email"]).lower(),
+        )
+    )
+
+    result = {
+        "academy_id": str(academy_id) if academy_id is not None else None,
+        "week_start": week_start,
+        "week_end": week_end,
+        "eligible_users_count": len(eligible_users),
+        "users_logged_at_least_once": len(users),
+        "users": users,
+    }
+    logger.info(
+        "get_weekly_panel_logins_report",
+        extra={
+            "academy_id": result["academy_id"],
+            "week_start": str(week_start),
+            "week_end": str(week_end),
+            "eligible_users_count": result["eligible_users_count"],
+            "users_logged_at_least_once": result["users_logged_at_least_once"],
         },
     )
     return result

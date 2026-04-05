@@ -5,6 +5,7 @@ import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/usage_metrics.dart';
+import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:viewer/screens/admin/academy_active_students_screen.dart';
 import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
@@ -14,6 +15,7 @@ import 'package:viewer/screens/admin/trophy_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
@@ -57,6 +59,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   UsageMetrics? _usageMetrics;
   bool _loadingUsageMetrics = false;
   String? _errorUsageMetrics;
+  WeeklyPanelLoginsReport? _weeklyPanelLogins;
+  bool _loadingWeeklyPanelLogins = false;
+  String? _errorWeeklyPanelLogins;
   late final TextEditingController _logoUrlController;
   bool _uploadingLogo = false;
   bool _uploadingScheduleImage = false;
@@ -88,6 +93,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _loadTechniques();
     _loadRankingAndReport();
     _loadUsageMetrics();
+    _loadWeeklyPanelLogins();
   }
 
   @override
@@ -161,6 +167,30 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       setState(() {
         _errorUsageMetrics = userFacingMessage(e);
         _loadingUsageMetrics = false;
+      });
+    }
+  }
+
+  Future<void> _loadWeeklyPanelLogins() async {
+    setState(() {
+      _loadingWeeklyPanelLogins = true;
+      _errorWeeklyPanelLogins = null;
+    });
+    try {
+      final report = await _api.getWeeklyPanelLoginsReport(
+        referenceDate: DateTime.now(),
+        academyId: _academy.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _weeklyPanelLogins = report;
+        _loadingWeeklyPanelLogins = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorWeeklyPanelLogins = userFacingMessage(e);
+        _loadingWeeklyPanelLogins = false;
       });
     }
   }
@@ -583,6 +613,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         onRefresh: () async {
           await _loadRankingAndReport();
           await _loadTechniques();
+          await _loadWeeklyPanelLogins();
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -1290,7 +1321,89 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 ),
               ),
       ),
+      const SizedBox(height: 20),
+      const _SectionTitle(title: 'Logins na semana'),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _loadingWeeklyPanelLogins
+              ? const Center(child: CircularProgressIndicator())
+              : _errorWeeklyPanelLogins != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _errorWeeklyPanelLogins!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _loadWeeklyPanelLogins,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    )
+                  : _buildWeeklyPanelLoginsContent(),
+        ),
+      ),
     ];
+  }
+
+  Widget _buildWeeklyPanelLoginsContent() {
+    final report = _weeklyPanelLogins;
+    if (report == null) {
+      return Text(
+        'Ainda não há dados suficientes para este relatório.',
+        style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+      );
+    }
+    final period = '${toBrDate(report.weekStart)} a ${toBrDate(report.weekEnd)}';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          period,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondaryOf(context),
+              ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '${report.usersLoggedAtLeastOnce} logaram ao menos 1 dia · '
+          '${report.eligibleUsersCount} utilizadores (staff e alunos)',
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        if (report.users.isNotEmpty) ...[
+          AppSpacing.verticalM,
+          const Divider(),
+          ...report.users.map(
+            (u) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(u.name ?? u.email),
+              subtitle: Text(
+                u.distinctLoginDaysInWeek == 1
+                    ? '1 dia com login'
+                    : '${u.distinctLoginDaysInWeek} dias com login',
+              ),
+              trailing: Text(
+                u.role,
+                style: TextStyle(color: AppTheme.textMutedOf(context)),
+              ),
+            ),
+          ),
+        ] else ...[
+          AppSpacing.verticalM,
+          Text(
+            'Ninguém da academia registou login nesta semana.',
+            style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+          ),
+        ],
+      ],
+    );
   }
 }
 

@@ -143,7 +143,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
         _loadAcademyLogoWith(currentUser.academyId),
-      ]);
+      ]).then((_) {
+        if (mounted) {
+          setState(() => _selectedUser = AuthService().currentUser);
+        }
+      });
     }
   }
 
@@ -192,7 +196,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _loadDailyVideo(),
       ]);
       if (mounted) {
-        setState(() => _loading = false);
+        setState(() {
+          _selectedUser = AuthService().currentUser;
+          _loading = false;
+        });
         await _runPostLoadNudges();
       }
     } catch (e) {
@@ -521,20 +528,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   /// Vídeo do dia que pontua: primeiro da lista getTrainingVideosToday da academia do usuário.
   Future<void> _loadDailyVideo() async {
-    final academyId = _selectedUser?.academyId;
-    if (academyId == null || academyId.isEmpty) {
-      if (mounted) {
+    try {
+      final list = await _api.getTrainingVideosToday();
+      if (!mounted) return;
+      final academyId = AuthService().currentUser?.academyId?.trim();
+      if (academyId == null || academyId.isEmpty) {
         setState(() {
           _dailyVideo = null;
           _dailyVideoPoints = 0;
           _dailyVideoCompleted = false;
         });
+        return;
       }
-      return;
-    }
-    try {
-      final list = await _api.getTrainingVideosToday();
-      if (!mounted) return;
       final forAcademy = list
           .where((v) => v.academyId == academyId && v.pointsPerDay > 0)
           .toList();

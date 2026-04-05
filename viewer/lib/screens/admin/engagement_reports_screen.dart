@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/engagement_report.dart';
+import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
@@ -22,6 +23,8 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
   DateTime _referenceDate = DateTime.now();
   EngagementReport? _globalReport;
   EngagementReport? _academyReport;
+  WeeklyPanelLoginsReport? _globalLoginsReport;
+  WeeklyPanelLoginsReport? _academyLoginsReport;
   List<Academy> _academies = [];
   String? _selectedAcademyId;
 
@@ -30,6 +33,8 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
   bool _loadingAcademy = false;
   String? _errorGlobal;
   String? _errorAcademy;
+  String? _errorGlobalLogins;
+  String? _errorAcademyLogins;
 
   @override
   void initState() {
@@ -43,16 +48,22 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       _loadingAcademies = true;
       _errorGlobal = null;
       _errorAcademy = null;
+      _errorGlobalLogins = null;
+      _errorAcademyLogins = null;
     });
     try {
       final metricsFuture =
           _api.getEngagementReport(referenceDate: _referenceDate);
+      final globalLoginsFuture =
+          _api.getWeeklyPanelLoginsReport(referenceDate: _referenceDate);
       final academiesFuture = _api.getAcademies();
-      final results = await Future.wait([metricsFuture, academiesFuture]);
+      final results =
+          await Future.wait([metricsFuture, globalLoginsFuture, academiesFuture]);
       if (!mounted) return;
       setState(() {
         _globalReport = results[0] as EngagementReport;
-        _academies = results[1] as List<Academy>;
+        _globalLoginsReport = results[1] as WeeklyPanelLoginsReport;
+        _academies = results[2] as List<Academy>;
         _loadingGlobal = false;
         _loadingAcademies = false;
       });
@@ -71,15 +82,23 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       _selectedAcademyId = academyId;
       _loadingAcademy = true;
       _errorAcademy = null;
+      _errorAcademyLogins = null;
     });
     try {
-      final report = await _api.getEngagementReport(
-        referenceDate: _referenceDate,
-        academyId: academyId,
-      );
+      final reports = await Future.wait([
+        _api.getEngagementReport(
+          referenceDate: _referenceDate,
+          academyId: academyId,
+        ),
+        _api.getWeeklyPanelLoginsReport(
+          referenceDate: _referenceDate,
+          academyId: academyId,
+        ),
+      ]);
       if (!mounted) return;
       setState(() {
-        _academyReport = report;
+        _academyReport = reports[0] as EngagementReport;
+        _academyLoginsReport = reports[1] as WeeklyPanelLoginsReport;
         _loadingAcademy = false;
       });
     } catch (e) {
@@ -87,6 +106,7 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       setState(() {
         _loadingAcademy = false;
         _errorAcademy = userFacingMessage(e);
+        _errorAcademyLogins = userFacingMessage(e);
       });
     }
   }
@@ -214,8 +234,10 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
       return const SizedBox.shrink();
     }
     return _EngagementCard(
-      title: 'Visão global (todas as academias)',
+      title: 'Visão global (todas as academias) — engajamento',
       report: _globalReport!,
+      loginReport: _globalLoginsReport,
+      loginError: _errorGlobalLogins,
     );
   }
 
@@ -252,6 +274,8 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
           setState(() {
             _selectedAcademyId = null;
             _academyReport = null;
+            _academyLoginsReport = null;
+            _errorAcademyLogins = null;
           });
         } else {
           _loadAcademyReport(value);
@@ -316,8 +340,10 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
         )
         .name;
     return _EngagementCard(
-      title: 'Visão da academia $academyName',
+      title: 'Visão da academia $academyName — engajamento',
       report: _academyReport!,
+      loginReport: _academyLoginsReport,
+      loginError: _errorAcademyLogins,
     );
   }
 }
@@ -325,10 +351,14 @@ class _EngagementReportsScreenState extends State<EngagementReportsScreen> {
 class _EngagementCard extends StatelessWidget {
   final String title;
   final EngagementReport report;
+  final WeeklyPanelLoginsReport? loginReport;
+  final String? loginError;
 
   const _EngagementCard({
     required this.title,
     required this.report,
+    this.loginReport,
+    this.loginError,
   });
 
   @override
@@ -370,6 +400,64 @@ class _EngagementCard extends StatelessWidget {
                     'Mês (${toBrDate(monthly.startDate)} a ${toBrDate(monthly.endDate)})',
                 period: monthly,
               ),
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text(
+                'Logins na semana (staff e alunos)',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppTheme.textPrimaryOf(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              if (loginError != null)
+                Text(
+                  loginError!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                )
+              else if (loginReport == null)
+                Text(
+                  'Sem dados de login para este período.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryOf(context),
+                      ),
+                )
+              else ...[
+                Text(
+                  '${loginReport!.usersLoggedAtLeastOnce} logaram ao menos 1 dia · '
+                  '${loginReport!.eligibleUsersCount} utilizadores (staff e alunos)',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondaryOf(context),
+                      ),
+                ),
+                if (loginReport!.users.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ...loginReport!.users.take(6).map(
+                    (u) => Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        '${u.name ?? u.email} — ${u.distinctLoginDaysInWeek} dia(s)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                      ),
+                    ),
+                  ),
+                  if (loginReport!.users.length > 6)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Text(
+                        '... e mais ${loginReport!.users.length - 6} usuários',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                      ),
+                    ),
+                ],
+              ],
             ],
           ],
         ),

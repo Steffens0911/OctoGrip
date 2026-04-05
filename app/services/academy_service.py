@@ -228,11 +228,16 @@ async def _get_user_completions_by_period(
     academy_id: UUID,
     start: datetime,
     end: datetime | None = None,
-) -> tuple[dict[UUID, tuple[str | None, int]], dict[UUID, tuple[str | None, int]]]:
+) -> tuple[
+    dict[UUID, tuple[str | None, int]],
+    dict[UUID, tuple[str | None, int]],
+    dict[UUID, tuple[str | None, int]],
+]:
     """
-    Retorna (lp_by_user, mu_by_user) onde cada dict mapeia user_id para (name, count).
+    Retorna (lp_by_user, mu_by_user, te_by_user) onde cada dict mapeia user_id para (name, count).
     lp_by_user: LessonProgress counts
     mu_by_user: MissionUsage counts
+    te_by_user: TechniqueExecution confirmadas counts
     """
     # Query LessonProgress
     lp_query = (
@@ -275,30 +280,60 @@ async def _get_user_completions_by_period(
     mu_by_user: dict[UUID, tuple[str | None, int]] = {
         r[0]: (r[1], r[2]) for r in mu_rows
     }
-    
-    return lp_by_user, mu_by_user
+
+    # Query TechniqueExecution (somente confirmadas no período)
+    te_event_time = func.coalesce(TechniqueExecution.confirmed_at, TechniqueExecution.created_at)
+    te_query = (
+        select(
+            User.id,
+            User.name,
+            func.count(TechniqueExecution.id).label("count"),
+        )
+        .join(TechniqueExecution, TechniqueExecution.user_id == User.id)
+        .where(
+            User.academy_id == academy_id,
+            TechniqueExecution.status == "confirmed",
+            te_event_time >= start,
+        )
+    )
+    if end is not None:
+        te_query = te_query.where(te_event_time < end)
+
+    te_rows = (await db.execute(te_query.group_by(User.id, User.name))).all()
+    te_by_user: dict[UUID, tuple[str | None, int]] = {
+        r[0]: (r[1], r[2]) for r in te_rows
+    }
+
+    return lp_by_user, mu_by_user, te_by_user
 
 
 def _merge_user_completions(
     lp_by_user: dict[UUID, tuple[str | None, int]],
     mu_by_user: dict[UUID, tuple[str | None, int]],
+    te_by_user: dict[UUID, tuple[str | None, int]],
     limit: int | None = None,
 ) -> list[tuple[UUID, str, int]]:
     """
     Combina LessonProgress e MissionUsage em ranking.
     Retorna lista de (user_id, name, total_count) ordenada por count desc.
     """
-    all_user_ids = set(lp_by_user) | set(mu_by_user)
+    all_user_ids = set(lp_by_user) | set(mu_by_user) | set(te_by_user)
     if not all_user_ids:
         return []
     
     merged = []
     for uid in all_user_ids:
-        # Priorizar nome de lp_by_user, depois mu_by_user
-        name = (lp_by_user.get(uid) or (None, 0))[0] or (mu_by_user.get(uid) or (None, 0))[0] or ""
+        # Priorizar nome de lp_by_user, depois mu_by_user, depois te_by_user
+        name = (
+            (lp_by_user.get(uid) or (None, 0))[0]
+            or (mu_by_user.get(uid) or (None, 0))[0]
+            or (te_by_user.get(uid) or (None, 0))[0]
+            or ""
+        )
         count_lp = (lp_by_user.get(uid) or (None, 0))[1]
         count_mu = (mu_by_user.get(uid) or (None, 0))[1]
-        merged.append((uid, name, count_lp + count_mu))
+        count_te = (te_by_user.get(uid) or (None, 0))[1]
+        merged.append((uid, name, count_lp + count_mu + count_te))
     
     merged.sort(key=lambda x: x[2], reverse=True)
     if limit is not None:
@@ -315,7 +350,8 @@ async def get_academy_ranking(
 ) -> list[dict]:
     """
     A-04: Ranking interno da academia por conclusões (LessonProgress + MissionUsage).
-    Inclui conclusões por lição (POST /lesson_complete) e por missão do dia (POST /mission_complete).
+    Inclui conclusões por lição (POST /lesson_complete), por missão do dia
+    (POST /mission_complete) e execuções confirmadas (TechniqueExecution).
     Retorna lista de { rank, user_id, name, completions_count } ordenada por count desc.
     Considera apenas conclusões nos últimos period_days dias.
     """
@@ -326,16 +362,19 @@ async def get_academy_ranking(
     since = datetime.now(timezone.utc) - timedelta(days=period_days)
 
     # Usar função comum para buscar completions
-    lp_by_user, mu_by_user = await _get_user_completions_by_period(db, academy_id, since)
+    lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
+        db, academy_id, since
+    )
     
     # Merge e formatação
-    merged = _merge_user_completions(lp_by_user, mu_by_user, limit=limit)
+    merged = _merge_user_completions(lp_by_user, mu_by_user, te_by_user, limit=limit)
     logger.debug(
         "get_academy_ranking merge",
         extra={
             "academy_id": str(academy_id),
             "lp_users": len(lp_by_user),
             "mu_users": len(mu_by_user),
+            "te_users": len(te_by_user),
             "total_users": len(merged),
         },
     )
@@ -354,7 +393,8 @@ async def get_academy_weekly_report(
 ) -> dict | None:
     """
     T-03: Relatório semanal da academia (export simples).
-    Inclui conclusões por lição (LessonProgress) e por missão do dia (MissionUsage).
+    Inclui conclusões por lição (LessonProgress), por missão do dia (MissionUsage)
+    e execuções confirmadas (TechniqueExecution).
     Se year/week não informados, usa a semana atual (ISO).
     Retorna week_start, week_end (ISO date), completions_count, active_users_count, entries (ranking da semana).
     """
@@ -371,10 +411,12 @@ async def get_academy_weekly_report(
     week_end = week_start + timedelta(days=7)
 
     # Usar função comum para buscar completions
-    lp_by_user, mu_by_user = await _get_user_completions_by_period(db, academy_id, week_start, week_end)
+    lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
+        db, academy_id, week_start, week_end
+    )
     
     # Merge usando função comum
-    merged = _merge_user_completions(lp_by_user, mu_by_user)
+    merged = _merge_user_completions(lp_by_user, mu_by_user, te_by_user)
     
     logger.debug(
         "get_academy_weekly_report merge",
@@ -382,6 +424,7 @@ async def get_academy_weekly_report(
             "academy_id": str(academy_id),
             "lp_users": len(lp_by_user),
             "mu_users": len(mu_by_user),
+            "te_users": len(te_by_user),
             "total_users": len(merged),
         },
     )

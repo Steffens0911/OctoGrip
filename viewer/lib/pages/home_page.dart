@@ -89,7 +89,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _loadDailyVideo(),
       ]);
     } catch (_) {}
-    if (mounted) setState(() => _loading = false);
+    if (mounted) {
+      setState(() {
+        _user = AuthService().currentUser;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _loadUserPointsWith(String userId) async {
@@ -138,20 +143,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Vídeo do dia que pontua: primeiro da lista getTrainingVideosToday da academia do usuário.
   Future<void> _loadDailyVideo() async {
-    final academyId = _user?.academyId;
-    if (academyId == null || academyId.isEmpty) {
-      if (mounted) {
+    try {
+      final list = await _api.getTrainingVideosToday();
+      if (!mounted) return;
+      final academyId = AuthService().currentUser?.academyId?.trim();
+      if (academyId == null || academyId.isEmpty) {
         setState(() {
           _dailyVideo = null;
           _dailyVideoPoints = 0;
           _dailyVideoCompleted = false;
         });
+        return;
       }
-      return;
-    }
-    try {
-      final list = await _api.getTrainingVideosToday();
-      if (!mounted) return;
       final forAcademy = list
           .where((v) => v.academyId == academyId && v.pointsPerDay > 0)
           .toList();

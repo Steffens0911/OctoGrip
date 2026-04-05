@@ -7,6 +7,10 @@ import 'package:viewer/models/mission_today.dart';
 /// Tamanho mínimo recomendado para alvos tocáveis (Material / acessibilidade).
 const double kWeeklyPathMinTapSize = 48;
 
+/// Largura horizontal de cada coluna do nó no caminho (padding 2+2 do [_PathNode] + alvo 48).
+/// Usada para alinhar os rótulos de técnica com os segmentos flex.
+const double kWeeklyPathNodeColumnWidth = kWeeklyPathMinTapSize + 4;
+
 /// Caminho horizontal tipo ●──●──● para as missões semanais (slots da API).
 ///
 /// Estados por slot:
@@ -169,30 +173,63 @@ class _PathRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final children = <Widget>[];
-    for (var i = 0; i < slots.length; i++) {
-      if (i > 0) {
-        final leftDone = slots[i - 1].mission?.alreadyCompleted ?? false;
-        children.add(
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 22),
+    if (slots.isEmpty) return const SizedBox.shrink();
+    const rowHeight = 70.0;
+    const nodeTop = rowHeight - kWeeklyPathMinTapSize;
+    const segmentHeight = 4.0;
+    const segmentTop = nodeTop + (kWeeklyPathMinTapSize / 2) - (segmentHeight / 2);
+
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        if (!w.isFinite || w <= 0) return const SizedBox.shrink();
+        final n = slots.length;
+        final partW = w / n;
+
+        final children = <Widget>[];
+
+        for (var i = 1; i < n; i++) {
+          final leftDone = slots[i - 1].mission?.alreadyCompleted ?? false;
+          final startX = partW * (i - 0.5);
+          final endX = partW * (i + 0.5);
+          children.add(
+            Positioned(
+              left: startX,
+              width: endX - startX,
+              top: segmentTop,
+              height: segmentHeight,
               child: _Segment(filled: leftDone),
             ),
+          );
+        }
+
+        for (var i = 0; i < n; i++) {
+          final centerX = partW * (i + 0.5);
+          children.add(
+            Positioned(
+              left: centerX - (kWeeklyPathNodeColumnWidth / 2),
+              width: kWeeklyPathNodeColumnWidth,
+              top: nodeTop,
+              child: Center(
+                child: _PathNode(
+                  slot: slots[i],
+                  onMissionTap: onMissionTap,
+                  scale: scaleFor(slots[i].mission),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          width: w,
+          height: rowHeight,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: children,
           ),
         );
-      }
-      children.add(
-        _PathNode(
-          slot: slots[i],
-          onMissionTap: onMissionTap,
-          scale: scaleFor(slots[i].mission),
-        ),
-      );
-    }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: children,
+      },
     );
   }
 }
@@ -337,7 +374,8 @@ class _PathNode extends StatelessWidget {
   }
 }
 
-/// Nome da técnica por slot, alinhado às colunas do caminho (mesma estrutura de [Expanded] + largura fixa).
+/// Nome da técnica por slot: **uma linha** em três (ou N) partes iguais.
+/// Cada texto fica no centro da sua parte, alinhado ao centro do nó/play.
 class _TechniqueRow extends StatelessWidget {
   const _TechniqueRow({required this.slots});
 
@@ -351,33 +389,28 @@ class _TechniqueRow extends StatelessWidget {
           height: 1.2,
           fontWeight: FontWeight.w500,
         );
+    final n = slots.length;
+    if (n == 0) return const SizedBox.shrink();
+
     final children = <Widget>[];
-    for (var i = 0; i < slots.length; i++) {
-      if (i > 0) {
-        children.add(
-          const Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(top: 2),
-              child: SizedBox.shrink(),
-            ),
-          ),
-        );
-      }
+    for (var i = 0; i < n; i++) {
       final m = slots[i].mission;
       final text = m == null
           ? '—'
           : (m.techniqueName.isNotEmpty
               ? m.techniqueName
-              : (m.lessonTitle.isNotEmpty ? m.lessonTitle : slots[i].periodLabel));
+              : (m.lessonTitle.isNotEmpty
+                  ? m.lessonTitle
+                  : slots[i].periodLabel));
       children.add(
-        SizedBox(
-          width: kWeeklyPathMinTapSize,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
+        Expanded(
+          child: Tooltip(
+            message: text,
+            waitDuration: const Duration(milliseconds: 400),
             child: Text(
               text,
               textAlign: TextAlign.center,
-              maxLines: 2,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: style,
             ),
@@ -386,7 +419,7 @@ class _TechniqueRow extends StatelessWidget {
       );
     }
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: children,
     );
   }
@@ -405,15 +438,13 @@ class _StatusRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final children = <Widget>[];
     for (var i = 0; i < slots.length; i++) {
-      if (i > 0) {
-        children.add(const Expanded(child: SizedBox.shrink()));
-      }
       children.add(
-        SizedBox(
-          width: kWeeklyPathMinTapSize,
-          child: _StatusCell(
-            slot: slots[i],
-            onMissionTap: onMissionTap,
+        Expanded(
+          child: Center(
+            child: _StatusCell(
+              slot: slots[i],
+              onMissionTap: onMissionTap,
+            ),
           ),
         ),
       );

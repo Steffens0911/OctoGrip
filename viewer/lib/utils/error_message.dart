@@ -33,10 +33,7 @@ String userFacingMessage(Object e) {
   }
   if (e is ApiException) {
     if (e.statusCode == 401) {
-      final base = e.message.trim().isEmpty ? 'Não autorizado.' : e.message.trim();
-      return '$base\n\n'
-          'Se acabou de restaurar um backup, use as credenciais desse banco. '
-          'Ambiente Docker com seed típico: admin@jjb.com / saas';
+      return 'E-mail ou senha inválidos.';
     }
     return e.message;
   }
