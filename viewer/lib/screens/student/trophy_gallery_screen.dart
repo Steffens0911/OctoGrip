@@ -246,6 +246,13 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
         TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context));
     final lines = <Widget>[];
     final target = t.targetCount;
+    final cap = t.maxCountPerOpponent;
+    if (cap != null) {
+      lines.add(Text(
+        'Limite: no máximo $cap execução(ões) contáveis por adversário no período.',
+        style: style,
+      ));
+    }
     final hasGold = t.earnedTier == 'gold';
     final hasSilver = t.earnedTier == 'silver' || hasGold;
     final hasBronze = t.earnedTier == 'bronze' || hasSilver;
@@ -258,10 +265,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     if (!hasBronze) {
       final missing = target - t.bronzeCount;
       if (missing > 0) {
-        lines.add(Text(
-          '${t.bronzeCount} adversários brancos distintos. Faltam $missing para o troféu bronze.',
-          style: style,
-        ));
+        final bronzeHint = cap != null
+            ? '${t.bronzeCount} no bronze (faixa branca). Faltam $missing para o troféu bronze.'
+            : '${t.bronzeCount} adversários brancos distintos. Faltam $missing para o troféu bronze.';
+        lines.add(Text(bronzeHint, style: style));
       }
     }
     if (!hasSilver) {

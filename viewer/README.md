@@ -1,24 +1,27 @@
-# FlowRoll (Flutter)
+# OctoGrip (Flutter)
 
-App **FlowRoll** para alunos e equipa da academia: campo de treino, painel da academia e administração (academias, usuários, técnicas, missões, etc.).
+App **OctoGrip** para alunos e equipa da academia: campo de treino, painel da academia e administração (academias, usuários, técnicas, missões, etc.).
+
+## Marca e logo
+
+- Nome e asset centralizados em `lib/branding/app_brand.dart`.
+- Logo principal (polvo + wordmark, PNG transparente): `assets/branding/octogrip_logo.png` — usado no **login** e na home simples.
 
 ## Ícone e PWA (web)
 
-O ícone (livro aberto — estudo/aprendizagem; âmbar com fundo transparente) e os PNG do PWA são gerados por script:
+Ícones legados (livro / wordmark FlowRoll) ainda existem em `assets/branding/` para scripts antigos. Para **favicon e ícones PWA** a partir da wordmark antiga:
 
 ```bash
 cd viewer
 python scripts/generate_flowroll_icons.py
 ```
 
-**Favicon e ícones PWA** (barra do browser / instalação) devem seguir a wordmark do login:
-
 ```bash
 cd viewer
 python scripts/generate_pwa_icons_from_wordmark.py
 ```
 
-Saídas do primeiro script: `assets/branding/flowroll_app_icon.png` (ícone livro, ex. home). Saídas do segundo: `web/favicon.png` e `web/icons/Icon-*.png` a partir de **`assets/branding/flowroll_wordmark.png`**. O login usa a mesma wordmark com fundo transparente no cartão.
+Para alinhar o PWA ao logo OctoGrip, podes copiar `octogrip_logo.png` sobre `web/favicon.png` e voltar a gerar tamanhos com um pipeline à tua escolha, ou adaptar os scripts para ler `octogrip_logo.png`.
 
 ## Como rodar
 

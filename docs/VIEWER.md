@@ -1,4 +1,4 @@
-# FlowRoll — App Flutter (viewer)
+# OctoGrip — App Flutter (viewer)
 
 App Flutter para **alunos** e **professores** de jiu-jitsu. Interface web responsiva e tema estilo Duolingo.
 
@@ -87,10 +87,8 @@ Acesse: **http://localhost:8080**
 - Exibe título, descrição, vídeo (ou placeholder) da lição/missão.
 - **Botão "Concluir"**:
   - Se já concluído (`alreadyCompleted` ou `GET /lesson_complete/status`): exibe "Lição concluída" ou "Missão concluída" e desabilita.
-  - Se missão: ao concluir, exibe diálogo **"Quando você visualizou?"** com:
-    - **Antes do treino**
-    - **Depois do treino**
-  - Se lição (biblioteca): envia `POST /lesson_complete` diretamente.
+  - Se missão (ex.: **missões da semana** no Início): ao concluir, diálogo **"Quando você visualizou?"** (**Antes** / **Depois** do treino); em seguida **`OpponentPickerSheet`** com **oponente obrigatório** (sem botão **Sem oponente**; **Cancelar** aborta a conclusão). Com oponente: `POST /executions` (confirmação do parceiro). Sem `academyId` na navegação, mantém-se o legado `POST /mission_complete`.
+  - Se lição (biblioteca ou fluxo só com `lessonId`): após o mesmo diálogo temporal quando há academia, **`OpponentPickerSheet`** com opção **Sem oponente**; com oponente → `POST /executions`; sem oponente → `POST /lesson_complete`.
 - Em 409 (já concluído): troca botão para conclusão e desabilita.
 - Após **`POST /mission_complete`** ou **`POST /lesson_complete`** com sucesso (fluxo sem oponente / sem execução pendente): abre **`RewardScreen`** com o campo **`points_awarded`** da resposta JSON; a barra de nível usa **`GET /users/{id}/points`** depois do POST. Se a resposta não trouxer `points_awarded` (API antiga), o app usa estimativa (`clampRewardPoints(multiplicador)` na missão; lição = `minRewardPoints`) e mostra nota no diálogo.
 
@@ -182,7 +180,7 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 ### Outras telas admin
 
 - `AcademyListScreen`, `UserListScreen`, `TrainingVideoListScreen`, listas de lições/técnicas/posições/missões: CRUD conforme o ecrã.
-- **`TrophyFormScreen`** (`admin/trophy_form_screen.dart`): novo registo abre com tipo **Medalha (ordinária)** por defeito (períodos curtos sem validação de 30 dias no servidor). **Troféu (especial)** continua a exigir duração mínima configurável (cliente + API).
+- **`TrophyFormScreen`** (`admin/trophy_form_screen.dart`): novo registo abre com tipo **Medalha (ordinária)** por defeito (períodos curtos sem validação de 30 dias no servidor). **Troféu (especial)** continua a exigir duração mínima configurável (cliente + API). Campo opcional **Máx. execuções contáveis por adversário** (`max_count_per_opponent`): vazio mantém o legado (ouro/prata sem teto por parceiro; bronze = faixas brancas **distintas**); com valor N, cada adversário contribui no máximo N vezes no total para o troféu (todas as faixas). A galeria do aluno mostra o limite quando definido.
 
 ---
 

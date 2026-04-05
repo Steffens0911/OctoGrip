@@ -89,6 +89,7 @@ async def create_trophy(
     min_duration_days: int | None = None,
     min_reward_level_to_unlock: int = 0,
     min_graduation_to_unlock: str | None = None,
+    max_count_per_opponent: int | None = None,
     audit_user_id: UUID | None = None,
 ) -> Trophy:
     """Cria troféu ou medalha da academia. Valida técnica, datas e duração mínima para troféu."""
@@ -118,6 +119,8 @@ async def create_trophy(
         raise AppError("A técnica deve pertencer à academia.", status_code=400)
     if start_date > end_date:
         raise AppError("start_date deve ser anterior ou igual a end_date.", status_code=400)
+    if max_count_per_opponent is not None and max_count_per_opponent < 1:
+        raise AppError("max_count_per_opponent deve ser >= 1 ou omitido.", status_code=400)
     if award_kind == "trophy":
         min_days = min_duration_days if min_duration_days is not None else 30
         duration_days = (end_date - start_date).days
@@ -137,6 +140,7 @@ async def create_trophy(
         min_duration_days=min_duration_days if award_kind == "trophy" else None,
         min_reward_level_to_unlock=max(0, min_reward_level_to_unlock),
         min_graduation_to_unlock=(min_graduation_to_unlock.strip().lower() if min_graduation_to_unlock and min_graduation_to_unlock.strip() else None),
+        max_count_per_opponent=max_count_per_opponent,
     )
     db.add(trophy)
     await db.flush()
@@ -216,6 +220,14 @@ async def update_trophy(
     else:
         mgrad = trophy.min_graduation_to_unlock
 
+    mcpo = (
+        updates["max_count_per_opponent"]
+        if "max_count_per_opponent" in updates
+        else trophy.max_count_per_opponent
+    )
+    if mcpo is not None and mcpo < 1:
+        raise AppError("max_count_per_opponent deve ser >= 1 ou null.", status_code=400)
+
     technique = (
         await db.execute(
             select(Technique).where(
@@ -250,6 +262,8 @@ async def update_trophy(
     trophy.min_graduation_to_unlock = (
         mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
     )
+    if "max_count_per_opponent" in updates:
+        trophy.max_count_per_opponent = updates["max_count_per_opponent"]
 
     after = entity_snapshot_row(trophy)
     if after != before:
@@ -341,27 +355,64 @@ def _executions_in_period_from_list(
     return in_period
 
 
+def _sorted_executions_for_opponent_cap(in_period: list[TechniqueExecution]) -> list[TechniqueExecution]:
+    """Ordem estável por confirmação (para limite por adversário ser reproduzível)."""
+
+    def sort_key(e: TechniqueExecution):
+        ca = e.confirmed_at or datetime(1970, 1, 1, tzinfo=timezone.utc)
+        return (ca, e.id)
+
+    return sorted(in_period, key=sort_key)
+
+
 def _compute_counts_from_executions(
     in_period: list[TechniqueExecution],
+    max_count_per_opponent: int | None,
 ) -> dict:
-    """Retorna gold_count, silver_count, bronze_count a partir de lista de execuções em período.
-    Adversário sem faixa (graduation) é tratado como bronze para a execução contar.
-    Aceita faixa em inglês (white, blue, ...) ou português (branca, azul, ...).
+    """Retorna gold_count, silver_count, bronze_count a partir de execuções no período do troféu.
+
+    Sem limite (``max_count_per_opponent`` null): ouro e prata contam todas as execuções válidas;
+    bronze conta **faixas brancas distintas** (comportamento legado).
+
+    Com limite N: cada ``opponent_id`` contribui no máximo N execuções no total; cada uma incrementa
+    ouro, prata ou bronze conforme a faixa do adversário (bronze deixa de ser só “distintos”).
     """
+    if max_count_per_opponent is None:
+        gold_count = 0
+        silver_count = 0
+        white_opponent_ids = set()
+        for e in in_period:
+            if not e.opponent:
+                continue
+            tier = _graduation_to_tier(e.opponent.graduation)
+            if tier == "gold":
+                gold_count += 1
+            elif tier == "silver":
+                silver_count += 1
+            elif tier == "bronze":
+                white_opponent_ids.add(e.opponent_id)
+        bronze_count = len(white_opponent_ids)
+        return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}
+
     gold_count = 0
     silver_count = 0
-    white_opponent_ids = set()
-    for e in in_period:
+    bronze_count = 0
+    per_opp: dict[UUID, int] = {}
+    cap = max_count_per_opponent
+    for e in _sorted_executions_for_opponent_cap(in_period):
         if not e.opponent:
+            continue
+        oid = e.opponent_id
+        if per_opp.get(oid, 0) >= cap:
             continue
         tier = _graduation_to_tier(e.opponent.graduation)
         if tier == "gold":
             gold_count += 1
         elif tier == "silver":
             silver_count += 1
-        elif tier == "bronze":
-            white_opponent_ids.add(e.opponent_id)
-    bronze_count = len(white_opponent_ids)
+        else:
+            bronze_count += 1
+        per_opp[oid] = per_opp.get(oid, 0) + 1
     return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}
 
 
@@ -385,14 +436,16 @@ async def compute_trophy_counts(
     Retorna gold_count, silver_count, bronze_count para o usuário no troféu.
     Ouro: execuções em adversários roxa/marrom/preta.
     Prata: execuções em adversários azuis.
-    Bronze: adversários brancos distintos.
+    Bronze: adversários brancos distintos (sem limite por adversário) ou contagem limitada por
+    adversário quando ``max_count_per_opponent`` está definido.
     """
     logger.debug(
         "compute_trophy_counts",
         extra={"user_id": str(user_id), "trophy_id": str(trophy.id)},
     )
     in_period = await _executions_in_period_for_trophy(db, user_id, trophy)
-    counts = _compute_counts_from_executions(in_period)
+    mcpo = getattr(trophy, "max_count_per_opponent", None)
+    counts = _compute_counts_from_executions(in_period, mcpo)
     logger.debug(
         "compute_trophy_counts result",
         extra={"user_id": str(user_id), "trophy_id": str(trophy.id), "counts": counts},
@@ -409,7 +462,8 @@ async def compute_user_trophy_tier(
     Calcula o tier conquistado (gold, silver, bronze) para o usuário no troféu.
     Ouro: N execuções confirmadas em adversários roxa/marrom/preta.
     Prata: N execuções em adversários azuis.
-    Bronze: N execuções em adversários brancos com opponent_id distinto (não repetir adversário).
+    Bronze: N execuções em adversários brancos (distintos se sem ``max_count_per_opponent``;
+    com limite, até N execuções por adversário contam em qualquer tier).
     Retorna o maior tier conquistado ou None.
     """
     logger.debug(
@@ -470,7 +524,8 @@ async def list_user_trophies_with_earned(
     today = date.today()
     for t in trophies:
         in_period = _executions_in_period_from_list(all_executions, t)
-        counts = _compute_counts_from_executions(in_period)
+        mcpo = getattr(t, "max_count_per_opponent", None)
+        counts = _compute_counts_from_executions(in_period, mcpo)
         # Conclusões da missão da semana (MissionUsage) com mesma técnica contam como bronze
         extra_bronze = _mission_usages_count_in_period_for_technique(
             all_mission_usages, t.technique_id, t.start_date, t.end_date
@@ -502,6 +557,7 @@ async def list_user_trophies_with_earned(
                 "min_duration_days": getattr(t, "min_duration_days", None),
                 "min_reward_level_to_unlock": min_lvl,
                 "min_graduation_to_unlock": min_grad,
+                "max_count_per_opponent": mcpo,
                 "unlocked": unlocked,
                 "earned_tier": tier,
                 "gold_count": counts["gold_count"],

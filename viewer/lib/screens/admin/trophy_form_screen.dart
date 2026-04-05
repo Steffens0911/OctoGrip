@@ -43,6 +43,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
   int? _initialTarget;
   String? _initialAwardKind;
   int? _initialMinDuration;
+  int? _initialMaxCountPerOpponent;
 
   @override
   void initState() {
@@ -55,6 +56,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
       _initialTarget = t.targetCount;
       _initialAwardKind = t.awardKind;
       _initialMinDuration = t.minDurationDays;
+      _initialMaxCountPerOpponent = t.maxCountPerOpponent;
       _awardKind = t.awardKind;
     } else {
       _awardKind = 'medal';
@@ -96,6 +98,9 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
     if (target != null && target != _initialTarget) return true;
     if (kind != _initialAwardKind) return true;
     if (kind == 'trophy' && minDur != _initialMinDuration) return true;
+    final maxRaw = (values['maxCountPerOpponent'] as String?)?.trim() ?? '';
+    final maxVal = maxRaw.isEmpty ? null : int.tryParse(maxRaw);
+    if (maxVal != _initialMaxCountPerOpponent) return true;
     return false;
   }
 
@@ -167,6 +172,19 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
     final minGraduationToUnlock = values['minGraduationToUnlock'] as String?;
     final startDate = toApiDate(startDateValue);
     final endDate = toApiDate(endDateValue);
+    final maxCountRaw = (values['maxCountPerOpponent'] as String?)?.trim() ?? '';
+    int? maxCountPerOpponent;
+    if (maxCountRaw.isNotEmpty) {
+      maxCountPerOpponent = int.tryParse(maxCountRaw);
+      if (maxCountPerOpponent == null || maxCountPerOpponent < 1) {
+        AppFeedback.show(
+          context,
+          message: 'Limite por adversário deve ser um inteiro ≥ 1 ou vazio.',
+          type: AppFeedbackType.error,
+        );
+        return;
+      }
+    }
 
     setState(() {
       _saving = true;
@@ -190,6 +208,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
               (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty)
                   ? minGraduationToUnlock
                   : null,
+          maxCountPerOpponent: maxCountPerOpponent,
         );
       } else {
         map = await _api.updateTrophy(
@@ -206,6 +225,8 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
               (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty)
                   ? minGraduationToUnlock
                   : null,
+          maxCountPerOpponent: maxCountPerOpponent,
+          setMaxCountPerOpponent: true,
         );
       }
       if (!mounted) return;
@@ -274,6 +295,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                         'startDate': DateTime.now(),
                         'endDate': DateTime.now().add(const Duration(days: 30)),
                         'targetCount': '10',
+                        'maxCountPerOpponent': '',
                       }
                     : {
                         'name': t.name,
@@ -286,6 +308,7 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                         'startDate': _parseStart(),
                         'endDate': _parseEnd(),
                         'targetCount': t.targetCount.toString(),
+                        'maxCountPerOpponent': t.maxCountPerOpponent?.toString() ?? '',
                       },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -407,6 +430,15 @@ class _TrophyFormScreenState extends State<TrophyFormScreen> {
                         FormBuilderValidators.integer(errorText: 'Deve ser um número inteiro'),
                         FormBuilderValidators.min(1, errorText: 'Meta deve ser pelo menos 1'),
                       ]),
+                    ),
+                    const SizedBox(height: 8),
+                    FormBuilderTextField(
+                      name: 'maxCountPerOpponent',
+                      decoration: const InputDecoration(
+                        labelText: 'Máx. execuções contáveis por adversário (opcional)',
+                        hintText: 'Vazio = padrão (sem limite; bronze = brancos distintos)',
+                      ),
+                      keyboardType: TextInputType.number,
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 16),

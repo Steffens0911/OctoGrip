@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -150,7 +151,7 @@ def register_exception_handlers(application: FastAPI) -> None:
             status_code=422,
             content=error_payload(
                 request,
-                detail=exc.errors(),
+                detail=jsonable_encoder(exc.errors()),
                 status_code=422,
                 error_code="VALIDATION_ERROR",
                 error_type="RequestValidationError",

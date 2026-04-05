@@ -16,6 +16,7 @@ class TrophyMapper {
       minDurationDays: dto.minDurationDays,
       minRewardLevelToUnlock: dto.minRewardLevelToUnlock,
       minGraduationToUnlock: dto.minGraduationToUnlock,
+      maxCountPerOpponent: dto.maxCountPerOpponent,
     );
   }
 }

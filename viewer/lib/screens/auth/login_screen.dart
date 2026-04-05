@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/branding/app_brand.dart';
 import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -9,7 +10,7 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_error_message.dart';
 
-/// Tela de login com e-mail e senha (layout landing escuro + wordmark Flow Roll).
+/// Tela de login com e-mail e senha (layout landing escuro + logo OctoGrip).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -135,8 +136,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Center(
                         child: Image.asset(
-                          'assets/branding/flowroll_wordmark.png',
-                          width: 220,
+                          AppBrand.logoAsset,
+                          width: 192,
                           fit: BoxFit.contain,
                           filterQuality: FilterQuality.high,
                           gaplessPlayback: true,

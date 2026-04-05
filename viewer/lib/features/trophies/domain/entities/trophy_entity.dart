@@ -14,6 +14,7 @@ class TrophyEntity extends Equatable {
     this.minDurationDays,
     this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
+    this.maxCountPerOpponent,
   });
 
   final String id;
@@ -28,6 +29,7 @@ class TrophyEntity extends Equatable {
   final int? minDurationDays;
   final int minRewardLevelToUnlock;
   final String? minGraduationToUnlock;
+  final int? maxCountPerOpponent;
 
   TrophyEntity copyWith({
     String? id,
@@ -42,6 +44,7 @@ class TrophyEntity extends Equatable {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxPerOpponent,
   }) {
     return TrophyEntity(
       id: id ?? this.id,
@@ -57,9 +60,20 @@ class TrophyEntity extends Equatable {
       minRewardLevelToUnlock:
           minRewardLevelToUnlock ?? this.minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock ?? this.minGraduationToUnlock,
+      maxCountPerOpponent: maxPerOpponent ?? maxCountPerOpponent,
     );
   }
 
   @override
-  List<Object?> get props => [id, academyId, techniqueId, name, startDateIso, endDateIso, targetCount, awardKind];
+  List<Object?> get props => [
+        id,
+        academyId,
+        techniqueId,
+        name,
+        startDateIso,
+        endDateIso,
+        targetCount,
+        awardKind,
+        maxCountPerOpponent,
+      ];
 }

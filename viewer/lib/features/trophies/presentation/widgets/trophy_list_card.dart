@@ -31,6 +31,12 @@ class TrophyListCard extends StatelessWidget {
       ..write(entity.endDateIso)
       ..write(' · Meta: ')
       ..write(entity.targetCount);
+    if (entity.maxCountPerOpponent != null) {
+      sub
+        ..write(' · Máx. ')
+        ..write(entity.maxCountPerOpponent)
+        ..write('/adversário');
+    }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),

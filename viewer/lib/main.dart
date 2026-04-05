@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/branding/app_brand.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/widgets/game_background.dart';
@@ -23,20 +24,20 @@ void main() async {
     ProviderScope(
       child: ChangeNotifierProvider<AuthService>.value(
         value: AuthService(),
-        child: const FlowRollApp(),
+        child: const OctoGripApp(),
       ),
     ),
   );
 }
 
-class FlowRollApp extends StatefulWidget {
-  const FlowRollApp({super.key});
+class OctoGripApp extends StatefulWidget {
+  const OctoGripApp({super.key});
 
   @override
-  State<FlowRollApp> createState() => _FlowRollAppState();
+  State<OctoGripApp> createState() => _OctoGripAppState();
 }
 
-class _FlowRollAppState extends State<FlowRollApp> {
+class _OctoGripAppState extends State<OctoGripApp> {
   /// Padrão escuro até carregar preferência (login e primeiro frame).
   ThemeMode _themeMode = ThemeMode.dark;
   bool _useGameFont = true;
@@ -71,7 +72,7 @@ class _FlowRollAppState extends State<FlowRollApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FlowRoll',
+      title: AppBrand.name,
       theme: _useGameFont ? AppTheme.memoLight : AppTheme.memoLightSans,
       darkTheme: _useGameFont ? AppTheme.memoDark : AppTheme.memoDarkSans,
       themeMode: _themeMode,

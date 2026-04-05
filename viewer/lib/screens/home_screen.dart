@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/branding/app_brand.dart';
 
 /// Tela inicial do viewer (conteúdo para o usuário comum).
 class HomeScreen extends StatelessWidget {
@@ -14,14 +15,15 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/branding/flowroll_app_icon.png',
-              width: 96,
-              height: 96,
+              AppBrand.logoAsset,
+              width: 120,
+              height: 120,
+              fit: BoxFit.contain,
               filterQuality: FilterQuality.high,
             ),
             const SizedBox(height: 24),
             Text(
-              'FlowRoll',
+              AppBrand.name,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: AppTheme.textPrimary,
                     fontWeight: FontWeight.bold,

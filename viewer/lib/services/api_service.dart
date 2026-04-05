@@ -610,6 +610,7 @@ class ApiService {
     int? minDurationDays,
     int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
@@ -625,6 +626,7 @@ class ApiService {
       body['min_reward_level_to_unlock'] = minRewardLevelToUnlock;
     }
     if (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) body['min_graduation_to_unlock'] = minGraduationToUnlock;
+    if (maxCountPerOpponent != null) body['max_count_per_opponent'] = maxCountPerOpponent;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
       headers: await _jsonHeaders(auth: true),
@@ -648,6 +650,9 @@ class ApiService {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    /// Quando true, envia [maxCountPerOpponent] no PATCH (inclui null para remover o limite).
+    bool setMaxCountPerOpponent = false,
   }) async {
     final body = <String, dynamic>{};
     if (techniqueId != null) body['technique_id'] = techniqueId;
@@ -663,6 +668,9 @@ class ApiService {
     if (minGraduationToUnlock != null) {
       body['min_graduation_to_unlock'] =
           minGraduationToUnlock.isEmpty ? null : minGraduationToUnlock;
+    }
+    if (setMaxCountPerOpponent) {
+      body['max_count_per_opponent'] = maxCountPerOpponent;
     }
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/trophies/${Uri.encodeComponent(trophyId)}'),

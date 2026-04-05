@@ -74,6 +74,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
     int? minDurationDays,
     int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   }) async {
     try {
       final dto = await _remote.create(
@@ -87,6 +88,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
         minDurationDays: minDurationDays,
         minRewardLevelToUnlock: minRewardLevelToUnlock,
         minGraduationToUnlock: minGraduationToUnlock,
+        maxCountPerOpponent: maxCountPerOpponent,
       );
       await _mergeIntoCache(academyId, dto);
       return Right(TrophyMapper.toEntity(dto));
@@ -109,6 +111,8 @@ class TrophyRepositoryImpl implements TrophyRepository {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    bool setMaxCountPerOpponent = false,
   }) async {
     try {
       final dto = await _remote.update(
@@ -122,6 +126,8 @@ class TrophyRepositoryImpl implements TrophyRepository {
         minDurationDays: minDurationDays,
         minRewardLevelToUnlock: minRewardLevelToUnlock,
         minGraduationToUnlock: minGraduationToUnlock,
+        maxCountPerOpponent: maxCountPerOpponent,
+        setMaxCountPerOpponent: setMaxCountPerOpponent,
       );
       await _mergeIntoCache(academyId, dto, replaceId: id);
       return Right(TrophyMapper.toEntity(dto));

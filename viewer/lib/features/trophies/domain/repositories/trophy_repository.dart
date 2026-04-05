@@ -21,6 +21,7 @@ abstract class TrophyRepository {
     int? minDurationDays,
     int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   });
 
   Future<Either<TrophyFailure, TrophyEntity>> update({
@@ -35,6 +36,8 @@ abstract class TrophyRepository {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    bool setMaxCountPerOpponent = false,
   });
 
   Future<Either<TrophyFailure, Unit>> delete({

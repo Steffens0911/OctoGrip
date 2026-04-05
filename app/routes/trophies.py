@@ -37,6 +37,7 @@ def _trophy_to_read(t):
         min_duration_days=getattr(t, "min_duration_days", None),
         min_reward_level_to_unlock=getattr(t, "min_reward_level_to_unlock", 0),
         min_graduation_to_unlock=getattr(t, "min_graduation_to_unlock", None),
+        max_count_per_opponent=getattr(t, "max_count_per_opponent", None),
         created_at=t.created_at,
     )
 
@@ -61,6 +62,7 @@ async def trophy_create(
         min_duration_days=body.min_duration_days,
         min_reward_level_to_unlock=body.min_reward_level_to_unlock,
         min_graduation_to_unlock=body.min_graduation_to_unlock,
+        max_count_per_opponent=body.max_count_per_opponent,
         audit_user_id=current_user.id,
     )
     return _trophy_to_read(trophy)

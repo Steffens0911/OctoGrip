@@ -15,6 +15,8 @@ class TrophyWithEarned {
   final int minRewardLevelToUnlock;
   /// Faixa mínima para desbloquear (white, blue, purple, brown, black); null = todos.
   final String? minGraduationToUnlock;
+  /// Limite de execuções que contam por adversário no período; null = regras padrão.
+  final int? maxCountPerOpponent;
   /// Se o aluno já atingiu nível e faixa mínimos para poder competir por este troféu.
   final bool unlocked;
   final String? earnedTier; // 'gold' | 'silver' | 'bronze' | null
@@ -35,6 +37,7 @@ class TrophyWithEarned {
     this.minDurationDays,
     this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
+    this.maxCountPerOpponent,
     this.unlocked = true,
     this.earnedTier,
     this.goldCount = 0,
@@ -57,6 +60,7 @@ class TrophyWithEarned {
       minRewardLevelToUnlock:
           (json['min_reward_level_to_unlock'] as num?)?.toInt() ?? 0,
       minGraduationToUnlock: json['min_graduation_to_unlock'] as String?,
+      maxCountPerOpponent: (json['max_count_per_opponent'] as num?)?.toInt(),
       unlocked: json['unlocked'] as bool? ?? true,
       earnedTier: json['earned_tier'] as String?,
       goldCount: (json['gold_count'] as num?)?.toInt() ?? 0,

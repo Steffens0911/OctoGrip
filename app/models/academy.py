@@ -104,44 +104,54 @@ class Academy(Base, UUIDMixin):
         foreign_keys=[visible_lesson_id],
         lazy="selectin",
     )
+    # passive_deletes: ao apagar a academia, não emitir UPDATE para anular academy_id nos filhos.
+    # Técnicas/troféus têm academy_id NOT NULL; a FK na BD usa ON DELETE CASCADE.
     users: Mapped[list["User"]] = relationship(
         "User",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     professors: Mapped[list["Professor"]] = relationship(
         "Professor",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     missions: Mapped[list["Mission"]] = relationship(
         "Mission",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
         "CollectiveGoal",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     techniques: Mapped[list["Technique"]] = relationship(
         "Technique",
         back_populates="academy",
         foreign_keys="Technique.academy_id",
         lazy="selectin",
+        passive_deletes=True,
     )
     trophies: Mapped[list["Trophy"]] = relationship(
         "Trophy",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     partners: Mapped[list["Partner"]] = relationship(
         "Partner",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )
     training_videos: Mapped[list["TrainingVideo"]] = relationship(
         "TrainingVideo",
         back_populates="academy",
         lazy="selectin",
+        passive_deletes=True,
     )

@@ -1,7 +1,52 @@
 """Testes de CRUD de troféus."""
-import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+from unittest.mock import MagicMock
 from uuid import uuid4
+
+import pytest
+
+
+def _mock_execution(opponent_id, graduation: str, confirmed_day: int, eid=None):
+    e = MagicMock()
+    e.id = eid or uuid4()
+    e.opponent_id = opponent_id
+    opp = MagicMock()
+    opp.graduation = graduation
+    e.opponent = opp
+    e.confirmed_at = datetime(2026, 1, confirmed_day, 12, 0, tzinfo=timezone.utc)
+    return e
+
+
+def test_compute_counts_legacy_bronze_apenas_brancos_distintos():
+    """Sem limite: bronze = número de faixas brancas distintas."""
+    from app.services.trophy_service import _compute_counts_from_executions
+
+    a, b = uuid4(), uuid4()
+    executions = [
+        _mock_execution(a, "white", 1),
+        _mock_execution(b, "white", 2),
+        _mock_execution(a, "white", 3),
+    ]
+    c = _compute_counts_from_executions(executions, None)
+    assert c["gold_count"] == 0
+    assert c["silver_count"] == 0
+    assert c["bronze_count"] == 2
+
+
+def test_compute_counts_limite_por_adversario_preta_tres_exec_conta_so_duas():
+    """Com limite 2: no máximo 2 ouros no mesmo opponent_id."""
+    from app.services.trophy_service import _compute_counts_from_executions
+
+    oid = uuid4()
+    executions = [
+        _mock_execution(oid, "black", 1),
+        _mock_execution(oid, "black", 2),
+        _mock_execution(oid, "black", 3),
+    ]
+    c = _compute_counts_from_executions(executions, 2)
+    assert c["gold_count"] == 2
+    assert c["silver_count"] == 0
+    assert c["bronze_count"] == 0
 
 
 @pytest.fixture
@@ -95,6 +140,36 @@ async def test_criar_trofeu_tecnica_outra_academia(client, admin_headers, academ
         "target_count": 10,
     })
     assert r.status_code == 400
+
+
+async def test_criar_trofeu_max_count_per_opponent(client, admin_headers, academy, technique):
+    """Criar troféu com limite de execuções contáveis por adversário."""
+    r = await client.post("/trophies", headers=admin_headers, json={
+        "academy_id": str(academy.id),
+        "technique_id": str(technique.id),
+        "name": "Troféu Limite Parceiro",
+        "start_date": date.today().isoformat(),
+        "end_date": (date.today() + timedelta(days=30)).isoformat(),
+        "target_count": 10,
+        "max_count_per_opponent": 2,
+    })
+    assert r.status_code == 201
+    data = r.json()
+    assert data["max_count_per_opponent"] == 2
+
+
+async def test_criar_trofeu_max_count_per_opponent_invalido(client, admin_headers, academy, technique):
+    """max_count_per_opponent < 1 é rejeitado."""
+    r = await client.post("/trophies", headers=admin_headers, json={
+        "academy_id": str(academy.id),
+        "technique_id": str(technique.id),
+        "name": "Troféu Inválido",
+        "start_date": date.today().isoformat(),
+        "end_date": (date.today() + timedelta(days=30)).isoformat(),
+        "target_count": 10,
+        "max_count_per_opponent": 0,
+    })
+    assert r.status_code == 422
 
 
 async def test_criar_trofeu_data_invalida(client, admin_headers, academy, technique):
@@ -204,6 +279,7 @@ async def test_galeria_trofeu_desbloqueio_por_nivel(client, aluno_headers, aluno
     assert r.status_code == 200
     item = next((t for t in r.json() if t["trophy_id"] == str(tr.id)), None)
     assert item is not None
+    assert item.get("max_count_per_opponent") is None
     assert item["min_reward_level_to_unlock"] == 5
     assert item["unlocked"] is False
 

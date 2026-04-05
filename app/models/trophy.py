@@ -43,6 +43,11 @@ class Trophy(Base, UUIDMixin, SoftDeleteMixin):
         comment="Nível mínimo (reward_level) para desbloquear; 0 = sem requisito.",
     )
     min_graduation_to_unlock: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    max_count_per_opponent: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Máx. execuções que contam por adversário no período; null = legado (bronze distinto).",
+    )
 
     academy: Mapped["Academy"] = relationship(
         "Academy",

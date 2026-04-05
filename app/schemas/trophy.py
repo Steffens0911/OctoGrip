@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, field_validator, model_validator
 
 AwardKind = Literal["medal", "trophy"]
 VALID_GRADUATIONS = frozenset({"white", "blue", "purple", "brown", "black"})
@@ -26,6 +26,10 @@ class TrophyCreate(BaseModel):
         description="Nível mínimo (reward_level) para desbloquear; 0 = sem requisito",
     )
     min_graduation_to_unlock: str | None = Field(default=None, description="Faixa mínima (white, blue, purple, brown, black); null = todos")
+    max_count_per_opponent: PositiveInt | None = Field(
+        default=None,
+        description="Máx. execuções que contam por adversário no período; null = sem limite (legado)",
+    )
 
     @model_validator(mode="after")
     def end_after_start(self):
@@ -58,6 +62,7 @@ class TrophyUpdate(BaseModel):
     min_duration_days: int | None = Field(default=None, description="Para trophy")
     min_reward_level_to_unlock: int | None = Field(None, ge=0)
     min_graduation_to_unlock: str | None = None
+    max_count_per_opponent: PositiveInt | None = None
 
     @field_validator("min_graduation_to_unlock")
     @classmethod
@@ -83,6 +88,7 @@ class TrophyRead(BaseModel):
     min_duration_days: int | None = None
     min_reward_level_to_unlock: int = 0
     min_graduation_to_unlock: str | None = None
+    max_count_per_opponent: int | None = None
     created_at: datetime | None = None
 
     class Config:
@@ -106,6 +112,7 @@ class UserTrophyEarned(BaseModel):
     min_duration_days: int | None = None
     min_reward_level_to_unlock: int = 0
     min_graduation_to_unlock: str | None = None
+    max_count_per_opponent: int | None = None
     unlocked: bool = True
     earned_tier: TrophyTier | None = None
     gold_count: int = 0

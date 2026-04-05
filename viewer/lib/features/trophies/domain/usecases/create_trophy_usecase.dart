@@ -20,6 +20,7 @@ class CreateTrophyUseCase {
     int? minDurationDays,
     int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   }) {
     return _repository.create(
       academyId: academyId,
@@ -32,6 +33,7 @@ class CreateTrophyUseCase {
       minDurationDays: minDurationDays,
       minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
+      maxCountPerOpponent: maxCountPerOpponent,
     );
   }
 }

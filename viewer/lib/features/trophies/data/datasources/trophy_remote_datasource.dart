@@ -14,6 +14,7 @@ abstract class TrophyRemoteDataSource {
     int? minDurationDays,
     int minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   });
   Future<TrophyDto> update({
     required String id,
@@ -26,6 +27,8 @@ abstract class TrophyRemoteDataSource {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    bool setMaxCountPerOpponent = false,
   });
   Future<void> delete(String id);
 }
@@ -53,6 +56,7 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
     int? minDurationDays,
     int minRewardLevelToUnlock = 0,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
   }) async {
     final map = await _api.createTrophy(
       academyId: academyId,
@@ -65,6 +69,7 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
       minDurationDays: minDurationDays,
       minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
+      maxCountPerOpponent: maxCountPerOpponent,
     );
     return TrophyDto.fromJson(map, academyId: academyId);
   }
@@ -81,6 +86,8 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    bool setMaxCountPerOpponent = false,
   }) async {
     final map = await _api.updateTrophy(
       id,
@@ -93,6 +100,8 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
       minDurationDays: minDurationDays,
       minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
+      maxCountPerOpponent: maxCountPerOpponent,
+      setMaxCountPerOpponent: setMaxCountPerOpponent,
     );
     return TrophyDto.fromJson(map, academyId: map['academy_id'] as String);
   }

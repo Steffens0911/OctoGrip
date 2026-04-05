@@ -12,6 +12,7 @@ class TrophyDto {
     this.minDurationDays,
     this.minRewardLevelToUnlock = 0,
     this.minGraduationToUnlock,
+    this.maxCountPerOpponent,
   });
 
   final String id;
@@ -26,6 +27,8 @@ class TrophyDto {
   final int? minDurationDays;
   final int minRewardLevelToUnlock;
   final String? minGraduationToUnlock;
+  /// Máx. execuções que contam por adversário no período; null = regras padrão (bronze distinto).
+  final int? maxCountPerOpponent;
 
   factory TrophyDto.fromJson(Map<String, dynamic> json, {required String academyId}) {
     String d(dynamic v) {
@@ -48,6 +51,7 @@ class TrophyDto {
       minRewardLevelToUnlock:
           (json['min_reward_level_to_unlock'] as num?)?.toInt() ?? 0,
       minGraduationToUnlock: json['min_graduation_to_unlock'] as String?,
+      maxCountPerOpponent: (json['max_count_per_opponent'] as num?)?.toInt(),
     );
   }
 
@@ -64,6 +68,7 @@ class TrophyDto {
         'min_duration_days': minDurationDays,
         'min_reward_level_to_unlock': minRewardLevelToUnlock,
         'min_graduation_to_unlock': minGraduationToUnlock,
+        'max_count_per_opponent': maxCountPerOpponent,
       };
 
   factory TrophyDto.fromHiveMap(Map<dynamic, dynamic> map) {
@@ -82,6 +87,7 @@ class TrophyDto {
       minDurationDays: (map['min_duration_days'] as num?)?.toInt(),
       minRewardLevelToUnlock: fromLevel ?? legacyPoints ?? 0,
       minGraduationToUnlock: map['min_graduation_to_unlock'] as String?,
+      maxCountPerOpponent: (map['max_count_per_opponent'] as num?)?.toInt(),
     );
   }
 }

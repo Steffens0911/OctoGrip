@@ -21,6 +21,8 @@ class UpdateTrophyUseCase {
     int? minDurationDays,
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
+    int? maxCountPerOpponent,
+    bool setMaxCountPerOpponent = false,
   }) {
     return _repository.update(
       academyId: academyId,
@@ -34,6 +36,8 @@ class UpdateTrophyUseCase {
       minDurationDays: minDurationDays,
       minRewardLevelToUnlock: minRewardLevelToUnlock,
       minGraduationToUnlock: minGraduationToUnlock,
+      maxCountPerOpponent: maxCountPerOpponent,
+      setMaxCountPerOpponent: setMaxCountPerOpponent,
     );
   }
 }

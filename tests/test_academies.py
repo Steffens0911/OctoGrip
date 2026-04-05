@@ -51,6 +51,29 @@ async def test_excluir_academia(client, admin_headers, db):
     assert r.status_code == 204
 
 
+async def test_excluir_academia_com_tecnicas(client, admin_headers, db):
+    """DELETE deve funcionar com técnicas vinculadas (academy_id NOT NULL + CASCADE na BD)."""
+    from uuid import uuid4
+
+    from app.models import Academy, Technique
+
+    a = Academy(name="Academia Com Técnicas", slug=f"tec-{uuid4().hex[:6]}")
+    db.add(a)
+    await db.commit()
+    await db.refresh(a)
+    t = Technique(
+        academy_id=a.id,
+        name="Omoplata",
+        slug=f"omoplata-{uuid4().hex[:6]}",
+        base_points=10,
+    )
+    db.add(t)
+    await db.commit()
+
+    r = await client.delete(f"/academies/{a.id}", headers=admin_headers)
+    assert r.status_code == 204
+
+
 async def test_academia_nao_encontrada(client, admin_headers):
     from uuid import uuid4
     fake_id = uuid4()

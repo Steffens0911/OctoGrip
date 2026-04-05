@@ -144,14 +144,13 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               ? 'before_training'
               : usageTypeUi;
       if (d.academyId != null && d.academyId!.isNotEmpty) {
-        final opponentId = await _showOpponentDialog(d.academyId!);
+        // Missões da semana: oponente obrigatório (sem "Sem oponente"; cancelar aborta).
+        final opponentId =
+            await _showOpponentDialog(d.academyId!, allowSkip: false);
         if (!mounted) return;
-        if (opponentId != null && opponentId.isNotEmpty) {
-          await _completeMissionWithOpponent(
-              d.missionId!, usageType, opponentId);
-        } else {
-          await _completeMissionLegacy(d.missionId!, usageType);
-        }
+        if (opponentId == null || opponentId.isEmpty) return;
+        await _completeMissionWithOpponent(
+            d.missionId!, usageType, opponentId);
       } else {
         await _completeMissionLegacy(d.missionId!, usageType);
       }
@@ -180,12 +179,15 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     }
   }
 
-  Future<String?> _showOpponentDialog(String academyId) {
+  Future<String?> _showOpponentDialog(
+    String academyId, {
+    bool allowSkip = true,
+  }) {
     return OpponentPickerSheet.show(
       context,
       academyId: academyId,
       currentUserId: widget.data.userId,
-      allowSkip: true,
+      allowSkip: allowSkip,
     );
   }
 

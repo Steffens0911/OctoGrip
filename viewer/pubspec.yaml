@@ -1,5 +1,5 @@
 name: viewer
-description: FlowRoll — app para academias de Jiu-Jitsu (campo de treino, academia e admin).
+description: OctoGrip — app para academias de Jiu-Jitsu (campo de treino, academia e admin).
 publish_to: 'none'
 version: 1.0.1+2
 
@@ -49,3 +49,4 @@ flutter:
     - assets/icons/
     - assets/branding/flowroll_app_icon.png
     - assets/branding/flowroll_wordmark.png
+    - assets/branding/octogrip_logo.png

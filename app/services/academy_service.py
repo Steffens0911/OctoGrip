@@ -147,13 +147,18 @@ async def create_academy(db: AsyncSession, name: str, slug: str | None = None) -
 
 
 async def delete_academy(db: AsyncSession, academy_id: UUID) -> bool:
-    """Remove uma academia. Retorna True se removeu, False se não existir."""
-    academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
-    if not academy:
+    """Remove uma academia. Retorna True se removeu, False se não existir.
+
+    Usa DELETE SQL em vez de session.delete(Academy): o ORM, por omissão, tentava
+    UPDATE em técnicas (academy_id NOT NULL) antes do DELETE, gerando IntegrityError.
+    A cascata na base remove filhos (técnicas, troféus, etc.) conforme as FKs.
+    """
+    exists = (await db.execute(select(Academy.id).where(Academy.id == academy_id))).scalar_one_or_none()
+    if not exists:
         return False
-    # Remover parceiros vinculados para evitar violações de integridade ao apagar a academia.
+    # Parceiros: remoção explícita (legado / ordem de flush); a FK também permite CASCADE.
     await db.execute(sa_delete(Partner).where(Partner.academy_id == academy_id))
-    await db.delete(academy)
+    await db.execute(sa_delete(Academy).where(Academy.id == academy_id))
     await db.commit()
     logger.info("delete_academy", extra={"academy_id": str(academy_id)})
     return True
