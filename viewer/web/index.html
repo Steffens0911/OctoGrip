@@ -55,6 +55,19 @@
       }
       var stored = sessionStorage.getItem('jjb_api_base_url');
       var h = window.location.hostname;
+      var viewerIsLocal = (h === 'localhost' || h === '127.0.0.1');
+      function storedPointsToLoopback(s) {
+        if (!s) return false;
+        return /localhost/i.test(s) || /127\.0\.0\.1/.test(s);
+      }
+      // Páginas públicas (Coolify, sslip.io, etc.): nunca reutilizar API em loopback
+      // guardada no dev — o Chrome bloqueia (Private Network Access / CORS).
+      if (stored && !viewerIsLocal && storedPointsToLoopback(stored)) {
+        try {
+          sessionStorage.removeItem('jjb_api_base_url');
+        } catch (e) {}
+        stored = null;
+      }
       if (stored && h.endsWith('.trycloudflare.com')) {
         if (/\.trycloudflare\.com:8000\b/.test(stored) ||
             /^https?:\/\/127\.0\.0\.1:8000/.test(stored) ||

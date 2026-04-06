@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:viewer/services/api_service.dart';
 
 /// Evita confundir 401/CORS com “API desligada”.
@@ -39,7 +40,10 @@ String userFacingMessage(Object e) {
   }
   final s = e.toString().toLowerCase();
   if (_looksLikeNetworkFailure(s)) {
-    return 'Falha de conexão. Verifique se a API está em execução (porta 8000) e se o app está na mesma rede ou no emulador.';
+    if (kIsWeb) {
+      return 'Falha de conexão. Em produção configure API_BASE_URL no deploy (ex.: Coolify) com a URL HTTPS da API, ou abra o site com ?api_base=URL_DA_API. Em desenvolvimento local, confirme que a API está a correr.';
+    }
+    return 'Falha de conexão. Verifique se a API está em execução e se o app está na mesma rede ou no emulador.';
   }
   final raw = e.toString().trim();
   if (raw.isEmpty) return 'Algo deu errado. Tente novamente.';

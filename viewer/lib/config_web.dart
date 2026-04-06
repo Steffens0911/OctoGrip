@@ -14,10 +14,12 @@ const String _kApiBaseFromBuild = String.fromEnvironment(
 String _trimTrailingSlashes(String s) =>
     s.replaceAll(RegExp(r'/+$'), '');
 
-bool _isBlockedLoopbackOnPublicTunnel(String stored, String host) {
-  if (!host.endsWith('.trycloudflare.com')) return false;
+/// Viewer em origem pública não pode usar API em loopback (Chrome PNA / CORS).
+bool _storedApiBaseIncompatibleWithHost(String stored, String host) {
+  final h = host.toLowerCase();
+  if (h == 'localhost' || h == '127.0.0.1') return false;
   final s = stored.toLowerCase();
-  return s.contains('127.0.0.1') || s.contains('localhost:');
+  return s.contains('127.0.0.1') || s.contains('localhost');
 }
 
 String getApiBaseUrl() {
@@ -43,7 +45,10 @@ String getApiBaseUrl() {
 
   try {
     final v = (html.window as dynamic)['__API_BASE_URL__'];
-    if (v != null && v is String && v.isNotEmpty) {
+    if (v != null &&
+        v is String &&
+        v.isNotEmpty &&
+        !_storedApiBaseIncompatibleWithHost(v, hostEarly)) {
       return _trimTrailingSlashes(v);
     }
   } catch (_) {}
@@ -52,7 +57,7 @@ String getApiBaseUrl() {
     final stored = html.window.sessionStorage['jjb_api_base_url'];
     if (stored != null &&
         stored.isNotEmpty &&
-        !_isBlockedLoopbackOnPublicTunnel(stored, hostEarly)) {
+        !_storedApiBaseIncompatibleWithHost(stored, hostEarly)) {
       return _trimTrailingSlashes(stored);
     }
   } catch (_) {}
