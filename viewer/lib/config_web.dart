@@ -1,9 +1,15 @@
-/// Implementação para web: `?api_base=` (ngrok / Cloudflare), depois `index.html`,
-/// depois mesmo host + porta 8001 (API Docker no host; uvicorn local costuma usar 8000).
+/// Implementação para web: build Docker/Coolify via `--dart-define=API_BASE_URL=`,
+/// depois `?api_base=`, `index.html` / sessionStorage, e por fim localhost:8001 ou mesmo host:8001.
 /// Em `*.trycloudflare.com` sem `api_base`, devolve string vazia: o browser bloqueia HTTPS→127.0.0.1 (PNA).
 library;
 
 import 'dart:html' as html;
+
+/// Injertado em `flutter build web --dart-define=API_BASE_URL=...` (ver `viewer/Dockerfile`).
+const String _kApiBaseFromBuild = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: '',
+);
 
 String _trimTrailingSlashes(String s) =>
     s.replaceAll(RegExp(r'/+$'), '');
@@ -15,6 +21,11 @@ bool _isBlockedLoopbackOnPublicTunnel(String stored, String host) {
 }
 
 String getApiBaseUrl() {
+  final fromBuild = _kApiBaseFromBuild.trim();
+  if (fromBuild.isNotEmpty) {
+    return _trimTrailingSlashes(fromBuild);
+  }
+
   final hostEarly = Uri.base.host;
   try {
     final qp = Uri.base.queryParameters['api_base'];

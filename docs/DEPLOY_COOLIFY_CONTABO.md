@@ -58,7 +58,7 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `CORS_ORIGINS` | JSON com a origem do viewer, ex. `["https://app.seudominio.com"]` |
 | `SEED_ON_STARTUP` | `false` em produção (recomendado) |
 | `PGSSLMODE` | `disable` (Postgres interno na rede Docker sem TLS) |
-| `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — usada no **build** do viewer (`ARG` no `viewer/Dockerfile`) |
+| `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify: o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
 | `LOG_LEVEL` | `INFO` ou `WARNING` |
 | `ENABLE_METRICS` | `true` se quiseres métricas |
 
