@@ -22,6 +22,10 @@ class Academy {
   final bool showPartners;
   final bool showSchedule;
   final bool showGlobalSupporters;
+  final String? loginNoticeTitle;
+  final String? loginNoticeBody;
+  final String? loginNoticeUrl;
+  final bool loginNoticeActive;
   final String? updatedAt;
 
   Academy({
@@ -46,6 +50,10 @@ class Academy {
     this.showPartners = true,
     this.showSchedule = true,
     this.showGlobalSupporters = true,
+    this.loginNoticeTitle,
+    this.loginNoticeBody,
+    this.loginNoticeUrl,
+    this.loginNoticeActive = false,
     this.updatedAt,
   });
 
@@ -72,6 +80,10 @@ class Academy {
       showPartners: json['show_partners'] as bool? ?? true,
       showSchedule: json['show_schedule'] as bool? ?? true,
       showGlobalSupporters: json['show_global_supporters'] as bool? ?? true,
+      loginNoticeTitle: json['login_notice_title'] as String?,
+      loginNoticeBody: json['login_notice_body'] as String?,
+      loginNoticeUrl: json['login_notice_url'] as String?,
+      loginNoticeActive: json['login_notice_active'] as bool? ?? false,
       updatedAt: json['updated_at'] as String?,
     );
   }
@@ -90,6 +102,10 @@ class Academy {
         'show_partners': showPartners,
         'show_schedule': showSchedule,
         'show_global_supporters': showGlobalSupporters,
+        'login_notice_title': loginNoticeTitle,
+        'login_notice_body': loginNoticeBody,
+        'login_notice_url': loginNoticeUrl,
+        'login_notice_active': loginNoticeActive,
         'updated_at': updatedAt,
       };
 }

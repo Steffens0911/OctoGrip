@@ -86,6 +86,10 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         show_partners=a.show_partners,
         show_schedule=a.show_schedule,
         show_global_supporters=a.show_global_supporters,
+        login_notice_title=a.login_notice_title,
+        login_notice_body=a.login_notice_body,
+        login_notice_url=a.login_notice_url,
+        login_notice_active=a.login_notice_active,
         updated_at=getattr(a, "updated_at", None),
     )
 

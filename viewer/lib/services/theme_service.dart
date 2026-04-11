@@ -4,6 +4,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _keyThemeMode = 'theme_mode';
 const _keyThemeStyle = 'theme_style';
 const _keyFontStyle = 'font_style';
+const _keyTextScale = 'text_scale';
+
+/// Contrato da escala de texto global (MaterialApp + botões na AppBar).
+/// Passo por toque na UI; valores persistidos fora do intervalo são corrigidos ao carregar.
+abstract final class TextScalePrefs {
+  static const double min = 0.85;
+  static const double max = 1.30;
+  static const double defaultScale = 1.0;
+  static const double step = 0.05;
+}
 
 /// Estilo visual do app: jogo (marrom/âmbar), premium (lavanda/claro) ou memo (Memo UI Kit).
 enum ThemeStyle {
@@ -12,7 +22,8 @@ enum ThemeStyle {
   memo,
 }
 
-/// Serviço para persistir e restaurar preferência de tema (light/dark/system) e estilo (game/premium).
+/// Serviço para persistir e restaurar preferência de tema (light/dark/system), estilo (game/premium),
+/// família de fonte (jogo/sans) e escala de texto global ([TextScalePrefs] + [loadTextScale]/[saveTextScale]).
 class ThemeService {
   static Future<ThemeMode> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,5 +117,21 @@ class ThemeService {
   static Future<void> saveUseGameFont(bool useGameFont) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyFontStyle, useGameFont ? 'game' : 'sans');
+  }
+
+  /// Fator linear de escala de texto (`TextScaler.linear`); aplica-se a login e shell.
+  static double clampTextScale(double value) =>
+      value.clamp(TextScalePrefs.min, TextScalePrefs.max);
+
+  static Future<double> loadTextScale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getDouble(_keyTextScale);
+    if (raw == null) return TextScalePrefs.defaultScale;
+    return clampTextScale(raw);
+  }
+
+  static Future<void> saveTextScale(double scale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyTextScale, clampTextScale(scale));
   }
 }

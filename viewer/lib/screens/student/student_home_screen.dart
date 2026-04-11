@@ -31,6 +31,7 @@ import 'package:viewer/widgets/gamification/streak_widget.dart';
 import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
+import 'package:viewer/widgets/academy_login_notice_dialog.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
@@ -80,6 +81,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _showPartners = true;
   bool _showSchedule = true;
   bool _showGlobalSupporters = true;
+  /// Aviso ao logar (dados da academia; modal uma vez por sessão).
+  String? _loginNoticeTitle;
+  String? _loginNoticeBody;
+  String? _loginNoticeUrl;
+  bool _loginNoticeActive = false;
   /// Missão recém-concluída (pulso no [WeeklyMissionPath]); limpo após animar.
   String? _celebrateMissionId;
   /// Rede a sincronizar (header + missões, etc.): barra no topo e skeletons opcionais.
@@ -267,10 +273,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  /// Parceiro em destaque (se houver) e depois lembrete de confirmações pendentes (sheet único por sessão).
+  /// Aviso da academia (se ativo), parceiro em destaque e lembrete de confirmações pendentes.
   Future<void> _runPostLoadNudges() async {
+    await _maybeShowAcademyLoginNotice();
     await _maybeShowRandomPartnerHighlight();
     await _maybeShowPendingConfirmationsBottomSheet();
+  }
+
+  /// Utilizadores com [UserModel.academyId] na home (aluno, gestor ou admin com academia).
+  Future<void> _maybeShowAcademyLoginNotice() async {
+    if (!mounted) return;
+    final auth = AuthService();
+    if (auth.loginNoticeShown) return;
+    final user = _selectedUser;
+    final academyId = user?.academyId;
+    if (academyId == null || academyId.isEmpty) return;
+    if (!_loginNoticeActive) return;
+    final body = _loginNoticeBody?.trim() ?? '';
+    if (body.isEmpty) return;
+    auth.markLoginNoticeShown();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AcademyLoginNoticeDialog(
+        titleText: _loginNoticeTitle,
+        bodyText: body,
+        linkUrl: _loginNoticeUrl,
+      ),
+    );
   }
 
   Future<void> _maybeShowPendingConfirmationsBottomSheet() async {
@@ -373,6 +403,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _showPartners = academy.showPartners;
         _showSchedule = academy.showSchedule;
         _showGlobalSupporters = academy.showGlobalSupporters;
+        _loginNoticeTitle = academy.loginNoticeTitle;
+        _loginNoticeBody = academy.loginNoticeBody;
+        _loginNoticeUrl = academy.loginNoticeUrl;
+        _loginNoticeActive = academy.loginNoticeActive;
       });
     } catch (_) {
       // Falha de rede ou permissão: mostra placeholder em vez de ficar em "Carregando...".
@@ -384,6 +418,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           _showPartners = true;
           _showSchedule = true;
           _showGlobalSupporters = true;
+          _loginNoticeTitle = null;
+          _loginNoticeBody = null;
+          _loginNoticeUrl = null;
+          _loginNoticeActive = false;
         });
       }
     }
@@ -423,6 +461,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _showSchedule = academy?['show_schedule'] as bool? ?? true;
       _showGlobalSupporters =
           academy?['show_global_supporters'] as bool? ?? true;
+      _loginNoticeTitle = academy?['login_notice_title'] as String?;
+      _loginNoticeBody = academy?['login_notice_body'] as String?;
+      _loginNoticeUrl = academy?['login_notice_url'] as String?;
+      _loginNoticeActive = academy?['login_notice_active'] as bool? ?? false;
     });
   }
 

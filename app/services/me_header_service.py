@@ -44,6 +44,10 @@ async def get_me_header_stats(db: AsyncSession, *, current_user: User) -> MeHead
                 show_partners=academy.show_partners,
                 show_schedule=academy.show_schedule,
                 show_global_supporters=academy.show_global_supporters,
+                login_notice_title=academy.login_notice_title,
+                login_notice_body=academy.login_notice_body,
+                login_notice_url=academy.login_notice_url,
+                login_notice_active=academy.login_notice_active,
             )
 
     return MeHeaderStatsRead(

@@ -41,6 +41,7 @@ class _OctoGripAppState extends State<OctoGripApp> {
   /// Padrão escuro até carregar preferência (login e primeiro frame).
   ThemeMode _themeMode = ThemeMode.dark;
   bool _useGameFont = true;
+  double _textScale = TextScalePrefs.defaultScale;
 
   @override
   void initState() {
@@ -50,6 +51,9 @@ class _OctoGripAppState extends State<OctoGripApp> {
     });
     ThemeService.loadUseGameFont().then((useGameFont) {
       if (mounted) setState(() => _useGameFont = useGameFont);
+    });
+    ThemeService.loadTextScale().then((scale) {
+      if (mounted) setState(() => _textScale = scale);
     });
   }
 
@@ -67,6 +71,20 @@ class _OctoGripAppState extends State<OctoGripApp> {
   Future<void> _cycleFont() async {
     setState(() => _useGameFont = !_useGameFont);
     await ThemeService.saveUseGameFont(_useGameFont);
+  }
+
+  Future<void> _increaseTextScale() async {
+    final next = ThemeService.clampTextScale(_textScale + TextScalePrefs.step);
+    if (next == _textScale) return;
+    setState(() => _textScale = next);
+    await ThemeService.saveTextScale(_textScale);
+  }
+
+  Future<void> _decreaseTextScale() async {
+    final next = ThemeService.clampTextScale(_textScale - TextScalePrefs.step);
+    if (next == _textScale) return;
+    setState(() => _textScale = next);
+    await ThemeService.saveTextScale(_textScale);
   }
 
   @override
@@ -87,9 +105,19 @@ class _OctoGripAppState extends State<OctoGripApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       debugShowCheckedModeBanner: false,
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(textScaler: TextScaler.linear(_textScale)),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: AuthGate(
         onThemeToggle: _cycleTheme,
         onFontToggle: _cycleFont,
+        textScale: _textScale,
+        onTextScaleIncrease: _increaseTextScale,
+        onTextScaleDecrease: _decreaseTextScale,
       ),
     );
   }
@@ -99,11 +127,17 @@ class _OctoGripAppState extends State<OctoGripApp> {
 class AuthGate extends StatelessWidget {
   final void Function(BuildContext context) onThemeToggle;
   final VoidCallback onFontToggle;
+  final double textScale;
+  final VoidCallback onTextScaleIncrease;
+  final VoidCallback onTextScaleDecrease;
 
   const AuthGate({
     super.key,
     required this.onThemeToggle,
     required this.onFontToggle,
+    required this.textScale,
+    required this.onTextScaleIncrease,
+    required this.onTextScaleDecrease,
   });
 
   @override
@@ -113,6 +147,9 @@ class AuthGate extends StatelessWidget {
       return MainShell(
         onThemeToggle: onThemeToggle,
         onFontToggle: onFontToggle,
+        textScale: textScale,
+        onTextScaleIncrease: onTextScaleIncrease,
+        onTextScaleDecrease: onTextScaleDecrease,
         onLogout: () async {
           await auth.logout();
         },
@@ -126,12 +163,18 @@ class AuthGate extends StatelessWidget {
 class MainShell extends StatefulWidget {
   final void Function(BuildContext context) onThemeToggle;
   final VoidCallback onFontToggle;
+  final double textScale;
+  final VoidCallback onTextScaleIncrease;
+  final VoidCallback onTextScaleDecrease;
   final VoidCallback onLogout;
 
   const MainShell({
     super.key,
     required this.onThemeToggle,
     required this.onFontToggle,
+    required this.textScale,
+    required this.onTextScaleIncrease,
+    required this.onTextScaleDecrease,
     required this.onLogout,
   });
 
@@ -278,6 +321,20 @@ class _MainShellState extends State<MainShell> {
               onPressed: _showImpersonateDialog,
               tooltip: 'Atuar como',
             ),
+          IconButton(
+            icon: const Icon(Icons.text_decrease_outlined),
+            onPressed: widget.textScale <= TextScalePrefs.min
+                ? null
+                : widget.onTextScaleDecrease,
+            tooltip: 'Diminuir tamanho do texto',
+          ),
+          IconButton(
+            icon: const Icon(Icons.text_increase_outlined),
+            onPressed: widget.textScale >= TextScalePrefs.max
+                ? null
+                : widget.onTextScaleIncrease,
+            tooltip: 'Aumentar tamanho do texto',
+          ),
           IconButton(
             icon: const Icon(Icons.text_fields),
             onPressed: widget.onFontToggle,

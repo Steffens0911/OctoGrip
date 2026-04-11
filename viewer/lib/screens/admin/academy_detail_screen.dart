@@ -71,6 +71,11 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _savingVisibility = false;
   bool _showGlobalSupporters = true;
   int? _scheduleImageCacheBuster;
+  late final TextEditingController _loginNoticeTitleController;
+  late final TextEditingController _loginNoticeBodyController;
+  late final TextEditingController _loginNoticeUrlController;
+  bool _loginNoticeActive = false;
+  bool _savingLoginNotice = false;
 
   @override
   void initState() {
@@ -90,6 +95,13 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _showPartners = _academy.showPartners;
     _showSchedule = _academy.showSchedule;
     _showGlobalSupporters = _academy.showGlobalSupporters;
+    _loginNoticeTitleController =
+        TextEditingController(text: _academy.loginNoticeTitle ?? '');
+    _loginNoticeBodyController =
+        TextEditingController(text: _academy.loginNoticeBody ?? '');
+    _loginNoticeUrlController =
+        TextEditingController(text: _academy.loginNoticeUrl ?? '');
+    _loginNoticeActive = _academy.loginNoticeActive;
     _loadTechniques();
     _loadRankingAndReport();
     _loadUsageMetrics();
@@ -102,6 +114,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult2Controller.dispose();
     _mult3Controller.dispose();
     _logoUrlController.dispose();
+    _loginNoticeTitleController.dispose();
+    _loginNoticeBodyController.dispose();
+    _loginNoticeUrlController.dispose();
     super.dispose();
   }
 
@@ -363,6 +378,64 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     }
   }
 
+  Future<void> _saveLoginNotice() async {
+    if (_savingLoginNotice) return;
+    final body = _loginNoticeBodyController.text.trim();
+    if (_loginNoticeActive && body.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: 'Para ativar o aviso, preencha o texto do corpo.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
+    setState(() => _savingLoginNotice = true);
+    try {
+      final t = _loginNoticeTitleController.text.trim();
+      final b = _loginNoticeBodyController.text.trim();
+      final u = _loginNoticeUrlController.text.trim();
+      final updated = await _api.updateAcademyLoginNotice(
+        _academy.id,
+        loginNoticeTitle: t.isEmpty ? null : t,
+        loginNoticeBody: b.isEmpty ? null : b,
+        loginNoticeUrl: u.isEmpty ? null : u,
+        loginNoticeActive: _loginNoticeActive,
+      );
+      if (!context.mounted) return;
+      setState(() {
+        _academy = updated;
+        _savingLoginNotice = false;
+        _loginNoticeTitleController.text = updated.loginNoticeTitle ?? '';
+        _loginNoticeBodyController.text = updated.loginNoticeBody ?? '';
+        _loginNoticeUrlController.text = updated.loginNoticeUrl ?? '';
+        _loginNoticeActive = updated.loginNoticeActive;
+      });
+      widget.onUpdated();
+      final navCtx = context;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!navCtx.mounted) return;
+        AppFeedback.show(
+          navCtx,
+          message: 'Aviso ao abrir o app atualizado.',
+          type: AppFeedbackType.success,
+        );
+      });
+    } catch (e) {
+      if (!context.mounted) return;
+      setState(() => _savingLoginNotice = false);
+      final err = userFacingMessage(e);
+      final navCtx = context;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!navCtx.mounted) return;
+        AppFeedback.show(
+          navCtx,
+          message: err,
+          type: AppFeedbackType.error,
+        );
+      });
+    }
+  }
+
   Future<void> _saveTheme() async {
     final e1 = int.tryParse(_mult1Controller.text.trim());
     final e2 = int.tryParse(_mult2Controller.text.trim());
@@ -575,13 +648,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                               widget.onUpdated();
                             }
                           } catch (e) {
-                            if (mounted) {
-                              AppFeedback.show(
-                                context,
-                                message: userFacingMessage(e),
-                                type: AppFeedbackType.error,
-                              );
-                            }
+                            if (!context.mounted) return;
+                            AppFeedback.show(
+                              context,
+                              message: userFacingMessage(e),
+                              type: AppFeedbackType.error,
+                            );
                           }
                         },
                         child: const Text('Salvar'),
@@ -958,6 +1030,94 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   _updateHomeVisibility(showGlobalSupporters: value);
                                 },
                         ),
+                    ],
+                  ),
+                ),
+              ),
+              AppSpacing.verticalM,
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Aviso ao abrir o app',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: AppTheme.textPrimaryOf(context),
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Modal na tela inicial (Campo de treinamento), uma vez por sessão de login, '
+                        'para todos os utilizadores com esta academia — antes do destaque de parceiros.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _loginNoticeTitleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Título (opcional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        maxLength: 255,
+                        buildCounter: (
+                          context, {
+                          required currentLength,
+                          required isFocused,
+                          maxLength,
+                        }) =>
+                            null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _loginNoticeBodyController,
+                        decoration: const InputDecoration(
+                          labelText: 'Texto do aviso',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                        maxLines: 6,
+                        maxLength: 8000,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _loginNoticeUrlController,
+                        decoration: const InputDecoration(
+                          labelText: 'Link opcional',
+                          hintText: 'https://…',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Mostrar aviso ao abrir o app'),
+                        subtitle: const Text(
+                          'Só aparece se o texto do aviso estiver preenchido.',
+                        ),
+                        value: _loginNoticeActive,
+                        onChanged: _savingLoginNotice
+                            ? null
+                            : (v) => setState(() => _loginNoticeActive = v),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton(
+                          onPressed: _savingLoginNotice ? null : _saveLoginNotice,
+                          child: _savingLoginNotice
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Guardar aviso'),
+                        ),
+                      ),
                     ],
                   ),
                 ),

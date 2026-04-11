@@ -22,6 +22,7 @@ class AuthService extends ChangeNotifier {
   String? _impersonatedUserId;
   UserModel? _effectiveUser;
   bool _randomPartnerShown = false;
+  bool _loginNoticeShown = false;
 
   AuthService._();
 
@@ -44,6 +45,12 @@ class AuthService extends ChangeNotifier {
 
   void markRandomPartnerShown() {
     _randomPartnerShown = true;
+  }
+
+  bool get loginNoticeShown => _loginNoticeShown;
+
+  void markLoginNoticeShown() {
+    _loginNoticeShown = true;
   }
 
   Future<void> _loadFromStorage() async {
@@ -86,6 +93,7 @@ class AuthService extends ChangeNotifier {
     _impersonatedUserId = null;
     _effectiveUser = null;
     _randomPartnerShown = false;
+    _loginNoticeShown = false;
     _saveToStorage(token, user);
     SharedPreferences.getInstance().then((p) => p.remove(_keyImpersonate));
     notifyListeners();
@@ -97,6 +105,7 @@ class AuthService extends ChangeNotifier {
     _token = null;
     _currentUser = null;
     _randomPartnerShown = false;
+    _loginNoticeShown = false;
     await _clearStorage();
     await StudentHomeSnapshotStore.clearAll();
     ApiService().invalidateCache();

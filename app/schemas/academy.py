@@ -40,6 +40,10 @@ class AcademyRead(BaseModel):
     show_partners: bool = True
     show_schedule: bool = True
     show_global_supporters: bool = True
+    login_notice_title: str | None = None
+    login_notice_body: str | None = None
+    login_notice_url: str | None = None
+    login_notice_active: bool = False
     updated_at: datetime | None = None
 
     class Config:
@@ -75,6 +79,10 @@ class AcademyUpdate(BaseModel):
     show_partners: bool | None = None
     show_schedule: bool | None = None
     show_global_supporters: bool | None = None
+    login_notice_title: str | None = Field(None, max_length=255)
+    login_notice_body: str | None = Field(None, max_length=8000)
+    login_notice_url: str | None = Field(None, max_length=512)
+    login_notice_active: bool | None = None
 
 
 class RankingEntry(BaseModel):

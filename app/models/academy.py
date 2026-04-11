@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, text
+from sqlalchemy import ForeignKey, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -82,6 +82,27 @@ class Academy(Base, UUIDMixin):
         server_default=text("true"),
         nullable=False,
         comment="Controle da home do aluno: exibe ou não o quadro de apoiadores globais do app.",
+    )
+    login_notice_title: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        comment="Título opcional do aviso ao abrir o app (modal na home).",
+    )
+    login_notice_body: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Corpo do aviso ao abrir o app; exibido se ativo e não vazio.",
+    )
+    login_notice_url: Mapped[str | None] = mapped_column(
+        String(512),
+        nullable=True,
+        comment="URL opcional (ex.: regulamento) no modal de aviso.",
+    )
+    login_notice_active: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Se verdadeiro e corpo preenchido, o app pode mostrar o aviso ao entrar na home.",
     )
 
     weekly_technique: Mapped["Technique | None"] = relationship(

@@ -529,6 +529,37 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
+  /// Atualiza o aviso ao abrir a home (título, corpo, URL e ativo). Strings vazias viram `null` na API.
+  Future<Academy> updateAcademyLoginNotice(
+    String id, {
+    required String? loginNoticeTitle,
+    required String? loginNoticeBody,
+    required String? loginNoticeUrl,
+    required bool loginNoticeActive,
+  }) async {
+    String? norm(String? s) {
+      final t = s?.trim();
+      return (t == null || t.isEmpty) ? null : t;
+    }
+
+    final body = <String, dynamic>{
+      'login_notice_title': norm(loginNoticeTitle),
+      'login_notice_body': norm(loginNoticeBody),
+      'login_notice_url': norm(loginNoticeUrl),
+      'login_notice_active': loginNoticeActive,
+    };
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/academies/$id'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/academies');
+    _invalidateHomeHeaderCache();
+    return Academy.fromJson(data! as Map<String, dynamic>);
+  }
+
   Future<void> deleteAcademy(String id) async {
     final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);

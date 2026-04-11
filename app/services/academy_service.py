@@ -210,6 +210,14 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
             setattr(academy, key, clamp_reward_points(int(value)))
         elif key in visibility_keys and value is not None:
             setattr(academy, key, bool(value))
+        elif key == "login_notice_title":
+            academy.login_notice_title = value.strip() if value and str(value).strip() else None
+        elif key == "login_notice_body":
+            academy.login_notice_body = value.strip() if value and str(value).strip() else None
+        elif key == "login_notice_url":
+            academy.login_notice_url = value.strip() if value and str(value).strip() else None
+        elif key == "login_notice_active" and value is not None:
+            academy.login_notice_active = bool(value)
     if (technique_keys | multiplier_keys) & set(kwargs.keys()):
         t1 = academy.weekly_technique_id
         t2 = academy.weekly_technique_2_id
