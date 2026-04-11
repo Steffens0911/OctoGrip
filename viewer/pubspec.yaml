@@ -1,7 +1,7 @@
 name: viewer
 description: OctoGrip — app para academias de Jiu-Jitsu (campo de treino, academia e admin).
 publish_to: 'none'
-version: 1.2.0+7
+version: 1.2.0+8
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

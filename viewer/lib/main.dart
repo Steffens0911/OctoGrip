@@ -314,8 +314,8 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento'),
-        // Ordem: ícones menos críticos primeiro (lado do título); ao faltar largura o
-        // [ClipRect] corta pela esquerda do grupo. +/− ficam no fim (borda direita) para não sumirem.
+        // Último item da lista = extremo direito do ecrã → [Sair] fica na borda direita.
+        // +/− antes do logout; em ecrãs muito estreitos o [ClipRect] pode cortar pela esquerda do grupo.
         actions: [
           if (auth.isRealUserAdmin)
             IconButton(
@@ -336,11 +336,6 @@ class _MainShellState extends State<MainShell> {
             ),
             onPressed: () => widget.onThemeToggle(context),
             tooltip: 'Alternar tema claro/escuro',
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout_outlined),
-            onPressed: widget.onLogout,
-            tooltip: 'Sair',
           ),
           IconButton(
             // onPressed: null deixa o ícone com opacidade de desativado — no AppBar escuro o "−" some.
@@ -372,6 +367,11 @@ class _MainShellState extends State<MainShell> {
                     alpha: widget.textScale >= TextScalePrefs.max ? 0.45 : 1,
                   ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_outlined),
+            onPressed: widget.onLogout,
+            tooltip: 'Sair',
           ),
         ],
       ),
