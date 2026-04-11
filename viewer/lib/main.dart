@@ -343,18 +343,35 @@ class _MainShellState extends State<MainShell> {
             tooltip: 'Sair',
           ),
           IconButton(
-            icon: const Icon(Icons.remove),
-            onPressed: widget.textScale <= TextScalePrefs.min
-                ? null
-                : widget.onTextScaleDecrease,
-            tooltip: 'Diminuir tamanho do texto',
+            // onPressed: null deixa o ícone com opacidade de desativado — no AppBar escuro o "−" some.
+            tooltip: widget.textScale <= TextScalePrefs.min
+                ? 'Tamanho mínimo (não pode diminuir mais)'
+                : 'Diminuir tamanho do texto',
+            onPressed: () {
+              if (widget.textScale <= TextScalePrefs.min) return;
+              widget.onTextScaleDecrease();
+            },
+            icon: Icon(
+              Icons.remove,
+              color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: widget.textScale <= TextScalePrefs.min ? 0.45 : 1,
+                  ),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: widget.textScale >= TextScalePrefs.max
-                ? null
-                : widget.onTextScaleIncrease,
-            tooltip: 'Aumentar tamanho do texto',
+            tooltip: widget.textScale >= TextScalePrefs.max
+                ? 'Tamanho máximo (não pode aumentar mais)'
+                : 'Aumentar tamanho do texto',
+            onPressed: () {
+              if (widget.textScale >= TextScalePrefs.max) return;
+              widget.onTextScaleIncrease();
+            },
+            icon: Icon(
+              Icons.add,
+              color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: widget.textScale >= TextScalePrefs.max ? 0.45 : 1,
+                  ),
+            ),
           ),
         ],
       ),
