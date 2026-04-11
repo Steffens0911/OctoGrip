@@ -50,8 +50,9 @@ class ApiService {
   static const _timeout = Duration(seconds: 15);
 
   final Map<String, _CacheEntry> _getCache = {};
-  static const int _cacheTtlShort = 30; // mission_today, week, pending count
+  static const int _cacheTtlShort = 45; // mission_today, week, pending count (pull-to-refresh pode servir cache válido)
   static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, users
+  static const int _cacheTtlHeader = 45; // snapshot do header da home
 
   /// Evita vários GET simultâneos ao mesmo endpoint (reduz pressão no browser / ERR_INSUFFICIENT_RESOURCES).
   Future<List<TrainingVideo>>? _inFlightTrainingVideosToday;
@@ -85,6 +86,10 @@ class ApiService {
       return;
     }
     _getCache.removeWhere((k, _) => k.startsWith(prefix));
+  }
+
+  void _invalidateHomeHeaderCache() {
+    invalidateCache('GET:$baseUrl/me/header_stats');
   }
 
   Future<http.Response> _req(Future<http.Response> f) => f.timeout(_timeout);
@@ -178,7 +183,20 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
+    _invalidateHomeHeaderCache();
     return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Snapshot agregado do header/home do usuário atual.
+  /// Inclui nível persistido, XP no nível e configurações visuais da academia.
+  Future<Map<String, dynamic>> getMeHeaderStats() async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/me/header_stats'),
+      _cacheTtlHeader,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
   }
 
   Future<dynamic> _decodeResponse(http.Response r) async {
@@ -432,6 +450,7 @@ class ApiService {
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
+    _invalidateHomeHeaderCache();
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -462,6 +481,7 @@ class ApiService {
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
+    _invalidateHomeHeaderCache();
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -505,6 +525,7 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/academies');
+    _invalidateHomeHeaderCache();
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1137,6 +1158,7 @@ class ApiService {
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/mission_today');
     invalidateCache('GET:$baseUrl/executions');
+    _invalidateHomeHeaderCache();
     return data! as Map<String, dynamic>;
   }
 
@@ -1155,6 +1177,7 @@ class ApiService {
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/mission_today');
     invalidateCache('GET:$baseUrl/executions');
+    _invalidateHomeHeaderCache();
     return data! as Map<String, dynamic>;
   }
 
@@ -1597,6 +1620,7 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = (data ?? {}) as Map<String, dynamic>;
+    _invalidateHomeHeaderCache();
     return TrainingVideoCompletionResult.fromJson(map);
   }
 

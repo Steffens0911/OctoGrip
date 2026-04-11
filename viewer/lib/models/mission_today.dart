@@ -53,6 +53,25 @@ class MissionToday {
       multiplier: json['multiplier'] as int? ?? 1,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        if (missionId != null) 'mission_id': missionId,
+        if (techniqueId != null) 'technique_id': techniqueId,
+        if (lessonId != null) 'lesson_id': lessonId,
+        'mission_title': missionTitle,
+        'lesson_title': lessonTitle,
+        'description': description,
+        'video_url': videoUrl,
+        'position_name': positionName,
+        'technique_name': techniqueName,
+        if (objective != null) 'objective': objective,
+        if (estimatedDurationSeconds != null)
+          'estimated_duration_seconds': estimatedDurationSeconds,
+        if (weeklyTheme != null) 'weekly_theme': weeklyTheme,
+        'is_review': isReview,
+        'already_completed': alreadyCompleted,
+        'multiplier': multiplier,
+      };
 }
 
 /// Um slot da semana (Seg–Ter, Qua–Qui, Sex–Dom) com a missão opcional. GET /mission_today/week.
@@ -69,6 +88,11 @@ class MissionWeekSlot {
       mission: m != null ? MissionToday.fromJson(m as Map<String, dynamic>) : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'period_label': periodLabel,
+        if (mission != null) 'mission': mission!.toJson(),
+      };
 }
 
 /// Resposta GET /mission_today/week — lista das 3 missões da semana.
@@ -83,4 +107,8 @@ class MissionWeek {
       entries: list.map((e) => MissionWeekSlot.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'entries': entries.map((e) => e.toJson()).toList(),
+      };
 }

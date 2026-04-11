@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/student_home_snapshot_store.dart';
 
 const _keyToken = 'auth_token';
 const _keyUser = 'auth_user';
@@ -97,6 +98,7 @@ class AuthService extends ChangeNotifier {
     _currentUser = null;
     _randomPartnerShown = false;
     await _clearStorage();
+    await StudentHomeSnapshotStore.clearAll();
     ApiService().invalidateCache();
     notifyListeners();
   }

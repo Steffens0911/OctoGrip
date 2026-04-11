@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -20,6 +22,7 @@ import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/student_home_snapshot_store.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
@@ -30,6 +33,7 @@ import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
+import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -52,6 +56,7 @@ class StudentHomeScreen extends StatefulWidget {
 class _StudentHomeScreenState extends State<StudentHomeScreen>
     with WidgetsBindingObserver {
   final _api = ApiService();
+  final _snapshotStore = StudentHomeSnapshotStore();
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
   int? _userPoints;
@@ -77,6 +82,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _showGlobalSupporters = true;
   /// Missão recém-concluída (pulso no [WeeklyMissionPath]); limpo após animar.
   String? _celebrateMissionId;
+  /// Rede a sincronizar (header + missões, etc.): barra no topo e skeletons opcionais.
+  bool _syncingHomeData = false;
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
   static String _levelFromGraduation(String? g) {
@@ -127,7 +134,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   void didUpdateWidget(covariant StudentHomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.refreshTrigger != widget.refreshTrigger) {
-      _load();
+      _load(silent: true);
     }
   }
 
@@ -139,10 +146,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       // Agrupar carregamentos para evitar múltiplos setState (inclui quadro de horários)
       Future.wait([
         _loadMissionWeekWith(currentUser.academyId, level),
-        _loadUserPointsWith(currentUser.id),
+        _loadHeaderStatsWith(),
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
-        _loadAcademyLogoWith(currentUser.academyId),
       ]).then((_) {
         if (mounted) {
           setState(() => _selectedUser = AuthService().currentUser);
@@ -151,23 +157,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  Future<void> _load() async {
+  /// [silent]: não mostra estado de “carregamento inicial” nem limpa celebração
+  /// (ex.: voltar à aba Início, pull-to-refresh). Mantém TTL/cache do [ApiService].
+  Future<void> _load({bool silent = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-      _celebrateMissionId = null;
-      _missionWeek = null;
-      _academyLogoUrl = null;
-      _academyScheduleImageUrl = null;
-      _showTrophies = true;
-      _showPartners = true;
-      _showSchedule = true;
-      _showGlobalSupporters = true;
-      _dailyVideo = null;
-      _dailyVideoPoints = 0;
-      _dailyVideoCompleted = false;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+        _celebrateMissionId = null;
+      });
+    }
     try {
       await AuthService().refreshMe();
     } catch (_) {
@@ -175,37 +175,92 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
     final currentUser = AuthService().currentUser;
     if (!mounted) return;
-    setState(() => _selectedUser = currentUser);
+    setState(() {
+      _selectedUser = currentUser;
+      if (currentUser != null) {
+        _syncingHomeData = true;
+      }
+    });
     if (currentUser == null) {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _syncingHomeData = false;
         _pendingConfirmationsCount = 0;
       });
       widget.onPendingConfirmationsCountChanged?.call(0);
       return;
     }
+
+    final level = _levelFromGraduation(currentUser.graduation);
+    final shouldHydrateDisk = _missionWeek == null ||
+        _userLevel == null ||
+        (_academyLogoUrl == null || _academyLogoUrl!.isEmpty);
+
+    if (shouldHydrateDisk) {
+      final snap = await _snapshotStore.read(
+        userId: currentUser.id,
+        academyId: currentUser.academyId,
+        levelKey: level,
+      );
+      if (snap != null && mounted) {
+        _applyHeaderStatsMap(snap.header);
+        setState(() {
+          _missionWeek = snap.week;
+          if (!silent) _loading = false;
+        });
+        final logoUrl =
+            (snap.header['academy'] as Map<String, dynamic>?)?['logo_url']
+                as String?;
+        unawaited(_precacheAcademyLogo(logoUrl));
+      }
+    }
+
     try {
-      final level = _levelFromGraduation(currentUser.graduation);
+      Map<String, dynamic>? headerMap;
+      MissionWeek? weekForSnapshot;
+
       await Future.wait([
-        _loadMissionWeekWith(currentUser.academyId, level),
-        _loadUserPointsWith(currentUser.id),
+        _loadHeaderStatsWith().then((m) {
+          headerMap = m;
+        }),
+        _loadMissionWeekWith(currentUser.academyId, level).then((w) {
+          weekForSnapshot = w;
+        }),
         _loadCollectiveGoalWith(currentUser.academyId),
         _loadPendingConfirmationsWith(),
-        _loadAcademyLogoWith(currentUser.academyId),
-        _loadDailyVideo(),
       ]);
+
+      if (headerMap == null) {
+        await Future.wait([
+          _loadUserPointsWith(currentUser.id),
+          _loadAcademyLogoWith(currentUser.academyId),
+        ]);
+      }
+
       if (mounted) {
         setState(() {
           _selectedUser = AuthService().currentUser;
           _loading = false;
+          _syncingHomeData = false;
         });
+        if (headerMap != null && weekForSnapshot != null) {
+          await _snapshotStore.write(
+            userId: currentUser.id,
+            academyId: currentUser.academyId,
+            levelKey: level,
+            header: headerMap!,
+            week: weekForSnapshot!,
+          );
+        }
+        unawaited(_loadDailyVideo());
         await _runPostLoadNudges();
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _loading = false;
+          _syncingHomeData = false;
           _error = userFacingMessage(e);
         });
       }
@@ -307,7 +362,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Future<void> _loadAcademyLogoWith(String? academyId) async {
     if (academyId == null || academyId.isEmpty) return;
     try {
-      final academy = await _api.getAcademyFresh(academyId);
+      // Fallback do fluxo otimizado: preferir cache para reduzir latência percebida.
+      final academy = await _api.getAcademy(academyId);
       if (!mounted) return;
       setState(() {
         _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
@@ -333,7 +389,59 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
-  Future<void> _loadMissionWeekWith(String? academyId, String level) async {
+  String? _absoluteMediaUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.isEmpty) return null;
+    return rawUrl.startsWith('/') ? '${_api.baseUrl}$rawUrl' : rawUrl;
+  }
+
+  Future<void> _precacheAcademyLogo(String? rawUrl) async {
+    final url = _absoluteMediaUrl(rawUrl);
+    if (url == null) return;
+    try {
+      await precacheImage(NetworkImage(url), context);
+    } catch (_) {
+      // Falha de pre-cache não deve bloquear a renderização.
+    }
+  }
+
+  void _applyHeaderStatsMap(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final academy = data['academy'] as Map<String, dynamic>?;
+    final logoUrl = academy?['logo_url'] as String?;
+    setState(() {
+      _userLevel = (data['reward_level'] as num?)?.toInt() ?? _userLevel ?? 1;
+      _userPoints =
+          (data['reward_level_points'] as num?)?.toInt() ?? _userPoints ?? 0;
+      _nextLevelThreshold =
+          (data['next_level_threshold'] as num?)?.toInt() ??
+              _nextLevelThreshold ??
+              kBaseLevelThreshold;
+      _academyLogoUrl = logoUrl;
+      _academyScheduleImageUrl = academy?['schedule_image_url'] as String?;
+      _showTrophies = academy?['show_trophies'] as bool? ?? true;
+      _showPartners = academy?['show_partners'] as bool? ?? true;
+      _showSchedule = academy?['show_schedule'] as bool? ?? true;
+      _showGlobalSupporters =
+          academy?['show_global_supporters'] as bool? ?? true;
+    });
+  }
+
+  /// Retorna o mapa bruto em sucesso (para persistir snapshot); `null` se falhar.
+  Future<Map<String, dynamic>?> _loadHeaderStatsWith() async {
+    try {
+      final data = await _api.getMeHeaderStats();
+      if (!mounted) return null;
+      final academy = data['academy'] as Map<String, dynamic>?;
+      final logoUrl = academy?['logo_url'] as String?;
+      _applyHeaderStatsMap(data);
+      unawaited(_precacheAcademyLogo(logoUrl));
+      return data;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<MissionWeek?> _loadMissionWeekWith(String? academyId, String level) async {
     try {
       final week =
           await _api.getMissionWeek(academyId: academyId, level: level);
@@ -345,6 +453,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           }
         });
       }
+      return week;
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -354,6 +463,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           }
         });
       }
+      return null;
     }
   }
 
@@ -434,6 +544,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadUserPoints() async {
     if (_selectedUser == null) return;
+    final byHeader = await _loadHeaderStatsWith();
+    if (byHeader != null) return;
     try {
       final res = await _api.getUserPoints(_selectedUser!.id);
       final p = levelProgressFromUserPointsMap(res);
@@ -605,13 +717,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
     final u = _selectedUser;
     final screenPadding = AppTheme.screenPadding(context);
+    final showHeaderSkeleton =
+        _syncingHomeData && _userLevel == null && u != null;
+    final showMissionSkeleton = _syncingHomeData &&
+        _missionWeek == null &&
+        u != null &&
+        (u.academyId != null && u.academyId!.isNotEmpty);
 
     return Scaffold(
       body: Stack(
         children: [
           const _FantasyBackground(),
           RefreshIndicator(
-            onRefresh: _load,
+            onRefresh: () => _load(silent: true),
             color: Theme.of(context).colorScheme.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -619,22 +737,25 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  HeaderWidget(
-                    userName: u?.name ?? u?.email ?? 'Perin',
-                    userBelt: _faixaLabel(u?.graduation),
-                    userLevel: _userLevel ?? 1,
-                    currentXp: _userPoints ?? 0,
-                    maxXp: _nextLevelThreshold ?? kBaseLevelThreshold,
-                    academyLogoUrl: _academyLogoUrl != null &&
-                            _academyLogoUrl!.isNotEmpty
-                        ? (_academyLogoUrl!.startsWith('/')
-                            ? '${_api.baseUrl}$_academyLogoUrl'
-                            : _academyLogoUrl!)
-                        : null,
-                    dailyVideoPoints: _dailyVideoPoints,
-                    dailyVideoCompleted: _dailyVideoCompleted,
-                    onDailyVideoTap: _onDailyVideoTap,
-                  ),
+                  if (showHeaderSkeleton)
+                    const HomeHeaderLoadingSkeleton()
+                  else
+                    HeaderWidget(
+                      userName: u?.name ?? u?.email ?? 'Perin',
+                      userBelt: _faixaLabel(u?.graduation),
+                      userLevel: _userLevel ?? 1,
+                      currentXp: _userPoints ?? 0,
+                      maxXp: _nextLevelThreshold ?? kBaseLevelThreshold,
+                      academyLogoUrl: _academyLogoUrl != null &&
+                              _academyLogoUrl!.isNotEmpty
+                          ? (_academyLogoUrl!.startsWith('/')
+                              ? '${_api.baseUrl}$_academyLogoUrl'
+                              : _academyLogoUrl!)
+                          : null,
+                      dailyVideoPoints: _dailyVideoPoints,
+                      dailyVideoCompleted: _dailyVideoCompleted,
+                      onDailyVideoTap: _onDailyVideoTap,
+                    ),
                   if (_pendingConfirmationsCount > 0 &&
                       !_pendingBannerDismissed &&
                       u != null) ...[
@@ -655,7 +776,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _buildCollectiveGoalCard(),
                     const SizedBox(height: 14),
                   ],
-                  if (_missionWeek != null &&
+                  if (showMissionSkeleton) ...[
+                    const HomeMissionSectionSkeleton(),
+                    const SizedBox(height: 14),
+                  ] else if (_missionWeek != null &&
                       _missionWeek!.entries.isNotEmpty) ...[
                     _buildWeeklyMissionPathSection(),
                     const SizedBox(height: 14),
@@ -717,6 +841,26 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
           ),
+          if (u != null && _syncingHomeData)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Semantics(
+                  label: 'A sincronizar dados',
+                  child: LinearProgressIndicator(
+                    minHeight: 3,
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.35),
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1011,6 +1155,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   Widget _buildMainAccordion() {
     final missionHint = _missionWeek == null &&
             !_loading &&
+            !_syncingHomeData &&
             _selectedUser != null
         ? Container(
             padding: const EdgeInsets.all(20),

@@ -6,10 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user
 from app.database import get_db
 from app.models import User
+from app.schemas.me_header import MeHeaderStatsRead
 from app.schemas.training_video import (
     TrainingVideoCompletionResponse,
     TrainingVideoStudentRead,
 )
+from app.services.me_header_service import get_me_header_stats
 from app.services.training_video_service import (
     complete_training_video_for_user,
     get_training_videos_for_user_today,
@@ -17,6 +19,15 @@ from app.services.training_video_service import (
 )
 
 router = APIRouter()
+
+
+@router.get("/header_stats", response_model=MeHeaderStatsRead)
+async def my_header_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Snapshot agregado do header/home do usuário autenticado."""
+    return await get_me_header_stats(db, current_user=current_user)
 
 
 @router.get("/training_videos/today", response_model=list[TrainingVideoStudentRead])

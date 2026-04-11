@@ -22,19 +22,20 @@ Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
 1. [Health](#health)
 2. [Academias](#academias)
 3. [Autenticação (perfil)](#autenticação-perfil)
-4. [Usuários](#usuários)
-5. [Lições](#lições)
-6. [Técnicas e Posições](#técnicas-e-posições)
-7. [Missões](#missões)
-8. [Missão do dia / Semana](#missão-do-dia--semana)
-9. [Conclusão de lição](#conclusão-de-lição)
-10. [Conclusão de missão](#conclusão-de-missão)
-11. [Histórico de missões](#histórico-de-missões)
-12. [Feedback de treino](#feedback-de-treino)
-13. [Métricas](#métricas)
-14. [Relatórios](#relatórios)
-15. [Admin — backup da base](#admin--backup-da-base)
-16. [Exceções HTTP](#exceções-http)
+4. [Me (home e vídeos)](#me-home-e-vídeos)
+5. [Usuários](#usuários)
+6. [Lições](#lições)
+7. [Técnicas e Posições](#técnicas-e-posições)
+8. [Missões](#missões)
+9. [Missão do dia / Semana](#missão-do-dia--semana)
+10. [Conclusão de lição](#conclusão-de-lição)
+11. [Conclusão de missão](#conclusão-de-missão)
+12. [Histórico de missões](#histórico-de-missões)
+13. [Feedback de treino](#feedback-de-treino)
+14. [Métricas](#métricas)
+15. [Relatórios](#relatórios)
+16. [Admin — backup da base](#admin--backup-da-base)
+17. [Exceções HTTP](#exceções-http)
 
 ---
 
@@ -92,6 +93,49 @@ Base: `/auth`.
 - **`streak_bonus_points`** (inteiro, default `0`): pontos extra creditados neste login quando a sequência de dias consecutivos (UTC) atinge um múltiplo configurado (por defeito **7**, **14**, **21**…). Os pontos somam-se em `points_adjustment` e o nível é recalculado. Variáveis de ambiente: `LOGIN_STREAK_BONUS_POINTS` (default `50`), `LOGIN_STREAK_BONUS_INTERVAL_DAYS` (default `7`). O bónus só corre quando o contador de sequência **sobe exatamente 1** neste login (evita duplicar no segundo pedido no mesmo dia).
 
 **`login_streak_days`** (inteiro) em **GET/PATCH /auth/me**: dias consecutivos com login bem-sucedido (calendário **UTC**). Cada `POST /auth/login` regista o dia atual. Se hoje ainda não houve login mas ontem houve, a sequência mantém-se até ao fim do dia UTC. Em **GET /users** e **GET /users/{id}** o mesmo campo pode aparecer como **0** porque o valor não é calculado nessas listagens — o viewer do aluno deve usar **`/auth/me`**.
+
+---
+
+## Me (home e vídeos)
+
+Base: `/me`.
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET    | /me/header_stats | Snapshot agregado do cabeçalho da home (nível, XP no nível, academia) |
+| GET    | /me/training_videos/today | Vídeos de treino ativos para o usuário no dia |
+| POST   | /me/training_videos/{video_id}/complete | Conclusão diária de vídeo de treino |
+
+### GET /me/header_stats
+
+Retorna um payload leve para reduzir latência do cabeçalho da home do aluno.
+
+- Usa dados persistidos do usuário (`reward_level`, `reward_level_points`) e calcula `next_level_threshold` a partir da regra de leveling.
+- Inclui resumo de visibilidade/branding da academia para evitar chamadas separadas na inicialização da home.
+- Requer autenticação Bearer.
+- No viewer Flutter, o cliente mantém cache em memória (TTL ~**45s**) e pode persistir o último JSON em `SharedPreferences` para hidratação após reload; invalida após mutações que alteram pontos ou o perfil visível na home.
+
+**Resposta (200):**
+```json
+{
+  "user_id": "uuid",
+  "reward_level": 3,
+  "reward_level_points": 17,
+  "next_level_threshold": 72,
+  "academy": {
+    "id": "uuid",
+    "name": "Academia Exemplo",
+    "logo_url": "/media/academies/logo.png",
+    "schedule_image_url": "/media/academies/schedule.png",
+    "show_trophies": true,
+    "show_partners": true,
+    "show_schedule": true,
+    "show_global_supporters": true
+  }
+}
+```
+
+`academy` pode ser `null` quando o usuário não está vinculado a nenhuma academia.
 
 ---
 
