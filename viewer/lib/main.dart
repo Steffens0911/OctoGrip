@@ -314,6 +314,8 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento'),
+        // Ordem: ícones menos críticos primeiro (lado do título); ao faltar largura o
+        // [ClipRect] corta pela esquerda do grupo. +/− ficam no fim (borda direita) para não sumirem.
         actions: [
           if (auth.isRealUserAdmin)
             IconButton(
@@ -321,21 +323,6 @@ class _MainShellState extends State<MainShell> {
               onPressed: _showImpersonateDialog,
               tooltip: 'Atuar como',
             ),
-          IconButton(
-            // Ícones text_*_outlined usam codepoints que o subset web (tree-shake) pode omitir — ficam invisíveis.
-            icon: const Icon(Icons.remove),
-            onPressed: widget.textScale <= TextScalePrefs.min
-                ? null
-                : widget.onTextScaleDecrease,
-            tooltip: 'Diminuir tamanho do texto',
-          ),
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: widget.textScale >= TextScalePrefs.max
-                ? null
-                : widget.onTextScaleIncrease,
-            tooltip: 'Aumentar tamanho do texto',
-          ),
           IconButton(
             icon: const Icon(Icons.text_fields),
             onPressed: widget.onFontToggle,
@@ -354,6 +341,20 @@ class _MainShellState extends State<MainShell> {
             icon: const Icon(Icons.logout_outlined),
             onPressed: widget.onLogout,
             tooltip: 'Sair',
+          ),
+          IconButton(
+            icon: const Icon(Icons.remove),
+            onPressed: widget.textScale <= TextScalePrefs.min
+                ? null
+                : widget.onTextScaleDecrease,
+            tooltip: 'Diminuir tamanho do texto',
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: widget.textScale >= TextScalePrefs.max
+                ? null
+                : widget.onTextScaleIncrease,
+            tooltip: 'Aumentar tamanho do texto',
           ),
         ],
       ),
