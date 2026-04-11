@@ -322,14 +322,15 @@ class _MainShellState extends State<MainShell> {
               tooltip: 'Atuar como',
             ),
           IconButton(
-            icon: const Icon(Icons.text_decrease_outlined),
+            // Ícones text_*_outlined usam codepoints que o subset web (tree-shake) pode omitir — ficam invisíveis.
+            icon: const Icon(Icons.remove),
             onPressed: widget.textScale <= TextScalePrefs.min
                 ? null
                 : widget.onTextScaleDecrease,
             tooltip: 'Diminuir tamanho do texto',
           ),
           IconButton(
-            icon: const Icon(Icons.text_increase_outlined),
+            icon: const Icon(Icons.add),
             onPressed: widget.textScale >= TextScalePrefs.max
                 ? null
                 : widget.onTextScaleIncrease,
