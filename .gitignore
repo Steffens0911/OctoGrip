@@ -1,5 +1,7 @@
 # Ambiente e secrets
 .env
+# Chave JSON da conta de serviço Firebase (criar manualmente; ver .env)
+secrets/*.json
 .venv/
 venv/
 env/

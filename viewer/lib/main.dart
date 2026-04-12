@@ -1,3 +1,5 @@
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
@@ -14,12 +16,22 @@ import 'package:viewer/screens/auth/login_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS)) {
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  }
   await Hive.initFlutter();
   await AuthService().init();
+  await PushNotificationService.init();
+  if (AuthService().isLoggedIn) {
+    await PushNotificationService.registerTokenIfLoggedIn();
+  }
   runApp(
     ProviderScope(
       child: ChangeNotifierProvider<AuthService>.value(

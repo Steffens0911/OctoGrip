@@ -187,6 +187,54 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
+  /// Regista token FCM para o utilizador autenticado (Android/iOS).
+  Future<void> registerMyPushToken(String token, String platform) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/me/push_token'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'token': token, 'platform': platform}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Remove todos os tokens FCM do utilizador (logout).
+  Future<void> deleteAllMyPushTokens() async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/me/push_tokens'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Envia notificação push a utilizadores da academia com app e token registados.
+  Future<({int targetTokens, int sent, int failed})> sendAcademyPushNotification(
+    String academyId, {
+    required String title,
+    required String body,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/push_notification'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'title': title, 'body': body}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final m = data! as Map<String, dynamic>;
+    int n(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return 0;
+    }
+
+    return (
+      targetTokens: n(m['target_tokens']),
+      sent: n(m['sent']),
+      failed: n(m['failed']),
+    );
+  }
+
   /// Snapshot agregado do header/home do usuário atual.
   /// Inclui nível persistido, XP no nível e configurações visuais da academia.
   Future<Map<String, dynamic>> getMeHeaderStats() async {

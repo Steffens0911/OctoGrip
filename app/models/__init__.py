@@ -18,6 +18,7 @@ from app.models.collective_goal import CollectiveGoal
 from app.models.trophy import Trophy
 from app.models.partner import Partner
 from app.models.training_video import TrainingVideo, TrainingVideoDailyView
+from app.models.user_device_token import UserDeviceToken
 
 __all__ = [
     "Base",
@@ -37,7 +38,8 @@ __all__ = [
     "TechniqueExecution",
     "CollectiveGoal",
     "Trophy",
-  "Partner",
-  "TrainingVideo",
-  "TrainingVideoDailyView",
+    "Partner",
+    "TrainingVideo",
+    "TrainingVideoDailyView",
+    "UserDeviceToken",
 ]

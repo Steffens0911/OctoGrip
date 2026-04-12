@@ -14,6 +14,7 @@ from app.routes import (
     health,
     lesson_complete,
     lessons,
+    me_push,
     me_training_videos,
     metrics,
     mission,
@@ -55,3 +56,4 @@ api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(training_videos.router, prefix="/training_videos", tags=["training_videos"])
 api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
+api_router.include_router(me_push.router, prefix="/me", tags=["me"])

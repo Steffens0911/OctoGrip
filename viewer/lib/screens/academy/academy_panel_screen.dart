@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
@@ -81,7 +82,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count += 3; // Cards extras: Usuários da academia + Técnicas da academia + Vídeos de treinamento
+      count +=
+          4; // Usuários + Técnicas + Vídeos + Aviso push
     }
     return count;
   }
@@ -175,10 +177,48 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
+    } else if (isManagerOrProfessor && index == 3) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.notifications_active_rounded,
+                color: AppTheme.primary),
+          ),
+          title: const Text(
+            'Aviso à academia (push)',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Enviar notificação para quem tem o app e está na sua academia',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            final academyId = AuthService().currentUser?.academyId;
+            if (academyId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Seu usuário não está vinculado a uma academia.',
+                  ),
+                ),
+              );
+              return;
+            }
+            Navigator.push<void>(
+              context,
+              MaterialPageRoute<void>(
+                builder: (context) => const AcademyPushNotificationScreen(),
+              ),
+            );
+          },
+        ),
+      );
     }
 
-    // Três cards fixos no topo (0–2); academias começam no índice 3.
-    final academyIndex = isManagerOrProfessor ? index - 3 : index;
+    // Quatro cards fixos no topo (0–3); academias começam no índice 4.
+    final academyIndex = isManagerOrProfessor ? index - 4 : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();
     }

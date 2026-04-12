@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/student_home_snapshot_store.dart';
 
 const _keyToken = 'auth_token';
@@ -97,9 +98,11 @@ class AuthService extends ChangeNotifier {
     _saveToStorage(token, user);
     SharedPreferences.getInstance().then((p) => p.remove(_keyImpersonate));
     notifyListeners();
+    PushNotificationService.registerTokenIfLoggedIn();
   }
 
   Future<void> logout({bool notifyInvalidated = false}) async {
+    await PushNotificationService.unregister();
     _impersonatedUserId = null;
     _effectiveUser = null;
     _token = null;

@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     # Ambiente (development/production)
     ENVIRONMENT: str = "development"
 
+    # Firebase Cloud Messaging (notificações push; opcional)
+    FIREBASE_PROJECT_ID: str | None = None
+    FIREBASE_SERVICE_ACCOUNT_PATH: str | None = None
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:

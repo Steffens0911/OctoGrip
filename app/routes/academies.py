@@ -2,9 +2,9 @@
 import json
 import urllib.parse
 import urllib.request
-from uuid import UUID
 from pathlib import Path
 from typing import Final
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import PlainTextResponse
@@ -12,9 +12,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import AcademyNotFoundError, ForbiddenError
+from app.config import settings
 from app.core.auth_deps import get_current_user
-from app.core.role_deps import require_admin, require_admin_or_academy_access, require_read_access, verify_academy_access
+from app.core.exceptions import AcademyNotFoundError, AppError, ForbiddenError
+from app.core.role_deps import (
+    require_admin,
+    require_admin_or_academy_access,
+    require_read_access,
+    require_write_access,
+    verify_academy_access,
+)
 from app.database import get_db
 from app.models import Academy, CollectiveGoal, User
 from app.schemas.academy import (
@@ -32,6 +39,7 @@ from app.schemas.collective_goal import (
     CollectiveGoalCurrentResponse,
     CollectiveGoalRead,
 )
+from app.schemas.push_notification import AcademyPushNotifyRequest, AcademyPushNotifyResponse
 from app.services.academy_service import (
     create_academy,
     delete_academy,
@@ -39,18 +47,19 @@ from app.services.academy_service import (
     get_academy_difficulties,
     get_academy_ranking,
     get_academy_weekly_report,
-    list_academies,
     reset_academy_missions,
     update_academy,
 )
-from app.services.execution_service import batch_total_points_for_users
-from app.services.user_service import list_users
 from app.services.collective_goal_service import (
     count_executions_for_goal,
     create_goal,
     get_current_goal_for_academy,
     list_goals_for_academy,
 )
+from app.services.execution_service import batch_total_points_for_users
+from app.services.fcm_service import send_fcm_data_message
+from app.services.push_token_service import delete_device_token, list_fcm_tokens_for_academy
+from app.services.user_service import list_users
 
 # Mesmo diretório base de app.main: raiz do projeto (/app) dentro do container.
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
@@ -496,6 +505,56 @@ async def collective_goal_current(
         goal=_goal_to_read(goal),
         current_count=current,
         target_count=goal.target_count,
+    )
+
+
+@router.post("/{academy_id}/push_notification", response_model=AcademyPushNotifyResponse)
+async def academy_send_push_notification(
+    academy_id: UUID,
+    body: AcademyPushNotifyRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """
+    Envia notificação push (barra do sistema) a todos os utilizadores da academia
+    com token FCM registado. Requer Firebase configurado no servidor.
+    """
+    if await get_academy(db, academy_id) is None:
+        raise AcademyNotFoundError()
+    verify_academy_access(current_user, str(academy_id))
+
+    if not settings.FIREBASE_PROJECT_ID or not settings.FIREBASE_SERVICE_ACCOUNT_PATH:
+        raise AppError(
+            "Notificações push não estão configuradas (FIREBASE_PROJECT_ID e "
+            "FIREBASE_SERVICE_ACCOUNT_PATH no servidor).",
+            status_code=503,
+        )
+
+    tokens = await list_fcm_tokens_for_academy(db, academy_id=academy_id)
+    if not tokens:
+        return AcademyPushNotifyResponse(target_tokens=0, sent=0, failed=0)
+
+    sent = 0
+    failed = 0
+    for device_token in tokens:
+        ok, drop = await send_fcm_data_message(
+            project_id=settings.FIREBASE_PROJECT_ID,
+            service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+            device_token=device_token,
+            title=body.title.strip(),
+            body=body.body.strip(),
+        )
+        if ok:
+            sent += 1
+        else:
+            failed += 1
+            if drop:
+                await delete_device_token(db, fcm_token=device_token)
+
+    return AcademyPushNotifyResponse(
+        target_tokens=len(tokens),
+        sent=sent,
+        failed=failed,
     )
 
 

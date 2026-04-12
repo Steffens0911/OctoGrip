@@ -104,3 +104,9 @@ class User(Base, UUIDMixin):
         back_populates="user",
         lazy="selectin",
     )
+    device_tokens: Mapped[list["UserDeviceToken"]] = relationship(
+        "UserDeviceToken",
+        back_populates="user",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+    )

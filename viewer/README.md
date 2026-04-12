@@ -60,6 +60,10 @@ Por padrão o app usa `http://localhost:8000`. Para alterar (ex.: emulador Andro
 - **Android emulador:** use `http://10.0.2.2:8000` como base.
 - **Dispositivo físico:** use o IP da máquina onde a API está (ex.: `http://192.168.1.10:8000`).
 
+## Notificações push (FCM)
+
+Gerente/professor pode enviar **Aviso à academia** no painel Academia. No telemóvel (Android/iOS) é preciso configurar o Firebase e substituir `lib/firebase_options.dart` (ex.: `flutterfire configure`). No servidor da API: `FIREBASE_PROJECT_ID` e `FIREBASE_SERVICE_ACCOUNT_PATH`. Ver [docs/PUSH_NOTIFICATIONS.md](../docs/PUSH_NOTIFICATIONS.md).
+
 ## Navegação
 
 - **Menu (drawer):** Início | **Administração**
