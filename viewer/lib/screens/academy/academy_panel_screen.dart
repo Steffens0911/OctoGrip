@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
+// ignore: unused_import — necessário quando _kAcademyPushNotificationUiEnabled for true
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
@@ -10,6 +11,9 @@ import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
+
+/// Card **Aviso à academia (push)** no painel. `false` = oculto até implementação final.
+const bool _kAcademyPushNotificationUiEnabled = false;
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {
@@ -82,8 +86,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count +=
-          4; // Usuários + Técnicas + Vídeos + Aviso push
+      count += _kAcademyPushNotificationUiEnabled ? 4 : 3; // + Aviso push se activo
     }
     return count;
   }
@@ -177,7 +180,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
-    } else if (isManagerOrProfessor && index == 3) {
+    } else if (isManagerOrProfessor &&
+        _kAcademyPushNotificationUiEnabled &&
+        index == 3) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -217,8 +222,10 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     }
 
-    // Quatro cards fixos no topo (0–3); academias começam no índice 4.
-    final academyIndex = isManagerOrProfessor ? index - 4 : index;
+    // Cards fixos no topo; academias começam após Usuários + Técnicas + Vídeos (+ push se activo).
+    final managerOffset =
+        isManagerOrProfessor ? (_kAcademyPushNotificationUiEnabled ? 4 : 3) : 0;
+    final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();
     }
