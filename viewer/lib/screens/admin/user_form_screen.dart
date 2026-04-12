@@ -11,6 +11,8 @@ import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
+/// Formulário admin Novo/Editar usuário.
+/// A confirmação de senha existe só no cliente; a API recebe apenas o campo `password`.
 class UserFormScreen extends StatefulWidget {
   final models.UserModel? user;
 
@@ -43,6 +45,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
   bool _loadingAcademies = true;
   bool _saving = false;
   String? _error;
+  bool _obscurePassword = true;
+  bool _obscurePasswordConfirm = true;
 
   @override
   void initState() {
@@ -191,13 +195,66 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   hintText: isEdit
                       ? 'Deixe em branco para não alterar'
                       : 'Opcional. Mínimo 6 caracteres para o usuário poder entrar.',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePassword ? 'Mostrar senha' : 'Ocultar senha',
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
                 ),
-                obscureText: true,
+                obscureText: _obscurePassword,
+                onChanged: (_) {
+                  _formKey.currentState?.fields['password_confirm']?.validate();
+                },
                 validator: (v) {
                   final s = (v)?.trim() ?? '';
                   if (s.isEmpty) return null;
                   if (s.length < 6) {
                     return 'Senha deve ter no mínimo 6 caracteres';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              FormBuilderTextField(
+                name: 'password_confirm',
+                decoration: InputDecoration(
+                  labelText: 'Confirmar senha',
+                  hintText: isEdit
+                      ? 'Repita a nova senha, se for alterá-la'
+                      : 'Repita a senha, se a preencheu',
+                  suffixIcon: IconButton(
+                    tooltip: _obscurePasswordConfirm
+                        ? 'Mostrar senha'
+                        : 'Ocultar senha',
+                    onPressed: () => setState(() =>
+                        _obscurePasswordConfirm = !_obscurePasswordConfirm),
+                    icon: Icon(
+                      _obscurePasswordConfirm
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                obscureText: _obscurePasswordConfirm,
+                validator: (v) {
+                  final pwdRaw =
+                      _formKey.currentState?.fields['password']?.value;
+                  final pwd = pwdRaw?.toString().trim() ?? '';
+                  final cfm = v?.toString().trim() ?? '';
+                  if (pwd.isEmpty && cfm.isEmpty) return null;
+                  if (pwd.isEmpty && cfm.isNotEmpty) {
+                    return 'Preencha a senha ou limpe a confirmação';
+                  }
+                  if (pwd.isNotEmpty && cfm.isEmpty) {
+                    return 'Confirme a senha';
+                  }
+                  if (pwd != cfm) {
+                    return 'As senhas não coincidem';
                   }
                   return null;
                 },

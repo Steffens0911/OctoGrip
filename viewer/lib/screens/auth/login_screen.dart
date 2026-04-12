@@ -11,6 +11,7 @@ import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_error_message.dart';
 
 /// Tela de login com e-mail e senha (layout landing escuro + logo OctoGrip).
+/// A senha pode ser mostrada ou ocultada com o ícone ao lado do campo (sem segunda confirmação).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apiTunnelController = TextEditingController();
   bool _loading = false;
   String? _error;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -46,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     required String label,
     String? hint,
     required IconData icon,
+    Widget? suffixIcon,
   }) {
     final r = BorderRadius.circular(12);
     return InputDecoration(
@@ -54,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
       filled: true,
       fillColor: _fieldFill,
       prefixIcon: Icon(icon, color: _textMuted, size: 22),
+      suffixIcon: suffixIcon,
       labelStyle: const TextStyle(color: _textMuted),
       hintStyle: TextStyle(color: _textMuted.withValues(alpha: 0.55)),
       border: OutlineInputBorder(borderRadius: r),
@@ -218,13 +222,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _passwordController,
-                        obscureText: true,
+                        obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _login(),
                         style: const TextStyle(color: _textOnField),
                         decoration: _fieldDecoration(
                           label: 'Senha',
                           icon: Icons.lock_outline,
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword
+                                ? 'Mostrar senha'
+                                : 'Ocultar senha',
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
+                              color: _textMuted,
+                              size: 22,
+                            ),
+                          ),
                         ),
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'Informe a senha';

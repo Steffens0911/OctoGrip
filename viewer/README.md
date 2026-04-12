@@ -9,6 +9,13 @@ App **OctoGrip** para alunos e equipa da academia: campo de treino, painel da ac
 
 ## Ícone e PWA (web)
 
+**Marca atual (OctoGrip):** favicon e ícones em `web/` gerados a partir de `assets/branding/octogrip_logo.png` (fundo #262433, igual ao cartão do login):
+
+```bash
+cd viewer
+python scripts/generate_pwa_icons_from_octogrip.py
+```
+
 Ícones legados (livro / wordmark FlowRoll) ainda existem em `assets/branding/` para scripts antigos. Para **favicon e ícones PWA** a partir da wordmark antiga:
 
 ```bash
@@ -20,8 +27,6 @@ python scripts/generate_flowroll_icons.py
 cd viewer
 python scripts/generate_pwa_icons_from_wordmark.py
 ```
-
-Para alinhar o PWA ao logo OctoGrip, podes copiar `octogrip_logo.png` sobre `web/favicon.png` e voltar a gerar tamanhos com um pipeline à tua escolha, ou adaptar os scripts para ler `octogrip_logo.png`.
 
 ## Como rodar
 
