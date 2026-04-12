@@ -61,8 +61,44 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify: o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
 | `LOG_LEVEL` | `INFO` ou `WARNING` |
 | `ENABLE_METRICS` | `true` se quiseres métricas |
+| `FIREBASE_PROJECT_ID` | (Opcional) ID do projeto Firebase — necessário para **push** na API. |
+| `FIREBASE_SERVICE_ACCOUNT_PATH` | (Opcional) Caminho **dentro do contentor** ao JSON da service account; o compose Coolify usa por defeito `/app/secrets/firebase-service-account.json`. |
+| `FIREBASE_SECRETS_HOST_PATH` | (Opcional) Pasta **no disco da VPS** montada em `/app/secrets` (só leitura). Por defeito `/srv/octogrip/secrets`. Coloca aí o ficheiro `firebase-service-account.json` (ver secção abaixo). |
 
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
+
+### Push (FCM) na VPS — passo a passo
+
+1. **No Google Cloud / Firebase**  
+   - [Firebase Console](https://console.firebase.google.com/) → Definições do projeto → **Contas de serviço** (ou [Google Cloud Console](https://console.cloud.google.com/) → IAM → Contas de serviço).  
+   - Cria uma conta de serviço (ou usa uma existente) com permissões para enviar mensagens FCM (ex.: papel **Firebase Admin SDK Administrator** ou equivalente ao teu projeto).  
+   - **Chaves** → **Adicionar chave** → **JSON** → descarrega o ficheiro (guarda-o em local seguro; não commits no Git).
+
+2. **ID do projeto**  
+   - No Firebase: Definições do projeto → **ID do projeto** — é o valor de `FIREBASE_PROJECT_ID` (ex.: `octogrip`).
+
+3. **Na VPS (SSH)** — pasta só no servidor, nunca no repositório:
+
+   ```bash
+   sudo mkdir -p /srv/octogrip/secrets
+   sudo nano /srv/octogrip/secrets/firebase-service-account.json
+   # cola o conteúdo do JSON descarregado, grava e sai
+   sudo chmod 600 /srv/octogrip/secrets/firebase-service-account.json
+   ```
+
+   Alternativa: copiar com `scp` a partir do teu PC, por exemplo:
+
+   `scp .\firebase-adminsdk-xxxxx.json user@IP_DA_VPS:/srv/octogrip/secrets/firebase-service-account.json`
+
+4. **No Coolify** (recurso Docker Compose desta app) → **Environment Variables** (ou equivalente ao teu painel):
+
+   - `FIREBASE_PROJECT_ID` = o ID do passo 2.  
+   - `FIREBASE_SERVICE_ACCOUNT_PATH` = `/app/secrets/firebase-service-account.json` (se o nome do ficheiro for outro, ajusta para coincidir com o ficheiro dentro de `/app/secrets` no contentor).  
+   - Se usares outra pasta no host em vez de `/srv/octogrip/secrets`, define também `FIREBASE_SECRETS_HOST_PATH` com o caminho absoluto dessa pasta na VPS.
+
+5. **Redeploy** da stack para a API voltar a subir com o volume montado e as variáveis aplicadas.
+
+6. **Teste** — com utilizador gerente/professor autenticado, `POST /academies/{id}/push_notification` com título/corpo; se faltar configuração, a API responde **503** com mensagem explícita. Ver também `docs/PUSH_NOTIFICATIONS.md`.
 
 Referência de segurança: `docs/CHECKLIST_DEPLOY.md`.
 

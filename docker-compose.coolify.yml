@@ -42,6 +42,9 @@ services:
       ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+      # Push FCM (opcional): na VPS cria a pasta no host e copia o JSON da service account; ver docs/DEPLOY_COOLIFY_CONTABO.md
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
@@ -53,6 +56,8 @@ services:
         condition: service_healthy
     volumes:
       - api_media:/app/app_media
+      # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
+      - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
 
   viewer:
     build:
