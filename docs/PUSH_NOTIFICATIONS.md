@@ -16,7 +16,7 @@ Variáveis de ambiente (ou `.env`):
 
 Sem estas variáveis, `POST /academies/{id}/push_notification` responde **503** com mensagem explicativa.
 
-Dependências Python: `httpx` e `google-auth` (já em `requirements.txt`).
+Dependências Python: `httpx`, `google-auth` e **`requests`** (o transporte `google.auth.transport.requests` exige o pacote `requests`; está em `requirements.txt`). Sem `requests`, a API falha ao arrancar com `ImportError` no `fcm_service`.
 
 ## Migração de base de dados
 
