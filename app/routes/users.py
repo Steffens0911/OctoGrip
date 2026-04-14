@@ -111,10 +111,12 @@ async def user_create(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Cria um usuário (email único)."""
+    """Cria um usuário; o e-mail deve ser único em todo o sistema (tabela users), não só na academia."""
     existing = await get_user_by_email(db, body.email)
     if existing:
-        raise ConflictError("E-mail já cadastrado.")
+        raise ConflictError(
+            "E-mail já cadastrado por outro usuário (único em todo o sistema)."
+        )
     if current_user.role == "administrador":
         academy_id = body.academy_id
         role = body.role
@@ -141,7 +143,7 @@ async def user_update(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """Atualiza um usuário."""
+    """Atualiza um usuário. Se `email` for enviado, deve continuar único em todo o sistema."""
     target = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador":
         if target.academy_id != current_user.academy_id:

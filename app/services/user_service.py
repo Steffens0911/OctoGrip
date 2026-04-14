@@ -45,7 +45,7 @@ async def get_user(db: AsyncSession, user_id: UUID) -> User | None:
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
-    """Retorna usuário por e-mail (para login). Comparação case-insensitive."""
+    """Procura e-mail na tabela `users` globalmente (sem filtrar por academia). Comparação case-insensitive."""
     if not email or not email.strip():
         return None
     return (await db.execute(select(User).where(User.email.ilike(email.strip())))).scalar_one_or_none()
@@ -107,7 +107,9 @@ async def update_user(
         if normalized != (user.email or "").lower():
             other = await get_user_by_email(db, normalized)
             if other is not None and other.id != user.id:
-                raise ConflictError("E-mail já cadastrado.")
+                raise ConflictError(
+                    "E-mail já cadastrado por outro usuário (único em todo o sistema)."
+                )
         user.email = normalized
     if name is not None:
         user.name = name.strip() if name else None

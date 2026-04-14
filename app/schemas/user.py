@@ -58,7 +58,10 @@ def _validate_password_strength(password: str) -> str:
 class UserCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr = Field(..., description="E-mail do usuário (deve ser válido)")
+    email: EmailStr = Field(
+        ...,
+        description="E-mail válido, único em todo o sistema (todas as academias); armazenado em minúsculas.",
+    )
     password: str | None = Field(
         None,
         min_length=1,
@@ -104,7 +107,7 @@ class UserUpdate(BaseModel):
     email: EmailStr | None = Field(
         None,
         max_length=255,
-        description="Novo e-mail (único no sistema; normalizado para minúsculas).",
+        description="Novo e-mail, único em todo o sistema (todas as academias); normalizado para minúsculas.",
     )
     graduation: str | None = Field(None, max_length=32)
     role: str | None = Field(None, max_length=32)

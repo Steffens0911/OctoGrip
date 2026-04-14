@@ -177,7 +177,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 name: 'email',
                 decoration: const InputDecoration(
                   labelText: 'E-mail',
-                  helperText: 'E-mail deve ser único no sistema.',
+                  helperText:
+                      'E-mail único em todo o sistema (todas as academias), sem diferenciar maiúsculas.',
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) => validateEmail(v?.toString().trim()),

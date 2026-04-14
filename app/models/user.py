@@ -15,6 +15,7 @@ class User(Base, UUIDMixin):
 
     __tablename__ = "users"
 
+    # Único em toda a tabela users (todas as academias); não há unicidade “por academia”.
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="Hash pbkdf2_sha256 da senha para login.")
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
