@@ -157,6 +157,7 @@ async def user_update(
         db,
         user_id,
         name=payload.get("name"),
+        email=payload.get("email"),
         graduation=payload.get("graduation"),
         role=payload.get("role"),
         academy_id=payload.get("academy_id"),

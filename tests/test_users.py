@@ -1,4 +1,6 @@
 """Testes de CRUD de usuários."""
+import uuid
+
 import pytest
 
 
@@ -52,6 +54,28 @@ async def test_atualizar_usuario(client, admin_headers, aluno_user):
     })
     assert r.status_code == 200
     assert r.json()["name"] == "Nome Atualizado"
+
+
+async def test_atualizar_usuario_email_unico(client, admin_headers, aluno_user):
+    new_email = f"aluno-renomeado-{uuid.uuid4().hex[:10]}@test.com"
+    r = await client.patch(
+        f"/users/{aluno_user.id}",
+        headers=admin_headers,
+        json={"email": new_email},
+    )
+    assert r.status_code == 200
+    assert r.json()["email"] == new_email
+
+
+async def test_atualizar_usuario_email_duplicado(
+    client, admin_headers, admin_user, aluno_user
+):
+    r = await client.patch(
+        f"/users/{aluno_user.id}",
+        headers=admin_headers,
+        json={"email": admin_user.email},
+    )
+    assert r.status_code == 409
 
 
 async def test_excluir_usuario(client, admin_headers, db):

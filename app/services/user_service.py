@@ -91,6 +91,7 @@ async def update_user(
     db: AsyncSession,
     user_id: UUID,
     name: str | None = None,
+    email: str | None = None,
     graduation: str | None = None,
     academy_id: UUID | None = None,
     points_adjustment: int | None = None,
@@ -101,6 +102,13 @@ async def update_user(
     user = await get_user(db, user_id)
     if not user:
         return None
+    if email is not None:
+        normalized = email.strip().lower()
+        if normalized != (user.email or "").lower():
+            other = await get_user_by_email(db, normalized)
+            if other is not None and other.id != user.id:
+                raise ConflictError("E-mail já cadastrado.")
+        user.email = normalized
     if name is not None:
         user.name = name.strip() if name else None
     if graduation is not None:

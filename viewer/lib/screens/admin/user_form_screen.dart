@@ -120,6 +120,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
         } else {
           await _api.updateUser(
             widget.user!.id,
+            email: email.trim(),
             name: name?.trim().isEmpty == true ? null : name?.trim(),
             graduation: graduation?.isEmpty == true ? null : graduation,
             role: role,
@@ -178,7 +179,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   labelText: 'E-mail',
                   helperText: 'E-mail deve ser único no sistema.',
                 ),
-                enabled: !isEdit,
                 keyboardType: TextInputType.emailAddress,
                 validator: (v) => validateEmail(v?.toString().trim()),
               ),

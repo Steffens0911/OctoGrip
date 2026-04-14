@@ -101,6 +101,11 @@ class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str | None = Field(None, max_length=255)
+    email: EmailStr | None = Field(
+        None,
+        max_length=255,
+        description="Novo e-mail (único no sistema; normalizado para minúsculas).",
+    )
     graduation: str | None = Field(None, max_length=32)
     role: str | None = Field(None, max_length=32)
     academy_id: UUID | None = None
@@ -120,6 +125,13 @@ class UserUpdate(BaseModel):
         if not v.strip():
             return None
         return _validate_password_strength(v)
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def email_normalize(cls, v):
+        if v is None or (isinstance(v, str) and not str(v).strip()):
+            return None
+        return str(v).strip().lower()
 
     @field_validator("graduation")
     @classmethod

@@ -902,8 +902,9 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<UserModel> updateUser(String id, {String? name, String? graduation, String? role, String? password, String? academyId, int? pointsAdjustment}) async {
+  Future<UserModel> updateUser(String id, {String? email, String? name, String? graduation, String? role, String? password, String? academyId, int? pointsAdjustment}) async {
     final body = <String, dynamic>{};
+    if (email != null && email.isNotEmpty) body['email'] = email;
     if (name != null) body['name'] = name;
     if (graduation != null) body['graduation'] = graduation;
     if (role != null) body['role'] = role;
