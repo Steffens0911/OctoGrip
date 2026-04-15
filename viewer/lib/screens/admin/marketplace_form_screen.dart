@@ -21,7 +21,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
-  final _imageCtrl = TextEditingController();
   final _dddCtrl = TextEditingController();
   final _phoneLocalCtrl = TextEditingController();
   final _sortCtrl = TextEditingController();
@@ -40,9 +39,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
         _descCtrl.text = it.description!;
       }
       _priceCtrl.text = (it.priceCents / 100).toStringAsFixed(2).replaceAll('.', ',');
-      if (it.imageUrl != null && it.imageUrl!.isNotEmpty) {
-        _imageCtrl.text = it.imageUrl!;
-      }
       if (it.whatsappDdd != null && it.whatsappDdd!.isNotEmpty) {
         _dddCtrl.text = it.whatsappDdd!;
       }
@@ -64,7 +60,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
     _titleCtrl.dispose();
     _descCtrl.dispose();
     _priceCtrl.dispose();
-    _imageCtrl.dispose();
     _dddCtrl.dispose();
     _phoneLocalCtrl.dispose();
     _sortCtrl.dispose();
@@ -104,7 +99,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
     });
 
     final desc = _descCtrl.text.trim();
-    final image = _imageCtrl.text.trim();
     final sort = int.tryParse(_sortCtrl.text.trim());
     final ddd = _dddCtrl.text.trim();
     final local = _phoneLocalCtrl.text.trim();
@@ -115,7 +109,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
           title: title,
           description: desc.isEmpty ? null : desc,
           priceCents: cents,
-          imageUrl: image.isEmpty ? null : image,
           whatsappDdd: ddd.isEmpty ? null : ddd,
           whatsappNumber: local.isEmpty ? null : local,
           sortOrder: sort,
@@ -128,7 +121,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
           title: title,
           description: desc.isEmpty ? null : desc,
           priceCents: cents,
-          imageUrl: image.isEmpty ? null : image,
           whatsappDdd: ddd.isEmpty ? null : ddd,
           whatsappNumber: local.isEmpty ? null : local,
           sortOrder: sort,
@@ -202,13 +194,6 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
               decoration: const InputDecoration(
                 labelText: 'Preço (R\$)',
                 hintText: '199,90',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _imageCtrl,
-              decoration: const InputDecoration(
-                labelText: 'URL da foto (opcional)',
               ),
             ),
             const SizedBox(height: 12),

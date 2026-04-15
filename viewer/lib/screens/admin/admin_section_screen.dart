@@ -66,7 +66,7 @@ class AdminSectionScreen extends StatelessWidget {
           AppNavigationTile(
             icon: Icons.storefront_rounded,
             title: 'Loja / anúncios',
-            subtitle: 'Marketplace por academia (preço, foto, WhatsApp)',
+            subtitle: 'Marketplace por academia (preço e WhatsApp)',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
