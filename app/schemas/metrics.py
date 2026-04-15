@@ -68,7 +68,7 @@ class ActiveStudentsReportResponse(BaseModel):
 
 
 class WeeklyPanelLoginUserItem(BaseModel):
-    """Usuário elegível (staff ou aluno) e seus dias de login na semana ISO."""
+    """Usuário elegível (staff ou aluno) e seus dias de login no período (semana ISO ou intervalo)."""
 
     user_id: str
     name: Optional[str] = None
@@ -81,10 +81,11 @@ class WeeklyPanelLoginUserItem(BaseModel):
 
 class WeeklyPanelLoginsReportResponse(BaseModel):
     """
-    Relatório semanal de logins (staff e alunos).
+    Relatório de logins (staff e alunos), semana ISO ou intervalo customizado.
 
     - Escopo global quando academy_id é null.
     - Escopo por academia quando academy_id é informado.
+    - week_start / week_end são as datas de início e fim do período (inclusive).
     """
 
     academy_id: Optional[str] = None

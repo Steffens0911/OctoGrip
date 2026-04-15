@@ -22,7 +22,7 @@ Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
 1. [Health](#health)
 2. [Academias](#academias)
 3. [Autenticação (perfil)](#autenticação-perfil)
-4. [Me (home e vídeos)](#me-home-e-vídeos)
+4. [Me (home, vídeos e marketplace)](#me-home-vídeos-e-marketplace)
 5. [Usuários](#usuários)
 6. [Lições](#lições)
 7. [Técnicas e Posições](#técnicas-e-posições)
@@ -36,6 +36,7 @@ Impersonação admin usa o header `X-Impersonate-User` nos pedidos reais.
 15. [Relatórios](#relatórios)
 16. [Admin — backup da base](#admin--backup-da-base)
 17. [Exceções HTTP](#exceções-http)
+18. [Marketplace (anúncios por academia)](#marketplace-anúncios-por-academia)
 
 ---
 
@@ -59,10 +60,17 @@ Base: `/academies`. Detalhes em [ACADEMIAS.md](ACADEMIAS.md).
 | GET    | /academies/{id}             | Detalhe da academia                            |
 | PATCH  | /academies/{id}             | Atualiza academia (incl. 3 técnicas semanais)  |
 | DELETE | /academies/{id}             | Exclui academia                                |
-| GET    | /academies/{id}/ranking     | Ranking interno (period_days, limit)           |
+| GET    | /academies/{id}/ranking     | Ranking interno (`period_days` ou `start_date`+`end_date`, `limit`) |
 | GET    | /academies/{id}/difficulties| Posições mais reportadas como difíceis         |
-| GET    | /academies/{id}/report/weekly | Relatório semanal (year, week opcionais)    |
-| GET    | /academies/{id}/report/weekly/csv | Relatório semanal em CSV                 |
+| GET    | /academies/{id}/report/weekly | Conclusões no período (`year`/`week` ISO ou `start_date`+`end_date`) |
+| GET    | /academies/{id}/report/weekly/csv | Export CSV (mesmos parâmetros do JSON)   |
+| GET    | /academies/{id}/weekly-kits      | Lista **turmas** semanais (rótulo + itens) da academia |
+| POST   | /academies/{id}/weekly-kits      | Cria turma (`label`, `sort_order`, `items` opcional 1–5) |
+| PATCH  | /academies/{id}/weekly-kits/{kit_id} | Atualiza turma (`label`, `sort_order`, `items` 1–5) |
+| DELETE | /academies/{id}/weekly-kits/{kit_id} | Remove turma (soft delete + missões com `weekly_kit_id`) |
+| POST   | /academies/{id}/reset_weekly_turmas_week | Reinicia **semana ISO atual (UTC)**: remove escolhas de turma dessa semana e conclusões (`MissionUsage` / `TechniqueExecution` confirmadas) de missões com `weekly_kit_id` cuja data cai na janela; pontos somam em `points_adjustment`. **400** se não houver turma ativa (1–5 técnicas). |
+
+**Alias legado (mesmo contrato):** `GET|POST /academies/{id}/weekly_kits`, `PATCH|DELETE /academies/{id}/weekly_kits/{kit_id}` — mantido para bundles antigos; preferir `weekly-kits`.
 
 **PATCH /academies/{id}** — body opcional:
 ```json
@@ -96,7 +104,7 @@ Base: `/auth`.
 
 ---
 
-## Me (home e vídeos)
+## Me (home, vídeos e marketplace)
 
 Base: `/me`.
 
@@ -105,6 +113,7 @@ Base: `/me`.
 | GET    | /me/header_stats | Snapshot agregado do cabeçalho da home (nível, XP no nível, academia) |
 | GET    | /me/training_videos/today | Vídeos de treino ativos para o usuário no dia |
 | POST   | /me/training_videos/{video_id}/complete | Conclusão diária de vídeo de treino |
+| GET    | /me/marketplace_items | Anúncios ativos da academia do utilizador (lista vazia se não tiver `academy_id`) |
 
 ### GET /me/header_stats
 
@@ -137,6 +146,29 @@ Retorna um payload leve para reduzir latência do cabeçalho da home do aluno.
 
 `academy` pode ser `null` quando o usuário não está vinculado a nenhuma academia.
 
+### GET /me/marketplace_items
+
+- Lista apenas itens com **`is_active: true`** da academia do utilizador (`users.academy_id`).
+- Se o utilizador não tiver academia, devolve **`[]`** (200).
+- Cada item inclui: `id`, `title`, `description`, `price_cents`, `currency`, `image_url`, `whatsapp_url` (opcional; URL `wa.me` gerada pela API com texto fixo + título quando há telefone).
+
+---
+
+## Marketplace (anúncios por academia)
+
+Base: **`/marketplace_items`**. Requer JWT; mutações usam a mesma política de **`require_write_access`** que os vídeos de treino (`administrador`, `gerente_academia`, `professor`).
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET    | /marketplace_items | Lista: **administrador** vê todas as academias; **gerente/professor** só itens da sua `academy_id` |
+| POST   | /marketplace_items | Cria anúncio; **`academy_id` obrigatório no JSON para administrador**; demais roles ignoram e usam a academia do utilizador |
+| PUT    | /marketplace_items/{id} | Atualização parcial (campos opcionais no body) |
+| DELETE | /marketplace_items/{id} | Remove o anúncio |
+
+**Corpo POST/PATCH (criação e atualização):** `title`, `description` (opcional), `price_cents`, `currency` (default `BRL`), `image_url` (opcional), **`whatsapp_ddd`** e **`whatsapp_number`** (opcionais; ex. `"11"` e `"999999999"` — número local com 8 ou 9 dígitos, sem o 55). Se um dos dois for enviado sem o outro, a API responde **400**. Vazios = anúncio sem WhatsApp.
+
+**Resposta GET (admin e aluno):** inclui `whatsapp_url` calculada (`https://wa.me/55…?text=…`) quando há telefone; na listagem admin também vêm `whatsapp_ddd` e `whatsapp_number` para preencher o formulário. O texto de `text=` é definido no servidor (`app/utils/marketplace_whatsapp.py`).
+
 ---
 
 ## Usuários
@@ -150,6 +182,7 @@ Base: `/users`.
 | GET    | /users/{id}   | Detalhe do usuário  |
 | PATCH  | /users/{id}   | Atualiza usuário    |
 | DELETE | /users/{id}   | Exclui usuário      |
+| PUT    | /users/me/weekly-kit-choice | Aluno escolhe kit da semana ISO (`kit_id`, `reference_date` opcional) |
 | GET    | /users/{id}/points_log | Histórico de pontuação do usuário |
 
 ### GET /users/{id}/points_log
@@ -296,11 +329,23 @@ Retorna a missão do dia para o aluno.
 
 ### GET /mission_today/week
 
-Retorna as **3 missões semanais** (Missão 1, 2, 3).
+Retorna as missões semanais do aluno autenticado.
 
-**Query params:** `level`, `user_id`, `academy_id` (mesmos que acima).
+**Query params:** `level` (obrigatório na prática no cliente); `user_id` e `academy_id` são ignorados nesta rota — usa sempre o utilizador do token e a academia dele.
 
-**Resposta (200):**
+**Modo legado (sem kits válidos):** até **3** entradas (`Missão 1` … `Missão 3`), com `mission` ou `null` por slot.
+
+**Modo kits:** quando a academia tem pelo menos um kit com **1–5** técnicas, a resposta inclui também:
+
+- `needs_kit_choice` (bool)
+- `available_kits`: `[{ "kit_id", "label", "item_count" }, ...]`
+- `selected_kit_id` (uuid ou null)
+
+Sem escolha na semana ISO corrente: `needs_kit_choice: true`, `entries: []`. Com escolha: `entries` tem só as missões do kit (`period_label`: `Foco 1` … `Foco N`).
+
+**Desempenho (turmas):** quando as missões ativas do kit já coincidem com os itens da turma na base de dados, o servidor **não** refaz o upsert completo de missões nesse GET (evita vários commits redundantes após o professor guardar a turma).
+
+**Resposta (200) — exemplo legado:**
 ```json
 {
   "entries": [
@@ -316,7 +361,10 @@ Retorna as **3 missões semanais** (Missão 1, 2, 3).
       "period_label": "Missão 3",
       "mission": null
     }
-  ]
+  ],
+  "needs_kit_choice": false,
+  "available_kits": [],
+  "selected_kit_id": null
 }
 ```
 
@@ -561,7 +609,7 @@ id,name,email,graduation,academy_id,academy_name,last_login_at
 
 ### GET /reports/weekly_panel_logins
 
-Relatório semanal (semana ISO) de logins (tabela `user_login_days`).
+Relatório de logins (tabela `user_login_days`): **semana ISO** ou **intervalo customizado** (`start_date` + `end_date`, inclusive, máximo 366 dias).
 
 - Universo: `administrador`, `gerente_academia`, `professor`, `supervisor` e `aluno`.
 - Visão por academia (`academy_id` informado): apenas usuários vinculados à academia.
@@ -572,7 +620,9 @@ Relatório semanal (semana ISO) de logins (tabela `user_login_days`).
 
 | Parâmetro      | Tipo | Obrigatório | Descrição                                                                 |
 |----------------|------|------------|---------------------------------------------------------------------------|
-| reference_date | date | sim        | Data de referência (YYYY-MM-DD) para determinar a semana ISO.            |
+| reference_date | date | não        | Semana ISO que contém esta data (default: hoje). Ignorado se `start_date` e `end_date` forem enviados. |
+| start_date     | date | não        | Início do intervalo (inclusive). Exige `end_date`.                         |
+| end_date       | date | não        | Fim do intervalo (inclusive). Exige `start_date`.                          |
 | academy_id     | UUID | não        | Se informado, limita à academia; se omitido, considera visão global.      |
 
 **Resposta (200):**

@@ -171,18 +171,27 @@ class AcademyService {
     return true;
   }
 
-  /// Ranking interno (últimos [periodDays] dias). [limit] máx 100.
+  /// Ranking interno: [periodDays] ou intervalo [periodStart]/[periodEnd] (datas locais).
+  /// [limit] máx 100.
   Future<Map<String, dynamic>> getRanking(
     String academyId, {
     int periodDays = 30,
     int limit = 50,
+    DateTime? periodStart,
+    DateTime? periodEnd,
   }) async {
     await AuthService().ensureLoaded();
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final qp = <String, String>{'limit': limit.toString()};
+    if (periodStart != null && periodEnd != null) {
+      qp['start_date'] = ymd(periodStart);
+      qp['end_date'] = ymd(periodEnd);
+    } else {
+      qp['period_days'] = periodDays.toString();
+    }
     final uri = Uri.parse('$_academiesUrl/$academyId/ranking')
-        .replace(queryParameters: {
-      'period_days': periodDays.toString(),
-      'limit': limit.toString(),
-    });
+        .replace(queryParameters: qp);
     final response = await http.get(uri, headers: _getHeaders(auth: true));
     if (response.statusCode == 404) return {};
     if (response.statusCode != 200) {
@@ -196,6 +205,8 @@ class AcademyService {
     return {
       'academy_id': map['academy_id'],
       'period_days': map['period_days'] as int,
+      if (map['period_start'] != null) 'period_start': map['period_start'] as String,
+      if (map['period_end'] != null) 'period_end': map['period_end'] as String,
       'entries': entries,
     };
   }
@@ -242,16 +253,25 @@ class AcademyService {
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
-  /// Relatório semanal. [year] e [week] opcionais (ISO); se omitidos, semana atual.
+  /// Relatório de conclusões: [year]/[week] ISO ou [startDate]/[endDate] inclusive.
   Future<AcademyWeeklyReport?> getWeeklyReport(
     String academyId, {
     int? year,
     int? week,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     await AuthService().ensureLoaded();
     final queryParams = <String, String>{};
-    if (year != null) queryParams['year'] = year.toString();
-    if (week != null) queryParams['week'] = week.toString();
+    if (startDate != null && endDate != null) {
+      String ymd(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      queryParams['start_date'] = ymd(startDate);
+      queryParams['end_date'] = ymd(endDate);
+    } else {
+      if (year != null) queryParams['year'] = year.toString();
+      if (week != null) queryParams['week'] = week.toString();
+    }
     final uri = Uri.parse('$_academiesUrl/$academyId/report/weekly')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
     final response = await http.get(uri, headers: _getHeaders(auth: true));

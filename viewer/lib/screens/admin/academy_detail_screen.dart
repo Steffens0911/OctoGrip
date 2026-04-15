@@ -5,6 +5,7 @@ import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/usage_metrics.dart';
+import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:viewer/screens/admin/academy_active_students_screen.dart';
@@ -52,6 +53,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _loadingTechniques = true;
   bool _savingTheme = false;
   bool _resetting = false;
+  bool _resettingTurmasWeek = false;
   Map<String, dynamic>? _ranking;
   AcademyWeeklyReport? _weeklyReport;
   bool _loadingExtra = true;
@@ -62,6 +64,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   WeeklyPanelLoginsReport? _weeklyPanelLogins;
   bool _loadingWeeklyPanelLogins = false;
   String? _errorWeeklyPanelLogins;
+  /// Intervalo (datas locais) para ranking, conclusões e relatório de logins.
+  late DateTime _reportPeriodStart;
+  late DateTime _reportPeriodEnd;
   late final TextEditingController _logoUrlController;
   bool _uploadingLogo = false;
   bool _uploadingScheduleImage = false;
@@ -76,6 +81,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   late final TextEditingController _loginNoticeUrlController;
   bool _loginNoticeActive = false;
   bool _savingLoginNotice = false;
+  List<WeeklyKitRead> _weeklyKits = [];
+  bool _loadingWeeklyKits = false;
 
   @override
   void initState() {
@@ -102,10 +109,74 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _loginNoticeUrlController =
         TextEditingController(text: _academy.loginNoticeUrl ?? '');
     _loginNoticeActive = _academy.loginNoticeActive;
+    final now = DateTime.now();
+    _reportPeriodStart = _mondayOfIsoWeek(now);
+    _reportPeriodEnd = _reportPeriodStart.add(const Duration(days: 6));
     _loadTechniques();
     _loadRankingAndReport();
     _loadUsageMetrics();
     _loadWeeklyPanelLogins();
+    _loadWeeklyKits(silentErrors: true);
+  }
+
+  /// Igual a [academy_has_active_weekly_kits] no backend: pelo menos uma turma com 1–5 técnicas.
+  bool _hasActiveTurmas() {
+    for (final k in _weeklyKits) {
+      final n = k.items.length;
+      if (n >= 1 && n <= 5) return true;
+    }
+    return false;
+  }
+
+  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  static DateTime _mondayOfIsoWeek(DateTime d) {
+    final day = _dateOnly(d);
+    return day.subtract(Duration(days: day.weekday - 1));
+  }
+
+  Future<void> _pickReportPeriodStart() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _reportPeriodStart,
+      firstDate: DateTime(now.year - 1, 1, 1),
+      lastDate: DateTime(now.year + 1, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+    var start = _dateOnly(picked);
+    var end = _reportPeriodEnd;
+    if (start.isAfter(end)) end = start;
+    setState(() {
+      _reportPeriodStart = start;
+      _reportPeriodEnd = end;
+    });
+    await _reloadPeriodReports();
+  }
+
+  Future<void> _pickReportPeriodEnd() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _reportPeriodEnd,
+      firstDate: _reportPeriodStart,
+      lastDate: DateTime(now.year + 1, 12, 31),
+    );
+    if (picked == null || !mounted) return;
+    var end = _dateOnly(picked);
+    var start = _reportPeriodStart;
+    if (end.isBefore(start)) start = end;
+    setState(() {
+      _reportPeriodStart = start;
+      _reportPeriodEnd = end;
+    });
+    await _reloadPeriodReports();
+  }
+
+  Future<void> _reloadPeriodReports() async {
+    await _loadRankingAndReport();
+    if (!mounted) return;
+    await _loadWeeklyPanelLogins();
   }
 
   @override
@@ -145,9 +216,17 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       _errorExtra = null;
     });
     try {
-      final ranking = await _api.getAcademyRanking(_academy.id);
+      final ranking = await _api.getAcademyRanking(
+        _academy.id,
+        periodStart: _reportPeriodStart,
+        periodEnd: _reportPeriodEnd,
+      );
       await _api.getAcademyDifficulties(_academy.id);
-      final report = await _api.getAcademyWeeklyReport(_academy.id);
+      final report = await _api.getAcademyWeeklyReport(
+        _academy.id,
+        startDate: _reportPeriodStart,
+        endDate: _reportPeriodEnd,
+      );
       if (mounted) {
         setState(() {
         _ranking = ranking;
@@ -193,7 +272,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     });
     try {
       final report = await _api.getWeeklyPanelLoginsReport(
-        referenceDate: DateTime.now(),
+        startDate: _reportPeriodStart,
+        endDate: _reportPeriodEnd,
         academyId: _academy.id,
       );
       if (!mounted) return;
@@ -811,13 +891,44 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Theme(
                         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                         child: ExpansionTile(
-                          title: const Text('Missões semanais'),
+                          title: const Text('Turmas (semana)'),
+                          subtitle: const Text(
+                            '1 a 5 técnicas por turma; o aluno escolhe a turma por semana ISO (UTC).',
+                          ),
                           childrenPadding: const EdgeInsets.all(16),
                           initiallyExpanded: false,
                           controlAffinity: ListTileControlAffinity.leading,
-                          children: _buildWeeklyMissionsFormChildren(),
+                          onExpansionChanged: (open) {
+                            if (open) _loadWeeklyKits();
+                          },
+                          children: _buildWeeklyKitsPanelChildren(),
                         ),
                       ),
+                      const Divider(height: 1),
+                      if (_hasActiveTurmas())
+                        ListTile(
+                          leading: const Icon(Icons.info_outline),
+                          title: const Text('Missões fixas (3 técnicas)'),
+                          subtitle: Text(
+                            'Ocultas: esta academia usa só turmas. Para voltar ao modo de três missões fixas, '
+                            'remova ou deixe sem técnicas válidas todas as turmas.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                          ),
+                        )
+                      else
+                        Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            title: const Text('Missões semanais (legado)'),
+                            childrenPadding: const EdgeInsets.all(16),
+                            initiallyExpanded: false,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            children: _buildWeeklyMissionsFormChildren(),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -1123,6 +1234,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 ),
               ),
               const SizedBox(height: 24),
+              _buildReportPeriodCard(),
+              const SizedBox(height: 16),
               ..._buildExtraSections(),
             ],
           ),
@@ -1316,6 +1429,432 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     ];
   }
 
+  Future<void> _loadWeeklyKits({bool silentErrors = false}) async {
+    setState(() => _loadingWeeklyKits = true);
+    try {
+      final list = await _api.getWeeklyKits(_academy.id);
+      if (mounted) {
+        setState(() {
+          _weeklyKits = list;
+          _loadingWeeklyKits = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingWeeklyKits = false);
+        if (!silentErrors) {
+          AppFeedback.show(
+            context,
+            message: userFacingMessage(e),
+            type: AppFeedbackType.error,
+          );
+        }
+      }
+    }
+  }
+
+  List<Widget> _buildWeeklyKitsPanelChildren() {
+    return [
+      Text(
+        'Com pelo menos uma turma válida (1–5 técnicas), a semana no app é só por turmas; '
+        'as três missões fixas ficam ocultas até não haver turmas ativas.',
+        style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+      ),
+      const SizedBox(height: 12),
+      if (_loadingWeeklyKits)
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          ),
+        )
+      else if (_weeklyKits.isEmpty)
+        Text(
+          'Nenhuma turma ainda. Crie pelo menos uma turma com 1 a 5 técnicas para os alunos '
+          'terem missões da semana.',
+          style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+        )
+      else
+        Column(
+          children: _weeklyKits
+              .map(
+                (k) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(k.label),
+                  subtitle: Text('${k.items.length} técnica(s)'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Editar turma',
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _editWeeklyKit(k),
+                      ),
+                      IconButton(
+                        tooltip: 'Remover turma',
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () => _confirmDeleteWeeklyKit(k),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+        ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          FilledButton.icon(
+            onPressed: _loadingWeeklyKits ? null : () => _editWeeklyKit(null),
+            icon: const Icon(Icons.add),
+            label: const Text('Nova turma'),
+          ),
+          if (_hasActiveTurmas())
+            OutlinedButton.icon(
+              onPressed: (_loadingWeeklyKits || _resettingTurmasWeek)
+                  ? null
+                  : _confirmResetTurmasWeek,
+              icon: _resettingTurmasWeek
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.restart_alt_outlined),
+              label: Text(
+                  _resettingTurmasWeek ? 'A reiniciar…' : 'Reiniciar semana (turmas)'),
+            ),
+        ],
+      ),
+      if (_hasActiveTurmas()) ...[
+        const SizedBox(height: 8),
+        Text(
+          '«Reiniciar semana (turmas)» remove a escolha de turma e as conclusões desta semana ISO (UTC) '
+          'para missões de turma; os pontos já ganhos mantêm-se (ajuste no perfil).',
+          style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryOf(context)),
+        ),
+      ],
+    ];
+  }
+
+  Future<void> _confirmResetTurmasWeek() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reiniciar semana das turmas?'),
+        content: const Text(
+          'Isto aplica-se à semana ISO atual (UTC): todos os alunos perdem a escolha de turma '
+          'e podem voltar a escolher; as conclusões dessa semana nas missões de turma são '
+          'anuladas para refazer os focos. A pontuação já conquistada é preservada.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Reiniciar')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _resettingTurmasWeek = true);
+    try {
+      final result = await _api.resetAcademyWeeklyTurmasWeek(_academy.id);
+      if (mounted) {
+        setState(() => _resettingTurmasWeek = false);
+        final msg = result['message'] as String? ?? 'Semana das turmas reiniciada.';
+        AppFeedback.show(context, message: msg, type: AppFeedbackType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _resettingTurmasWeek = false);
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDeleteWeeklyKit(WeeklyKitRead kit) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remover turma?'),
+        content: Text(
+          'A turma «${kit.label}» será removida. As missões geradas por ela deixam de estar ativas.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _api.deleteWeeklyKit(_academy.id, kit.id);
+      await _loadWeeklyKits();
+      if (mounted) {
+        AppFeedback.show(context, message: 'Turma removida.', type: AppFeedbackType.success);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    }
+  }
+
+  Future<void> _editWeeklyKit(WeeklyKitRead? existing) async {
+    if (_techniques.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: 'Crie ou carregue técnicas nesta academia primeiro.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
+    final labelCtrl = TextEditingController(text: existing?.label ?? '');
+    final techIds = <String>[];
+    final multCtrls = <TextEditingController>[];
+    if (existing != null && existing.items.isNotEmpty) {
+      for (final it in existing.items) {
+        techIds.add(it.techniqueId);
+        multCtrls.add(TextEditingController(text: '${it.multiplier}'));
+      }
+    } else {
+      techIds.add(_techniques.first.id);
+      multCtrls.add(TextEditingController(text: '$minRewardPoints'));
+    }
+    void disposeRowCtrls() {
+      for (final c in multCtrls) {
+        c.dispose();
+      }
+    }
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text(existing == null ? 'Nova turma' : 'Editar turma'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: labelCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome (turma)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    for (var i = 0; i < techIds.length; i++) ...[
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: DropdownButtonFormField<String>(
+                              initialValue: techIds[i],
+                              decoration: const InputDecoration(
+                                labelText: 'Técnica',
+                                border: OutlineInputBorder(),
+                              ),
+                              items: _techniques
+                                  .map(
+                                    (t) => DropdownMenuItem(
+                                      value: t.id,
+                                      child: Text(
+                                        t.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v != null) setLocal(() => techIds[i] = v);
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: multCtrls[i],
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Pontos',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        if (techIds.length < 5)
+                          TextButton.icon(
+                            onPressed: () {
+                              setLocal(() {
+                                techIds.add(_techniques.first.id);
+                                multCtrls.add(TextEditingController(text: '$minRewardPoints'));
+                              });
+                            },
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Técnica'),
+                          ),
+                        if (techIds.length > 1)
+                          TextButton.icon(
+                            onPressed: () {
+                              setLocal(() {
+                                final last = multCtrls.removeLast();
+                                last.dispose();
+                                techIds.removeLast();
+                              });
+                            },
+                            icon: const Icon(Icons.remove, size: 18),
+                            label: const Text('Última'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (labelCtrl.text.trim().isEmpty) return;
+                    if (techIds.isEmpty || techIds.length > 5) return;
+                    Navigator.pop(ctx, true);
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (saved != true) {
+      labelCtrl.dispose();
+      disposeRowCtrls();
+      return;
+    }
+    final items = <Map<String, dynamic>>[];
+    for (var i = 0; i < techIds.length; i++) {
+      final mult = int.tryParse(multCtrls[i].text.trim()) ?? minRewardPoints;
+      items.add({
+        'technique_id': techIds[i],
+        'multiplier': clampRewardPoints(mult),
+      });
+    }
+    final labelTrim = labelCtrl.text.trim();
+    labelCtrl.dispose();
+    disposeRowCtrls();
+    if (items.isEmpty || items.length > 5) {
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: 'Indique entre 1 e 5 técnicas.',
+          type: AppFeedbackType.warning,
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    try {
+      if (existing == null) {
+        await _api.createWeeklyKit(
+          academyId: _academy.id,
+          label: labelTrim,
+          items: items,
+        );
+      } else {
+        await _api.patchWeeklyKit(
+          academyId: _academy.id,
+          kitId: existing.id,
+          label: labelTrim,
+          items: items,
+        );
+      }
+      await _loadWeeklyKits();
+      if (mounted) {
+        AppFeedback.show(context, message: 'Turma guardada.', type: AppFeedbackType.success);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    }
+  }
+
+  Widget _buildReportPeriodCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Período dos relatórios',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimaryOf(context),
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Ranking, conclusões e logins usam o mesmo intervalo (máx. 366 dias na API).',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${toBrDate(_reportPeriodStart)} — ${toBrDate(_reportPeriodEnd)}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickReportPeriodStart,
+                  icon: const Icon(Icons.date_range_outlined, size: 18),
+                  label: const Text('Data inicial'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickReportPeriodEnd,
+                  icon: const Icon(Icons.event_outlined, size: 18),
+                  label: const Text('Data final'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildExtraSections() {
     if (_loadingExtra) {
       return const [
@@ -1350,7 +1889,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       ];
     }
     return [
-      const _SectionTitle(title: 'Ranking (últimos 30 dias)'),
+      const _SectionTitle(title: 'Ranking (conclusões no período)'),
       Card(
         child: _ranking != null && (_ranking!['entries'] as List).isNotEmpty
             ? ListView.separated(
@@ -1424,7 +1963,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         ),
       ),
       const SizedBox(height: 20),
-      const _SectionTitle(title: 'Relatório semanal'),
+      const _SectionTitle(title: 'Conclusões no período'),
       Card(
         child: _weeklyReport != null
             ? Padding(
@@ -1475,14 +2014,14 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                 padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
-                    'Sem dados da semana.',
+                    'Sem dados no período.',
                     style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                   ),
                 ),
               ),
       ),
       const SizedBox(height: 20),
-      const _SectionTitle(title: 'Logins na semana'),
+      const _SectionTitle(title: 'Logins no período'),
       Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1558,7 +2097,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         ] else ...[
           AppSpacing.verticalM,
           Text(
-            'Ninguém da academia registou login nesta semana.',
+            'Ninguém da academia registou login neste período.',
             style: TextStyle(color: AppTheme.textSecondaryOf(context)),
           ),
         ],

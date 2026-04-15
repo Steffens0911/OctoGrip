@@ -95,20 +95,64 @@ class MissionWeekSlot {
       };
 }
 
-/// Resposta GET /mission_today/week — lista das 3 missões da semana.
+/// Opção de turma na semana. GET /mission_today/week (`available_kits` no JSON).
+class WeeklyKitOption {
+  final String kitId;
+  final String label;
+  final int itemCount;
+
+  WeeklyKitOption({
+    required this.kitId,
+    required this.label,
+    required this.itemCount,
+  });
+
+  factory WeeklyKitOption.fromJson(Map<String, dynamic> json) {
+    return WeeklyKitOption(
+      kitId: json['kit_id'] as String,
+      label: json['label'] as String? ?? '',
+      itemCount: json['item_count'] as int? ?? 0,
+    );
+  }
+}
+
+/// Resposta GET /mission_today/week — modo legado (até 3 slots) ou kits (1–5 por kit escolhido).
 class MissionWeek {
   final List<MissionWeekSlot> entries;
+  final bool needsKitChoice;
+  final List<WeeklyKitOption> availableKits;
+  final String? selectedKitId;
 
-  MissionWeek({required this.entries});
+  MissionWeek({
+    required this.entries,
+    this.needsKitChoice = false,
+    this.availableKits = const [],
+    this.selectedKitId,
+  });
 
   factory MissionWeek.fromJson(Map<String, dynamic> json) {
     final list = (json['entries'] as List<dynamic>?) ?? [];
+    final kitsRaw = json['available_kits'] as List<dynamic>? ?? [];
     return MissionWeek(
       entries: list.map((e) => MissionWeekSlot.fromJson(e as Map<String, dynamic>)).toList(),
+      needsKitChoice: json['needs_kit_choice'] as bool? ?? false,
+      availableKits: kitsRaw
+          .map((e) => WeeklyKitOption.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      selectedKitId: json['selected_kit_id'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'entries': entries.map((e) => e.toJson()).toList(),
+        'needs_kit_choice': needsKitChoice,
+        'available_kits': availableKits
+            .map((k) => <String, dynamic>{
+                  'kit_id': k.kitId,
+                  'label': k.label,
+                  'item_count': k.itemCount,
+                })
+            .toList(),
+        'selected_kit_id': selectedKitId,
       };
 }

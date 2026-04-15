@@ -1,5 +1,5 @@
 """Schemas para Academia (A-03, A-04)."""
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -99,6 +99,8 @@ class RankingResponse(BaseModel):
 
     academy_id: UUID
     period_days: int
+    period_start: date | None = None
+    period_end: date | None = None
     entries: list[RankingEntry]
 
 

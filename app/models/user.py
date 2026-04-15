@@ -100,6 +100,11 @@ class User(Base, UUIDMixin):
         back_populates="created_by",
         lazy="selectin",
     )
+    marketplace_items_created: Mapped[list["AcademyMarketplaceItem"]] = relationship(
+        "AcademyMarketplaceItem",
+        back_populates="created_by",
+        lazy="selectin",
+    )
     training_video_daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
         "TrainingVideoDailyView",
         back_populates="user",
@@ -110,4 +115,9 @@ class User(Base, UUIDMixin):
         back_populates="user",
         lazy="selectin",
         cascade="all, delete-orphan",
+    )
+    weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
+        "UserWeeklyKitChoice",
+        back_populates="user",
+        lazy="selectin",
     )

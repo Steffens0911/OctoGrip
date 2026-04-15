@@ -88,6 +88,33 @@ async def test_ranking_academia_vazio(client, admin_headers, academy):
     assert data["entries"] == []
 
 
+async def test_ranking_intervalo_calendario(client, admin_headers, academy):
+    r = await client.get(
+        f"/academies/{academy.id}/ranking"
+        "?start_date=2020-01-01&end_date=2020-01-05",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["period_days"] == 5
+    assert data["period_start"] == "2020-01-01"
+    assert data["period_end"] == "2020-01-05"
+    assert data["entries"] == []
+
+
+async def test_relatorio_conclusoes_intervalo_calendario(client, admin_headers, academy):
+    r = await client.get(
+        f"/academies/{academy.id}/report/weekly"
+        "?start_date=2020-06-10&end_date=2020-06-12",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["week_start"] == "2020-06-10"
+    assert data["week_end"] == "2020-06-12"
+    assert data["completions_count"] == 0
+
+
 async def test_dificuldades_academia_vazio(client, admin_headers, academy):
     r = await client.get(f"/academies/{academy.id}/difficulties", headers=admin_headers)
     assert r.status_code == 200

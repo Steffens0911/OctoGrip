@@ -10,6 +10,7 @@ from app.core.exceptions import UserNotFoundError
 from app.core.points_limits import clamp_reward_points
 from app.models import Mission, MissionUsage, User
 from app.services.leveling_service import refresh_user_level
+from app.services.weekly_kit_service import assert_user_may_complete_kit_mission
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ async def complete_mission(
             from app.core.exceptions import AppError
 
             raise AppError("Você só pode completar missões da sua academia.", status_code=403)
+
+    await assert_user_may_complete_kit_mission(db, user_id, mission)
 
     existing = (
         await db.execute(

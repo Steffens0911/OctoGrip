@@ -43,6 +43,9 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/migrations/001_cr
 | 049 | trophy_min_reward_level_to_unlock | `trophies.min_reward_level_to_unlock` (nível mínimo `reward_level` para desbloquear; 0 = sem requisito); remove `min_points_to_unlock` |
 | 052 | user_login_days | Tabela `user_login_days` (user_id, login_day UTC); streak de login em `/auth/me`; backfill a partir de `users.last_login_at` |
 | 053 | trophy_max_count_per_opponent | `trophies.max_count_per_opponent` (INT NULL): limite de execuções contáveis por adversário no período |
+| 056 | weekly_technique_kits | `weekly_technique_kits`, `weekly_kit_items`, `user_weekly_kit_choices`; `missions.weekly_kit_id` (kits 1–5 técnicas, escolha por semana ISO) |
+| 057 | academy_marketplace_items | Tabela `academy_marketplace_items` (anúncios por academia; versão inicial com `whatsapp_url`) |
+| 058 | marketplace_whatsapp_phone | Coluna `whatsapp_phone` (dígitos BR opcional); backfill a partir de `wa.me`; remove `whatsapp_url` |
 
 ---
 
@@ -77,3 +80,6 @@ docker compose exec postgres psql -U jjb -d jjb_db -f /caminho/scripts/zerar_pos
 - **Migration 049:** substitui desbloqueio por pontos por `trophies.min_reward_level_to_unlock` (0 = sem requisito; N ≥ 1 exige `users.reward_level >= N`). Remove `min_points_to_unlock`. Troféus que tinham barreira por pontos precisam ser reconfigurados manualmente.
 - **Migration 052:** regista dias UTC com login bem-sucedido (`POST /auth/login`); `login_streak_days` em `GET/PATCH /auth/me` conta dias consecutivos (âncora hoje ou ontem em UTC). O backfill insere apenas a data do último `last_login_at` por utilizador.
 - **Migration 053:** `trophies.max_count_per_opponent` opcional; sem coluna, a API falha ao listar troféus (`UndefinedColumnError`). Aplicar o SQL antes de usar o painel Admin com troféus atualizados.
+- **Migration 056:** kits semanais nomeados (rótulo de turma) com 1–5 técnicas; missões por kit (`weekly_kit_id`, `slot_index` 0–4); escolha do aluno por `(user_id, academy_id, iso_week_year, iso_week_number)`.
+- **Migration 057:** marketplace por academia (`academy_marketplace_items`): divulgação de produtos com `price_cents`, `whatsapp_url`, `image_url` opcional; CRUD em `/marketplace_items`; leitura pública dos ativos em `GET /me/marketplace_items` para utilizadores com `academy_id`.
+- **Migration 058:** substitui armazenamento de URL completa por `whatsapp_phone` (dígitos `55`+DDD+número, NULL opcional); migra números de URLs `wa.me` antigas; a API gera `whatsapp_url` na resposta com mensagem fixa em código.

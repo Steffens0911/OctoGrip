@@ -51,6 +51,7 @@ class MissionRead(BaseModel):
     technique_id: UUID
     technique_name: str | None = None
     lesson_id: UUID | None = None
+    weekly_kit_id: UUID | None = None
     slot_index: int | None = None
     start_date: date | None = None
     end_date: date | None = None
@@ -91,7 +92,18 @@ class MissionWeekSlotResponse(BaseModel):
     mission: MissionTodayResponse | None = None
 
 
-class MissionWeekResponse(BaseModel):
-    """Lista das 3 missões semanais para exibição ao aluno."""
+class WeeklyKitOptionResponse(BaseModel):
+    """Kit disponível para o aluno escolher (rótulo de turma)."""
 
-    entries: list[MissionWeekSlotResponse]  # sempre 3 itens, na ordem seg-ter, qua-qui, sex-dom
+    kit_id: UUID
+    label: str
+    item_count: int
+
+
+class MissionWeekResponse(BaseModel):
+    """Missões semanais: modo legado (até 3 slots) ou modo kits (1–5 por kit escolhido)."""
+
+    entries: list[MissionWeekSlotResponse]
+    needs_kit_choice: bool = False
+    available_kits: list[WeeklyKitOptionResponse] = Field(default_factory=list)
+    selected_kit_id: UUID | None = None

@@ -14,8 +14,8 @@ from app.models.soft_delete import SoftDeleteMixin
 
 class Mission(Base, UUIDMixin, SoftDeleteMixin):
     """
-    Missão da academia: vincula uma Técnica a um slot (slot_index 0, 1, 2).
-    Conclusão por missão (MissionUsage.mission_id). academy_id + slot_index identificam o slot.
+    Missão da academia: vincula uma Técnica a um slot.
+    Legado: slot_index 0–2 e weekly_kit_id nulo. Kits semanais: slot_index 0–4 e weekly_kit_id.
     start_date/end_date opcionais (legado).
     """
 
@@ -39,7 +39,7 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
         Integer,
         nullable=True,
         index=True,
-        comment="Slot da academia (0, 1, 2). NULL para missões globais/legado.",
+        comment="Slot da academia: 0–2 sem kit; 0–4 com weekly_kit_id. NULL para missões globais/legado.",
     )
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
@@ -52,6 +52,12 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
         index=True,
         comment="NULL = missão global; preenchido = override da academia (A-02).",
     )
+    weekly_kit_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("weekly_technique_kits.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+        comment="NULL = missão do slot legado (0–2); preenchido = missão de kit semanal (slot 0–4).",
+    )
     multiplier: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -62,6 +68,10 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
     academy: Mapped["Academy | None"] = relationship(
         "Academy",
         back_populates="missions",
+        lazy="selectin",
+    )
+    weekly_kit: Mapped["WeeklyTechniqueKit | None"] = relationship(
+        "WeeklyTechniqueKit",
         lazy="selectin",
     )
     technique: Mapped["Technique"] = relationship(

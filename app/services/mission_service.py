@@ -13,6 +13,7 @@ from app.schemas.mission import (
     MissionTodayResponse,
     MissionWeekResponse,
     MissionWeekSlotResponse,
+    WeeklyKitOptionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,7 @@ async def get_today_mission(
                     Mission.academy_id == academy_id,
                     Mission.level == level_normalized,
                     Mission.slot_index.isnot(None),
+                    Mission.weekly_kit_id.is_(None),
                     Mission.deleted_at.is_(None),
                 )
                 .options(*options)
@@ -255,6 +257,123 @@ async def get_mission_today_response(
     )
 
 
+async def _get_mission_week_kit_response(
+    db: AsyncSession,
+    *,
+    level_n: str,
+    user_id: UUID | None,
+    resolved_academy_id: UUID,
+    academy: Academy | None,
+    options,
+) -> MissionWeekResponse:
+    from app.services.weekly_kit_service import (
+        ensure_kit_missions_from_db_items,
+        get_kit,
+        get_user_kit_choice,
+        list_active_kits_for_academy,
+    )
+    from app.utils.iso_week import iso_week_key_for_date
+
+    kits = await list_active_kits_for_academy(db, resolved_academy_id)
+    available: list[WeeklyKitOptionResponse] = []
+    for k in kits:
+        n_items = len(k.items or [])
+        if 1 <= n_items <= 5:
+            available.append(
+                WeeklyKitOptionResponse(kit_id=k.id, label=k.label, item_count=n_items)
+            )
+    iso_y, iso_w = iso_week_key_for_date()
+    selected_kit_id: UUID | None = None
+    if user_id is not None:
+        ch = await get_user_kit_choice(db, user_id, resolved_academy_id, iso_y, iso_w)
+        if ch:
+            selected_kit_id = ch.kit_id
+    if selected_kit_id is None:
+        return MissionWeekResponse(
+            entries=[],
+            needs_kit_choice=True,
+            available_kits=available,
+            selected_kit_id=None,
+        )
+
+    await ensure_kit_missions_from_db_items(db, resolved_academy_id, selected_kit_id)
+    kit_row = await get_kit(db, selected_kit_id, resolved_academy_id)
+    kit_label = kit_row.label if kit_row else None
+
+    missions = (
+        (
+            await db.execute(
+                select(Mission)
+                .where(
+                    Mission.is_active.is_(True),
+                    Mission.academy_id == resolved_academy_id,
+                    Mission.level == level_n,
+                    Mission.weekly_kit_id == selected_kit_id,
+                    Mission.slot_index.in_((0, 1, 2, 3, 4)),
+                    Mission.deleted_at.is_(None),
+                )
+                .options(*options)
+                .order_by(Mission.slot_index.asc())
+            )
+        )
+        .unique()
+        .scalars()
+        .all()
+    )
+    missions_by_slot: dict[int, Mission] = {}
+    for m in missions:
+        if m.technique and m.slot_index is not None:
+            missions_by_slot[m.slot_index] = m
+    ordered_slots = sorted(missions_by_slot.keys())
+    completed_mission_ids: set[UUID] = set()
+    if user_id is not None and ordered_slots:
+        mission_ids = [missions_by_slot[s].id for s in ordered_slots]
+        usages = (
+            await db.execute(
+                select(MissionUsage.mission_id).where(
+                    MissionUsage.user_id == user_id,
+                    MissionUsage.mission_id.in_(mission_ids),
+                )
+            )
+        ).all()
+        for (mid,) in usages:
+            completed_mission_ids.add(mid)
+        execs = (
+            await db.execute(
+                select(TechniqueExecution.mission_id).where(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.mission_id.in_(mission_ids),
+                    TechniqueExecution.status == "confirmed",
+                )
+            )
+        ).all()
+        for (mid,) in execs:
+            completed_mission_ids.add(mid)
+
+    entries: list[MissionWeekSlotResponse] = []
+    for si in ordered_slots:
+        mission = missions_by_slot[si]
+        period_label = f"Foco {si + 1}"
+        weekly_theme = kit_label or mission.theme
+        if academy and academy.weekly_theme and not kit_label:
+            weekly_theme = academy.weekly_theme
+        payload = await _mission_to_today_response(
+            mission,
+            weekly_theme=weekly_theme,
+            db=None,
+            user_id=user_id,
+            already_completed_override=mission.id in completed_mission_ids,
+        )
+        entries.append(MissionWeekSlotResponse(period_label=period_label, mission=payload))
+
+    return MissionWeekResponse(
+        entries=entries,
+        needs_kit_choice=False,
+        available_kits=available,
+        selected_kit_id=selected_kit_id,
+    )
+
+
 async def get_mission_week_response(
     db: AsyncSession,
     level: str = "beginner",
@@ -262,10 +381,11 @@ async def get_mission_week_response(
     academy_id: UUID | None = None,
 ) -> MissionWeekResponse:
     """
-    Retorna as 3 missões para a academia do usuário.
-    Missões persistem enquanto configuradas (sem rotação por dias).
+    Semana do aluno: modo **turmas** (escolha + focos 1–N) se a academia tiver turma ativa;
+    caso contrário, até 3 missões legadas por slots 0–2.
     """
     from app.models import User
+    from app.services.weekly_kit_service import academy_has_active_weekly_kits
 
     user = None
     if user_id:
@@ -303,6 +423,15 @@ async def get_mission_week_response(
                     .options(selectinload(Academy.weekly_technique))
                 )
             ).unique().scalars().first()
+        if await academy_has_active_weekly_kits(db, resolved_academy_id):
+            return await _get_mission_week_kit_response(
+                db,
+                level_n=level_n,
+                user_id=user_id,
+                resolved_academy_id=resolved_academy_id,
+                academy=academy,
+                options=options,
+            )
         all_missions = (
             await db.execute(
                 select(Mission)
@@ -311,6 +440,7 @@ async def get_mission_week_response(
                     Mission.academy_id == resolved_academy_id,
                     Mission.level == level_n,
                     Mission.slot_index.in_((0, 1, 2)),
+                    Mission.weekly_kit_id.is_(None),
                     Mission.deleted_at.is_(None),
                 )
                 .options(*options)
@@ -331,6 +461,7 @@ async def get_mission_week_response(
                         Mission.academy_id == resolved_academy_id,
                         Mission.level == level_n,
                         Mission.slot_index.in_((0, 1, 2)),
+                        Mission.weekly_kit_id.is_(None),
                         Mission.deleted_at.is_(None),
                     )
                     .options(*options)
@@ -405,4 +536,9 @@ async def get_mission_week_response(
             "missions_found": missions_count,
         },
     )
-    return MissionWeekResponse(entries=entries)
+    return MissionWeekResponse(
+        entries=entries,
+        needs_kit_choice=False,
+        available_kits=[],
+        selected_kit_id=None,
+    )

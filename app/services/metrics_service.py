@@ -304,11 +304,18 @@ async def get_active_students_report(
 async def get_weekly_panel_logins_report(
     db: AsyncSession,
     *,
-    reference_date: date,
+    reference_date: date | None,
     academy_id: uuid.UUID | None,
+    range_start: date | None = None,
+    range_end: date | None = None,
 ) -> dict:
     """
-    Relatório semanal (ISO) de logins (user_login_days).
+    Relatório de logins (user_login_days) num intervalo de datas.
+
+    - Modo intervalo: `range_start` e `range_end` (inclusive); o limite máximo de
+      dias é validado na rota HTTP.
+    - Modo semana ISO: se o intervalo não for passado, usa a semana ISO que contém
+      `reference_date` (default hoje se `reference_date` for None).
 
     Regras:
     - Roles elegíveis: administrador, gerente_academia, professor, supervisor e aluno.
@@ -316,10 +323,15 @@ async def get_weekly_panel_logins_report(
       (admins globais sem academy_id aparecem somente na visão global).
     - Escopo global: todos os usuários elegíveis.
     """
-    iso_year, iso_week, _ = reference_date.isocalendar()
-    monday = datetime.fromisocalendar(iso_year, iso_week, 1).date()
-    week_start = monday
-    week_end = monday + timedelta(days=6)
+    if range_start is not None and range_end is not None:
+        week_start = range_start
+        week_end = range_end
+    else:
+        ref = reference_date if reference_date is not None else date.today()
+        iso_year, iso_week, _ = ref.isocalendar()
+        monday = datetime.fromisocalendar(iso_year, iso_week, 1).date()
+        week_start = monday
+        week_end = monday + timedelta(days=6)
 
     eligible_users_query = select(User).where(
         User.role.in_(_WEEKLY_LOGIN_REPORT_ROLES)

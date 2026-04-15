@@ -101,11 +101,11 @@ Documentação da API de **Academias** (recurso B2B: usuários vinculados, miss�
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| **GET** | `GET /academies/{academy_id}/ranking` | Ranking interno (missões concluídas). Parâmetros: `period_days` (default 30), `limit` (default 50). |
+| **GET** | `GET /academies/{academy_id}/ranking` | Ranking interno (conclusões). Parâmetros: `period_days` (default 30) **ou** `start_date`+`end_date` (inclusive, máx. 366 dias); `limit` (default 50). |
 | **GET** | `GET /academies/{academy_id}/difficulties` | Posições mais reportadas como difíceis (T-02). Parâmetro: `limit` (default 50). |
-| **GET** | `GET /academies/{academy_id}/report/weekly` | Relatório semanal (JSON). Soma `LessonProgress`, `MissionUsage` e `TechniqueExecution` com `status=confirmed`. Parâmetros opcionais: `year`, `week` (ISO). |
-| **GET** | `GET /academies/{academy_id}/report/weekly/csv` | Relatório semanal em CSV. Mesmos parâmetros `year`, `week`. |
-| **GET** | `GET /reports/weekly_panel_logins` | Relatório semanal (semana ISO) de logins: staff (`administrador`, `gerente_academia`, `professor`, `supervisor`) e `aluno`. Aceita `reference_date` e `academy_id` opcional para visão local/global. |
+| **GET** | `GET /academies/{academy_id}/report/weekly` | Relatório de conclusões (JSON). Soma `LessonProgress`, `MissionUsage` e `TechniqueExecution` com `status=confirmed`. Parâmetros: `year`+`week` (ISO) **ou** `start_date`+`end_date` (inclusive). |
+| **GET** | `GET /academies/{academy_id}/report/weekly/csv` | Export CSV. Mesmos parâmetros que o JSON. |
+| **GET** | `GET /reports/weekly_panel_logins` | Logins de staff e `aluno` (`user_login_days`). Semana ISO (`reference_date`, default hoje) **ou** intervalo `start_date`+`end_date` (inclusive). `academy_id` opcional (visão local/global). |
 
 ---
 
@@ -122,6 +122,17 @@ A academia pode definir **até 3 técnicas semanais** (slots):
 - Se só **Missão 1** estiver preenchida, a técnica aparece **apenas no slot 1**; slots 2 e 3 ficam vazios.
 - O endpoint `GET /mission_today/week` retorna as 3 entradas para o aluno; cada entrada tem `period_label` ("Missão 1", "Missão 2", "Missão 3") e `mission` (preenchida ou null).
 - No **viewer**, o professor configura via 3 dropdowns no detalhe da academia; o aluno vê 3 cards na tela inicial.
+
+---
+
+## Kits semanais por turma (1–5 técnicas)
+
+Quando a academia tem **pelo menos um kit** com entre **1 e 5 técnicas** cadastradas, o modo **kits** substitui o fluxo das três missões fixas para os alunos:
+
+- **Professor:** CRUD de **turmas** em `GET/POST /academies/{id}/weekly-kits`, `PATCH/DELETE /academies/{id}/weekly-kits/{kit_id}`. **Alias legado:** path `weekly_kits` (underscore) — mesmo contrato (ver [API.md](API.md)). `POST /academies/{id}/reset_weekly_turmas_week` reinicia a semana ISO **atual (UTC)**: escolhas de turma + conclusões na janela, mantendo pontos em `points_adjustment`. Cada turma tem **rótulo** e 1–5 técnicas com multiplicador (10–50); o backend cria/atualiza `missions` com `weekly_kit_id` e `slot_index` 0–4.
+- **Aluno:** `PUT /users/me/weekly-kit-choice` com `{ "kit_id": "uuid", "reference_date": "YYYY-MM-DD" opcional }` grava a escolha para a **semana ISO** da data de referência (default: hoje em UTC). O `GET /mission_today/week` passa a incluir `needs_kit_choice`, `available_kits` e `selected_kit_id`; sem escolha, `entries` vem vazio até o aluno escolher. Com escolha, `entries` contém só as missões do kit (rótulos `Foco 1` … `Foco N`).
+- **Isolamento:** `POST /mission_complete` e execuções com `mission_id` de missão de kit exigem que o kit escolhido na semana coincida; caso contrário **403**. **Troca de kit** na mesma semana é permitida só enquanto não houver `MissionUsage` nem `TechniqueExecution` confirmada com missão de kit nessa semana ISO; depois **409**.
+- **Legado:** se não existir nenhum kit válido, mantém-se o comportamento A-03 (3 slots). O `PATCH /academies/{id}` deixa de sincronizar as 3 missões legadas enquanto houver kit válido (evita duas fontes de verdade).
 
 ---
 

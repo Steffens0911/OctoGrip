@@ -1,5 +1,6 @@
 """Rotas de Academia (A-03 tema semanal, A-04 ranking)."""
 import json
+from datetime import date
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -14,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.core.auth_deps import get_current_user
+from app.core.cache import app_cache
 from app.core.exceptions import AcademyNotFoundError, AppError, ForbiddenError
 from app.core.role_deps import (
     require_admin,
@@ -48,6 +50,7 @@ from app.services.academy_service import (
     get_academy_ranking,
     get_academy_weekly_report,
     reset_academy_missions,
+    reset_academy_weekly_turmas_week,
     update_academy,
 )
 from app.services.collective_goal_service import (
@@ -60,6 +63,19 @@ from app.services.execution_service import batch_total_points_for_users
 from app.services.fcm_service import send_fcm_data_message
 from app.services.push_token_service import delete_device_token, list_fcm_tokens_for_academy
 from app.services.user_service import list_users
+
+_MAX_ACADEMY_REPORT_RANGE_DAYS = 366
+
+
+def _validate_academy_report_date_range(start: date, end: date) -> None:
+    if start > end:
+        raise AppError("start_date deve ser anterior ou igual a end_date.", status_code=400)
+    if (end - start).days + 1 > _MAX_ACADEMY_REPORT_RANGE_DAYS:
+        raise AppError(
+            f"Intervalo máximo de {_MAX_ACADEMY_REPORT_RANGE_DAYS} dias.",
+            status_code=400,
+        )
+
 
 # Mesmo diretório base de app.main: raiz do projeto (/app) dentro do container.
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
@@ -281,6 +297,26 @@ async def academy_reset_missions_route(
     return await reset_academy_missions(db, academy_id)
 
 
+@router.post("/{academy_id}/reset_weekly_turmas_week")
+async def academy_reset_weekly_turmas_week_route(
+    academy_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """
+    Reinicia escolha de turma e progresso na **semana ISO atual (UTC)** para missões
+    de turmas (`weekly_kit_id`), preservando pontos em `points_adjustment`.
+    Exige academia com pelo menos uma turma ativa (1–5 técnicas).
+    """
+    academy = await get_academy(db, academy_id)
+    if academy is None:
+        raise AcademyNotFoundError()
+    verify_academy_access(current_user, str(academy_id))
+    result = await reset_academy_weekly_turmas_week(db, academy_id)
+    await app_cache.invalidate_prefix("mission_week:")
+    return result
+
+
 @router.post("/{academy_id}/logo", response_model=AcademyRead)
 async def academy_upload_logo(
     academy_id: UUID,
@@ -406,14 +442,36 @@ async def academy_ranking(
     academy_id: UUID,
     period_days: int = 30,
     limit: int = 50,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """A-04: Ranking interno da academia."""
+    """A-04: Ranking interno da academia (últimos N dias ou intervalo start_date/end_date)."""
     academy = await get_academy(db, academy_id)
     if not academy:
         raise AcademyNotFoundError()
     verify_academy_access(current_user, str(academy_id))
+    if (start_date is None) ^ (end_date is None):
+        raise AppError("Informe start_date e end_date juntos, ou omita ambos.", status_code=400)
+    if start_date is not None and end_date is not None:
+        _validate_academy_report_date_range(start_date, end_date)
+        entries = await get_academy_ranking(
+            db,
+            academy_id,
+            period_days=30,
+            limit=min(limit, 100),
+            range_start=start_date,
+            range_end=end_date,
+        )
+        span_days = (end_date - start_date).days + 1
+        return RankingResponse(
+            academy_id=academy_id,
+            period_days=span_days,
+            period_start=start_date,
+            period_end=end_date,
+            entries=[RankingEntry(**e) for e in entries],
+        )
     entries = await get_academy_ranking(
         db,
         academy_id,
@@ -423,6 +481,8 @@ async def academy_ranking(
     return RankingResponse(
         academy_id=academy_id,
         period_days=min(period_days, 365),
+        period_start=None,
+        period_end=None,
         entries=[RankingEntry(**e) for e in entries],
     )
 
@@ -432,12 +492,22 @@ async def academy_report_weekly(
     academy_id: UUID,
     year: int | None = None,
     week: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """T-03: Relatório semanal."""
+    """T-03: Relatório de conclusões (semana ISO ou intervalo start_date/end_date)."""
     verify_academy_access(current_user, str(academy_id))
-    report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
+    if (start_date is None) ^ (end_date is None):
+        raise AppError("Informe start_date e end_date juntos, ou omita ambos.", status_code=400)
+    if start_date is not None and end_date is not None:
+        _validate_academy_report_date_range(start_date, end_date)
+        report = await get_academy_weekly_report(
+            db, academy_id, start_date=start_date, end_date=end_date
+        )
+    else:
+        report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
     if not report:
         raise AcademyNotFoundError()
     return WeeklyReportResponse(
@@ -455,12 +525,22 @@ async def academy_report_weekly_csv(
     academy_id: UUID,
     year: int | None = None,
     week: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
-    """T-03: Relatório semanal em CSV."""
+    """T-03: Relatório de conclusões em CSV."""
     verify_academy_access(current_user, str(academy_id))
-    report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
+    if (start_date is None) ^ (end_date is None):
+        raise AppError("Informe start_date e end_date juntos, ou omita ambos.", status_code=400)
+    if start_date is not None and end_date is not None:
+        _validate_academy_report_date_range(start_date, end_date)
+        report = await get_academy_weekly_report(
+            db, academy_id, start_date=start_date, end_date=end_date
+        )
+    else:
+        report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
     if not report:
         raise AcademyNotFoundError()
     lines = [

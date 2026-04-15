@@ -7,9 +7,22 @@ from uuid import UUID
 from sqlalchemy import func, select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import AppError
 from app.core.points_limits import clamp_reward_points
-from app.models import Academy, LessonProgress, Mission, MissionUsage, Partner, TechniqueExecution, TrainingFeedback, User
+from app.models import (
+    Academy,
+    LessonProgress,
+    Mission,
+    MissionUsage,
+    Partner,
+    TechniqueExecution,
+    TrainingFeedback,
+    User,
+    UserWeeklyKitChoice,
+)
+from app.utils.iso_week import iso_week_key_for_date, utc_datetime_bounds_for_iso_week
 from app.services.mission_crud_service import upsert_academy_week_missions
+from app.services.weekly_kit_service import academy_has_active_weekly_kits
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +41,8 @@ async def ensure_weekly_missions_if_needed(
     if academy is None:
         academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
+        return
+    if await academy_has_active_weekly_kits(db, academy_id):
         return
     if (
         academy.weekly_technique_id is None
@@ -129,6 +144,135 @@ async def reset_academy_missions(db: AsyncSession, academy_id: UUID) -> dict:
     return {"message": "Missões reiniciadas. Pontuação preservada.", "users_affected": len(user_points)}
 
 
+async def reset_academy_weekly_turmas_week(db: AsyncSession, academy_id: UUID) -> dict:
+    """
+    Reinicia escolhas de turma (kit) e progresso na semana ISO atual (UTC):
+    remove `user_weekly_kit_choices` dessa semana e `MissionUsage` / `TechniqueExecution`
+    confirmadas ligadas a missões com `weekly_kit_id`, apenas com timestamps na janela
+    da semana. Pontos dessas linhas somam em `points_adjustment` (como `reset_academy_missions`).
+    """
+    academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
+    if not academy:
+        return {"message": "Academia não encontrada.", "users_affected": 0, "choices_removed": 0}
+
+    if not await academy_has_active_weekly_kits(db, academy_id):
+        raise AppError(
+            "A academia não tem turmas ativas (1–5 técnicas). Crie uma turma antes de usar este reinício.",
+            status_code=400,
+        )
+
+    iso_y, iso_w = iso_week_key_for_date()
+    t_start, t_end = utc_datetime_bounds_for_iso_week(iso_y, iso_w)
+
+    r_choices = await db.execute(
+        sa_delete(UserWeeklyKitChoice).where(
+            UserWeeklyKitChoice.academy_id == academy_id,
+            UserWeeklyKitChoice.iso_week_year == iso_y,
+            UserWeeklyKitChoice.iso_week_number == iso_w,
+        )
+    )
+    choices_removed = r_choices.rowcount if r_choices.rowcount is not None else 0
+
+    mission_ids_subq = select(Mission.id).where(
+        Mission.academy_id == academy_id,
+        Mission.weekly_kit_id.is_not(None),
+        Mission.deleted_at.is_(None),
+    )
+    mission_ids = (await db.execute(mission_ids_subq)).scalars().all()
+    if not mission_ids:
+        await db.commit()
+        return {
+            "message": "Semana reiniciada (sem missões de turma). Escolhas de turma da semana removidas.",
+            "users_affected": 0,
+            "choices_removed": choices_removed,
+            "iso_week_year": iso_y,
+            "iso_week_number": iso_w,
+        }
+
+    mu_points_rows = (
+        await db.execute(
+            select(
+                MissionUsage.user_id,
+                func.coalesce(func.sum(MissionUsage.points_awarded), 0).label("total_points"),
+            )
+            .where(
+                MissionUsage.mission_id.in_(mission_ids),
+                MissionUsage.user_id.is_not(None),
+                MissionUsage.completed_at >= t_start,
+                MissionUsage.completed_at < t_end,
+            )
+            .group_by(MissionUsage.user_id)
+        )
+    ).all()
+
+    te_points_rows = (
+        await db.execute(
+            select(
+                TechniqueExecution.user_id,
+                func.coalesce(func.sum(TechniqueExecution.points_awarded), 0).label("total_points"),
+            )
+            .where(
+                TechniqueExecution.mission_id.in_(mission_ids),
+                TechniqueExecution.status == "confirmed",
+                TechniqueExecution.confirmed_at.is_not(None),
+                TechniqueExecution.confirmed_at >= t_start,
+                TechniqueExecution.confirmed_at < t_end,
+            )
+            .group_by(TechniqueExecution.user_id)
+        )
+    ).all()
+
+    user_points: dict[UUID, int] = {}
+    for row in mu_points_rows:
+        if row.user_id and row.total_points:
+            user_points[row.user_id] = user_points.get(row.user_id, 0) + int(row.total_points)
+    for row in te_points_rows:
+        if row.user_id and row.total_points:
+            user_points[row.user_id] = user_points.get(row.user_id, 0) + int(row.total_points)
+
+    if user_points:
+        user_ids = list(user_points.keys())
+        users = (await db.execute(select(User).where(User.id.in_(user_ids)))).scalars().all()
+        user_dict = {u.id: u for u in users}
+        for uid, pts in user_points.items():
+            if uid in user_dict:
+                user_dict[uid].points_adjustment = (user_dict[uid].points_adjustment or 0) + pts
+
+    await db.execute(
+        sa_delete(MissionUsage).where(
+            MissionUsage.mission_id.in_(mission_ids),
+            MissionUsage.completed_at >= t_start,
+            MissionUsage.completed_at < t_end,
+        )
+    )
+    await db.execute(
+        sa_delete(TechniqueExecution).where(
+            TechniqueExecution.mission_id.in_(mission_ids),
+            TechniqueExecution.status == "confirmed",
+            TechniqueExecution.confirmed_at.is_not(None),
+            TechniqueExecution.confirmed_at >= t_start,
+            TechniqueExecution.confirmed_at < t_end,
+        )
+    )
+    await db.commit()
+    logger.info(
+        "reset_academy_weekly_turmas_week",
+        extra={
+            "academy_id": str(academy_id),
+            "iso_week": f"{iso_y}-W{iso_w}",
+            "users_affected": len(user_points),
+            "choices_removed": choices_removed,
+        },
+    )
+    return {
+        "message": "Semana das turmas reiniciada (UTC). Pontuação preservada.",
+        "users_affected": len(user_points),
+        "choices_removed": choices_removed,
+        "iso_week_year": iso_y,
+        "iso_week_number": iso_w,
+    }
+
+
 async def list_academies(db: AsyncSession, limit: int = 100) -> list[Academy]:
     """Lista academias (para painel do professor)."""
     return (await db.execute(select(Academy).order_by(Academy.name).limit(limit))).scalars().all()
@@ -219,17 +363,18 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
         elif key == "login_notice_active" and value is not None:
             academy.login_notice_active = bool(value)
     if (technique_keys | multiplier_keys) & set(kwargs.keys()):
-        t1 = academy.weekly_technique_id
-        t2 = academy.weekly_technique_2_id
-        t3 = academy.weekly_technique_3_id
-        try:
-            await upsert_academy_week_missions(
-                db, academy_id, (t1, t2, t3),
-                date(2020, 1, 6), date(2099, 12, 31),
-            )
-        except Exception as e:
-            logger.exception("update_academy upsert_academy_week_missions: %s", e)
-            raise
+        if not await academy_has_active_weekly_kits(db, academy_id):
+            t1 = academy.weekly_technique_id
+            t2 = academy.weekly_technique_2_id
+            t3 = academy.weekly_technique_3_id
+            try:
+                await upsert_academy_week_missions(
+                    db, academy_id, (t1, t2, t3),
+                    date(2020, 1, 6), date(2099, 12, 31),
+                )
+            except Exception as e:
+                logger.exception("update_academy upsert_academy_week_missions: %s", e)
+                raise
     await db.commit()
     await db.refresh(academy)
     logger.info("update_academy", extra={"academy_id": str(academy_id)})
@@ -360,24 +505,37 @@ async def get_academy_ranking(
     academy_id: UUID,
     period_days: int = 30,
     limit: int = 50,
+    *,
+    range_start: date | None = None,
+    range_end: date | None = None,
 ) -> list[dict]:
     """
     A-04: Ranking interno da academia por conclusões (LessonProgress + MissionUsage).
     Inclui conclusões por lição (POST /lesson_complete), por missão do dia
     (POST /mission_complete) e execuções confirmadas (TechniqueExecution).
     Retorna lista de { rank, user_id, name, completions_count } ordenada por count desc.
-    Considera apenas conclusões nos últimos period_days dias.
+
+    - Com `range_start` e `range_end` (datas inclusive em UTC): filtra o intervalo
+      [início do dia range_start, fim exclusivo do dia seguinte a range_end).
+    - Caso contrário: últimos `period_days` dias a partir do instante atual (UTC).
     """
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return []
 
-    since = datetime.now(timezone.utc) - timedelta(days=period_days)
-
-    # Usar função comum para buscar completions
-    lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
-        db, academy_id, since
-    )
+    if range_start is not None and range_end is not None:
+        start_dt = datetime.combine(range_start, datetime.min.time()).replace(tzinfo=timezone.utc)
+        end_dt = datetime.combine(range_end + timedelta(days=1), datetime.min.time()).replace(
+            tzinfo=timezone.utc
+        )
+        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
+            db, academy_id, start_dt, end_dt
+        )
+    else:
+        since = datetime.now(timezone.utc) - timedelta(days=period_days)
+        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
+            db, academy_id, since
+        )
     
     # Merge e formatação
     merged = _merge_user_completions(lp_by_user, mu_by_user, te_by_user, limit=limit)
@@ -403,25 +561,39 @@ async def get_academy_weekly_report(
     academy_id: UUID,
     year: int | None = None,
     week: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> dict | None:
     """
-    T-03: Relatório semanal da academia (export simples).
+    T-03: Relatório de conclusões da academia (export simples).
     Inclui conclusões por lição (LessonProgress), por missão do dia (MissionUsage)
     e execuções confirmadas (TechniqueExecution).
-    Se year/week não informados, usa a semana atual (ISO).
-    Retorna week_start, week_end (ISO date), completions_count, active_users_count, entries (ranking da semana).
+
+    - Com `start_date` e `end_date` (inclusive): usa esse intervalo em calendário UTC
+      (ignora year/week).
+    - Senão, se year/week informados: semana ISO correspondente.
+    - Senão: semana ISO atual.
+    Retorna week_start, week_end (datas do período), completions_count, active_users_count, entries.
     """
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return None
 
-    if year is not None and week is not None:
+    if start_date is not None and end_date is not None:
+        d = start_date
+        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+        week_end = datetime.combine(end_date + timedelta(days=1), datetime.min.time()).replace(
+            tzinfo=timezone.utc
+        )
+    elif year is not None and week is not None:
         d = datetime.fromisocalendar(year, week, 1).date()
+        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+        week_end = week_start + timedelta(days=7)
     else:
         today = date.today()
         d = today - timedelta(days=today.weekday())
-    week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
-    week_end = week_start + timedelta(days=7)
+        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
+        week_end = week_start + timedelta(days=7)
 
     # Usar função comum para buscar completions
     lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
@@ -441,22 +613,29 @@ async def get_academy_weekly_report(
             "total_users": len(merged),
         },
     )
-    
+
+    if start_date is not None and end_date is not None:
+        label_start = start_date
+        label_end = end_date
+    else:
+        label_start = d
+        label_end = d + timedelta(days=6)
+
     if not merged:
         return {
             "academy_id": academy_id,
-            "week_start": d.isoformat(),
-            "week_end": (d + timedelta(days=6)).isoformat(),
+            "week_start": label_start.isoformat(),
+            "week_end": label_end.isoformat(),
             "completions_count": 0,
             "active_users_count": 0,
             "entries": [],
         }
-    
+
     total_completions = sum(r[2] for r in merged)
     return {
         "academy_id": academy_id,
-        "week_start": d.isoformat(),
-        "week_end": (d + timedelta(days=6)).isoformat(),
+        "week_start": label_start.isoformat(),
+        "week_end": label_end.isoformat(),
         "completions_count": total_completions,
         "active_users_count": len(merged),
         "entries": [

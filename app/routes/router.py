@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.routes import (
     academies,
+    academy_weekly_kits,
     admin,
     admin_audit,
     admin_backup,
@@ -14,6 +15,7 @@ from app.routes import (
     health,
     lesson_complete,
     lessons,
+    me_marketplace,
     me_push,
     me_training_videos,
     metrics,
@@ -25,6 +27,7 @@ from app.routes import (
     professors,
     reports,
     techniques,
+    marketplace_items,
     training_feedback,
     training_videos,
     trophies,
@@ -39,6 +42,11 @@ api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audi
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(academies.router, prefix="/academies", tags=["academies"])
+api_router.include_router(
+    academy_weekly_kits.router,
+    prefix="/academies",
+    tags=["academies-weekly-kits"],
+)
 api_router.include_router(professors.router, prefix="/professors", tags=["professors"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["lessons"])
@@ -55,5 +63,7 @@ api_router.include_router(training_feedback.router, prefix="/training_feedback",
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(training_videos.router, prefix="/training_videos", tags=["training_videos"])
+api_router.include_router(marketplace_items.router, prefix="/marketplace_items", tags=["marketplace_items"])
 api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
+api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])

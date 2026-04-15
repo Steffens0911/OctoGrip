@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
@@ -258,6 +259,86 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     dailyVideoCompleted: _dailyVideoCompleted,
                     onDailyVideoTap: _onDailyVideoTap,
                   ),
+                  if (academyId != null && academyId.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push<void>(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (context) => const MarketplaceScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: FantasyTheme.cardBorderRadius,
+                        child: Ink(
+                          decoration: BoxDecoration(
+                            borderRadius: FantasyTheme.cardBorderRadius,
+                            border: Border.all(
+                              color: FantasyTheme.gold.withValues(alpha: 0.45),
+                            ),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest
+                                .withValues(alpha: 0.35),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.storefront_rounded,
+                                  color: FantasyTheme.gold,
+                                  size: 28,
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Loja da academia',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall
+                                            ?.copyWith(
+                                              color: FantasyTheme.textPrimaryOf(
+                                                  context),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Produtos, preços e contato no WhatsApp',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color:
+                                                  FantasyTheme.textSecondaryOf(
+                                                      context),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: FantasyTheme.textSecondaryOf(context),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   if (isWide)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,

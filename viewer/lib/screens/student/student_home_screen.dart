@@ -13,6 +13,7 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
+import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
@@ -31,6 +32,7 @@ import 'package:viewer/widgets/gamification/streak_widget.dart';
 import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/academy_login_notice_dialog.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
@@ -60,6 +62,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   final _snapshotStore = StudentHomeSnapshotStore();
   UserModel? _selectedUser;
   MissionWeek? _missionWeek;
+  /// Pré-seleção na UI antes de confirmar escolha de turma (`PUT /users/me/weekly-kit-choice`).
+  String? _weeklyKitChoiceLocal;
+  /// Durante PUT escolha + recarregar semana (missões da turma).
+  bool _savingWeeklyTurmaChoice = false;
   int? _userPoints;
   int? _userLevel;
   int? _nextLevelThreshold;
@@ -775,7 +781,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             color: Theme.of(context).colorScheme.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(screenPadding, 0, screenPadding, 24),
+              padding: EdgeInsets.fromLTRB(
+                screenPadding,
+                0,
+                screenPadding,
+                24 + MediaQuery.viewPaddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -821,8 +832,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (showMissionSkeleton) ...[
                     const HomeMissionSectionSkeleton(),
                     const SizedBox(height: 14),
+                  ] else if (_missionWeek?.needsKitChoice == true &&
+                      _missionWeek!.availableKits.isNotEmpty) ...[
+                    _buildWeeklyKitChoiceSection(),
+                    const SizedBox(height: 14),
                   ] else if (_missionWeek != null &&
-                      _missionWeek!.entries.isNotEmpty) ...[
+                      _missionWeek!.entries.any((e) => e.mission != null)) ...[
                     _buildWeeklyMissionPathSection(),
                     const SizedBox(height: 14),
                   ],
@@ -878,6 +893,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (u != null) ...[
                     const SizedBox(height: 16),
                     _buildConfirmationsAndRequestsSection(),
+                    const SizedBox(height: 16),
+                    _buildMarketplaceEntryCard(),
                   ],
                 ],
               ),
@@ -904,6 +921,74 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Atalho no fim do Campo de treinamento (após confirmações): `GET /me/marketplace_items`.
+  Widget _buildMarketplaceEntryCard() {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.push<void>(
+            context,
+            MaterialPageRoute<void>(
+              builder: (context) => const MarketplaceScreen(),
+            ),
+          );
+        },
+        borderRadius: FantasyTheme.cardBorderRadius,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: FantasyTheme.cardBorderRadius,
+            border: Border.all(
+              color: FantasyTheme.gold.withValues(alpha: 0.45),
+            ),
+            color: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.35),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.storefront_rounded,
+                  color: FantasyTheme.gold,
+                  size: 28,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Loja da academia',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: FantasyTheme.textPrimaryOf(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Produtos, preços e contato no WhatsApp',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: FantasyTheme.textSecondaryOf(context),
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: FantasyTheme.textSecondaryOf(context),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1152,12 +1237,170 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
+  /// Escolha da turma da semana quando a academia usa turmas (1–5 técnicas).
+  Widget _buildWeeklyKitChoiceSection() {
+    final week = _missionWeek;
+    final u = _selectedUser;
+    if (week == null || u == null) return const SizedBox.shrink();
+    final options = week.availableKits;
+    if (options.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceOf(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.borderOf(context)),
+        ),
+        child: Text(
+          'A academia ainda não configurou turmas válidas (1–5 técnicas) para esta semana.',
+          style: TextStyle(color: AppTheme.textSecondaryOf(context)),
+        ),
+      );
+    }
+    final groupValue = _weeklyKitChoiceLocal ?? week.selectedKitId;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Turma da semana',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: AppTheme.textPrimaryOf(context),
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Escolha em que turma vai treinar. Só aparecem as técnicas dessa turma; após concluir uma missão, '
+          'não pode misturar com outra turma na mesma semana.',
+          style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+        ),
+        if (_savingWeeklyTurmaChoice) ...[
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              minHeight: 3,
+              backgroundColor: AppTheme.borderOf(context),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'A preparar as missões da turma…',
+            style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+          ),
+        ],
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: Column(
+            children: [
+              for (final k in options)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Material(
+                    color: groupValue == k.kitId
+                        ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35)
+                        : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _savingWeeklyTurmaChoice
+                          ? null
+                          : () => setState(() => _weeklyKitChoiceLocal = k.kitId),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(
+                              groupValue == k.kitId
+                                  ? Icons.check_circle
+                                  : Icons.circle_outlined,
+                              size: 22,
+                              color: groupValue == k.kitId
+                                  ? Theme.of(context).colorScheme.primary
+                                  : AppTheme.textSecondaryOf(context),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    k.label,
+                                    style: const TextStyle(fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    '${k.itemCount} técnica(s)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppTheme.textSecondaryOf(context),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              FilledButton(
+                onPressed: switch (groupValue) {
+                  null => null,
+                  final g => _savingWeeklyTurmaChoice
+                      ? null
+                      : () async {
+                          setState(() => _savingWeeklyTurmaChoice = true);
+                          try {
+                            await _api.putWeeklyKitChoice(kitId: g);
+                            if (!mounted) return;
+                            setState(() => _weeklyKitChoiceLocal = null);
+                            await _loadMissionWeek();
+                          } catch (e) {
+                            if (!mounted) return;
+                            AppFeedback.show(
+                              context,
+                              message: userFacingMessage(e),
+                              type: AppFeedbackType.error,
+                            );
+                          } finally {
+                            if (mounted) {
+                              setState(() => _savingWeeklyTurmaChoice = false);
+                            }
+                          }
+                        },
+                },
+                child: _savingWeeklyTurmaChoice
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Confirmar turma'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Título **Missões da semana** + caminho ●──●──● (técnicas + toque → lição).
   Widget _buildWeeklyMissionPathSection() {
     final week = _missionWeek;
     final u = _selectedUser;
     if (week == null || u == null) return const SizedBox.shrink();
-    final entries = week.entries;
+    final entries = week.entries.where((e) => e.mission != null).toList();
     if (entries.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

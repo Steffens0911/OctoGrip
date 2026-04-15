@@ -1,16 +1,20 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
+from app.core.cache import app_cache
 from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
 from app.core.rate_limit import limiter
 from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
 from app.models import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.weekly_kit import WeeklyKitChoiceRequest, WeeklyKitChoiceResponse
+from app.services.weekly_kit_service import set_user_weekly_kit_choice
 from app.services.user_service import (
     create_user,
     delete_user,
@@ -26,6 +30,34 @@ from app.services.leveling_service import refresh_user_level
 router = APIRouter()
 
 _ALLOWED_NON_ADMIN_CREATE_ROLE = "aluno"
+
+
+@router.put("/me/weekly-kit-choice", response_model=WeeklyKitChoiceResponse)
+async def me_weekly_kit_choice(
+    body: WeeklyKitChoiceRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Aluno (ou utilizador com academia) escolhe o kit da semana ISO para seguir as missões corretas."""
+    if current_user.academy_id is None:
+        raise ForbiddenError("Vincule-se a uma academia para escolher um kit semanal.")
+    ref: date | None = None
+    if body.reference_date:
+        ref = date.fromisoformat(body.reference_date)
+    row = await set_user_weekly_kit_choice(
+        db,
+        current_user.id,
+        current_user.academy_id,
+        body.kit_id,
+        reference_date=ref,
+    )
+    await app_cache.invalidate_prefix(f"mission_week:{current_user.id}:")
+    return WeeklyKitChoiceResponse(
+        kit_id=row.kit_id,
+        iso_week_year=row.iso_week_year,
+        iso_week_number=row.iso_week_number,
+        academy_id=row.academy_id,
+    )
 
 
 @router.get("", response_model=list[UserRead])

@@ -145,6 +145,18 @@ class Academy(Base, UUIDMixin):
         lazy="selectin",
         passive_deletes=True,
     )
+    weekly_technique_kits: Mapped[list["WeeklyTechniqueKit"]] = relationship(
+        "WeeklyTechniqueKit",
+        back_populates="academy",
+        lazy="selectin",
+        passive_deletes=True,
+    )
+    user_weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
+        "UserWeeklyKitChoice",
+        back_populates="academy",
+        lazy="selectin",
+        passive_deletes=True,
+    )
     collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
         "CollectiveGoal",
         back_populates="academy",
@@ -172,6 +184,12 @@ class Academy(Base, UUIDMixin):
     )
     training_videos: Mapped[list["TrainingVideo"]] = relationship(
         "TrainingVideo",
+        back_populates="academy",
+        lazy="selectin",
+        passive_deletes=True,
+    )
+    marketplace_items: Mapped[list["AcademyMarketplaceItem"]] = relationship(
+        "AcademyMarketplaceItem",
         back_populates="academy",
         lazy="selectin",
         passive_deletes=True,

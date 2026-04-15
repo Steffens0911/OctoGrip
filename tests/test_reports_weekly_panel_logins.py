@@ -174,3 +174,41 @@ async def test_weekly_panel_logins_supervisor_requires_academy_id(client, db, ac
         headers=headers,
     )
     assert r.status_code == 403
+
+
+async def test_weekly_panel_logins_custom_date_range(client, db, admin_headers, academy):
+    """Intervalo start_date/end_date (inclusive) substitui a semana ISO."""
+    from app.models import User
+    from app.models.user_login_day import UserLoginDay
+
+    u = User(
+        email=f"range-user-{uuid4().hex[:8]}@test.com",
+        name="Range User",
+        role="aluno",
+        academy_id=academy.id,
+        password_hash=hash_password_sync("aluno123"),
+    )
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+    db.add_all(
+        [
+            UserLoginDay(user_id=u.id, login_day=date(2026, 5, 10)),
+            UserLoginDay(user_id=u.id, login_day=date(2026, 5, 12)),
+        ]
+    )
+    await db.commit()
+
+    r = await client.get(
+        "/reports/weekly_panel_logins"
+        "?start_date=2026-05-10&end_date=2026-05-11"
+        f"&academy_id={academy.id}",
+        headers=admin_headers,
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["week_start"] == "2026-05-10"
+    assert data["week_end"] == "2026-05-11"
+    item = next(x for x in data["users"] if x["user_id"] == str(u.id))
+    assert item["distinct_login_days_in_week"] == 1
+    assert item["login_days"] == ["2026-05-10"]

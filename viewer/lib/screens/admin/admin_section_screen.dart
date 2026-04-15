@@ -5,6 +5,7 @@ import 'package:viewer/screens/admin/engagement_reports_screen.dart';
 import 'package:viewer/screens/admin/execution_reports_screen.dart';
 import 'package:viewer/screens/admin/audit_recovery_screen.dart';
 import 'package:viewer/screens/admin/database_backup_screen.dart';
+import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
@@ -58,6 +59,18 @@ class AdminSectionScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const TrainingVideoListScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppNavigationTile(
+            icon: Icons.storefront_rounded,
+            title: 'Loja / anúncios',
+            subtitle: 'Marketplace por academia (preço, foto, WhatsApp)',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MarketplaceListScreen(),
               ),
             ),
           ),

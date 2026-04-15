@@ -18,7 +18,9 @@ from app.models.collective_goal import CollectiveGoal
 from app.models.trophy import Trophy
 from app.models.partner import Partner
 from app.models.training_video import TrainingVideo, TrainingVideoDailyView
+from app.models.academy_marketplace_item import AcademyMarketplaceItem
 from app.models.user_device_token import UserDeviceToken
+from app.models.weekly_technique_kit import UserWeeklyKitChoice, WeeklyKitItem, WeeklyTechniqueKit
 
 __all__ = [
     "Base",
@@ -41,5 +43,9 @@ __all__ = [
     "Partner",
     "TrainingVideo",
     "TrainingVideoDailyView",
+    "AcademyMarketplaceItem",
     "UserDeviceToken",
+    "WeeklyTechniqueKit",
+    "WeeklyKitItem",
+    "UserWeeklyKitChoice",
 ]

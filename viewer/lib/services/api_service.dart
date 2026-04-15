@@ -17,11 +17,13 @@ import 'package:viewer/models/partner.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
+import 'package:viewer/models/marketplace_item.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'dart:typed_data';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/backup_multipart_io.dart'
     if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart' as backup_multipart;
@@ -1200,7 +1202,7 @@ class ApiService {
     return MissionToday.fromJson(data! as Map<String, dynamic>);
   }
 
-  /// Lista das 3 missões da semana (Seg–Ter, Qua–Qui, Sex–Dom) para exibição ao aluno.
+  /// Missões da semana: modo legado (até 3 slots) ou **turmas** (escolha + focos 1–N).
   /// [level] mapeado da faixa do usuário: beginner (white/blue) ou intermediate (purple/brown/black).
   Future<MissionWeek> getMissionWeek({
     String level = 'beginner',
@@ -1215,6 +1217,89 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return MissionWeek.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Escolha da turma da semana ISO (aluno). Invalida cache de [getMissionWeek].
+  Future<void> putWeeklyKitChoice({
+    required String kitId,
+    String? referenceDate,
+  }) async {
+    final body = <String, dynamic>{
+      'kit_id': kitId,
+      if (referenceDate != null) 'reference_date': referenceDate,
+    };
+    final r = await _req(http.put(
+      Uri.parse('$baseUrl/users/me/weekly-kit-choice'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today/week');
+  }
+
+  Future<List<WeeklyKitRead>> getWeeklyKits(String academyId) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/weekly-kits');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data as List<dynamic>;
+    return list.map((e) => WeeklyKitRead.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<WeeklyKitRead> createWeeklyKit({
+    required String academyId,
+    required String label,
+    int sortOrder = 0,
+    List<Map<String, dynamic>>? items,
+  }) async {
+    final body = <String, dynamic>{
+      'label': label,
+      'sort_order': sortOrder,
+      if (items != null) 'items': items,
+    };
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/weekly-kits'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today/week');
+    return WeeklyKitRead.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<WeeklyKitRead> patchWeeklyKit({
+    required String academyId,
+    required String kitId,
+    String? label,
+    int? sortOrder,
+    List<Map<String, dynamic>>? items,
+  }) async {
+    final body = <String, dynamic>{
+      if (label != null) 'label': label,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (items != null) 'items': items,
+    };
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/academies/$academyId/weekly-kits/$kitId'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today/week');
+    return WeeklyKitRead.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWeeklyKit(String academyId, String kitId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/academies/$academyId/weekly-kits/$kitId'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today/week');
   }
 
   /// Indica se a lição já foi concluída pelo usuário logado (para botão desabilitado ao abrir).
@@ -1441,14 +1526,24 @@ class ApiService {
   }
 
   Future<WeeklyPanelLoginsReport> getWeeklyPanelLoginsReport({
-    required DateTime referenceDate,
+    DateTime? referenceDate,
+    DateTime? startDate,
+    DateTime? endDate,
     String? academyId,
   }) async {
     final params = <String, String>{
-      'reference_date':
-          '${referenceDate.year.toString().padLeft(4, '0')}-${referenceDate.month.toString().padLeft(2, '0')}-${referenceDate.day.toString().padLeft(2, '0')}',
       if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
     };
+    if (startDate != null && endDate != null) {
+      String ymd(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      params['start_date'] = ymd(startDate);
+      params['end_date'] = ymd(endDate);
+    } else {
+      final ref = referenceDate ?? DateTime.now();
+      params['reference_date'] =
+          '${ref.year.toString().padLeft(4, '0')}-${ref.month.toString().padLeft(2, '0')}-${ref.day.toString().padLeft(2, '0')}';
+    }
     final uri = Uri.parse('$baseUrl/reports/weekly_panel_logins')
         .replace(queryParameters: params);
     final r = await _req(
@@ -1465,12 +1560,20 @@ class ApiService {
     String academyId, {
     int periodDays = 30,
     int limit = 50,
+    DateTime? periodStart,
+    DateTime? periodEnd,
   }) async {
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final qp = <String, String>{'limit': limit.toString()};
+    if (periodStart != null && periodEnd != null) {
+      qp['start_date'] = ymd(periodStart);
+      qp['end_date'] = ymd(periodEnd);
+    } else {
+      qp['period_days'] = periodDays.toString();
+    }
     final uri = Uri.parse('$baseUrl/academies/$academyId/ranking')
-        .replace(queryParameters: {
-      'period_days': periodDays.toString(),
-      'limit': limit.toString(),
-    });
+        .replace(queryParameters: qp);
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     if (r.statusCode == 404) return {};
     final data = await _decodeResponse(r);
@@ -1484,6 +1587,8 @@ class ApiService {
     return {
       'academy_id': map['academy_id'],
       'period_days': map['period_days'] as int,
+      if (map['period_start'] != null) 'period_start': map['period_start'] as String,
+      if (map['period_end'] != null) 'period_end': map['period_end'] as String,
       'entries': entries,
     };
   }
@@ -1520,14 +1625,36 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
+  /// Reinicia escolha de turma e progresso na semana ISO atual (UTC); pontos preservados.
+  Future<Map<String, dynamic>> resetAcademyWeeklyTurmasWeek(
+      String academyId) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/reset_weekly_turmas_week'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/mission_today/week');
+    return data! as Map<String, dynamic>;
+  }
+
   Future<AcademyWeeklyReport?> getAcademyWeeklyReport(
     String academyId, {
     int? year,
     int? week,
+    DateTime? startDate,
+    DateTime? endDate,
   }) async {
     final queryParams = <String, String>{};
-    if (year != null) queryParams['year'] = year.toString();
-    if (week != null) queryParams['week'] = week.toString();
+    if (startDate != null && endDate != null) {
+      String ymd(DateTime d) =>
+          '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      queryParams['start_date'] = ymd(startDate);
+      queryParams['end_date'] = ymd(endDate);
+    } else {
+      if (year != null) queryParams['year'] = year.toString();
+      if (week != null) queryParams['week'] = week.toString();
+    }
     final uri = Uri.parse('$baseUrl/academies/$academyId/report/weekly')
         .replace(
             queryParameters: queryParams.isNotEmpty ? queryParams : null);
@@ -1780,6 +1907,130 @@ class ApiService {
     ));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/training_videos');
+  }
+
+  /// Anúncios ativos da academia do usuário.
+  /// Endpoint: GET /me/marketplace_items
+  Future<List<MarketplaceItem>> getMeMarketplaceItems() async {
+    final uri = Uri.parse('$baseUrl/me/marketplace_items');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final decoded = jsonDecode(r.body);
+    _throwIfNotOk(r, decoded is Map ? decoded : null);
+    final raw = decoded is List ? decoded : <dynamic>[];
+    return raw
+        .map((e) => MarketplaceItem.fromStudentJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Lista anúncios (admin: todos; gerente/professor: só da academia).
+  /// Endpoint: GET /marketplace_items
+  Future<List<MarketplaceItem>> getMarketplaceItemsAdmin() async {
+    final uri = Uri.parse('$baseUrl/marketplace_items');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final decoded = jsonDecode(r.body);
+    _throwIfNotOk(r, decoded is Map ? decoded : null);
+    final raw = decoded is List ? decoded : <dynamic>[];
+    return raw
+        .map((e) => MarketplaceItem.fromAdminJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Cria anúncio. [academyId] obrigatório para administrador global.
+  /// [whatsappDdd] e [whatsappNumber] opcionais (ex.: 11 e 999999999).
+  Future<void> createMarketplaceItem({
+    required String title,
+    String? description,
+    required int priceCents,
+    String currency = 'BRL',
+    String? imageUrl,
+    String? whatsappDdd,
+    String? whatsappNumber,
+    int? sortOrder,
+    bool isActive = true,
+    String? academyId,
+  }) async {
+    final body = <String, dynamic>{
+      'title': title,
+      'price_cents': priceCents,
+      'currency': currency,
+      'is_active': isActive,
+    };
+    if (description != null && description.isNotEmpty) {
+      body['description'] = description;
+    }
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      body['image_url'] = imageUrl;
+    }
+    final ddd = whatsappDdd?.trim();
+    final num = whatsappNumber?.trim();
+    if (ddd != null && ddd.isNotEmpty) {
+      body['whatsapp_ddd'] = ddd;
+    }
+    if (num != null && num.isNotEmpty) {
+      body['whatsapp_number'] = num;
+    }
+    if (sortOrder != null) {
+      body['sort_order'] = sortOrder;
+    }
+    if (academyId != null && academyId.isNotEmpty) {
+      body['academy_id'] = academyId;
+    }
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/marketplace_items'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/marketplace_items');
+  }
+
+  Future<void> updateMarketplaceItem({
+    required String id,
+    required String title,
+    String? description,
+    required int priceCents,
+    String currency = 'BRL',
+    String? imageUrl,
+    String? whatsappDdd,
+    String? whatsappNumber,
+    int? sortOrder,
+    required bool isActive,
+  }) async {
+    final dddW = whatsappDdd?.trim();
+    final numW = whatsappNumber?.trim();
+    final body = <String, dynamic>{
+      'title': title,
+      'description': description,
+      'price_cents': priceCents,
+      'currency': currency,
+      'whatsapp_ddd': (dddW == null || dddW.isEmpty) ? null : dddW,
+      'whatsapp_number': (numW == null || numW.isEmpty) ? null : numW,
+      'is_active': isActive,
+    };
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      body['image_url'] = imageUrl;
+    } else {
+      body['image_url'] = null;
+    }
+    body['sort_order'] = sortOrder;
+    final r = await _req(http.put(
+      Uri.parse('$baseUrl/marketplace_items/$id'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/marketplace_items');
+  }
+
+  Future<void> deleteMarketplaceItem(String id) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/marketplace_items/$id'),
+      headers: await _headers(auth: true),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
+    invalidateCache('GET:$baseUrl/marketplace_items');
   }
 
   static const _backupDownloadTimeout = Duration(minutes: 10);

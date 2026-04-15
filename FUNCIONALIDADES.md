@@ -10,6 +10,7 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 
 - **Stack:** FastAPI, PostgreSQL, SQLAlchemy, Docker, docker-compose
 - **Execução:** `docker compose up` sobe API (porta 8000) e Postgres (5432)
+- **Imagem da API com código novo:** `docker compose restart api` **não** reconstrói a imagem Docker; após alterar o backend use `docker compose build api` e `docker compose up -d api` (ou `docker compose up -d --build api`).
 - **Documentação:** Swagger em `/docs`
 - **CORS:** Habilitado para o app Flutter (web/mobile)
 - **Config:** Variáveis em `.env` (pydantic-settings)
@@ -19,13 +20,15 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 | Modelo | Descrição |
 |--------|-----------|
 | **User** | Usuário (email, name, academy_id opcional); UUID como PK |
-| **Academy** | Academia (name, slug, weekly_theme); 3 técnicas semanais (weekly_technique_id, weekly_technique_2_id, weekly_technique_3_id) para Missão 1, 2, 3 (A-01, A-02, A-03) |
+| **Academy** | Academia (name, slug, weekly_theme); 3 técnicas semanais legadas (weekly_technique_id …) ou **turmas** (`weekly_technique_kits` + `weekly_kit_items`, 1–5 técnicas por turma) com escolha por semana ISO (`user_weekly_kit_choices`) |
 | **Position** | Posição do jiu-jitsu (name, slug, description) |
 | **Technique** | Técnica da academia (name, slug, description, video_url, base_points) — não depende mais de Position |
 | **Lesson** | Aula vinculada a uma Technique (title, slug, video_url, order_index) |
 | **LessonProgress** | Conclusão de lição por usuário (user_id, lesson_id, completed_at); constraint única (user, lesson) |
+| **Mission** | Missão ativa (técnica, nível, academia); `slot_index` 0–2 legado ou 0–4 com `weekly_kit_id` para turmas semanais |
 | **MissionUsage** | Conclusão de missão (user_id, mission_id, usage_type: before_training \| after_training); constraint única (user, mission) |
 | **TrainingFeedback** | Dificuldade em posição (user_id, position_id, difficulty_level, note) |
+| **AcademyMarketplaceItem** | Anúncio da academia (`academy_id`, título, preço em centavos, moeda, `image_url` opcional, `whatsapp_phone` opcional em dígitos BR 55+DDD+número, ordem, ativo); URL `wa.me` gerada na API |
 
 - PKs em **UUID**; timestamps **created_at** e **updated_at** (UUIDMixin)
 - Preparado para **Alembic** (migrations)
@@ -39,13 +42,22 @@ Documento único com todas as funcionalidades do **backend (bjj_app)** e do **ap
 | GET | `/lessons` | Lista aulas |
 | GET | `/positions` | Lista posições (para reportar dificuldade no app) |
 | GET | `/mission_today` | Missão do dia (título, video_url, técnica com posições); `already_completed` indica se já concluiu |
-| GET | `/mission_today/week` | 3 missões semanais (Missão 1, Missão 2, Missão 3) por nível/academia |
+| GET | `/mission_today/week` | Missões semanais por nível: modo legado (3 slots) ou **turmas** (`needs_kit_choice`, `available_kits`, `selected_kit_id`, entradas `Foco 1`–`Foco N`) |
+| PUT | `/users/me/weekly-kit-choice` | Aluno escolhe o kit da semana ISO (`kit_id`; `reference_date` opcional) |
+| GET/POST | `/academies/{id}/weekly-kits` | Lista / cria **turmas** (1–5 técnicas; rótulo = nome da turma) |
+| PATCH/DELETE | `/academies/{id}/weekly-kits/{kit_id}` | Atualiza ou remove turma |
+| POST | `/academies/{id}/reset_weekly_turmas_week` | Reinicia semana ISO atual (UTC): escolhas de turma + progresso nas missões de turma na janela; pontos preservados via `points_adjustment` |
+| GET/POST | `/academies/{id}/weekly_kits` | Alias legado (mesmo contrato que `weekly-kits`; omitido do OpenAPI) |
+| PATCH/DELETE | `/academies/{id}/weekly_kits/{kit_id}` | Alias legado (idem) |
 | GET | `/mission_usages/history` | Histórico de missões concluídas (user_id, limit) |
 | GET | `/lesson_complete/status` | Verifica se lição já foi concluída (user_id, lesson_id) |
 | POST | `/mission_complete` | Conclusão por missão (user_id, mission_id, usage_type: before_training \| after_training); 409 se já concluiu |
 | GET | `/metrics/usage` | Métricas de uso (totais, últimos 7 dias, % antes do treino) |
 | POST | `/lesson_complete` | Registrar conclusão de lição (user_id, lesson_id); evita duplicata (409) |
 | POST | `/training_feedback` | Registrar dificuldade em posição (user_id, position_id, observation opcional) |
+| GET | `/me/marketplace_items` | Lista anúncios ativos da academia do utilizador (vazia sem `academy_id`) |
+| GET/POST | `/marketplace_items` | Lista ou cria anúncios; body com `whatsapp_ddd` + `whatsapp_number` opcionais (ou omitir ambos); resposta inclui `whatsapp_url` calculada quando há telefone |
+| PUT/DELETE | `/marketplace_items/{id}` | Atualizar ou remover anúncio (mesmo isolamento por academia) |
 
 #### Seção Academia (CRUD e relatórios)
 
@@ -58,10 +70,10 @@ Ver documentação detalhada em **[docs/ACADEMIAS.md](docs/ACADEMIAS.md)**.
 | GET | `/academies/{id}` | Detalhe de uma academia |
 | PATCH | `/academies/{id}` | Atualizar academia (body: name?, slug?, weekly_theme?) |
 | DELETE | `/academies/{id}` | Excluir academia |
-| GET | `/academies/{id}/ranking` | Ranking interno (period_days, limit) |
+| GET | `/academies/{id}/ranking` | Ranking interno (`period_days` ou `start_date`+`end_date`, `limit`) |
 | GET | `/academies/{id}/difficulties` | Posições mais reportadas como difíceis |
-| GET | `/academies/{id}/report/weekly` | Relatório semanal (year, week opcionais) |
-| GET | `/academies/{id}/report/weekly/csv` | Relatório semanal em CSV |
+| GET | `/academies/{id}/report/weekly` | Conclusões no período (`year`/`week` ISO ou `start_date`+`end_date`) |
+| GET | `/academies/{id}/report/weekly/csv` | Export CSV (mesmos parâmetros) |
 | GET | `/missions` | Lista missões (academy_id, limit opcionais) |
 | GET | `/missions/{id}` | Detalhe de uma missão |
 | POST | `/missions` | Criar missão (lesson_id, start_date, end_date, level, theme?, academy_id?) |
@@ -161,7 +173,8 @@ O professor acessa pelo app (Perfil → **Área do professor**) e pode:
      - **Tema da semana:** campo de texto + **Salvar tema** (PATCH /academies/{id}).
      - **Ranking (últimos 30 dias):** lista legível (posição, nome, conclusões).
      - **Dificuldades reportadas:** posições mais marcadas como difíceis (nome, quantidade de reportes).
-     - **Relatório semanal:** período da semana, total de conclusões, ativos e lista do ranking da semana.
+     - **Período dos relatórios:** data inicial e final (calendário); ranking, conclusões e logins usam o mesmo intervalo.
+     - **Conclusões / ranking / logins:** respeitam esse período (API: até 366 dias).
    - Estado vazio: mensagem quando não há academias cadastradas.
 
 ### CRUD Técnicas (módulo admin — referência para outros CRUDs)
@@ -178,6 +191,7 @@ Documentação detalhada para replicar o padrão em lições, missões, etc.: **
 
 ### Outras telas do app
 
+- **Loja da academia (marketplace):** na aba **Campo de treinamento** (`StudentHomeScreen`), **último bloco** do scroll (após **Confirmações e solicitações**): atalho **Loja da academia** → `MarketplaceScreen` (preço, foto; botão WhatsApp só se o anúncio tiver telefone). Visível para **qualquer utilizador logado**; sem `academy_id` a API pode devolver lista vazia. Cadastro com **DDD e número opcionais**; mensagem do `wa.me` é fixa no backend. **Painel Academia** / **Admin**: `MarketplaceListScreen` / `MarketplaceFormScreen`; admin indica `academy_id` ao criar. (`HomePage` mantém o mesmo atalho se for reutilizada noutro fluxo.)
 - **Biblioteca de lições** (aba Lições): lista GET /lessons; toque abre a lição como LessonScreen (e envia POST /lesson_complete ao concluir).
 - **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Itens podem aparecer **trancados** até o aluno atingir o **nível mínimo** e a **faixa** definidos no troféu. Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
 - **Reportar dificuldade** (Perfil): GET /positions, escolha da posição e observação opcional; POST /training_feedback.
@@ -195,5 +209,5 @@ Documentação detalhada para replicar o padrão em lições, missões, etc.: **
 
 | Área | O que está pronto |
 |------|-------------------|
-| **Backend** | API REST, modelos, missão do dia, 3 missões semanais, conclusão de lição/missão (com usage_type), lesson_complete/status, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (3 técnicas semanais, tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
-| **App** | Tela inicial com 3 missões semanais, lição (botão concluído desabilitado quando já feito), diálogo antes/depois do treino ao concluir missão, biblioteca de lições, **galeria de troféus/medalhas** (lista + estante gamificada), progresso com histórico (data sem horário), reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (3 missões semanais, tema, ranking, dificuldades, relatório semanal) |
+| **Backend** | API REST, modelos, missão do dia, missões semanais **legado (3 slots) ou turmas** (1–5 técnicas, escolha por semana ISO UTC), `POST …/reset_weekly_turmas_week`, conclusão de lição/missão (com usage_type), lesson_complete/status, feedback de treino, positions, mission_usages/history, metrics/usage; área professor: academies (CRUD turmas `weekly-kits` + alias, tema, ranking, difficulties, report/weekly), missions CRUD; seed com academia e missões |
+| **App** | Tela inicial com missões semanais (modo legado 3 slots ou **escolha de turma**), lição (botão concluído desabilitado quando já feito), diálogo antes/depois do treino ao concluir missão, biblioteca de lições, **galeria de troféus/medalhas** (lista + estante gamificada), progresso com histórico (data sem horário), reportar dificuldade, métricas; **Área do professor:** missões (CRUD) e academias (missões legadas ocultas com turmas ativas, **painel de turmas**, tema, período comum para ranking/conclusões/logins, dificuldades) |

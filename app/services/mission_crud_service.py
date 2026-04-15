@@ -33,8 +33,13 @@ def _normalize_level_or_raise(level: str | None) -> str:
     return level_n
 
 
-def _validate_slot_index(slot_index: int | None) -> None:
-    if slot_index is not None and slot_index not in (0, 1, 2):
+def _validate_slot_index(slot_index: int | None, weekly_kit_id: UUID | None = None) -> None:
+    if slot_index is None:
+        return
+    if weekly_kit_id is not None:
+        if slot_index not in (0, 1, 2, 3, 4):
+            raise AppError("slot_index inválido para kit. Use 0 a 4.", status_code=400)
+    elif slot_index not in (0, 1, 2):
         raise AppError("slot_index inválido. Use 0, 1 ou 2.", status_code=400)
 
 
@@ -100,9 +105,10 @@ async def create_mission(
     start_date: date | None = None,
     end_date: date | None = None,
     audit_user_id: UUID | None = None,
+    weekly_kit_id: UUID | None = None,
 ) -> Mission:
     """Cria uma missão (técnica + slot da academia). Se lesson_id não for informado, usa a primeira lição da técnica."""
-    _validate_slot_index(slot_index)
+    _validate_slot_index(slot_index, weekly_kit_id)
     _validate_date_range(start_date, end_date)
     technique = (
         await db.execute(
@@ -145,6 +151,7 @@ async def create_mission(
         theme=theme,
         academy_id=academy_id,
         multiplier=mult,
+        weekly_kit_id=weekly_kit_id,
     )
     db.add(mission)
     await db.flush()
@@ -222,7 +229,8 @@ async def update_mission(
     mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission or mission.deleted_at is not None:
         return None
-    _validate_slot_index(slot_index)
+    if slot_index is not None:
+        _validate_slot_index(slot_index, mission.weekly_kit_id)
     effective_start = start_date if start_date is not None else mission.start_date
     effective_end = end_date if end_date is not None else mission.end_date
     _validate_date_range(effective_start, effective_end)
@@ -347,6 +355,8 @@ async def _upsert_slot_missions(
     slot_idx: int,
     tech_id: UUID,
     mult: int,
+    *,
+    weekly_kit_id: UUID | None = None,
 ) -> list[Mission]:
     """
     Cria ou atualiza missões para um slot específico (beginner e intermediate).
@@ -366,6 +376,11 @@ async def _upsert_slot_missions(
     result: list[Mission] = []
     try:
         for level in ("beginner", "intermediate"):
+            cond_kit = (
+                Mission.weekly_kit_id == weekly_kit_id
+                if weekly_kit_id is not None
+                else Mission.weekly_kit_id.is_(None)
+            )
             existing = (
                 await db.execute(
                     select(Mission).where(
@@ -373,6 +388,7 @@ async def _upsert_slot_missions(
                         Mission.level == level,
                         Mission.slot_index == slot_idx,
                         Mission.deleted_at.is_(None),
+                        cond_kit,
                     )
                 )
             ).scalar_one_or_none()
@@ -390,6 +406,7 @@ async def _upsert_slot_missions(
                         theme=technique.name,
                         multiplier=mult,
                         slot_index=slot_idx,
+                        weekly_kit_id=weekly_kit_id,
                     )
                     result.append(mission)
                     logger.info(
@@ -412,12 +429,88 @@ async def _upsert_slot_missions(
                     theme=technique.name,
                     multiplier=mult,
                     slot_index=slot_idx,
+                    weekly_kit_id=weekly_kit_id,
                 )
                 result.append(mission)
     except Exception:
         await db.rollback()
         raise
     
+    return result
+
+
+async def _cleanup_kit_trailing_slots(
+    db: AsyncSession,
+    academy_id: UUID,
+    weekly_kit_id: UUID,
+    keep_slot_count: int,
+) -> None:
+    """Soft-delete missões do kit com slot_index >= keep_slot_count (0–4)."""
+    try:
+        for level in ("beginner", "intermediate"):
+            for slot_idx in range(keep_slot_count, 5):
+                cond_kit = Mission.weekly_kit_id == weekly_kit_id
+                old = (
+                    await db.execute(
+                        select(Mission).where(
+                            Mission.academy_id == academy_id,
+                            Mission.level == level,
+                            Mission.slot_index == slot_idx,
+                            Mission.deleted_at.is_(None),
+                            cond_kit,
+                        )
+                    )
+                ).scalar_one_or_none()
+                if old:
+                    before = entity_snapshot_row(old)
+                    old.deleted_at = datetime.now(timezone.utc)
+                    await write_audit_log(
+                        db,
+                        action=AUDIT_ACTION_DELETE,
+                        entity_label=_ENTITY_MISSION,
+                        entity_id=old.id,
+                        old_data=before,
+                        new_data={"deleted_at": old.deleted_at.isoformat()},
+                        user_id=None,
+                    )
+                    await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+
+async def upsert_academy_kit_missions(
+    db: AsyncSession,
+    academy_id: UUID,
+    weekly_kit_id: UUID,
+    items: list[tuple[UUID, int]],
+    week_start: date | None = None,
+    week_end: date | None = None,
+) -> list[Mission]:
+    """
+    Cria ou atualiza missões (beginner/intermediate) para cada item do kit.
+    items: lista ordenada de (technique_id, multiplier).
+    """
+    academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
+    if not academy:
+        raise AcademyNotFoundError()
+    _ = (week_start, week_end)  # reservado para evolução com datas por semana
+    result: list[Mission] = []
+    try:
+        for slot_idx, (tech_id, mult) in enumerate(items):
+            slot_missions = await _upsert_slot_missions(
+                db,
+                academy_id,
+                slot_idx,
+                tech_id,
+                clamp_reward_points(mult),
+                weekly_kit_id=weekly_kit_id,
+            )
+            result.extend(slot_missions)
+        await _cleanup_kit_trailing_slots(db, academy_id, weekly_kit_id, len(items))
+    except Exception:
+        await db.rollback()
+        raise
     return result
 
 
@@ -444,6 +537,7 @@ async def _cleanup_empty_slots(
                                 Mission.level == level,
                                 Mission.slot_index == slot_idx,
                                 Mission.deleted_at.is_(None),
+                                Mission.weekly_kit_id.is_(None),
                             )
                         )
                     ).scalar_one_or_none()
@@ -473,6 +567,7 @@ async def _cleanup_empty_slots(
                                 Mission.level == level,
                                 Mission.slot_index == slot_idx,
                                 Mission.deleted_at.is_(None),
+                                Mission.weekly_kit_id.is_(None),
                             )
                         )
                     ).scalar_one_or_none()

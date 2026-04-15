@@ -23,6 +23,14 @@ docker compose up -d --build api viewer
 
 Acesse: **http://localhost:8080**
 
+### Web estática local (ex.: porta 8765)
+
+- Gerar bundle: `cd viewer` → `flutter build web --release` (ver regra do projeto para o caminho do `flutter.bat` no Windows).
+- Servir ficheiros: `cd viewer/build/web` → `python -m http.server 8765` → abrir `http://127.0.0.1:8765/`.
+- Garantir que o viewer fala com a API certa (ex. Docker no host **8001**): `kApiBaseUrl` / `--dart-define=API_BASE_URL=...` ou query **`?api_base=http://127.0.0.1:8001`** quando aplicável.
+- **404 em rotas novas (ex. kits)** ou dados desatualizados: (1) reconstruir a **imagem** da API (`docker compose build api` + `up -d api`; `restart` sozinho não atualiza código dentro da imagem); (2) **hard refresh** no browser ou novo build web para evitar `main.dart.js` em cache.
+- **`GET /reports/weekly_panel_logins` com 422:** abrir o pedido na aba Rede → corpo da resposta JSON (`detail`); indica validação de query (datas, `academy_id`, etc.). No detalhe da academia, o intervalo do cartão envia `start_date` e `end_date` juntos.
+
 ---
 
 ## URL da API
@@ -79,7 +87,8 @@ Acesse: **http://localhost:8080**
 - Carregamento progressivo do header: mantém último estado válido durante refresh e atualiza sem “piscar” (sem reset para `null` antes da resposta). Hidratação opcional a partir do snapshot em disco quando o estado em memória ainda está vazio (nível, missões ou logo). Pedidos do header e da semana de missões não são encadeados em série na primeira onda.
 - **Sincronização visível (`_syncingHomeData`)**: após `GET /auth/me`, enquanto corre o lote paralelo (header, missões, etc.), mostra-se **`LinearProgressIndicator`** no topo do corpo (com `Semantics` “A sincronizar dados”) e, se ainda não há nível/XP da API (`_userLevel == null`), **`HomeHeaderLoadingSkeleton`** em vez do `HeaderWidget`; se há academia e ainda não há `missionWeek`, **`HomeMissionSectionSkeleton`** no bloco das missões. Com snapshot em disco já aplicado, o skeleton do header não aparece (há nível/logo); pode manter-se só a barra fina até a rede concluir. O acordeão “Centro de treinamento” não usa a mensagem “nenhuma missão” enquanto `_syncingHomeData` é verdadeiro.
 - Abaixo do cabeçalho, cartão **`StreakWidget(streakDays: …, onOpenPointsRules: …)`** com `login_streak_days` de **`GET /auth/me`**: sequência (flame + dias) e, **no mesmo cartão** à direita, **`LoginBonusRing`** (`login_bonus_ring.dart`) — progresso até ao próximo múltiplo de 7 dias, centro **+50 PTS** (`gamification_constants.dart`); toque no anel abre **Como funcionam os pontos** (`showPointsRulesSheet` em `points_rules_sheet.dart`).
-- Carrega `GET /mission_today/week` (3 missões semanais).
+- Carrega `GET /mission_today/week` (modo legado até 3 slots ou turmas com vários focos).
+- **Confirmar turma:** ao tocar em «Confirmar turma», `_savingWeeklyTurmaChoice` mostra `LinearProgressIndicator`, texto «A preparar as missões da turma…», desativa a escolha por rádio e o botão mostra `CircularProgressIndicator` até concluir `PUT /users/me/weekly-kit-choice` e o `GET /mission_today/week` seguinte.
 - **`WeeklyMissionPath`** (`lib/widgets/gamification/weekly_mission_path.dart`): no scroll principal, com título **Missões da semana** acima do cartão; ✓ / play / cadeado; **três filas** partilham a mesma grelha `Row`: colunas com largura **`kWeeklyPathNodeColumnWidth`** (48 + padding do nó) e **`Expanded`** entre colunas, para o play, o **nome da técnica** (uma linha, centrado sob o nó, reticências; **`Tooltip`** com o nome completo) e o estado (**Treinar** / Feito) ficarem alinhados na vertical; haptic, alvos tocáveis **48×48** dentro da coluna, segmentos com contraste reforçado, **pulso** ao concluir missão (`celebrateMissionId`). Toque no nó ou no estado → `LessonViewScreen`.
 - **Removidos** da home: cartão “Você já concluiu X de Y missões” + barra linear; acordeão **Missões da semana** com os três cards “Começar”.
 - **Centro de treinamento**: acordeão só aparece quando não há `missionWeek` (mensagem para configurar academia ou “nenhuma missão”). Com missões carregadas o acordeão **não** é mostrado.
@@ -138,12 +147,12 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 
 ### AcademyDetailScreen
 
-- **Missões semanais:** 3 dropdowns (Missão 1, Missão 2, Missão 3) para selecionar técnica.
+- **Missões semanais:** 3 dropdowns (Missão 1, Missão 2, Missão 3) para selecionar técnica (modo legado enquanto não houver kits válidos).
+- **Turmas (semana):** CRUD (1–5 técnicas, rótulo) via `GET/POST/PATCH/DELETE` em `/academies/{id}/weekly-kits` (`ApiService`). Botão **«Reiniciar semana (turmas)»** chama `POST …/reset_weekly_turmas_week` (semana ISO atual UTC). A API expõe também o alias **`/weekly_kits`** (underscore) — útil para bundles antigos.
 - **Tema da semana:** campo de texto + Salvar tema.
-- **Ranking:** últimos 30 dias.
+- **Período dos relatórios:** cartão com **data inicial** e **data final** (calendário); por defeito a semana ISO corrente (seg–dom). O mesmo intervalo alimenta **ranking**, **conclusões** e **logins** (`start_date`/`end_date` na API, até 366 dias).
 - **Dificuldades reportadas:** posições mais marcadas.
-- **Relatório semanal:** período, total de conclusões, ativos, ranking.
-- **Logins na semana:** seção separada com total de utilizadores (staff e alunos) que logaram ao menos 1 dia e lista por utilizador com quantidade de dias.
+- **Ranking / Conclusões / Logins:** respeitam o período escolhido.
 - **Execuções focadas em troféu/medalha/posição:** usa `/metrics/usage/by_academy` para mostrar premeditadas vs naturais.
 
 ### ExecutionReportsScreen (Relatórios de execuções)
@@ -163,7 +172,7 @@ Acesso via **Perfil → Área do professor** ou **Administração**.
 - Usa:
   - `GET /reports/engagement` — resumo de engajamento **semanal** e **mensal**.
   - `GET /reports/active_students` — lista de alunos ativos na janela de 7 dias (apenas backend; CSV via `/reports/active_students/csv`).
-  - `GET /reports/weekly_panel_logins` — logins semanais de staff e alunos (global ou por academia).
+  - `GET /reports/weekly_panel_logins` — logins semanais de staff e alunos (global ou por academia). Resposta **422:** consultar `detail` no JSON da resposta (validação de query).
 - Definição usada na tela:
   - **Aluno ativo** = fez pelo menos **1 login** no app nos **últimos 7 dias** em relação à data de referência.
 - Componentes principais:

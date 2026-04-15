@@ -6,6 +6,7 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
+import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -86,7 +87,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count += _kAcademyPushNotificationUiEnabled ? 4 : 3; // + Aviso push se activo
+      count += _kAcademyPushNotificationUiEnabled ? 5 : 4; // vídeos + loja (+ push se activo)
     }
     return count;
   }
@@ -180,9 +181,48 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
+    } else if (isManagerOrProfessor && index == 3) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.storefront_rounded, color: AppTheme.primary),
+          ),
+          title: const Text(
+            'Loja / anúncios',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Produtos da academia com preço e WhatsApp',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            final academyId = AuthService().currentUser?.academyId;
+            if (academyId == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Seu usuário não está vinculado a uma academia.',
+                  ),
+                ),
+              );
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MarketplaceListScreen(
+                  localOnly: true,
+                ),
+              ),
+            );
+          },
+        ),
+      );
     } else if (isManagerOrProfessor &&
         _kAcademyPushNotificationUiEnabled &&
-        index == 3) {
+        index == 4) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -222,9 +262,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     }
 
-    // Cards fixos no topo; academias começam após Usuários + Técnicas + Vídeos (+ push se activo).
+    // Cards fixos no topo; academias após Usuários + Técnicas + Vídeos + Loja (+ push se activo).
     final managerOffset =
-        isManagerOrProfessor ? (_kAcademyPushNotificationUiEnabled ? 4 : 3) : 0;
+        isManagerOrProfessor ? (_kAcademyPushNotificationUiEnabled ? 5 : 4) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();

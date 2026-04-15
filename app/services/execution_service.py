@@ -127,7 +127,11 @@ async def _create_mission_execution(
     if user_academy_id is not None:
         if mission.academy_id is not None and mission.academy_id != user_academy_id:
             raise AppError("Você só pode executar missões da sua academia.", status_code=403)
-    
+
+    from app.services.weekly_kit_service import assert_user_may_complete_kit_mission
+
+    await assert_user_may_complete_kit_mission(db, user_id, mission)
+
     # Verificar se já existe execução confirmada
     existing_confirmed = (
         await db.execute(
