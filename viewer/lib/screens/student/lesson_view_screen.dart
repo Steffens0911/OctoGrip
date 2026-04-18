@@ -393,7 +393,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             Text(
               d.title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimaryOf(context),
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -403,8 +403,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
                 d.positionName != null && d.positionName!.isNotEmpty
                     ? '${d.techniqueName!} ${d.positionName}'
                     : d.techniqueName!,
-                style: const TextStyle(
-                    color: AppTheme.textSecondary, fontSize: 16),
+                style: TextStyle(
+                  color: AppTheme.textSecondaryOf(context),
+                  fontSize: 16,
+                ),
               ),
             ],
             if (d.estimatedDurationSeconds != null &&
@@ -412,8 +414,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               const SizedBox(height: 4),
               Text(
                 'Duração estimada: ~${d.estimatedDurationSeconds! ~/ 60} min',
-                style: const TextStyle(
-                    color: AppTheme.textSecondary, fontSize: 12),
+                style: TextStyle(
+                  color: AppTheme.textMutedOf(context),
+                  fontSize: 12,
+                ),
               ),
             ],
             const SizedBox(height: 20),
@@ -436,10 +440,10 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
             if (d.description.isNotEmpty)
               Text(
                 d.description,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyMedium
-                    ?.copyWith(color: AppTheme.textPrimary),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: AppTheme.textPrimaryOf(context),
+                      height: 1.45,
+                    ),
               ),
             if (d.description.isNotEmpty) const SizedBox(height: 24),
             if (_error != null) ...[
