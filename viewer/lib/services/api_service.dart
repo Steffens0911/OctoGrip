@@ -1850,16 +1850,19 @@ class ApiService {
     required String youtubeUrl,
     required int pointsPerDay,
     bool isActive = true,
-    int? durationSeconds,
+    required int durationSeconds,
+    String? positionDescription,
   }) async {
     final body = <String, dynamic>{
       'title': title,
       'youtube_url': youtubeUrl,
       'points_per_day': pointsPerDay,
       'is_active': isActive,
+      'duration_seconds': durationSeconds,
     };
-    if (durationSeconds != null) {
-      body['duration_seconds'] = durationSeconds;
+    final pd = positionDescription?.trim();
+    if (pd != null && pd.isNotEmpty) {
+      body['position_description'] = pd;
     }
     final r = await _req(http.post(
       Uri.parse('$baseUrl/training_videos'),
@@ -1879,6 +1882,7 @@ class ApiService {
     required int pointsPerDay,
     required bool isActive,
     int? durationSeconds,
+    required String positionDescription,
   }) async {
     final body = <String, dynamic>{
       'title': title,
@@ -1889,6 +1893,8 @@ class ApiService {
     if (durationSeconds != null) {
       body['duration_seconds'] = durationSeconds;
     }
+    final pd = positionDescription.trim();
+    body['position_description'] = pd.isEmpty ? null : pd;
     final r = await _req(http.put(
       Uri.parse('$baseUrl/training_videos/$id'),
       headers: await _jsonHeaders(auth: true),

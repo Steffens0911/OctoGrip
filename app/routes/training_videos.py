@@ -13,6 +13,7 @@ from app.schemas.training_video import (
     TrainingVideoUpdate,
 )
 from app.services.training_video_service import (
+    PATCH_UNSET,
     create_training_video,
     delete_training_video,
     get_training_video,
@@ -56,6 +57,7 @@ async def training_video_create(
         points_per_day=body.points_per_day,
         is_active=body.is_active,
         duration_seconds=body.duration_seconds,
+        position_description=body.position_description,
         academy_id=academy_id,
         created_by_id=current_user.id,
     )
@@ -88,6 +90,9 @@ async def training_video_update(
         points_per_day=payload.get("points_per_day"),
         is_active=payload.get("is_active"),
         duration_seconds=payload.get("duration_seconds"),
+        position_description=payload["position_description"]
+        if "position_description" in payload
+        else PATCH_UNSET,
     )
     assert updated is not None
     return TrainingVideoAdminRead.model_validate(updated)

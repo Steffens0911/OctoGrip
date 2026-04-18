@@ -893,7 +893,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                         child: ExpansionTile(
                           title: const Text('Turmas (semana)'),
                           subtitle: const Text(
-                            '1 a 5 técnicas por turma; o aluno escolhe a turma por semana ISO (UTC).',
+                            '1 a 5 técnicas por turma; o aluno escolhe a turma por semana.',
                           ),
                           childrenPadding: const EdgeInsets.all(16),
                           initiallyExpanded: false,

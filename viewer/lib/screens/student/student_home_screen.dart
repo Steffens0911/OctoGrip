@@ -1270,8 +1270,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          'Escolha em que turma vai treinar. Só aparecem as técnicas dessa turma; após concluir uma missão, '
-          'não pode misturar com outra turma na mesma semana.',
+          'Escolha a turma que vai treinar mais vezes essa semana.',
           style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
         ),
         if (_savingWeeklyTurmaChoice) ...[

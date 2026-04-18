@@ -128,14 +128,6 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          if (canEdit)
-            IconButton(
-              tooltip: 'Formulário completo',
-              icon: const Icon(Icons.article_outlined),
-              onPressed: state.mutationInProgress ? null : () => _openForm(),
-            ),
-        ],
       ),
       floatingActionButton: canEdit
           ? FloatingActionButton(

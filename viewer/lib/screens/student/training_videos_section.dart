@@ -197,6 +197,19 @@ class _TrainingVideoTile extends StatelessWidget {
                     color: AppTheme.textSecondaryOf(context),
                   ),
             ),
+            if (video.positionDescription != null &&
+                video.positionDescription!.trim().isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                video.positionDescription!.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textMutedOf(context),
+                      fontSize: 12,
+                    ),
+              ),
+            ],
             if (completedToday) ...[
               const SizedBox(height: 2),
               Text(

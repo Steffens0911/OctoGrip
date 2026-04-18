@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, Index
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -24,6 +24,7 @@ class TrainingVideo(Base, UUIDMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
     order_index: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    position_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     academy_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("academies.id", ondelete="CASCADE"),
         nullable=True,

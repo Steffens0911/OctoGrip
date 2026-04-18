@@ -116,6 +116,17 @@ class _TrainingVideoViewScreenState extends State<TrainingVideoViewScreen> {
                     color: AppTheme.textSecondaryOf(context),
                   ),
             ),
+            if (v.positionDescription != null &&
+                v.positionDescription!.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                v.positionDescription!.trim(),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textSecondaryOf(context),
+                      height: 1.35,
+                    ),
+              ),
+            ],
             if (v.durationSeconds != null && v.durationSeconds! > 0) ...[
               const SizedBox(height: 4),
               Text(

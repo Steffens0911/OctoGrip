@@ -24,6 +24,7 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
   final _urlCtrl = TextEditingController();
   final _pointsCtrl = TextEditingController(text: '$minRewardPoints');
   final _durationCtrl = TextEditingController();
+  final _positionDescCtrl = TextEditingController();
   bool _isActive = true;
   bool _saving = false;
   String? _error;
@@ -39,6 +40,9 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
       if (v.durationSeconds != null && v.durationSeconds! > 0) {
         _durationCtrl.text = v.durationSeconds.toString();
       }
+      if (v.positionDescription != null && v.positionDescription!.isNotEmpty) {
+        _positionDescCtrl.text = v.positionDescription!;
+      }
       _isActive = v.isActive;
     }
   }
@@ -49,6 +53,7 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
     _urlCtrl.dispose();
     _pointsCtrl.dispose();
     _durationCtrl.dispose();
+    _positionDescCtrl.dispose();
     super.dispose();
   }
 
@@ -69,11 +74,22 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
       );
       return;
     }
-    if (points == null || points <= 0) {
-      setState(() => _error = 'Informe pontos por dia maior que zero.');
+    if (points == null || !isValidRewardPoints(points)) {
+      setState(
+        () => _error =
+            'Informe pontos por dia entre $minRewardPoints e $maxRewardPoints.',
+      );
       return;
     }
-    if (durationSeconds != null && durationSeconds <= 0) {
+    if (widget.video == null) {
+      if (durationSeconds == null || durationSeconds <= 0) {
+        setState(
+          () => _error =
+              'Informe a duração em segundos (obrigatório ao cadastrar; maior que zero).',
+        );
+        return;
+      }
+    } else if (durationSeconds != null && durationSeconds <= 0) {
       setState(() => _error = 'Duração (segundos) deve ser maior que zero.');
       return;
     }
@@ -90,7 +106,8 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
           youtubeUrl: url,
           pointsPerDay: points,
           isActive: _isActive,
-          durationSeconds: durationSeconds,
+          durationSeconds: durationSeconds!,
+          positionDescription: _positionDescCtrl.text,
         );
       } else {
         await _api.updateTrainingVideo(
@@ -100,6 +117,7 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
           pointsPerDay: points,
           isActive: _isActive,
           durationSeconds: durationSeconds,
+          positionDescription: _positionDescCtrl.text,
         );
       }
 
@@ -121,9 +139,10 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isNew = widget.video == null;
     return Scaffold(
       appBar: AppStandardAppBar(
-        title: widget.video == null
+        title: isNew
             ? 'Novo vídeo de treinamento'
             : 'Editar vídeo de treinamento',
       ),
@@ -160,10 +179,27 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
             TextField(
               controller: _durationCtrl,
               keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: isNew
+                    ? 'Duração (segundos) — obrigatório'
+                    : 'Duração (segundos) — opcional',
+                helperText: isNew
+                    ? 'Usado para liberar o botão após ~95% do tempo.'
+                    : 'Usado como fallback para liberar o botão após ~95% do tempo.',
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _positionDescCtrl,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              minLines: 2,
+              maxLines: 5,
               decoration: const InputDecoration(
-                labelText: 'Duração (segundos) – opcional',
-                helperText:
-                    'Usado como fallback para liberar o botão após ~95% do tempo.',
+                labelText: 'Descrição da posição (opcional)',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+                hintText: 'Contexto da posição ou do treino no vídeo',
               ),
             ),
             const SizedBox(height: 16),

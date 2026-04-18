@@ -5,6 +5,7 @@ class TrainingVideo {
   final int pointsPerDay;
   final bool isActive;
   final int? durationSeconds;
+  final String? positionDescription;
   final String? academyId;
   final String? academyName;
   final bool hasCompletedToday;
@@ -17,6 +18,7 @@ class TrainingVideo {
     required this.pointsPerDay,
     required this.isActive,
     this.durationSeconds,
+    this.positionDescription,
     this.academyId,
     this.academyName,
     required this.hasCompletedToday,
@@ -31,6 +33,7 @@ class TrainingVideo {
       pointsPerDay: (json['points_per_day'] as num).toInt(),
       isActive: json['is_active'] as bool? ?? true,
       durationSeconds: (json['duration_seconds'] as num?)?.toInt(),
+      positionDescription: json['position_description'] as String?,
       academyId: json['academy_id'] as String?,
       academyName: json['academy_name'] as String?,
       hasCompletedToday: json['has_completed_today'] as bool? ?? false,
@@ -47,6 +50,7 @@ class TrainingVideo {
         'points_per_day': pointsPerDay,
         'is_active': isActive,
         'duration_seconds': durationSeconds,
+        'position_description': positionDescription,
         'academy_id': academyId,
         'academy_name': academyName,
       };
@@ -80,4 +84,3 @@ class TrainingVideoCompletionResult {
     );
   }
 }
-

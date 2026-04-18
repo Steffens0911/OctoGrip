@@ -46,7 +46,8 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
       list = list
           .where((v) =>
               v.title.toLowerCase().contains(q) ||
-              v.youtubeUrl.toLowerCase().contains(q))
+              v.youtubeUrl.toLowerCase().contains(q) ||
+              (v.positionDescription?.toLowerCase().contains(q) ?? false))
           .toList();
     }
     setState(() {
@@ -273,6 +274,27 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                                     context),
                                               ),
                                         ),
+                                        if (v.positionDescription != null &&
+                                            v.positionDescription!
+                                                .trim()
+                                                .isNotEmpty)
+                                          Padding(
+                                            padding:
+                                                const EdgeInsets.only(top: 4),
+                                            child: Text(
+                                              v.positionDescription!.trim(),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .bodySmall
+                                                  ?.copyWith(
+                                                    color:
+                                                        AppTheme.textSecondaryOf(
+                                                            context),
+                                                  ),
+                                            ),
+                                          ),
                                         Text(
                                           v.youtubeUrl,
                                           maxLines: 1,

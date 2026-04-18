@@ -13,6 +13,16 @@ from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
 
+# Marca campo não enviado em PATCH (vs. enviado como null para limpar).
+PATCH_UNSET = object()
+
+
+def _optional_text(value: str | None) -> str | None:
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
 
 async def list_training_videos(db: AsyncSession) -> list[TrainingVideo]:
     stmt = (
@@ -35,7 +45,8 @@ async def create_training_video(
     youtube_url: str,
     points_per_day: int,
     is_active: bool = True,
-    duration_seconds: int | None = None,
+    duration_seconds: int,
+    position_description: str | None = None,
     academy_id: UUID | None = None,
     created_by_id: UUID | None = None,
 ) -> TrainingVideo:
@@ -45,6 +56,7 @@ async def create_training_video(
         points_per_day=points_per_day,
         is_active=is_active,
         duration_seconds=duration_seconds,
+        position_description=_optional_text(position_description),
         academy_id=academy_id,
         created_by_id=created_by_id,
     )
@@ -64,6 +76,7 @@ async def update_training_video(
     points_per_day: int | None = None,
     is_active: bool | None = None,
     duration_seconds: int | None = None,
+    position_description: str | None | object = PATCH_UNSET,
 ) -> TrainingVideo | None:
     video = await get_training_video(db, video_id)
     if not video:
@@ -78,6 +91,10 @@ async def update_training_video(
         video.is_active = is_active
     if duration_seconds is not None:
         video.duration_seconds = duration_seconds
+    if position_description is not PATCH_UNSET:
+        video.position_description = _optional_text(
+            position_description if isinstance(position_description, str) else None
+        )
     await db.commit()
     await db.refresh(video)
     logger.info("update_training_video", extra={"video_id": str(video.id)})
@@ -149,6 +166,7 @@ async def get_training_videos_for_user_today(
                 "youtube_url": v.youtube_url,
                 "points_per_day": v.points_per_day,
                 "duration_seconds": v.duration_seconds,
+                "position_description": v.position_description,
                 "academy_id": v.academy_id,
                 "academy_name": getattr(v.academy, "name", None) if hasattr(v, "academy") else None,
                 "has_completed_today": has_completed_today,

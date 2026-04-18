@@ -55,7 +55,7 @@ Formulário administrativo completo (legado, partilhado):
 | **Busca** | Debounce ~280 ms; filtro client-side sobre `allItems`. |
 | **Paginação** | Client-side: `visibleCount` aumenta ao aproximar do fim do scroll (`loadMore`). |
 | **Criação rápida (FAB)** | Bottom sheet → `createOptimistic` no notifier: API → merge na lista → invalida HTTP + limpa Hive → sync. |
-| **Formulário completo** | Ícone na AppBar ou fluxos que abrem `TechniqueFormScreen`; ao gravar, retorna o modelo → `syncAfterFormClose(saved:)` faz merge + reload. |
+| **Formulário completo** | Link no bottom sheet de criação rápida (FAB) ou ao editar um card; abre `TechniqueFormScreen`; ao gravar, retorna o modelo → `syncAfterFormClose(saved:)` faz merge + reload. |
 | **Editar** | Card abre o mesmo form; mesmo fluxo de retorno com `saved`. |
 | **Excluir** | Confirmação → API → remove linha de imediato → reload canónico (invalida HTTP + Hive + sync). |
 | **Loading de mutação** | Overlay com `mutationInProgress` durante operações longas. |
