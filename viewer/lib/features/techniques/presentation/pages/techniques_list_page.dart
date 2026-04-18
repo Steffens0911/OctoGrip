@@ -123,7 +123,11 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
       backgroundColor:
           isDark ? const Color(0xFF1A1A2E) : Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Técnicas'),
+        title: const Text(
+          'Técnicas (para serem vinculadas aos troféus e posições da semana)',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),

@@ -124,11 +124,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
             child: const Icon(Icons.alt_route_rounded, color: AppTheme.primary),
           ),
           title: const Text(
-            'Técnicas da academia',
+            'Técnicas (para serem vinculadas aos troféus e posições da semana)',
             style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Cadastrar e gerenciar técnicas da sua academia',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
@@ -164,11 +161,11 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                 color: AppTheme.primary),
           ),
           title: const Text(
-            'Vídeos de treinamento',
+            'Vídeo da tarefa diária',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           subtitle: const Text(
-            'Cadastrar vídeos de campo de treinamento da sua academia',
+            'Cadastrar vídeos da tarefa diária da sua academia',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => Navigator.push(
@@ -262,7 +259,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     }
 
-    // Cards fixos no topo; academias após Usuários + Técnicas + Vídeos + Loja (+ push se activo).
+    // Cards fixos no topo; academias após Usuários + lista de técnicas + vídeos tarefa diária + Loja (+ push se activo).
     final managerOffset =
         isManagerOrProfessor ? (_kAcademyPushNotificationUiEnabled ? 5 : 4) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;

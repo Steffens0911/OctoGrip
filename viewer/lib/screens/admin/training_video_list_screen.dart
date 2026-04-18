@@ -112,7 +112,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Excluir vídeo de treinamento'),
+        title: const Text('Excluir vídeo da tarefa diária'),
         content: Text('Excluir "${video.title}"?'),
         actions: [
           TextButton(
@@ -150,7 +150,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
   Widget build(BuildContext context) {
     final canEdit = AuthService().canEditResources();
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Vídeos de treinamento'),
+      appBar: const AppStandardAppBar(title: 'Vídeos da tarefa diária'),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: AppTheme.primary))
@@ -175,7 +175,7 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
               : _all.isEmpty
                   ? Center(
                       child: Text(
-                        'Nenhum vídeo de treinamento. Toque em + para criar.',
+                        'Nenhum vídeo da tarefa diária. Toque em + para criar.',
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppTheme.textSecondaryOf(context),
                             ),

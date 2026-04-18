@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:viewer/features/techniques/presentation/pages/techniques_list_page.dart';
 
-/// Lista de técnicas da academia — delega ao módulo Clean Architecture + Riverpod.
+/// Lista de técnicas (vínculo a troféus e posições da semana) — delega ao módulo Clean + Riverpod.
 class TechniqueListScreen extends ConsumerWidget {
   final String academyId;
 

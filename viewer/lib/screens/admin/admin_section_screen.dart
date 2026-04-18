@@ -53,7 +53,7 @@ class AdminSectionScreen extends StatelessWidget {
           const SizedBox(height: 16),
           AppNavigationTile(
             icon: Icons.ondemand_video_rounded,
-            title: 'Vídeos de treinamento',
+            title: 'Vídeo da tarefa diária',
             subtitle: 'Cadastrar vídeos do YouTube com pontos diários',
             onTap: () => Navigator.push(
               context,

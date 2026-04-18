@@ -832,9 +832,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.alt_route_rounded),
-                        title: const Text('Técnicas'),
-                        subtitle:
-                            const Text('Gerencie as técnicas desta academia'),
+                        title: const Text(
+                          'Técnicas (para serem vinculadas aos troféus e posições da semana)',
+                        ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () async {
                           await Navigator.push(

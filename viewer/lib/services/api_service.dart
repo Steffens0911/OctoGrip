@@ -1021,7 +1021,7 @@ class ApiService {
   }
 
   // ---------- Techniques ----------
-  /// Lista técnicas da academia. [academyId] obrigatório.
+  /// Lista técnicas da academia (para vínculo a troféus e posições da semana). [academyId] obrigatório.
   /// [_cacheBust] evita respostas antigas em cache HTTP do browser (web) após CRUD.
   Future<List<Technique>> getTechniques({
     required String academyId,
@@ -1782,8 +1782,8 @@ class ApiService {
     invalidateCache('GET:$baseUrl/professors');
   }
 
-  // ---------- Training videos (campo de treinamento) ----------
-  /// Lista vídeos de treinamento disponíveis hoje para o aluno logado.
+  // ---------- Training videos (vídeo da tarefa diária / campo de treinamento) ----------
+  /// Lista vídeos da tarefa diária disponíveis hoje para o aluno logado.
   /// Endpoint esperado: GET /me/training_videos/today
   Future<List<TrainingVideo>> getTrainingVideosToday() async {
     final existing = _inFlightTrainingVideosToday;
@@ -1813,7 +1813,7 @@ class ApiService {
         .toList();
   }
 
-  /// Registra a conclusão diária de um vídeo de treinamento.
+  /// Registra a conclusão diária de um vídeo da tarefa diária.
   /// Endpoint esperado: POST /me/training_videos/{id}/complete
   Future<TrainingVideoCompletionResult> completeTrainingVideo(
     String trainingVideoId,
@@ -1831,7 +1831,7 @@ class ApiService {
     return TrainingVideoCompletionResult.fromJson(map);
   }
 
-  /// Lista todos os vídeos de treinamento (admin/professor).
+  /// Lista todos os vídeos da tarefa diária (admin/professor).
   /// Endpoint esperado: GET /training_videos
   Future<List<TrainingVideo>> getTrainingVideosAdmin() async {
     final uri = Uri.parse('$baseUrl/training_videos');
@@ -1844,7 +1844,7 @@ class ApiService {
         .toList();
   }
 
-  /// Cria vídeo de treinamento (admin/professor).
+  /// Cria vídeo da tarefa diária (admin/professor).
   Future<void> createTrainingVideo({
     required String title,
     required String youtubeUrl,
@@ -1874,7 +1874,7 @@ class ApiService {
     invalidateCache('GET:$baseUrl/training_videos');
   }
 
-  /// Atualiza vídeo de treinamento (admin/professor).
+  /// Atualiza vídeo da tarefa diária (admin/professor).
   Future<void> updateTrainingVideo({
     required String id,
     required String title,
@@ -1905,7 +1905,7 @@ class ApiService {
     invalidateCache('GET:$baseUrl/training_videos');
   }
 
-  /// Remove vídeo de treinamento (admin/professor).
+  /// Remove vídeo da tarefa diária (admin/professor).
   Future<void> deleteTrainingVideo(String id) async {
     final r = await _req(http.delete(
       Uri.parse('$baseUrl/training_videos/$id'),

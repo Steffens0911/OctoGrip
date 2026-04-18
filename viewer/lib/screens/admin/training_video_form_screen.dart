@@ -124,7 +124,7 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
       if (!mounted) return;
       AppFeedback.show(
         context,
-        message: 'Vídeo de treinamento salvo.',
+        message: 'Vídeo da tarefa diária salvo.',
         type: AppFeedbackType.success,
       );
       Navigator.pop(context, true);
@@ -143,8 +143,8 @@ class _TrainingVideoFormScreenState extends State<TrainingVideoFormScreen> {
     return Scaffold(
       appBar: AppStandardAppBar(
         title: isNew
-            ? 'Novo vídeo de treinamento'
-            : 'Editar vídeo de treinamento',
+            ? 'Novo vídeo da tarefa diária'
+            : 'Editar vídeo da tarefa diária',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
