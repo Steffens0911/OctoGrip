@@ -286,7 +286,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     await _maybeShowPendingConfirmationsBottomSheet();
   }
 
-  /// Utilizadores com [UserModel.academyId] na home (aluno, gestor ou admin com academia).
+  /// Usuários com [UserModel.academyId] na home (aluno, gestor ou admin com academia).
   Future<void> _maybeShowAcademyLoginNotice() async {
     if (!mounted) return;
     final auth = AuthService();

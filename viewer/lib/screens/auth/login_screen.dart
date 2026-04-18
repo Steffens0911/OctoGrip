@@ -98,7 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '+${result.streakBonusPoints} pts — bónus por dias seguidos de login!',
+              '+${result.streakBonusPoints} pts — bônus por dias seguidos de login!',
             ),
             behavior: SnackBarBehavior.floating,
           ),
@@ -188,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (!u.startsWith('https://') && !u.startsWith('http://')) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('A URL deve começar por https:// ou http://'),
+                                  content: Text('A URL deve começar com https:// ou http://'),
                                 ),
                               );
                               return;
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             foregroundColor: _textOnField,
                             backgroundColor: _fieldFill,
                           ),
-                          child: const Text('Guardar URL da API e recarregar'),
+                          child: const Text('Salvar URL da API e recarregar'),
                         ),
                       ],
                       const SizedBox(height: 24),

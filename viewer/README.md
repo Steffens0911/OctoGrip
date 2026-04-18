@@ -1,6 +1,11 @@
 # OctoGrip (Flutter)
 
-App **OctoGrip** para alunos e equipa da academia: campo de treino, painel da academia e administração (academias, usuários, técnicas, missões, etc.).
+App **OctoGrip** para alunos e equipe da academia: campo de treino, painel da academia e administração (academias, usuários, técnicas, missões, etc.).
+
+## Idioma (cópia na interface)
+
+- Textos fixos no código e mensagens ao usuário devem seguir **português do Brasil (pt-BR)** — inclusive vocabulário comum no app (ex.: **Salvar** em vez de “Guardar”, **celular** em vez de “telemóvel”, **usuário** em vez de “utilizador”, **aba** em vez de “separador”, **bônus** com acento circunflexo).
+- O `MaterialApp` já usa `locale: Locale('pt', 'BR')` em `lib/main.dart` para delegações de data/número do Flutter.
 
 ## Marca e logo
 

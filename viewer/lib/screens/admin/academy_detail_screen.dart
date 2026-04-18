@@ -1162,7 +1162,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Modal na tela inicial (Campo de treinamento), uma vez por sessão de login, '
-                        'para todos os utilizadores com esta academia — antes do destaque de parceiros.',
+                        'para todos os usuários com esta academia — antes do destaque de parceiros.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppTheme.textSecondaryOf(context),
                             ),
@@ -1226,7 +1226,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                   height: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Guardar aviso'),
+                              : const Text('Salvar aviso'),
                         ),
                       ),
                     ],
@@ -1740,7 +1740,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                     if (techIds.isEmpty || techIds.length > 5) return;
                     Navigator.pop(ctx, true);
                   },
-                  child: const Text('Guardar'),
+                  child: const Text('Salvar'),
                 ),
               ],
             );
@@ -2072,7 +2072,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         const SizedBox(height: 8),
         Text(
           '${report.usersLoggedAtLeastOnce} logaram ao menos 1 dia · '
-          '${report.eligibleUsersCount} utilizadores (staff e alunos)',
+          '${report.eligibleUsersCount} usuários (staff e alunos)',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         if (report.users.isNotEmpty) ...[

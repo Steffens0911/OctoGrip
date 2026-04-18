@@ -326,8 +326,8 @@ class _MainShellState extends State<MainShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento'),
-        // Último item da lista = extremo direito do ecrã → [Sair] fica na borda direita.
-        // +/− antes do logout; em ecrãs muito estreitos o [ClipRect] pode cortar pela esquerda do grupo.
+        // Último item da lista = extremo direito da tela → [Sair] fica na borda direita.
+        // +/− antes do logout; em telas muito estreitas o [ClipRect] pode cortar pela esquerda do grupo.
         actions: [
           if (auth.isRealUserAdmin)
             IconButton(

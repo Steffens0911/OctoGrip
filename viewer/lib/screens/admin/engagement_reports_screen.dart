@@ -428,7 +428,7 @@ class _EngagementCard extends StatelessWidget {
               else ...[
                 Text(
                   '${loginReport!.usersLoggedAtLeastOnce} logaram ao menos 1 dia · '
-                  '${loginReport!.eligibleUsersCount} utilizadores (staff e alunos)',
+                  '${loginReport!.eligibleUsersCount} usuários (staff e alunos)',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.textSecondaryOf(context),
                       ),

@@ -232,7 +232,7 @@ class _DatabaseBackupScreenState extends State<DatabaseBackupScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Pode demorar vários minutos (bases grandes). Não feche o separador. '
+                'Pode demorar vários minutos (bases grandes). Não feche a aba. '
                 'Se o Chrome mostrar falha de rede, aguarde e reinicie a API se necessário.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: AppTheme.textSecondaryOf(context),

@@ -5,10 +5,10 @@ import 'package:flutter/material.dart';
 import 'package:viewer/core/gamification_constants.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
-/// Progresso visual até ao próximo bónus de sequência de login (múltiplo de 7 dias).
+/// Progresso visual até o próximo bônus de sequência de login (múltiplo de 7 dias).
 ///
 /// [streakDays] vem de `login_streak_days` em `/auth/me`. Múltiplos de 7 mostram anel
-/// completo (ciclo concluído até ao bónus); caso contrário, `streak % 7 / 7`.
+/// completo (ciclo concluído até o bônus); caso contrário, `streak % 7 / 7`.
 double streakProgressToNextBonus(int streakDays) {
   if (streakDays <= 0) return 0.0;
   const interval = kLoginStreakBonusIntervalDays;
@@ -17,7 +17,7 @@ double streakProgressToNextBonus(int streakDays) {
   return r / interval;
 }
 
-/// Anel estilo “gauge” (fundo escuro, progresso menta), centro com valor do bónus em pontos.
+/// Anel estilo “gauge” (fundo escuro, progresso menta), centro com valor do bônus em pontos.
 ///
 /// O toque abre o detalhe das regras (ex. [showPointsRulesSheet]).
 class LoginBonusRing extends StatelessWidget {
@@ -46,7 +46,7 @@ class LoginBonusRing extends StatelessWidget {
     final accent = isDark ? mint : FantasyTheme.xpGreen;
 
     return Tooltip(
-      message: 'Toque para ver como funcionam os pontos e o bónus de login',
+      message: 'Toque para ver como funcionam os pontos e o bônus de login',
       child: Material(
         color: Colors.transparent,
         child: InkWell(

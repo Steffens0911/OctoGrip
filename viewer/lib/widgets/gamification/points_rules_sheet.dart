@@ -1,6 +1,6 @@
 /// Bottom sheet “Como funcionam os pontos” na home do aluno.
 ///
-/// Valores de bónus de sequência: `gamification_constants.dart`.
+/// Valores de bônus de sequência: `gamification_constants.dart`.
 library;
 import 'package:flutter/material.dart';
 
@@ -33,25 +33,25 @@ void showPointsRulesSheet(BuildContext context) {
                 body:
                     'Os pontos somam missões, lições, execuções confirmadas por parceiros, '
                     'ajustes da academia e, quando aplicável, o vídeo da tarefa diária. '
-                    'A barra no topo mostra o progresso até ao próximo nível.',
+                    'A barra no topo mostra o progresso até o próximo nível.',
               ),
               const SizedBox(height: 14),
               const _RuleBlock(
                 title: 'Tarefa diária',
                 body:
                     'Ao completar o vídeo diário pela primeira vez no dia, ganha os pontos '
-                    '(XP) indicados no selo por baixo do brasão.',
+                    '(XP) indicados no selo abaixo do brasão.',
               ),
               const SizedBox(height: 14),
               const _RuleBlock(
                 title: 'Sequência de login',
                 body:
-                    'Conta um dia por calendário em UTC em que entra na app. '
-                    'Se falhar um dia UTC, a sequência volta a zero.',
+                    'Conta um dia por calendário em UTC em que você entra no app. '
+                    'Se perder um dia (UTC), a sequência zera.',
               ),
               const SizedBox(height: 14),
               const _RuleBlock(
-                title: 'Bónus de sequência',
+                title: 'Bônus de sequência',
                 body:
                     'A cada $kLoginStreakBonusIntervalDays dias consecutivos de login '
                     '($kLoginStreakBonusIntervalDays, ${kLoginStreakBonusIntervalDays * 2}, …), '

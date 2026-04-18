@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:viewer/screens/access_denied_screen.dart';
 import 'package:viewer/services/auth_service.dart';
 
-/// Protege conteúdo por roles do utilizador **efetivo** ([AuthService.currentUser]).
+/// Protege conteúdo por roles do usuário **efetivo** ([AuthService.currentUser]).
 ///
 /// Com [allowWhenRealUserIsAdmin] / [allowWhenRealUserIsSupervisor]: durante **Atuar como**,
-/// o papel efetivo muda mas o JWT continua a ser o da conta real; estes ecrãs podem usar
+/// o papel efetivo muda mas o JWT continua sendo o da conta real; estas telas podem usar
 /// [AuthService.isRealUserAdmin] / [isRealUserSupervisor] (perfil reidratado sem `X-Impersonate-User`).
 /// **Não** usar [allowWhenRealUserIsAdmin] na secção **Admin**: o acesso global deve seguir só o papel efetivo.
 class RoleGuard extends StatelessWidget {
