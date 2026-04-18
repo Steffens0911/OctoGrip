@@ -10,7 +10,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
-/// Inicializa FCM (Android/iOS), regista token na API após login.
+/// Inicializa FCM (Android/iOS), registra token na API após login.
 ///
 /// Requer `firebase_options.dart` com projeto real e, no servidor,
 /// `FIREBASE_PROJECT_ID` + `FIREBASE_SERVICE_ACCOUNT_PATH` para o gerente enviar avisos.
@@ -62,7 +62,7 @@ class PushNotificationService {
     }
   }
 
-  /// Chamar após login (ou ao arrancar com sessão já guardada).
+  /// Chamar após login (ou ao iniciar com sessão já salva).
   static Future<void> registerTokenIfLoggedIn() async {
     if (!_firebaseReady || !AuthService().isLoggedIn) return;
     try {

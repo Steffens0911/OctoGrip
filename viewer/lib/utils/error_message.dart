@@ -18,11 +18,11 @@ bool _looksLikeNetworkFailure(String s) {
 
 /// Instrução quando o viewer está em *.trycloudflare.com sem `?api_base=` (Chrome bloqueia HTTPS → loopback).
 const String kWebTrycloudflareMissingApiBaseMessage =
-    'Este site está num túnel Cloudflare público: o Chrome não permite que a página chame a API em 127.0.0.1.\n\n'
-    '1) Com a API na porta 8000, noutro terminal: cloudflared tunnel --url http://127.0.0.1:8000\n'
+    'Este site está em um túnel Cloudflare público: o Chrome não permite que a página chame a API em 127.0.0.1.\n\n'
+    '1) Com a API na porta 8000, em outro terminal: cloudflared tunnel --url http://127.0.0.1:8000\n'
     '2) Copie a URL https://….trycloudflare.com desse túnel.\n'
-    '3) Cole abaixo em “URL do túnel da API” e toque em Guardar (ou abra o viewer com ?api_base=URL na barra de endereço).\n\n'
-    'O valor fica na sessão do navegador até fechar o separador.';
+    '3) Cole abaixo em “URL do túnel da API” e toque em Salvar (ou abra o viewer com ?api_base=URL na barra de endereço).\n\n'
+    'O valor fica na sessão do navegador até você fechar a aba.';
 
 /// Retorna uma mensagem de erro amigável para exibir ao usuário.
 /// Evita expor detalhes técnicos (ClientException, URI, etc.) em erros de rede.
@@ -41,7 +41,7 @@ String userFacingMessage(Object e) {
   final s = e.toString().toLowerCase();
   if (_looksLikeNetworkFailure(s)) {
     if (kIsWeb) {
-      return 'Falha de conexão. Em produção configure API_BASE_URL no deploy (ex.: Coolify) com a URL HTTPS da API, ou abra o site com ?api_base=URL_DA_API. Em desenvolvimento local, confirme que a API está a correr.';
+      return 'Falha de conexão. Em produção configure API_BASE_URL no deploy (ex.: Coolify) com a URL HTTPS da API, ou abra o site com ?api_base=URL_DA_API. Em desenvolvimento local, confirme que a API está em execução.';
     }
     return 'Falha de conexão. Verifique se a API está em execução e se o app está na mesma rede ou no emulador.';
   }

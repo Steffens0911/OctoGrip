@@ -8,7 +8,7 @@ import 'package:viewer/models/mission_today.dart';
 /// para **web e mobile**: após reload da página ou cold start, a UI pode hidratar
 /// antes da rede responder (alinhado a stale-while-revalidate no cliente).
 ///
-/// Chave por utilizador efetivo; em **logout** chamar [clearAll].
+/// Chave por usuário efetivo; em **logout** chamar [clearAll].
 class StudentHomeSnapshotStore {
   static const _prefix = 'student_home_snap_v1_';
   static const _maxAge = Duration(days: 7);

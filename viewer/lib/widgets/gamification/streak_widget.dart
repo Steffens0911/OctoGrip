@@ -7,7 +7,7 @@ import 'package:viewer/widgets/gamification/login_bonus_ring.dart';
 ///
 /// Com [streakDays] null, não renderiza nada. [showPlaceholder] mostra "em breve" (legado).
 ///
-/// Se [onOpenPointsRules] for definido, o anel **+PTS** (bónus de sequência) fica **dentro**
+/// Se [onOpenPointsRules] for definido, o anel **+PTS** (bônus de sequência) fica **dentro**
 /// do mesmo cartão, à direita do texto.
 class StreakWidget extends StatelessWidget {
   const StreakWidget({

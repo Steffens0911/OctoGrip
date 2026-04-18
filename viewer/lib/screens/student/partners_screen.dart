@@ -130,7 +130,7 @@ class _PartnersScreenState extends State<PartnersScreen> {
                                               Text(
                                                 p.name,
                                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                      color: AppTheme.textPrimary,
+                                                      color: AppTheme.textPrimaryOf(context),
                                                       fontWeight: FontWeight.w600,
                                                     ),
                                               ),

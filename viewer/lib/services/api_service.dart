@@ -189,7 +189,7 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  /// Regista token FCM para o utilizador autenticado (Android/iOS).
+  /// Registra token FCM para o usuário autenticado (Android/iOS).
   Future<void> registerMyPushToken(String token, String platform) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/me/push_token'),
@@ -200,7 +200,7 @@ class ApiService {
     _throwIfNotOk(r, data);
   }
 
-  /// Remove todos os tokens FCM do utilizador (logout).
+  /// Remove todos os tokens FCM do usuário (logout).
   Future<void> deleteAllMyPushTokens() async {
     final r = await _req(http.delete(
       Uri.parse('$baseUrl/me/push_tokens'),
@@ -210,7 +210,7 @@ class ApiService {
     _throwIfNotOk(r, data);
   }
 
-  /// Envia notificação push a utilizadores da academia com app e token registados.
+  /// Envia notificação push a usuários da academia com app e tokens registrados.
   Future<({int targetTokens, int sent, int failed})> sendAcademyPushNotification(
     String academyId, {
     required String title,
@@ -332,7 +332,7 @@ class ApiService {
   /// Retorna a academia sem usar cache (para o brasão na home do aluno aparecer logo após o admin salvar).
   ///
   /// Em 403, chama `AuthService().refreshMe()` e tenta de novo com o `academy_id` atual do servidor
-  /// (evita brasão vazio quando o utilizador em cache ficou desatualizado).
+  /// (evita brasão vazio quando o usuário em cache ficou desatualizado).
   Future<Academy> getAcademyFresh(String id) async {
     Future<Academy> fetchOnce(String academyId) async {
       final r = await _req(http.get(
@@ -2152,7 +2152,7 @@ class ApiService {
       _restoreBackupTimeout,
       onTimeout: () {
         throw TimeoutException(
-          'Tempo esgotado após $minutes minutos. O servidor pode ainda estar a restaurar bases grandes. '
+          'Tempo esgotado após $minutes minutos. O servidor pode ainda estar restaurando bancos grandes. '
           'Aguarde 2–5 minutos, reinicie a API (docker compose restart api), recarregue a página e tente entrar. '
           'Consulte os logs: docker compose logs api',
           _restoreBackupTimeout,

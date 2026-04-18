@@ -8,7 +8,7 @@ import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Permite ao gerente/professor (escrita na academia) enviar um aviso push
-/// a todos os utilizadores da mesma academia com token FCM registado.
+/// a todos os usuários da mesma academia com token FCM registrado.
 class AcademyPushNotificationScreen extends StatefulWidget {
   const AcademyPushNotificationScreen({super.key});
 
@@ -84,8 +84,8 @@ class _AcademyPushNotificationScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'A mensagem aparece na barra de notificações dos alunos e equipa '
-              'que tenham o app no telemóvel, com conta na sua academia e '
+              'A mensagem aparece na barra de notificações dos alunos e da equipe '
+              'que tenham o app no celular, com conta na sua academia e '
               'notificações ativas.',
               style: TextStyle(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
