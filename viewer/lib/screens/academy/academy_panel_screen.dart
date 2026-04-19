@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
@@ -11,9 +12,6 @@ import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
-
-/// Card **Aviso à academia (push)** no painel da academia (gerente/professor).
-const bool _kAcademyPushNotificationUiEnabled = true;
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {
@@ -86,7 +84,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count += _kAcademyPushNotificationUiEnabled ? 5 : 4; // vídeos + loja (+ push se activo)
+      count += kPushNotificationsEnabled ? 5 : 4; // vídeos + loja (+ push se activo)
     }
     return count;
   }
@@ -217,7 +215,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         ),
       );
     } else if (isManagerOrProfessor &&
-        _kAcademyPushNotificationUiEnabled &&
+        kPushNotificationsEnabled &&
         index == 4) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
@@ -260,7 +258,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
     // Cards fixos no topo; academias após Usuários + lista de técnicas + vídeos tarefa diária + Loja (+ push se activo).
     final managerOffset =
-        isManagerOrProfessor ? (_kAcademyPushNotificationUiEnabled ? 5 : 4) : 0;
+        isManagerOrProfessor ? (kPushNotificationsEnabled ? 5 : 4) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();

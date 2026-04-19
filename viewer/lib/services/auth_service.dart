@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
@@ -100,8 +101,10 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyImpersonate);
     notifyListeners();
-    await PushNotificationService.registerTokenIfLoggedIn();
-    PushNotificationService.scheduleWebPushTokenRetries();
+    if (kPushNotificationsEnabled) {
+      await PushNotificationService.registerTokenIfLoggedIn();
+      PushNotificationService.schedulePostLoginPushTokenRetries();
+    }
   }
 
   Future<void> logout({bool notifyInvalidated = false}) async {

@@ -1,6 +1,9 @@
+import 'dart:async' show unawaited;
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:viewer/firebase_options.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -24,6 +27,72 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class PushNotificationService {
   PushNotificationService._();
   static bool _firebaseReady = false;
+
+  /// Canal Android (O+); alinhado a `AndroidManifest` meta-data
+  /// `com.google.firebase.messaging.default_notification_channel_id`.
+  static const String _androidChannelId = 'octogrip_push';
+  static const String _androidChannelName = 'Avisos OctoGrip';
+
+  static FlutterLocalNotificationsPlugin? _androidLocalNotifications;
+
+  /// FCM no Android **não** mostra notificação de sistema com a app em primeiro plano;
+  /// usamos notificações locais com o mesmo canal que o FCM usa em segundo plano.
+  static Future<void> _ensureAndroidLocalNotifications() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (_androidLocalNotifications != null) return;
+    final plugin = FlutterLocalNotificationsPlugin();
+    await plugin.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      ),
+    );
+    final android = plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await android?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _androidChannelId,
+        _androidChannelName,
+        description: 'Avisos da academia e da plataforma.',
+        importance: Importance.high,
+      ),
+    );
+    _androidLocalNotifications = plugin;
+  }
+
+  static Future<void> _showAndroidForegroundNotification(RemoteMessage m) async {
+    final n = m.notification;
+    final title = (n?.title ?? m.data['title'])?.trim();
+    final body = (n?.body ?? m.data['body'])?.trim();
+    if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+      return;
+    }
+    await _ensureAndroidLocalNotifications();
+    final plugin = _androidLocalNotifications;
+    if (plugin == null) return;
+    // Android exige id 32-bit positivo para [show].
+    final id = Object.hash(
+          m.messageId,
+          m.sentTime?.millisecondsSinceEpoch,
+          title,
+          body,
+        ) &
+        0x7fffffff;
+    await plugin.show(
+      id,
+      title?.isNotEmpty == true ? title : _androidChannelName,
+      body ?? '',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannelId,
+          _androidChannelName,
+          channelDescription: 'Avisos da academia e da plataforma.',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+        ),
+      ),
+    );
+  }
 
   static const String _vapidKey = String.fromEnvironment(
     'FCM_VAPID_KEY',
@@ -108,18 +177,33 @@ class PushNotificationService {
       }
       FirebaseMessaging.onMessage.listen((RemoteMessage m) {
         debugPrint('FCM foreground: ${m.notification?.title}');
+        if (defaultTargetPlatform == TargetPlatform.android) {
+          unawaited(_showAndroidForegroundNotification(m));
+        }
       });
       final fm = FirebaseMessaging.instance;
       await fm.requestPermission(alert: true, badge: true, sound: true);
-      await fm.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await fm.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        await _ensureAndroidLocalNotifications();
+      }
       FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
       _firebaseReady = true;
     } catch (e, st) {
       debugPrint('PushNotificationService.init: $e\n$st');
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        // ignore: avoid_print
+        print(
+          '[OctoGrip FCM] init Android falhou — confirma google-services.json em '
+          'android/app/, o mesmo projectId que firebase_options.dart e Play Services.\n$e',
+        );
+      }
     }
   }
 
@@ -156,6 +240,12 @@ class PushNotificationService {
             '[OctoGrip FCM] getToken devolveu vazio. Permissões de notificação, '
             'FCM_VAPID_KEY no build e firebase-messaging-sw.js com o mesmo appId.',
           );
+        } else if (defaultTargetPlatform == TargetPlatform.android) {
+          // ignore: avoid_print
+          print(
+            '[OctoGrip FCM] getToken vazio no Android: conceda notificações à app, '
+            'confirme google-services.json em android/app/ e o package no Firebase.',
+          );
         }
         return;
       }
@@ -165,14 +255,20 @@ class PushNotificationService {
       if (kIsWeb) {
         // ignore: avoid_print
         print('[OctoGrip FCM] registerTokenIfLoggedIn: $e');
+      } else if (defaultTargetPlatform == TargetPlatform.android) {
+        // ignore: avoid_print
+        print('[OctoGrip FCM] registerTokenIfLoggedIn (Android): $e');
       }
     }
   }
 
-  /// Na Web o [firebase_messaging] pode falhar na 1.ª tentativa (service worker
-  /// ainda a registar). Re-tenta em segundo plano sem bloquear a UI.
-  static void scheduleWebPushTokenRetries() {
-    if (!kIsWeb || !_firebaseReady) return;
+  /// Re-tenta [registerTokenIfLoggedIn] após o login (Web: SW ainda a registar;
+  /// Android/iOS: permissão ou token por vezes só disponível momentos depois).
+  static void schedulePostLoginPushTokenRetries() {
+    if (!_firebaseReady || !AuthService().isLoggedIn) return;
+    final mobile = defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+    if (!kIsWeb && !mobile) return;
     Future<void>(() async {
       await Future<void>.delayed(const Duration(seconds: 2));
       if (AuthService().isLoggedIn) await registerTokenIfLoggedIn();
@@ -190,10 +286,10 @@ class PushNotificationService {
 
   /// Chamado no logout: remove tokens no servidor e invalida FCM local.
   static Future<void> unregister() async {
-    if (!_firebaseReady) return;
     try {
       await ApiService().deleteAllMyPushTokens();
     } catch (_) {}
+    if (!_firebaseReady) return;
     try {
       await FirebaseMessaging.instance.deleteToken();
     } catch (_) {}

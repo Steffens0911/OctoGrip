@@ -291,7 +291,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                             child: Row(
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.storefront_rounded,
                                   color: FantasyTheme.gold,
                                   size: 28,

@@ -7,6 +7,13 @@
 - **Gerente ou professor** (com permissão de escrita na academia): no painel **Academia → Aviso à academia (push)**, envia título + mensagem. A API chama o **Firebase Cloud Messaging HTTP v1** para cada token dos utilizadores com `academy_id` igual à da academia alvo.
 - **Administrador da plataforma**: `POST /admin/push_broadcast` com o mesmo corpo `{ "title", "body" }` envia para **todos** os tokens FCM registados (toda a base), útil para avisos globais. No app Flutter, aba **Admin** → **Notificação push global** (com confirmação antes do envio).
 
+### Flag do viewer (`kPushNotificationsEnabled`)
+
+Em **`viewer/lib/config/feature_flags.dart`**, a constante **`kPushNotificationsEnabled`** controla o push **no cliente Flutter**:
+
+- **`false`** (valor por omissão neste branch): não regista o handler em segundo plano nem executa `PushNotificationService.init()`, não regista token após login e oculta a UI de envio (**Admin → Notificação push global** e **Academia → Aviso à academia (push)**). O **logout** continua a pedir `DELETE /me/push_tokens` para limpar tokens no servidor.
+- **`true`**: FCM e ecrãs de envio activos, como descrito nas bullets anteriores.
+
 ## Configuração do servidor (API)
 
 Variáveis de ambiente (ou `.env`):
@@ -35,6 +42,11 @@ Aplicar `migrations/055_user_device_push_tokens.sql` (executada pelo fluxo habit
    ```
    Isto gera/atualiza `lib/firebase_options.dart` (substitui o placeholder do repositório).
 4. **Android**: coloca o ficheiro **`google-services.json`** (botão “Baixar” no assistente Firebase) em **`viewer/android/app/`**. O projeto já inclui o plugin Gradle `com.google.gms.google-services` para o Gradle processar esse ficheiro. Sem ele, o build Android falha até colocares o JSON correto.
+   - O **package name** na consola Firebase tem de coincidir com `applicationId` em `viewer/android/app/build.gradle.kts` (actualmente `com.example.viewer`).
+   - **Android 13+**: a app pede permissão de notificação via `FirebaseMessaging.requestPermission()`; nas definições do telemóvel, confirma que as notificações estão ligadas para a OctoGrip.
+   - **Primeiro plano**: o FCM no Android não mostra bandeja de sistema com a app aberta; o viewer usa **`flutter_local_notifications`** no mesmo canal **`octogrip_push`** (definido no `AndroidManifest` e em `PushNotificationService`). O payload deve incluir bloco **`notification`** (título/corpo) ou, em alternativa, campos `data` com chaves `title` / `body` para o primeiro plano mostrar o aviso local.
+   - **Build local (APK/AAB):** na pasta `viewer/`, com `google-services.json` no sítio certo: `flutter build apk --release` ou `flutter build appbundle --release`. O contentor Docker do deploy **Web** (Coolify) não inclui este ficheiro nem compila Android — o binário nativo gera-se na máquina ou CI onde corres estes comandos.
+   - Após login, `PushNotificationService.schedulePostLoginPushTokenRetries()` volta a tentar `POST /me/push_token` aos **2 s** e **7 s** (útil na Web e no Android quando o token ou a permissão só ficam prontos logo a seguir).
 5. **iOS**: adicionar capacidade **Push Notifications** no Xcode e configurar certificados APNs no Firebase, conforme documentação Apple/Firebase.
 6. **Web (push no browser):** no Firebase, adicionar uma app do tipo **Web** ao mesmo projecto. Copiar o **App ID** para o build (`FIREBASE_WEB_APP_ID`). Gerar o par de chaves **Web Push** na consola e passar a chave pública em `FCM_VAPID_KEY` se `getToken()` falhar sem ela. Garantir que `firebase-messaging-sw.js` na raiz do build coincide com o `appId` (substituição automática no `viewer/Dockerfile` com `ARG FIREBASE_WEB_APP_ID`).
 

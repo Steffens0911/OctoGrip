@@ -14,6 +14,7 @@ import 'package:viewer/screens/academy/academy_panel_screen.dart';
 import 'package:viewer/screens/admin/admin_section_screen.dart';
 import 'package:viewer/screens/auth/login_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
+import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
@@ -21,17 +22,20 @@ import 'package:viewer/services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (!kIsWeb &&
+  if (kPushNotificationsEnabled &&
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS)) {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
   await Hive.initFlutter();
   await AuthService().init();
-  await PushNotificationService.init();
-  if (AuthService().isLoggedIn) {
-    await PushNotificationService.registerTokenIfLoggedIn();
-    PushNotificationService.scheduleWebPushTokenRetries();
+  if (kPushNotificationsEnabled) {
+    await PushNotificationService.init();
+    if (AuthService().isLoggedIn) {
+      await PushNotificationService.registerTokenIfLoggedIn();
+      PushNotificationService.schedulePostLoginPushTokenRetries();
+    }
   }
   runApp(
     ProviderScope(
