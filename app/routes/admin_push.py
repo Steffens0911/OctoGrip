@@ -1,5 +1,7 @@
 """Broadcast de notificações push (FCM) para administradores da plataforma."""
 
+import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,8 +11,10 @@ from app.core.exceptions import AppError
 from app.core.role_deps import require_admin
 from app.models import User
 from app.schemas.push_notification import AcademyPushNotifyRequest, AcademyPushNotifyResponse
-from app.services.fcm_service import send_fcm_data_message
+from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
 from app.services.push_token_service import delete_device_token, list_all_fcm_tokens
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -36,22 +40,49 @@ async def admin_push_broadcast(
     if not tokens:
         return AcademyPushNotifyResponse(target_tokens=0, sent=0, failed=0)
 
+    try:
+        access_token = await fetch_fcm_access_token(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+    except FileNotFoundError as e:
+        raise AppError(
+            "Ficheiro da conta de serviço Firebase não encontrado no servidor "
+            f"({settings.FIREBASE_SERVICE_ACCOUNT_PATH}).",
+            status_code=503,
+        ) from e
+    except Exception as e:
+        logger.exception("FCM broadcast: falha ao obter token OAuth para Google")
+        raise AppError(
+            "Não foi possível autenticar no Firebase (credenciais ou rede). "
+            "Verifique FIREBASE_SERVICE_ACCOUNT_PATH e o JSON montado no contentor.",
+            status_code=503,
+        ) from e
+
     sent = 0
     failed = 0
     for device_token in tokens:
-        ok, drop = await send_fcm_data_message(
-            project_id=settings.FIREBASE_PROJECT_ID,
-            service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-            device_token=device_token,
-            title=body.title.strip(),
-            body=body.body.strip(),
-        )
+        try:
+            ok, drop = await send_fcm_data_message(
+                project_id=settings.FIREBASE_PROJECT_ID,
+                service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+                device_token=device_token,
+                title=body.title.strip(),
+                body=body.body.strip(),
+                access_token=access_token,
+            )
+        except Exception:
+            logger.exception(
+                "FCM broadcast: falha não tratada para token (prefixo)",
+            )
+            failed += 1
+            continue
         if ok:
             sent += 1
         else:
             failed += 1
             if drop:
-                await delete_device_token(db, fcm_token=device_token)
+                try:
+                    await delete_device_token(db, fcm_token=device_token)
+                except Exception:
+                    logger.exception("FCM broadcast: falha ao remover token inválido")
 
     return AcademyPushNotifyResponse(
         target_tokens=len(tokens),

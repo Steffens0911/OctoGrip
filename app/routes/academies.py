@@ -60,7 +60,7 @@ from app.services.collective_goal_service import (
     list_goals_for_academy,
 )
 from app.services.execution_service import batch_total_points_for_users
-from app.services.fcm_service import send_fcm_data_message
+from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
 from app.services.push_token_service import delete_device_token, list_fcm_tokens_for_academy
 from app.services.user_service import list_users
 
@@ -614,22 +614,44 @@ async def academy_send_push_notification(
     if not tokens:
         return AcademyPushNotifyResponse(target_tokens=0, sent=0, failed=0)
 
+    try:
+        access_token = await fetch_fcm_access_token(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
+    except FileNotFoundError as e:
+        raise AppError(
+            "Ficheiro da conta de serviço Firebase não encontrado no servidor "
+            f"({settings.FIREBASE_SERVICE_ACCOUNT_PATH}).",
+            status_code=503,
+        ) from e
+    except Exception as e:
+        raise AppError(
+            "Não foi possível autenticar no Firebase (credenciais ou rede).",
+            status_code=503,
+        ) from e
+
     sent = 0
     failed = 0
     for device_token in tokens:
-        ok, drop = await send_fcm_data_message(
-            project_id=settings.FIREBASE_PROJECT_ID,
-            service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-            device_token=device_token,
-            title=body.title.strip(),
-            body=body.body.strip(),
-        )
+        try:
+            ok, drop = await send_fcm_data_message(
+                project_id=settings.FIREBASE_PROJECT_ID,
+                service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+                device_token=device_token,
+                title=body.title.strip(),
+                body=body.body.strip(),
+                access_token=access_token,
+            )
+        except Exception:
+            failed += 1
+            continue
         if ok:
             sent += 1
         else:
             failed += 1
             if drop:
-                await delete_device_token(db, fcm_token=device_token)
+                try:
+                    await delete_device_token(db, fcm_token=device_token)
+                except Exception:
+                    pass
 
     return AcademyPushNotifyResponse(
         target_tokens=len(tokens),
