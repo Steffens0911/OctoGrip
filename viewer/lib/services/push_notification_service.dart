@@ -47,8 +47,16 @@ class PushNotificationService {
         return;
       }
       try {
+        // O [FirebaseMessaging.instance] chama [Firebase.app()] — a app tem de existir primeiro.
+        // ignore: avoid_print
+        print('[OctoGrip FCM] init web: passo A — Firebase.initializeApp');
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(options: webOpts);
+        }
         var supported = true;
         try {
+          // ignore: avoid_print
+          print('[OctoGrip FCM] init web: passo B — isSupported');
           supported = await FirebaseMessaging.instance.isSupported();
         } catch (e, st) {
           debugPrint(
@@ -59,18 +67,21 @@ class PushNotificationService {
           debugPrint('FCM Web: este browser não suporta Firebase Messaging.');
           return;
         }
-        if (Firebase.apps.isEmpty) {
-          await Firebase.initializeApp(options: webOpts);
-        }
+        // ignore: avoid_print
+        print('[OctoGrip FCM] init web: passo C — onMessage.listen');
         FirebaseMessaging.onMessage.listen((RemoteMessage m) {
           debugPrint('FCM web foreground: ${m.notification?.title}');
         });
+        // ignore: avoid_print
+        print('[OctoGrip FCM] init web: passo D — pedido de permissão');
         final perm = await webNotificationPermissionResult();
         if (perm != 'granted') {
           debugPrint(
             'FCM Web: permissão de notificação = $perm (concede no browser para obter token).',
           );
         }
+        // ignore: avoid_print
+        print('[OctoGrip FCM] init web: passo E — concluído');
         FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
         _firebaseReady = true;
       } catch (e, st) {

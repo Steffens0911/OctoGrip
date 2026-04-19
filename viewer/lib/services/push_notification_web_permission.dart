@@ -7,5 +7,9 @@ Future<String> webNotificationPermissionResult() async {
   final dynamic resolved =
       await web.Notification.requestPermission().toDart;
   if (resolved is String) return resolved;
-  return (resolved as JSString).toDart;
+  try {
+    return (resolved as JSString).toDart;
+  } catch (_) {
+    return resolved.toString();
+  }
 }

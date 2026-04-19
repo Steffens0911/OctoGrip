@@ -42,6 +42,10 @@ Aplicar `migrations/055_user_device_push_tokens.sql` (executada pelo fluxo habit
 
 Em builds **release** (`dart2js`), o resultado de `Notification.requestPermission()` pode chegar ao Dart já como `String`. O plugin `firebase_messaging_web` aplicava um segundo `.toDart` e gerava esse erro; o viewer pede a permissão via `lib/services/push_notification_web_permission.dart` (import condicional) para contornar o problema. Depois de **rebuild** do viewer, o `POST /me/push_token` deve voltar a ser tentado após login.
 
+**Ordem de inicialização:** na Web é obrigatório chamar `Firebase.initializeApp` **antes** de `FirebaseMessaging.instance` (por exemplo `isSupported()`), porque o getter `instance` invoca `Firebase.app()`. Se a ordem estiver invertida, podem ocorrer falhas difíceis de ler no JS minificado.
+
+Para diagnóstico, a consola imprime `[OctoGrip FCM] init web: passo A–E`; o último passo visto antes do erro indica onde parou.
+
 ## Endpoints
 
 - `POST /me/push_token` — corpo `{ "token": "...", "platform": "android"|"ios"|"web" }` (autenticado).
