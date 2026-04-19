@@ -54,6 +54,10 @@ Significa que o **firebaseConfig** usado no browser (Dart + `firebase-messaging-
 
 **Correcção:** no Firebase Console → Definições do projeto → **As tuas apps** → app **Web** → copiar o snippet (ou os campos `apiKey`, `appId`, `messagingSenderId`, `projectId`, `authDomain`, `storageBucket`) e passar **todos** no **build** do viewer (`docker-compose.coolify.yml` / `viewer/Dockerfile`: `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, etc., com *Buildtime* no Coolify). O `apiKey` da app **Web** costuma ser **diferente** do `apiKey` Android no mesmo projeto.
 
+**Variáveis no Coolify:** não coloques aspas à volta dos valores (`"AIza..."` errado; `AIza...` certo). Espaços no início/fim também invalidam o pedido.
+
+**Restrições da chave API (Google Cloud):** em [APIs e serviços → Credenciais](https://console.cloud.google.com/apis/credentials), abre a **API key** usada pela app Web. Se tiver **Restrições de pedidos HTTP (referenciadores)**, tem de incluir o teu domínio (ex. `https://octogrip.com.br/*` e `https://www.octogrip.com.br/*` se usares os dois). Enquanto o referenciador não coincidir, o Installations pode responder **400**.
+
 ## Endpoints
 
 - `POST /me/push_token` — corpo `{ "token": "...", "platform": "android"|"ios"|"web" }` (autenticado).

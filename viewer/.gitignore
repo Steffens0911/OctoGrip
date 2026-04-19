@@ -46,3 +46,6 @@ app.*.map.json
 
 # Firebase Android (contém chaves; manter local ou fornecer em CI)
 /android/app/google-services.json
+
+# Gerado pelo Docker build (FCM Web)
+/tool/dart_define_web.json
