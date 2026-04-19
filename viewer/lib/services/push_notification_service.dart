@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:viewer/firebase_options.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/push_notification_web_permission_stub.dart'
+    if (dart.library.js_interop) 'package:viewer/services/push_notification_web_permission.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -45,7 +47,14 @@ class PushNotificationService {
         return;
       }
       try {
-        final supported = await FirebaseMessaging.instance.isSupported();
+        var supported = true;
+        try {
+          supported = await FirebaseMessaging.instance.isSupported();
+        } catch (e, st) {
+          debugPrint(
+            'FCM Web: isSupported falhou (continuação assumindo suportado): $e\n$st',
+          );
+        }
         if (!supported) {
           debugPrint('FCM Web: este browser não suporta Firebase Messaging.');
           return;
@@ -56,17 +65,22 @@ class PushNotificationService {
         FirebaseMessaging.onMessage.listen((RemoteMessage m) {
           debugPrint('FCM web foreground: ${m.notification?.title}');
         });
-        await FirebaseMessaging.instance.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-        );
+        final perm = await webNotificationPermissionResult();
+        if (perm != 'granted') {
+          debugPrint(
+            'FCM Web: permissão de notificação = $perm (concede no browser para obter token).',
+          );
+        }
         FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
         _firebaseReady = true;
       } catch (e, st) {
         debugPrint('PushNotificationService.init (web): $e\n$st');
         // ignore: avoid_print
-        print('[OctoGrip FCM] init (web) falhou: $e');
+        print(
+          '[OctoGrip FCM] init (web) falhou — copia erro + stack completos:\n'
+          '$e\n'
+          '$st',
+        );
       }
       return;
     }

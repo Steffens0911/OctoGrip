@@ -38,6 +38,10 @@ Aplicar `migrations/055_user_device_push_tokens.sql` (executada pelo fluxo habit
 5. **iOS**: adicionar capacidade **Push Notifications** no Xcode e configurar certificados APNs no Firebase, conforme documentação Apple/Firebase.
 6. **Web (push no browser):** no Firebase, adicionar uma app do tipo **Web** ao mesmo projecto. Copiar o **App ID** para o build (`FIREBASE_WEB_APP_ID`). Gerar o par de chaves **Web Push** na consola e passar a chave pública em `FCM_VAPID_KEY` se `getToken()` falhar sem ela. Garantir que `firebase-messaging-sw.js` na raiz do build coincide com o `appId` (substituição automática no `viewer/Dockerfile` com `ARG FIREBASE_WEB_APP_ID`).
 
+### Web — `init (web) falhou` com `TypeError: ... is not a subtype`
+
+Em builds **release** (`dart2js`), o resultado de `Notification.requestPermission()` pode chegar ao Dart já como `String`. O plugin `firebase_messaging_web` aplicava um segundo `.toDart` e gerava esse erro; o viewer pede a permissão via `lib/services/push_notification_web_permission.dart` (import condicional) para contornar o problema. Depois de **rebuild** do viewer, o `POST /me/push_token` deve voltar a ser tentado após login.
+
 ## Endpoints
 
 - `POST /me/push_token` — corpo `{ "token": "...", "platform": "android"|"ios"|"web" }` (autenticado).
