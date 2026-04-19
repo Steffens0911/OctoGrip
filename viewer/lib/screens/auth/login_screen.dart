@@ -93,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text,
       );
-      AuthService().setLoggedIn(result.token, result.user);
+      await AuthService().setLoggedIn(result.token, result.user);
       if (mounted && result.streakBonusPoints > 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

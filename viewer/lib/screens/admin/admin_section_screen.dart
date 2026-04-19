@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
+import 'package:viewer/screens/admin/admin_broadcast_push_screen.dart';
 import 'package:viewer/screens/admin/engagement_reports_screen.dart';
 import 'package:viewer/screens/admin/execution_reports_screen.dart';
 import 'package:viewer/screens/admin/audit_recovery_screen.dart';
@@ -83,6 +84,18 @@ class AdminSectionScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const UserListScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppNavigationTile(
+            icon: Icons.campaign_rounded,
+            title: 'Notificação push global',
+            subtitle: 'Todos os apps com token FCM (todas as academias)',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminBroadcastPushScreen(),
               ),
             ),
           ),

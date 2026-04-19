@@ -237,6 +237,32 @@ class ApiService {
     );
   }
 
+  /// Broadcast push a todos os tokens FCM (apenas administrador global).
+  Future<({int targetTokens, int sent, int failed})> sendAdminPushBroadcast({
+    required String title,
+    required String body,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/admin/push_broadcast'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'title': title, 'body': body}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final m = data! as Map<String, dynamic>;
+    int n(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      return 0;
+    }
+
+    return (
+      targetTokens: n(m['target_tokens']),
+      sent: n(m['sent']),
+      failed: n(m['failed']),
+    );
+  }
+
   /// Snapshot agregado do header/home do usuário atual.
   /// Inclui nível persistido, XP no nível e configurações visuais da academia.
   Future<Map<String, dynamic>> getMeHeaderStats() async {
