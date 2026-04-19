@@ -42,7 +42,7 @@ O sistema valida automaticamente:
 
 ### JWT (JSON Web Tokens)
 
-- **Expiração**: Tokens expiram em 2 horas (reduzido de 7 dias para maior segurança).
+- **Expiração**: Por defeito os tokens duram **30 dias** (`JWT_EXPIRE_MINUTES` em `app/config.py`), para o utilizador permanecer autenticado na app móvel de uso pessoal. Em postos partilhados ou políticas mais rígidas, defina um valor menor via variável de ambiente (ex.: `JWT_EXPIRE_MINUTES=120` para 2 horas).
 - **Algoritmo**: HS256 (HMAC-SHA256).
 - **Uso**: Enviar no header `Authorization: Bearer <token>`.
 

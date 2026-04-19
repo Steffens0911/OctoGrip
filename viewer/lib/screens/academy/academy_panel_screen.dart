@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
-// ignore: unused_import — necessário quando _kAcademyPushNotificationUiEnabled for true
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
@@ -13,8 +12,8 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
-/// Card **Aviso à academia (push)** no painel. `false` = oculto até implementação final.
-const bool _kAcademyPushNotificationUiEnabled = false;
+/// Card **Aviso à academia (push)** no painel da academia (gerente/professor).
+const bool _kAcademyPushNotificationUiEnabled = true;
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {

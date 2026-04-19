@@ -10,11 +10,13 @@ from app.routes import (
     admin,
     admin_audit,
     admin_backup,
+    admin_push,
     auth,
     executions,
     health,
     lesson_complete,
     lessons,
+    marketplace_items,
     me_marketplace,
     me_push,
     me_training_videos,
@@ -27,7 +29,6 @@ from app.routes import (
     professors,
     reports,
     techniques,
-    marketplace_items,
     training_feedback,
     training_videos,
     trophies,
@@ -37,6 +38,7 @@ from app.routes import (
 api_router = APIRouter()
 
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_push.router, prefix="/admin", tags=["admin-push"])
 api_router.include_router(admin_backup.router, prefix="/admin", tags=["admin-backup"])
 api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])

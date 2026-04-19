@@ -61,3 +61,10 @@ async def list_fcm_tokens_for_academy(db: AsyncSession, *, academy_id: uuid.UUID
     )
     result = await db.execute(stmt)
     return [row[0] for row in result.fetchall()]
+
+
+async def list_all_fcm_tokens(db: AsyncSession) -> list[str]:
+    """Todos os tokens FCM distintos (utilizadores com app que registaram token após login)."""
+    stmt = select(UserDeviceToken.fcm_token).distinct()
+    result = await db.execute(stmt)
+    return [row[0] for row in result.fetchall()]

@@ -162,7 +162,7 @@ Este documento apresenta uma análise abrangente do projeto, identificando probl
 
 ### Segurança
 
-- ✅ **Autenticação JWT**: Implementada corretamente com expiração de 2 horas
+- ✅ **Autenticação JWT**: Implementada corretamente; expiração configurável (`JWT_EXPIRE_MINUTES`, p.ex. 30 dias no cliente móvel de uso pessoal)
 - ✅ **Autorização por roles**: Sistema robusto de permissões (admin, gerente_academia, professor, aluno)
 - ✅ **Validação de inputs**: Pydantic com `EmailStr`, validação de senhas (min 12 chars)
 - ✅ **Proteção contra XSS**: Escape de HTML em templates

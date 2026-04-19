@@ -88,15 +88,17 @@ class AuthService extends ChangeNotifier {
     await _loadFromStorage();
   }
 
-  void setLoggedIn(String token, UserModel user) {
+  /// Persiste token e utilizador antes de notificar a UI (evita perder sessão se a app fechar logo a seguir ao login).
+  Future<void> setLoggedIn(String token, UserModel user) async {
     _token = token;
     _currentUser = user;
     _impersonatedUserId = null;
     _effectiveUser = null;
     _randomPartnerShown = false;
     _loginNoticeShown = false;
-    _saveToStorage(token, user);
-    SharedPreferences.getInstance().then((p) => p.remove(_keyImpersonate));
+    await _saveToStorage(token, user);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keyImpersonate);
     notifyListeners();
     PushNotificationService.registerTokenIfLoggedIn();
   }

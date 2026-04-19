@@ -26,6 +26,10 @@ Resposta (200):
 
 Use o `access_token` em todas as requisições que exigem autenticação.
 
+### App móvel — manter sessão
+
+O cliente Flutter grava `access_token` e o perfil em **SharedPreferences** ao fazer login e recarrega no arranque (`AuthService.init`). O utilizador continua autenticado enquanto o JWT for válido; o tempo de vida vem de `JWT_EXPIRE_MINUTES` na API (ver tabela abaixo). Após expirar, qualquer pedido autenticado devolve 401 e o cliente termina a sessão — é preciso voltar a entrar com e-mail e senha.
+
 ---
 
 ## Usuário logado
@@ -63,7 +67,7 @@ Retorna o usuário autenticado (id, email, name, graduation, academy_id, points_
 |----------|-----------|--------|
 | `JWT_SECRET` | Chave para assinar o token. **Altere em produção.** | `altere-em-producao-use-um-secret-forte` |
 | `JWT_ALGORITHM` | Algoritmo do JWT | `HS256` |
-| `JWT_EXPIRE_MINUTES` | Tempo de vida do token em minutos | `10080` (7 dias) |
+| `JWT_EXPIRE_MINUTES` | Tempo de vida do token em minutos | `43200` (30 dias; ajustável por ambiente) |
 
 ---
 

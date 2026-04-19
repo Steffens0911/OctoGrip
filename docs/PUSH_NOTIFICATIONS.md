@@ -4,6 +4,7 @@
 
 - **Aluno / equipa**: com a app **Android ou iOS**, após login, o token FCM é enviado para `POST /me/push_token` e fica associado ao utilizador e à sua academia.
 - **Gerente ou professor** (com permissão de escrita na academia): no painel **Academia → Aviso à academia (push)**, envia título + mensagem. A API chama o **Firebase Cloud Messaging HTTP v1** para cada token dos utilizadores com `academy_id` igual à da academia alvo.
+- **Administrador da plataforma**: `POST /admin/push_broadcast` com o mesmo corpo `{ "title", "body" }` envia para **todos** os tokens FCM registados (toda a base), útil para avisos globais. No app Flutter, aba **Admin** → **Notificação push global** (com confirmação antes do envio).
 
 ## Configuração do servidor (API)
 
@@ -40,8 +41,10 @@ Aplicar `migrations/055_user_device_push_tokens.sql` (executada pelo fluxo habit
 - `POST /me/push_token` — corpo `{ "token": "...", "platform": "android"|"ios"|"web" }` (autenticado).
 - `DELETE /me/push_tokens` — remove todos os tokens do utilizador (logout chama isto).
 - `POST /academies/{academy_id}/push_notification` — corpo `{ "title": "...", "body": "..." }`; requer role com escrita na academia e acesso à academia indicada.
+- `POST /admin/push_broadcast` — mesmo corpo; requer JWT de utilizador com role **`administrador`**. Envia para todos os tokens na tabela `user_device_tokens`.
 
 ## Segurança
 
-- O envio está limitado por **verificação de academia** (`verify_academy_access`): gerente/professor só dispara para a própria academia.
+- O envio por academia está limitado por **verificação de academia** (`verify_academy_access`): gerente/professor só dispara para a própria academia.
+- O broadcast global só é acessível a **administradores**; use com cuidado (todos os utilizadores com app e token activo).
 - Tokens inválidos (app desinstalada, etc.) são **removidos** da base após resposta FCM indicativa.
