@@ -31,6 +31,7 @@ void main() async {
   await PushNotificationService.init();
   if (AuthService().isLoggedIn) {
     await PushNotificationService.registerTokenIfLoggedIn();
+    PushNotificationService.scheduleWebPushTokenRetries();
   }
   runApp(
     ProviderScope(

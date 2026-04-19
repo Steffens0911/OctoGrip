@@ -59,6 +59,8 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `SEED_ON_STARTUP` | `false` em produção (recomendado) |
 | `PGSSLMODE` | `disable` (Postgres interno na rede Docker sem TLS) |
 | `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify: o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
+| `FIREBASE_WEB_APP_ID` | (Opcional) App ID da app **Web** no Firebase (`1:...:web:...`). Passado como *build arg* do serviço `viewer` no `docker-compose.coolify.yml`. Sem isto, o site não regista token FCM. |
+| `FCM_VAPID_KEY` | (Opcional) Chave **pública** Web Push (Cloud Messaging → certificados). Cola a string longa **inteira**. *Build arg* do `viewer`. |
 | `LOG_LEVEL` | `INFO` ou `WARNING` |
 | `ENABLE_METRICS` | `true` se quiseres métricas |
 | `FIREBASE_PROJECT_ID` | (Opcional) ID do projeto Firebase — necessário para **push** na API. |
@@ -66,6 +68,17 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `FIREBASE_SECRETS_HOST_PATH` | (Opcional) Pasta **no disco da VPS** montada em `/app/secrets` (só leitura). Por defeito `/srv/octogrip/secrets`. Coloca aí o ficheiro `firebase-service-account.json` (ver secção abaixo). |
 
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
+
+### Onde colar `FCM_VAPID_KEY` e `FIREBASE_WEB_APP_ID` no Coolify
+
+1. Abre o **mesmo** recurso **Docker Compose** que usa `docker-compose.coolify.yml` (Project → a tua app → o serviço compose).
+2. Vai a **Environment Variables** (ou **Configuration** → **Environment Variables**, conforme a versão do Coolify).
+3. Adiciona duas variáveis **ao nível do recurso** (as que o Compose substitui em `${...}`):
+   - **Name:** `FCM_VAPID_KEY` — **Value:** cola a chave pública completa (uma linha, sem aspas extra).
+   - **Name:** `FIREBASE_WEB_APP_ID` — **Value:** ex. `1:914963189561:web:abcdef` (o App ID da app Web no Firebase).
+4. **Guarda** e faz **Redeploy** com **rebuild** das imagens (o viewer precisa de novo `docker build` para embutir os `--dart-define`).
+
+Estas variáveis **não** são `environment:` do contentor do viewer em runtime; entram só na fase **build** via `build.args` no compose. O Coolify injeta-as quando expande o compose antes do build.
 
 ### Push (FCM) na VPS — passo a passo
 

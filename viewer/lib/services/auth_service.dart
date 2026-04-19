@@ -100,7 +100,8 @@ class AuthService extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_keyImpersonate);
     notifyListeners();
-    PushNotificationService.registerTokenIfLoggedIn();
+    await PushNotificationService.registerTokenIfLoggedIn();
+    PushNotificationService.scheduleWebPushTokenRetries();
   }
 
   Future<void> logout({bool notifyInvalidated = false}) async {

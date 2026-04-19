@@ -37,6 +37,11 @@ class PushNotificationService {
         debugPrint(
           'FCM Web: desativado neste build (defina --dart-define=FIREBASE_WEB_APP_ID=...).',
         );
+        // ignore: avoid_print
+        print(
+          '[OctoGrip FCM] Web desativado: FIREBASE_WEB_APP_ID ausente no build Dart. '
+          'O firebase-messaging-sw.js pode estar certo, mas o Flutter precisa do mesmo define.',
+        );
         return;
       }
       try {
@@ -60,6 +65,8 @@ class PushNotificationService {
         _firebaseReady = true;
       } catch (e, st) {
         debugPrint('PushNotificationService.init (web): $e\n$st');
+        // ignore: avoid_print
+        print('[OctoGrip FCM] init (web) falhou: $e');
       }
       return;
     }
@@ -116,11 +123,37 @@ class PushNotificationService {
     if (!_firebaseReady || !AuthService().isLoggedIn) return;
     try {
       final token = await _fcmToken();
-      if (token == null || token.isEmpty) return;
+      if (token == null || token.isEmpty) {
+        if (kIsWeb) {
+          // Consola do browser (release): ajuda a diagnosticar SW/VAPID/permissões.
+          // ignore: avoid_print
+          print(
+            '[OctoGrip FCM] getToken devolveu vazio. Permissões de notificação, '
+            'FCM_VAPID_KEY no build e firebase-messaging-sw.js com o mesmo appId.',
+          );
+        }
+        return;
+      }
       await ApiService().registerMyPushToken(token, _platformLabel());
-    } catch (e) {
-      debugPrint('registerTokenIfLoggedIn: $e');
+    } catch (e, st) {
+      debugPrint('registerTokenIfLoggedIn: $e\n$st');
+      if (kIsWeb) {
+        // ignore: avoid_print
+        print('[OctoGrip FCM] registerTokenIfLoggedIn: $e');
+      }
     }
+  }
+
+  /// Na Web o [firebase_messaging] pode falhar na 1.ª tentativa (service worker
+  /// ainda a registar). Re-tenta em segundo plano sem bloquear a UI.
+  static void scheduleWebPushTokenRetries() {
+    if (!kIsWeb || !_firebaseReady) return;
+    Future<void>(() async {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (AuthService().isLoggedIn) await registerTokenIfLoggedIn();
+      await Future<void>.delayed(const Duration(seconds: 5));
+      if (AuthService().isLoggedIn) await registerTokenIfLoggedIn();
+    });
   }
 
   static Future<void> _registerTokenQuietly(String token) async {
