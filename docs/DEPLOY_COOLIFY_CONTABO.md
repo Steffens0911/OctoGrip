@@ -59,7 +59,12 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `SEED_ON_STARTUP` | `false` em produção (recomendado) |
 | `PGSSLMODE` | `disable` (Postgres interno na rede Docker sem TLS) |
 | `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify: o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
-| `FIREBASE_WEB_APP_ID` | (Opcional) App ID da app **Web** no Firebase (`1:...:web:...`). Passado como *build arg* do serviço `viewer` no `docker-compose.coolify.yml`. Sem isto, o site não regista token FCM. |
+| `FIREBASE_WEB_APP_ID` | (Opcional) `appId` da app **Web** no Firebase (`1:...:web:...`). *Build arg* do `viewer`. |
+| `FIREBASE_WEB_API_KEY` | **Recomendado com FCM Web:** `apiKey` da **mesma** app Web na consola (costuma ser diferente da chave Android). Sem o par certo `apiKey`+`appId`, o Firebase Installations responde **400 INVALID_ARGUMENT**. |
+| `FIREBASE_MESSAGING_SENDER_ID` | (Opcional) `messagingSenderId` do snippet da app Web, se diferente do default do repositório. |
+| `FIREBASE_PROJECT_ID` | (Opcional) `projectId` no snippet Web (para o viewer; a API usa a env homónima em runtime). |
+| `FIREBASE_AUTH_DOMAIN` | (Opcional) `authDomain` do snippet Web. |
+| `FIREBASE_STORAGE_BUCKET` | (Opcional) `storageBucket` do snippet Web. |
 | `FCM_VAPID_KEY` | (Opcional) Chave **pública** Web Push (Cloud Messaging → certificados). Cola a string longa **inteira**. *Build arg* do `viewer`. |
 | `LOG_LEVEL` | `INFO` ou `WARNING` |
 | `ENABLE_METRICS` | `true` se quiseres métricas |
@@ -69,16 +74,15 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
 
-### Onde colar `FCM_VAPID_KEY` e `FIREBASE_WEB_APP_ID` no Coolify
+### Onde colar a config Firebase **Web** (FCM) no Coolify
 
-1. Abre o **mesmo** recurso **Docker Compose** que usa `docker-compose.coolify.yml` (Project → a tua app → o serviço compose).
-2. Vai a **Environment Variables** (ou **Configuration** → **Environment Variables**, conforme a versão do Coolify).
-3. Adiciona duas variáveis **ao nível do recurso** (as que o Compose substitui em `${...}`):
-   - **Name:** `FCM_VAPID_KEY` — **Value:** cola a chave pública completa (uma linha, sem aspas extra).
-   - **Name:** `FIREBASE_WEB_APP_ID` — **Value:** ex. `1:914963189561:web:abcdef` (o App ID da app Web no Firebase).
-4. **Guarda** e faz **Redeploy** com **rebuild** das imagens (o viewer precisa de novo `docker build` para embutir os `--dart-define`).
+1. Firebase Console → Definições do projeto → **As tuas apps** → escolhe a app **Web** (ou cria uma) → copia os campos do objecto de configuração (`apiKey`, `appId`, `messagingSenderId`, `projectId`, `authDomain`, `storageBucket`).
+2. No Coolify, no recurso **Docker Compose** com `docker-compose.coolify.yml` → **Environment Variables** → **Available at Buildtime** para cada uma usada em `build.args`:
+   - `FIREBASE_WEB_APP_ID`, `FIREBASE_WEB_API_KEY` (**obrigatórios** para evitar 400 nas Installations), e se necessário `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_STORAGE_BUCKET`.
+   - `FCM_VAPID_KEY` (recomendado para `getToken` na Web).
+3. **Guarda** e **Redeploy** com **rebuild** do **viewer**.
 
-Estas variáveis **não** são `environment:` do contentor do viewer em runtime; entram só na fase **build** via `build.args` no compose. O Coolify injeta-as quando expande o compose antes do build.
+Estas variáveis **não** são `environment:` do contentor em runtime para o Flutter; entram na **imagem** via `--dart-define` e substituição do `firebase-messaging-sw.js`.
 
 ### Push (FCM) na VPS — passo a passo
 

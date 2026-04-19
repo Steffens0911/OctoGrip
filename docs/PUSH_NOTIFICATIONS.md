@@ -46,6 +46,14 @@ Em builds **release** (`dart2js`), o resultado de `Notification.requestPermissio
 
 Para diagnóstico, a consola imprime `[OctoGrip FCM] init web: passo A–E`; o último passo visto antes do erro indica onde parou.
 
+### Web — `installations/request-failed` / `400 INVALID_ARGUMENT`
+
+Mensagem típica: *Create Installation request failed with error "400 INVALID_ARGUMENT"*.
+
+Significa que o **firebaseConfig** usado no browser (Dart + `firebase-messaging-sw.js`) está **inconsistente**: por exemplo **App ID** da app Web com **API key** de outra app (ex. Android) ou `projectId` / `messagingSenderId` de outro projeto.
+
+**Correcção:** no Firebase Console → Definições do projeto → **As tuas apps** → app **Web** → copiar o snippet (ou os campos `apiKey`, `appId`, `messagingSenderId`, `projectId`, `authDomain`, `storageBucket`) e passar **todos** no **build** do viewer (`docker-compose.coolify.yml` / `viewer/Dockerfile`: `FIREBASE_WEB_API_KEY`, `FIREBASE_WEB_APP_ID`, etc., com *Buildtime* no Coolify). O `apiKey` da app **Web** costuma ser **diferente** do `apiKey` Android no mesmo projeto.
+
 ## Endpoints
 
 - `POST /me/push_token` — corpo `{ "token": "...", "platform": "android"|"ios"|"web" }` (autenticado).
