@@ -48,7 +48,8 @@ class ApiService {
   static final ApiService _instance = ApiService._();
   factory ApiService() => _instance;
 
-  late final String baseUrl;
+  /// Lida sempre com [kApiBaseUrl] para `?api_base=` / sessionStorage surtirem efeito sem reload rígido.
+  String get baseUrl => kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
   static const _timeout = Duration(seconds: 15);
 
   final Map<String, _CacheEntry> _getCache = {};
@@ -59,9 +60,7 @@ class ApiService {
   /// Evita vários GET simultâneos ao mesmo endpoint (reduz pressão no browser / ERR_INSUFFICIENT_RESOURCES).
   Future<List<TrainingVideo>>? _inFlightTrainingVideosToday;
 
-  ApiService._() {
-    baseUrl = kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
-  }
+  ApiService._();
 
   String _cacheKey(String method, Uri uri) => '$method:${uri.toString()}';
 

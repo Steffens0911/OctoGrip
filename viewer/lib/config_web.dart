@@ -1,5 +1,6 @@
-/// Implementação para web: build Docker/Coolify via `--dart-define=API_BASE_URL=`,
-/// depois `?api_base=`, `index.html` / sessionStorage, e por fim localhost:8001 ou mesmo host:8001.
+/// Implementação para web: **primeiro** `?api_base=` e sessionStorage (correcção sem rebuild),
+/// depois `index.html`, **`--dart-define=API_BASE_URL`** (build Docker/Coolify), e por fim
+/// localhost:8001 ou mesmo host:8001.
 /// Em `*.trycloudflare.com` sem `api_base`, devolve string vazia: o browser bloqueia HTTPS→127.0.0.1 (PNA).
 library;
 
@@ -23,12 +24,9 @@ bool _storedApiBaseIncompatibleWithHost(String stored, String host) {
 }
 
 String getApiBaseUrl() {
-  final fromBuild = _kApiBaseFromBuild.trim();
-  if (fromBuild.isNotEmpty) {
-    return _trimTrailingSlashes(fromBuild);
-  }
-
   final hostEarly = Uri.base.host;
+
+  // 1) Query na URL — permite corrigir API em produção sem novo build (documentação Coolify).
   try {
     final qp = Uri.base.queryParameters['api_base'];
     if (qp != null && qp.isNotEmpty) {
@@ -43,6 +41,17 @@ String getApiBaseUrl() {
     }
   } catch (_) {}
 
+  // 2) Sessão (gravada por ?api_base= anterior ou fluxo em index.html).
+  try {
+    final stored = html.window.sessionStorage['jjb_api_base_url'];
+    if (stored != null &&
+        stored.isNotEmpty &&
+        !_storedApiBaseIncompatibleWithHost(stored, hostEarly)) {
+      return _trimTrailingSlashes(stored);
+    }
+  } catch (_) {}
+
+  // 3) Injeção síncrona do index.html antes do Flutter arrancar.
   try {
     final v = (html.window as dynamic)['__API_BASE_URL__'];
     if (v != null &&
@@ -53,14 +62,11 @@ String getApiBaseUrl() {
     }
   } catch (_) {}
 
-  try {
-    final stored = html.window.sessionStorage['jjb_api_base_url'];
-    if (stored != null &&
-        stored.isNotEmpty &&
-        !_storedApiBaseIncompatibleWithHost(stored, hostEarly)) {
-      return _trimTrailingSlashes(stored);
-    }
-  } catch (_) {}
+  // 4) Build release (`--dart-define=API_BASE_URL`).
+  final fromBuild = _kApiBaseFromBuild.trim();
+  if (fromBuild.isNotEmpty) {
+    return _trimTrailingSlashes(fromBuild);
+  }
 
   // Porta no host: docker-compose mapeia API em 8001:8000.
   const localApiPort = 8001;
