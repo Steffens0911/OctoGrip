@@ -7,24 +7,67 @@ import 'package:viewer/services/auth_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  if (kIsWeb) return;
+  final options = defaultTargetPlatform == TargetPlatform.iOS
+      ? DefaultFirebaseOptions.ios
+      : DefaultFirebaseOptions.android;
+  await Firebase.initializeApp(options: options);
 }
 
-/// Inicializa FCM (Android/iOS), registra token na API após login.
+/// Inicializa FCM (Android / iOS / Web com build configurado), regista token na API após login.
 ///
-/// Requer `firebase_options.dart` com projeto real e, no servidor,
-/// `FIREBASE_PROJECT_ID` + `FIREBASE_SERVICE_ACCOUNT_PATH` para o gerente enviar avisos.
+/// **Web:** só activa se o build incluir `FIREBASE_WEB_APP_ID` e existir
+/// `web/firebase-messaging-sw.js` coerente (ver `docs/PUSH_NOTIFICATIONS.md`).
+/// No servidor: `FIREBASE_PROJECT_ID` + `FIREBASE_SERVICE_ACCOUNT_PATH`.
 class PushNotificationService {
   PushNotificationService._();
   static bool _firebaseReady = false;
 
+  static const String _vapidKey = String.fromEnvironment(
+    'FCM_VAPID_KEY',
+    defaultValue: '',
+  );
+
   static Future<void> init() async {
-    if (kIsWeb) return;
+    if (_firebaseReady) return;
+
+    if (kIsWeb) {
+      final webOpts = DefaultFirebaseOptions.webFcmOptionsOrNull;
+      if (webOpts == null) {
+        debugPrint(
+          'FCM Web: desativado neste build (defina --dart-define=FIREBASE_WEB_APP_ID=...).',
+        );
+        return;
+      }
+      try {
+        final supported = await FirebaseMessaging.instance.isSupported();
+        if (!supported) {
+          debugPrint('FCM Web: este browser não suporta Firebase Messaging.');
+          return;
+        }
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp(options: webOpts);
+        }
+        FirebaseMessaging.onMessage.listen((RemoteMessage m) {
+          debugPrint('FCM web foreground: ${m.notification?.title}');
+        });
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
+        _firebaseReady = true;
+      } catch (e, st) {
+        debugPrint('PushNotificationService.init (web): $e\n$st');
+      }
+      return;
+    }
+
     if (defaultTargetPlatform != TargetPlatform.android &&
         defaultTargetPlatform != TargetPlatform.iOS) {
       return;
     }
-    if (_firebaseReady) return;
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
@@ -41,9 +84,7 @@ class PushNotificationService {
         badge: true,
         sound: true,
       );
-      FirebaseMessaging.instance.onTokenRefresh.listen((t) {
-        _registerTokenQuietly(t);
-      });
+      FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
       _firebaseReady = true;
     } catch (e, st) {
       debugPrint('PushNotificationService.init: $e\n$st');
@@ -62,11 +103,19 @@ class PushNotificationService {
     }
   }
 
+  static Future<String?> _fcmToken() async {
+    final v = _vapidKey.trim();
+    if (kIsWeb && v.isNotEmpty) {
+      return FirebaseMessaging.instance.getToken(vapidKey: v);
+    }
+    return FirebaseMessaging.instance.getToken();
+  }
+
   /// Chamar após login (ou ao iniciar com sessão já salva).
   static Future<void> registerTokenIfLoggedIn() async {
     if (!_firebaseReady || !AuthService().isLoggedIn) return;
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await _fcmToken();
       if (token == null || token.isEmpty) return;
       await ApiService().registerMyPushToken(token, _platformLabel());
     } catch (e) {

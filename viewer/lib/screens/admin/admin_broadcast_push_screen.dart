@@ -69,12 +69,40 @@ class _AdminBroadcastPushScreenState extends State<AdminBroadcastPushScreen> {
     try {
       final r = await _api.sendAdminPushBroadcast(title: title, body: body);
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message:
-            'Enviado: ${r.sent} de ${r.targetTokens} dispositivos (${r.failed} falhas).',
-        type: r.sent > 0 ? AppFeedbackType.success : AppFeedbackType.info,
-      );
+      if (r.targetTokens == 0) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Nenhum dispositivo na lista'),
+            content: const Text(
+              'A API não encontrou tokens FCM na base de dados (0 destinos). '
+              'Isto não tem a ver só com “notificações ligadas” no telemóvel — '
+              'é preciso que exista um token guardado após login.\n\n'
+              '• App Android ou iOS: login com Firebase configurado '
+              '(google-services.json / APNs).\n\n'
+              '• Site / PWA no Chrome: o build do viewer tem de incluir '
+              'FIREBASE_WEB_APP_ID (e o firebase-messaging-sw.js alinhado); '
+              'caso contrário o browser não regista token. Ver '
+              'docs/PUSH_NOTIFICATIONS.md.\n\n'
+              '• Na API: migração user_device_tokens e variáveis FIREBASE_* '
+              'no servidor.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Entendi'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        AppFeedback.show(
+          context,
+          message:
+              'Enviado: ${r.sent} de ${r.targetTokens} dispositivos (${r.failed} falhas).',
+          type: r.sent > 0 ? AppFeedbackType.success : AppFeedbackType.info,
+        );
+      }
       _titleCtrl.clear();
       _bodyCtrl.clear();
     } catch (e) {
@@ -100,9 +128,10 @@ class _AdminBroadcastPushScreenState extends State<AdminBroadcastPushScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Envia uma notificação na barra do sistema para todos os '
-                'utilizadores que tenham sessão na app móvel e token FCM '
-                'registado (todas as academias).',
+                'Envia notificação na barra do sistema para cada token FCM '
+                'guardado na API (todas as academias). Contam sessões na app '
+                'Android/iOS com Firebase, ou no site se o build do viewer '
+                'tiver FCM Web configurado (ver documentação).',
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.35,

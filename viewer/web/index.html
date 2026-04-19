@@ -22,6 +22,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="OctoGrip — treino, academia e progresso no Jiu-Jitsu.">
+  <!-- theme-color: barra do Chrome / convite PWA (alinha ao manifest.json) -->
+  <meta name="theme-color" content="#D4A017">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -33,7 +35,7 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>OctoGrip</title>
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="manifest.json" crossorigin="anonymous">
 </head>
 <body>
   <!--
@@ -95,6 +97,7 @@
       }
     })();
   </script>
-  <script src="flutter_bootstrap.js" async></script>
+  <!-- defer: registo do service worker mais previsível que async (critério de instalação PWA no Chrome). -->
+  <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>

@@ -1,23 +1,31 @@
 {
+    "id": "/",
     "name": "OctoGrip",
     "short_name": "OctoGrip",
-    "start_url": ".",
+    "lang": "pt-BR",
+    "dir": "ltr",
+    "scope": "/",
+    "start_url": "/",
     "display": "standalone",
+    "display_override": ["standalone", "minimal-ui", "browser"],
     "background_color": "#262433",
     "theme_color": "#D4A017",
     "description": "Treino, academia e progresso no Jiu-Jitsu.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
+    "categories": ["sports", "health", "lifestyle"],
     "icons": [
         {
             "src": "icons/Icon-192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "icons/Icon-maskable-192.png",

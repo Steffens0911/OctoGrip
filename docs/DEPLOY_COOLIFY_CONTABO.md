@@ -119,7 +119,8 @@ Depois configura **domínios** no UI do Coolify para `viewer` (porta **80**) e `
 
 1. Define primeiro os domínios finais (ou URLs estáveis) que vais usar.
 2. Garante `API_BASE_URL=https://api.seudominio.com` **antes** do build do viewer — o Flutter embute esta URL em compile time.
-3. Faz **Deploy**. Se mudares o domínio da API, é necessário **reconstruir** a imagem do serviço `viewer` (novo build com novo `API_BASE_URL`).
+3. **Push no browser (opcional):** no build do serviço que usa `viewer/Dockerfile`, define também os *build args* `FIREBASE_WEB_APP_ID` (App ID da app **Web** no Firebase, ex. `1:914963189561:web:xxxx`) e, se precisares, `FCM_VAPID_KEY` (chave pública Web Push na consola). O Dockerfile substitui `__FIREBASE_WEB_APP_ID__` em `web/firebase-messaging-sw.js` e passa os `--dart-define` ao `flutter build web`. Sem `FIREBASE_WEB_APP_ID`, utilizadores só no site não ganham token FCM. Ver `docs/PUSH_NOTIFICATIONS.md`.
+4. Faz **Deploy**. Se mudares o domínio da API, é necessário **reconstruir** a imagem do serviço `viewer` (novo build com novo `API_BASE_URL`).
 
 A API executa **migrations** no arranque (`app/main.py` → `run_migrations`).
 
@@ -132,7 +133,7 @@ A API executa **migrations** no arranque (`app/main.py` → `run_migrations`).
 ## 9. Alternativas (se preferires não usar um único compose)
 
 - **PostgreSQL** como recurso “Database” gerido pelo Coolify e **API** como aplicação Docker (Dockerfile na raiz) — ajustas `DATABASE_URL` para o hostname interno que o Coolify indicar.
-- **Viewer** como recurso separado (build a partir de `viewer/Dockerfile` com build arg `API_BASE_URL`).
+- **Viewer** como recurso separado (build a partir de `viewer/Dockerfile` com build args `API_BASE_URL`, opcionalmente `FIREBASE_WEB_APP_ID` e `FCM_VAPID_KEY` para FCM Web).
 
 O caminho **um Docker Compose** costuma ser o mais simples para manter `postgres`, `api` e `viewer` alinhados com o `docker-compose.yml` do repositório.
 

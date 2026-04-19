@@ -33,6 +33,10 @@ cd viewer
 python scripts/generate_pwa_icons_from_wordmark.py
 ```
 
+**Instalar app (Chrome Android):** o convite na barra nem sempre aparece; use o menu **⋮ → Instalar app**. Se já tiver fechado o banner antes, limpe os dados do site para `octogrip.com.br`. O `web/manifest.json` usa `start_url` e `scope` na raiz (`/`); se publicares o viewer num **subcaminho** (`--base-href=/algo/`), tens de alinhar manualmente `id`, `scope` e `start_url` no manifest a esse prefixo. O `nginx.default.conf` força `no-cache` em `manifest.json` e `flutter_service_worker.js` para o Chrome não ficar com PWA desactualizada.
+
+**Push FCM no browser (Web):** opcional; exige app Web no Firebase e build com `--dart-define=FIREBASE_WEB_APP_ID=1:...:web:...` e, em produção, o mesmo valor no `firebase-messaging-sw.js` (o `viewer/Dockerfile` faz `sed` a partir do `ARG FIREBASE_WEB_APP_ID`). Opcional: `--dart-define=FCM_VAPID_KEY=` (chave pública Web Push na consola Firebase). Sem isto, o site não regista token e o push global continua com 0 destinos para utilizadores só web.
+
 ## Como rodar
 
 1. Tenha a API rodando (ex.: `http://localhost:8000`).
