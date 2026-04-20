@@ -60,6 +60,7 @@ async def training_video_create(
         position_description=body.position_description,
         academy_id=academy_id,
         created_by_id=current_user.id,
+        audit_user_id=current_user.id,
     )
     return TrainingVideoAdminRead.model_validate(video)
 
@@ -93,6 +94,7 @@ async def training_video_update(
         position_description=payload["position_description"]
         if "position_description" in payload
         else PATCH_UNSET,
+        audit_user_id=current_user.id,
     )
     assert updated is not None
     return TrainingVideoAdminRead.model_validate(updated)
@@ -113,7 +115,7 @@ async def training_video_delete(
     if current_user.role != "administrador":
         if current_user.academy_id is None or video.academy_id != current_user.academy_id:
             raise ForbiddenError("Você não tem permissão para remover este vídeo.")
-    ok = await delete_training_video(db, video_id)
+    ok = await delete_training_video(db, video_id, audit_user_id=current_user.id)
     if not ok:
         from app.core.exceptions import NotFoundError
 

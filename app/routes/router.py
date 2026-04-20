@@ -11,6 +11,7 @@ from app.routes import (
     admin_audit,
     admin_backup,
     admin_push,
+    admin_undo,
     auth,
     executions,
     health,
@@ -41,6 +42,7 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_push.router, prefix="/admin", tags=["admin-push"])
 api_router.include_router(admin_backup.router, prefix="/admin", tags=["admin-backup"])
 api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])
+api_router.include_router(admin_undo.router, prefix="/admin", tags=["admin-undo"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(academies.router, prefix="/academies", tags=["academies"])

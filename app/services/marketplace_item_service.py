@@ -7,8 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AcademyMarketplaceItem, User
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_MP = "AcademyMarketplaceItem"
 
 
 async def list_marketplace_items_for_admin(
@@ -64,6 +73,7 @@ async def create_marketplace_item(
     sort_order: int | None,
     is_active: bool,
     created_by_id: UUID | None,
+    audit_user_id: UUID | None = None,
 ) -> AcademyMarketplaceItem:
     row = AcademyMarketplaceItem(
         academy_id=academy_id,
@@ -78,6 +88,16 @@ async def create_marketplace_item(
         created_by_id=created_by_id,
     )
     db.add(row)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_MP,
+        entity_id=row.id,
+        old_data=None,
+        new_data=entity_snapshot_row(row),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(row)
     logger.info("create_marketplace_item", extra={"item_id": str(row.id), "academy_id": str(academy_id)})
@@ -88,10 +108,13 @@ async def update_marketplace_item(
     db: AsyncSession,
     item_id: UUID,
     patch: dict,
+    *,
+    audit_user_id: UUID | None = None,
 ) -> AcademyMarketplaceItem | None:
     row = await get_marketplace_item(db, item_id)
     if not row:
         return None
+    before = entity_snapshot_row(row)
     if "title" in patch and patch["title"] is not None:
         row.title = str(patch["title"]).strip()
     if "description" in patch:
@@ -110,16 +133,44 @@ async def update_marketplace_item(
         row.sort_order = patch["sort_order"]
     if "is_active" in patch and patch["is_active"] is not None:
         row.is_active = bool(patch["is_active"])
+    await db.flush()
+    await db.refresh(row)
+    after = entity_snapshot_row(row)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_MP,
+            entity_id=item_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(row)
     logger.info("update_marketplace_item", extra={"item_id": str(row.id)})
     return row
 
 
-async def delete_marketplace_item(db: AsyncSession, item_id: UUID) -> bool:
+async def delete_marketplace_item(
+    db: AsyncSession,
+    item_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     row = await get_marketplace_item(db, item_id)
     if not row:
         return False
+    before = entity_snapshot_row(row)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_MP,
+        entity_id=item_id,
+        old_data=before,
+        new_data=None,
+        user_id=audit_user_id,
+    )
     await db.delete(row)
     await db.commit()
     logger.info("delete_marketplace_item", extra={"item_id": str(item_id)})

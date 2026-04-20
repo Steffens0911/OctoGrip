@@ -83,12 +83,24 @@ async def create_weekly_kit(
     current_user: User = Depends(require_write_access),
 ):
     verify_academy_access(current_user, str(academy_id))
-    kit = await create_kit(db, academy_id, label=body.label, sort_order=body.sort_order)
+    kit = await create_kit(
+        db,
+        academy_id,
+        label=body.label,
+        sort_order=body.sort_order,
+        audit_user_id=current_user.id,
+    )
     if body.items:
         if len(body.items) < 1 or len(body.items) > 5:
             raise AppError("Cada kit deve ter entre 1 e 5 técnicas.", status_code=400)
         tuples = [(x.technique_id, x.multiplier) for x in body.items]
-        kit = await replace_kit_items_and_sync_missions(db, kit.id, academy_id, tuples)
+        kit = await replace_kit_items_and_sync_missions(
+            db,
+            kit.id,
+            academy_id,
+            tuples,
+            audit_user_id=current_user.id,
+        )
     k2 = await get_kit(db, kit.id, academy_id)
     if not k2:
         raise NotFoundError("Kit não encontrado.")
@@ -118,12 +130,19 @@ async def patch_weekly_kit(
             academy_id,
             label=body.label,
             sort_order=body.sort_order,
+            audit_user_id=current_user.id,
         )
     if body.items is not None:
         if len(body.items) < 1 or len(body.items) > 5:
             raise AppError("Cada kit deve ter entre 1 e 5 técnicas.", status_code=400)
         tuples = [(x.technique_id, x.multiplier) for x in body.items]
-        await replace_kit_items_and_sync_missions(db, kit_id, academy_id, tuples)
+        await replace_kit_items_and_sync_missions(
+            db,
+            kit_id,
+            academy_id,
+            tuples,
+            audit_user_id=current_user.id,
+        )
     k = await get_kit(db, kit_id, academy_id)
     if not k:
         raise NotFoundError("Kit não encontrado.")
@@ -145,7 +164,7 @@ async def delete_weekly_kit(
     current_user: User = Depends(require_write_access),
 ):
     verify_academy_access(current_user, str(academy_id))
-    ok = await soft_delete_kit(db, kit_id, academy_id)
+    ok = await soft_delete_kit(db, kit_id, academy_id, audit_user_id=current_user.id)
     if not ok:
         raise NotFoundError("Kit não encontrado.")
     await app_cache.invalidate_prefix("mission_week:")

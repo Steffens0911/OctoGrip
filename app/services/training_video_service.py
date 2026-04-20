@@ -8,10 +8,19 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import TrainingVideo, TrainingVideoDailyView, User
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 from app.services.execution_service import total_points_for_user
 from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_TV = "TrainingVideo"
 
 # Marca campo não enviado em PATCH (vs. enviado como null para limpar).
 PATCH_UNSET = object()
@@ -49,6 +58,7 @@ async def create_training_video(
     position_description: str | None = None,
     academy_id: UUID | None = None,
     created_by_id: UUID | None = None,
+    audit_user_id: UUID | None = None,
 ) -> TrainingVideo:
     video = TrainingVideo(
         title=title.strip(),
@@ -61,6 +71,16 @@ async def create_training_video(
         created_by_id=created_by_id,
     )
     db.add(video)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_TV,
+        entity_id=video.id,
+        old_data=None,
+        new_data=entity_snapshot_row(video),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(video)
     logger.info("create_training_video", extra={"video_id": str(video.id)})
@@ -77,10 +97,12 @@ async def update_training_video(
     is_active: bool | None = None,
     duration_seconds: int | None = None,
     position_description: str | None | object = PATCH_UNSET,
+    audit_user_id: UUID | None = None,
 ) -> TrainingVideo | None:
     video = await get_training_video(db, video_id)
     if not video:
         return None
+    before = entity_snapshot_row(video)
     if title is not None:
         video.title = title.strip()
     if youtube_url is not None:
@@ -95,16 +117,44 @@ async def update_training_video(
         video.position_description = _optional_text(
             position_description if isinstance(position_description, str) else None
         )
+    await db.flush()
+    await db.refresh(video)
+    after = entity_snapshot_row(video)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_TV,
+            entity_id=video_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(video)
     logger.info("update_training_video", extra={"video_id": str(video.id)})
     return video
 
 
-async def delete_training_video(db: AsyncSession, video_id: UUID) -> bool:
+async def delete_training_video(
+    db: AsyncSession,
+    video_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     video = await get_training_video(db, video_id)
     if not video:
         return False
+    before = entity_snapshot_row(video)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_TV,
+        entity_id=video_id,
+        old_data=before,
+        new_data=None,
+        user_id=audit_user_id,
+    )
     await db.delete(video)
     await db.commit()
     logger.info("delete_training_video", extra={"video_id": str(video.id)})

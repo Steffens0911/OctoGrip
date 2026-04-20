@@ -949,11 +949,34 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<void> deleteUser(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/users/$id'), headers: await _headers(auth: true)));
+  Future<void> deleteUser(String id, {required String confirmEmail}) async {
+    final uri = Uri.parse('$baseUrl/users/$id').replace(
+      queryParameters: {'confirm_email': confirmEmail},
+    );
+    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     // Limpar cache de listagem de usuários após exclusão.
     invalidateCache('GET:$baseUrl/users');
+  }
+
+  /// Administrador: reverte confirmação de uma execução (`POST /admin/executions/{id}/revert_confirmation`).
+  Future<Map<String, dynamic>> adminRevertExecutionConfirmation(String executionId) async {
+    final uri = Uri.parse('$baseUrl/admin/executions/$executionId/revert_confirmation');
+    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/users');
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Administrador: remove um registo de conclusão de missão (`POST /admin/mission_usages/{id}/void`).
+  Future<Map<String, dynamic>> adminVoidMissionUsage(String usageId) async {
+    final uri = Uri.parse('$baseUrl/admin/mission_usages/$usageId/void');
+    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/users');
+    return data! as Map<String, dynamic>;
   }
 
   // ---------- Lessons ----------

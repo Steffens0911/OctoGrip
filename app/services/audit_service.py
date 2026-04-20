@@ -10,7 +10,21 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, NotFoundError
-from app.models import AuditLog, Lesson, Mission, Technique, Trophy
+from app.models import (
+    Academy,
+    AcademyMarketplaceItem,
+    AuditLog,
+    Lesson,
+    Mission,
+    MissionUsage,
+    Partner,
+    Technique,
+    TechniqueExecution,
+    TrainingVideo,
+    Trophy,
+    User,
+    WeeklyTechniqueKit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +34,16 @@ _AUDIT_MODELS: dict[str, type] = {
     "lesson": Lesson,
     "technique": Technique,
     "trophy": Trophy,
+    "academy": Academy,
+    "user": User,
+    "training_video": TrainingVideo,
+    "marketplace_item": AcademyMarketplaceItem,
+    "academy_marketplace_item": AcademyMarketplaceItem,
+    "partner": Partner,
+    "weekly_technique_kit": WeeklyTechniqueKit,
+    "weekly_kit": WeeklyTechniqueKit,
+    "technique_execution": TechniqueExecution,
+    "mission_usage": MissionUsage,
 }
 
 _ENTITY_LABEL: dict[type, str] = {
@@ -27,6 +51,14 @@ _ENTITY_LABEL: dict[type, str] = {
     Lesson: "Lesson",
     Technique: "Technique",
     Trophy: "Trophy",
+    Academy: "Academy",
+    User: "User",
+    TrainingVideo: "TrainingVideo",
+    AcademyMarketplaceItem: "AcademyMarketplaceItem",
+    Partner: "Partner",
+    WeeklyTechniqueKit: "WeeklyTechniqueKit",
+    TechniqueExecution: "TechniqueExecution",
+    MissionUsage: "MissionUsage",
 }
 
 AUDIT_ACTION_CREATE = "CREATE"
@@ -54,6 +86,13 @@ def entity_snapshot_row(obj) -> dict:
         val = getattr(obj, key, None)
         out[key] = _json_safe(val)
     return out
+
+
+def user_entity_snapshot_row(user: User) -> dict:
+    """Snapshot de utilizador para auditoria (nunca persiste hash de senha)."""
+    data = entity_snapshot_row(user)
+    data.pop("password_hash", None)
+    return data
 
 
 def _json_safe(val):
@@ -190,11 +229,26 @@ def _academy_audit_filter(academy_id: UUID):
         )
     )
     trophies_of = select(Trophy.id).where(Trophy.academy_id == academy_id)
+    users_of = select(User.id).where(User.academy_id == academy_id)
+    partners_of = select(Partner.id).where(Partner.academy_id == academy_id)
+    marketplace_of = select(AcademyMarketplaceItem.id).where(AcademyMarketplaceItem.academy_id == academy_id)
+    kits_of = select(WeeklyTechniqueKit.id).where(WeeklyTechniqueKit.academy_id == academy_id)
+    training_videos_of = select(TrainingVideo.id).where(TrainingVideo.academy_id == academy_id)
+    exec_users = select(TechniqueExecution.id).where(TechniqueExecution.user_id.in_(users_of))
+    mu_users = select(MissionUsage.id).where(MissionUsage.user_id.in_(users_of))
     return or_(
         and_(AuditLog.entity == _ENTITY_LABEL[Technique], AuditLog.entity_id.in_(techniques_of)),
         and_(AuditLog.entity == _ENTITY_LABEL[Lesson], AuditLog.entity_id.in_(lessons_of)),
         and_(AuditLog.entity == _ENTITY_LABEL[Mission], AuditLog.entity_id.in_(missions_of)),
         and_(AuditLog.entity == _ENTITY_LABEL[Trophy], AuditLog.entity_id.in_(trophies_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[Academy], AuditLog.entity_id == academy_id),
+        and_(AuditLog.entity == _ENTITY_LABEL[User], AuditLog.entity_id.in_(users_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[Partner], AuditLog.entity_id.in_(partners_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[AcademyMarketplaceItem], AuditLog.entity_id.in_(marketplace_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[WeeklyTechniqueKit], AuditLog.entity_id.in_(kits_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[TrainingVideo], AuditLog.entity_id.in_(training_videos_of)),
+        and_(AuditLog.entity == _ENTITY_LABEL[TechniqueExecution], AuditLog.entity_id.in_(exec_users)),
+        and_(AuditLog.entity == _ENTITY_LABEL[MissionUsage], AuditLog.entity_id.in_(mu_users)),
     )
 
 
@@ -211,7 +265,8 @@ async def list_audit_feed(
     """
     Lista logs de auditoria de todas as entidades suportadas, com filtros opcionais.
     academy_id: quando informado, apenas alterações ligadas a essa academia.
-    entity_api_key: mission, lesson, technique, trophy (mesmo formato da API).
+    entity_api_key: mission, lesson, technique, trophy, academy, user, training_video,
+    marketplace_item, partner, weekly_kit, technique_execution, mission_usage (mesmo formato da API).
     """
     limit = min(max(1, limit), 200)
     offset = max(0, offset)
@@ -266,6 +321,9 @@ async def restore_entity(
     before = entity_snapshot_row(obj)
 
     if audit_log_id is None:
+        mapper_undel = inspect(obj).mapper
+        if "deleted_at" not in mapper_undel.columns:
+            raise AppError("Esta entidade não suporta reactivação por soft-delete.", status_code=400)
         if getattr(obj, "deleted_at", None) is None:
             raise AppError("Registro já está ativo (não está soft-deletado).", status_code=400)
         obj.deleted_at = None
@@ -308,7 +366,9 @@ async def restore_entity(
         raise AppError("Este log não possui old_data para restaurar.", status_code=400)
 
     apply_snapshot_to_instance(obj, snap)
-    obj.deleted_at = None
+    mapper = inspect(obj).mapper
+    if "deleted_at" in mapper.columns:
+        obj.deleted_at = None
     after = entity_snapshot_row(obj)
     await write_audit_log(
         db,

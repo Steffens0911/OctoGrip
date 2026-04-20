@@ -6,6 +6,7 @@ import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/audit_history.dart';
 import 'package:viewer/services/admin_audit_service.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/role_guard.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
@@ -15,6 +16,14 @@ const _entityChoices = <MapEntry<String, String>>[
   MapEntry('lesson', 'Lição'),
   MapEntry('technique', 'Técnica'),
   MapEntry('trophy', 'Troféu'),
+  MapEntry('academy', 'Academia'),
+  MapEntry('user', 'Utilizador'),
+  MapEntry('training_video', 'Vídeo de treino'),
+  MapEntry('marketplace_item', 'Loja / anúncio'),
+  MapEntry('partner', 'Parceiro'),
+  MapEntry('weekly_kit', 'Turma semanal (kit)'),
+  MapEntry('technique_execution', 'Execução de técnica'),
+  MapEntry('mission_usage', 'Conclusão de missão (usage)'),
 ];
 
 const JsonEncoder _jsonPretty = JsonEncoder.withIndent('  ');
@@ -31,6 +40,8 @@ class AuditRecoveryScreen extends StatefulWidget {
 class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
   final _service = AdminAuditService();
   final _api = ApiService();
+  final _execIdCtrl = TextEditingController();
+  final _muIdCtrl = TextEditingController();
 
   List<Academy> _academies = [];
   bool _academiesLoading = false;
@@ -44,11 +55,19 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
   bool _feedLoading = false;
   String? _feedError;
   static const int _feedPageSize = 40;
+  bool _opsBusy = false;
 
   @override
   void initState() {
     super.initState();
     _loadAcademies();
+  }
+
+  @override
+  void dispose() {
+    _execIdCtrl.dispose();
+    _muIdCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAcademies() async {
@@ -206,6 +225,22 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
         return 'technique';
       case 'Trophy':
         return 'trophy';
+      case 'Academy':
+        return 'academy';
+      case 'User':
+        return 'user';
+      case 'TrainingVideo':
+        return 'training_video';
+      case 'AcademyMarketplaceItem':
+        return 'marketplace_item';
+      case 'Partner':
+        return 'partner';
+      case 'WeeklyTechniqueKit':
+        return 'weekly_kit';
+      case 'TechniqueExecution':
+        return 'technique_execution';
+      case 'MissionUsage':
+        return 'mission_usage';
       default:
         return label.toLowerCase();
     }
@@ -221,6 +256,22 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
         return 'Técnica';
       case 'Trophy':
         return 'Troféu';
+      case 'Academy':
+        return 'Academia';
+      case 'User':
+        return 'Utilizador';
+      case 'TrainingVideo':
+        return 'Vídeo de treino';
+      case 'AcademyMarketplaceItem':
+        return 'Loja / anúncio';
+      case 'Partner':
+        return 'Parceiro';
+      case 'WeeklyTechniqueKit':
+        return 'Turma semanal';
+      case 'TechniqueExecution':
+        return 'Execução de técnica';
+      case 'MissionUsage':
+        return 'Conclusão de missão';
       default:
         return label;
     }
@@ -274,8 +325,9 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
       padding: EdgeInsets.all(AppTheme.screenPadding(context)),
       children: [
         Text(
-          'Todas as alterações auditadas (missões, lições, técnicas, troféus). '
-          'Filtre por academia para ver só o que afeta essa unidade.',
+          'Alterações auditadas (cadastros e conteúdo). '
+          'Filtre por academia para ver o que afeta essa unidade. '
+          'Para desfazer confirmação de execução ou um usage de missão, use a secção abaixo.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppTheme.textSecondaryOf(context),
               ),
@@ -355,6 +407,109 @@ class _AuditRecoveryScreenState extends State<AuditRecoveryScreen> {
           onChanged: (v) {
             if (v != null) setState(() => _feedAction = v);
           },
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Operações de compensação',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Reverter confirmação: execução deve estar em estado confirmado. '
+                  'Anular conclusão: remove a linha MissionUsage e recalcula nível.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondaryOf(context),
+                      ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _execIdCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'UUID da execução (technique_execution)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: _opsBusy
+                      ? null
+                      : () async {
+                          final id = _execIdCtrl.text.trim();
+                          if (id.isEmpty) return;
+                          setState(() => _opsBusy = true);
+                          try {
+                            await _api.adminRevertExecutionConfirmation(id);
+                            if (mounted) {
+                              AppFeedback.show(
+                                context,
+                                message: 'Confirmação revertida.',
+                                type: AppFeedbackType.success,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              AppFeedback.show(
+                                context,
+                                message: userFacingMessage(e),
+                                type: AppFeedbackType.error,
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _opsBusy = false);
+                          }
+                        },
+                  child: const Text('Reverter confirmação da execução'),
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _muIdCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'UUID do mission_usage a anular',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _opsBusy
+                      ? null
+                      : () async {
+                          final id = _muIdCtrl.text.trim();
+                          if (id.isEmpty) return;
+                          setState(() => _opsBusy = true);
+                          try {
+                            await _api.adminVoidMissionUsage(id);
+                            if (mounted) {
+                              AppFeedback.show(
+                                context,
+                                message: 'Mission usage removido.',
+                                type: AppFeedbackType.success,
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              AppFeedback.show(
+                                context,
+                                message: userFacingMessage(e),
+                                type: AppFeedbackType.error,
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => _opsBusy = false);
+                          }
+                        },
+                  child: const Text('Anular conclusão (mission_usage)'),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 16),
         FilledButton.icon(

@@ -82,6 +82,7 @@ async def marketplace_item_create(
         sort_order=body.sort_order,
         is_active=body.is_active,
         created_by_id=current_user.id,
+        audit_user_id=current_user.id,
     )
     return marketplace_item_admin_read_from_orm(row)
 
@@ -103,7 +104,7 @@ async def marketplace_item_update(
             raise ForbiddenError("Você não tem permissão para editar este anúncio.")
     patch = body.model_dump(exclude_unset=True)
     _merge_whatsapp_into_patch(patch)
-    updated = await update_marketplace_item(db, item_id, patch)
+    updated = await update_marketplace_item(db, item_id, patch, audit_user_id=current_user.id)
     assert updated is not None
     return marketplace_item_admin_read_from_orm(updated)
 
@@ -122,7 +123,7 @@ async def marketplace_item_delete(
     if current_user.role != "administrador":
         if current_user.academy_id is None or row.academy_id != current_user.academy_id:
             raise ForbiddenError("Você não tem permissão para remover este anúncio.")
-    ok = await delete_marketplace_item(db, item_id)
+    ok = await delete_marketplace_item(db, item_id, audit_user_id=current_user.id)
     if not ok:
         raise NotFoundError("Anúncio não encontrado.")
     return None

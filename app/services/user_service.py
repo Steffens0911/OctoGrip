@@ -15,8 +15,17 @@ from app.models import (
 )
 from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
 from app.core.security import hash_password
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    user_entity_snapshot_row,
+    write_audit_log,
+)
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_USER = "User"
 
 
 async def get_user_or_raise(db: AsyncSession, user_id: UUID) -> User:
@@ -70,6 +79,8 @@ async def create_user(
     academy_id: UUID | None = None,
     password: str | None = None,
     role: str = "aluno",
+    *,
+    audit_user_id: UUID | None = None,
 ) -> User:
     grad = graduation.strip() if graduation and graduation.strip() else None
     user = User(
@@ -81,6 +92,16 @@ async def create_user(
         password_hash=await hash_password(password) if password else None,
     )
     db.add(user)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_USER,
+        entity_id=user.id,
+        old_data=None,
+        new_data=user_entity_snapshot_row(user),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(user)
     logger.info("create_user", extra={"user_id": str(user.id), "email": user.email, "role": role})
@@ -98,10 +119,13 @@ async def update_user(
     role: str | None = None,
     password: str | None = None,
     gallery_visible: bool | None = None,
+    *,
+    audit_user_id: UUID | None = None,
 ) -> User | None:
     user = await get_user(db, user_id)
     if not user:
         return None
+    before = user_entity_snapshot_row(user)
     if email is not None:
         normalized = email.strip().lower()
         if normalized != (user.email or "").lower():
@@ -125,6 +149,19 @@ async def update_user(
         user.gallery_visible = gallery_visible
     if password is not None and password.strip():
         user.password_hash = await hash_password(password.strip())
+    await db.flush()
+    await db.refresh(user)
+    after = user_entity_snapshot_row(user)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_USER,
+            entity_id=user_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(user)
 
@@ -138,11 +175,26 @@ async def update_user(
     return user
 
 
-async def delete_user(db: AsyncSession, user_id: UUID) -> bool:
+async def delete_user(
+    db: AsyncSession,
+    user_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     """Exclui o usuário e, em cascata, seus progressos, usos de missão e feedbacks."""
     user = await get_user(db, user_id)
     if not user:
         return False
+    before = user_entity_snapshot_row(user)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_USER,
+        entity_id=user_id,
+        old_data=before,
+        new_data=None,
+        user_id=audit_user_id,
+    )
     await db.execute(sa_delete(TrainingVideoDailyView).where(TrainingVideoDailyView.user_id == user_id))
     await db.execute(sa_delete(LessonProgress).where(LessonProgress.user_id == user_id))
     await db.execute(sa_delete(MissionUsage).where(MissionUsage.user_id == user_id))

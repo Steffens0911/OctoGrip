@@ -21,10 +21,19 @@ from app.models import (
     UserWeeklyKitChoice,
 )
 from app.utils.iso_week import iso_week_key_for_date, utc_datetime_bounds_for_iso_week
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 from app.services.mission_crud_service import upsert_academy_week_missions
 from app.services.weekly_kit_service import academy_has_active_weekly_kits
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_ACADEMY = "Academy"
 
 
 async def ensure_weekly_missions_if_needed(
@@ -278,30 +287,61 @@ async def list_academies(db: AsyncSession, limit: int = 100) -> list[Academy]:
     return (await db.execute(select(Academy).order_by(Academy.name).limit(limit))).scalars().all()
 
 
-async def create_academy(db: AsyncSession, name: str, slug: str | None = None) -> Academy:
+async def create_academy(
+    db: AsyncSession,
+    name: str,
+    slug: str | None = None,
+    *,
+    audit_user_id: UUID | None = None,
+) -> Academy:
     """Cria uma academia. Slug opcional (gerado a partir do nome se vazio)."""
     if not slug or not slug.strip():
         slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "academia"
     academy = Academy(name=name.strip(), slug=slug.strip())
     db.add(academy)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_ACADEMY,
+        entity_id=academy.id,
+        old_data=None,
+        new_data=entity_snapshot_row(academy),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(academy)
     logger.info("create_academy", extra={"academy_id": str(academy.id), "academy_name": academy.name})
     return academy
 
 
-async def delete_academy(db: AsyncSession, academy_id: UUID) -> bool:
+async def delete_academy(
+    db: AsyncSession,
+    academy_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     """Remove uma academia. Retorna True se removeu, False se não existir.
 
     Usa DELETE SQL em vez de session.delete(Academy): o ORM, por omissão, tentava
     UPDATE em técnicas (academy_id NOT NULL) antes do DELETE, gerando IntegrityError.
     A cascata na base remove filhos (técnicas, troféus, etc.) conforme as FKs.
     """
-    exists = (await db.execute(select(Academy.id).where(Academy.id == academy_id))).scalar_one_or_none()
-    if not exists:
+    academy = await get_academy(db, academy_id)
+    if not academy:
         return False
+    before = entity_snapshot_row(academy)
     # Parceiros: remoção explícita (legado / ordem de flush); a FK também permite CASCADE.
     await db.execute(sa_delete(Partner).where(Partner.academy_id == academy_id))
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_ACADEMY,
+        entity_id=academy_id,
+        old_data=before,
+        new_data=None,
+        user_id=audit_user_id,
+    )
     await db.execute(sa_delete(Academy).where(Academy.id == academy_id))
     await db.commit()
     logger.info("delete_academy", extra={"academy_id": str(academy_id)})
@@ -327,11 +367,18 @@ async def update_academy_weekly_theme(
     return academy
 
 
-async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academy | None:
+async def update_academy(
+    db: AsyncSession,
+    academy_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+    **kwargs,
+) -> Academy | None:
     """Atualiza academia (campos em kwargs). Se alguma técnica for alterada, cria/atualiza missões da semana (até 3)."""
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return None
+    before = entity_snapshot_row(academy)
     technique_keys = {"weekly_technique_id", "weekly_technique_2_id", "weekly_technique_3_id"}
     multiplier_keys = {"weekly_multiplier_1", "weekly_multiplier_2", "weekly_multiplier_3"}
     visibility_keys = {"show_trophies", "show_partners", "show_schedule", "show_global_supporters"}
@@ -375,6 +422,19 @@ async def update_academy(db: AsyncSession, academy_id: UUID, **kwargs) -> Academ
             except Exception as e:
                 logger.exception("update_academy upsert_academy_week_missions: %s", e)
                 raise
+    # Não fazer refresh aqui: os campos já foram aplicados em memória e ainda
+    # não foram persistidos — refresh recarregaria valores antigos da BD.
+    after = entity_snapshot_row(academy)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_ACADEMY,
+            entity_id=academy_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(academy)
     logger.info("update_academy", extra={"academy_id": str(academy_id)})

@@ -165,6 +165,7 @@ async def user_create(
         role=role,
         academy_id=academy_id,
         password=body.password,
+        audit_user_id=current_user.id,
     )
 
 
@@ -198,6 +199,7 @@ async def user_update(
         points_adjustment=payload.get("points_adjustment"),
         password=payload.get("password"),
         gallery_visible=payload.get("gallery_visible"),
+        audit_user_id=current_user.id,
     )
     if not updated:
         raise UserNotFoundError()
@@ -207,6 +209,10 @@ async def user_update(
 @router.delete("/{user_id}", status_code=204)
 async def user_delete(
     user_id: UUID,
+    confirm_email: str = Query(
+        ...,
+        description="Confirmação: repita o e-mail do utilizador a eliminar (irreversível sem backup SQL).",
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
@@ -214,6 +220,10 @@ async def user_delete(
     target = await get_user_or_raise(db, user_id)
     if current_user.role != "administrador" and target.academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Você só pode excluir usuários da sua academia.")
-    if not await delete_user(db, user_id):
+    if (confirm_email or "").strip().lower() != (target.email or "").strip().lower():
+        raise ForbiddenError(
+            "Confirmação inválida: o parâmetro confirm_email deve ser igual ao e-mail do utilizador."
+        )
+    if not await delete_user(db, user_id, audit_user_id=current_user.id):
         raise UserNotFoundError()
     return None

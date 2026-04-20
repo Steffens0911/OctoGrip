@@ -209,7 +209,7 @@ async def academy_create(
     current_user: User = Depends(require_admin),
 ):
     """Cria uma nova academia. Apenas administradores."""
-    return await create_academy(db, name=body.name, slug=body.slug)
+    return await create_academy(db, name=body.name, slug=body.slug, audit_user_id=current_user.id)
 
 
 @router.get("/{academy_id}", response_model=AcademyRead)
@@ -263,7 +263,7 @@ async def academy_update(
     exige current_user.academy_id == academy_id."""
     verify_academy_access(current_user, str(academy_id))
     updates = body.model_dump(exclude_unset=True)
-    academy = await update_academy(db, academy_id, **updates)
+    academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()
     await db.refresh(academy)
@@ -278,7 +278,7 @@ async def academy_delete(
     current_user: User = Depends(require_admin),
 ):
     """Remove uma academia. Apenas administradores."""
-    if not await delete_academy(db, academy_id):
+    if not await delete_academy(db, academy_id, audit_user_id=current_user.id):
         raise AcademyNotFoundError()
     return None
 

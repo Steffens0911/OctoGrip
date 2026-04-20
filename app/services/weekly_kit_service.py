@@ -21,10 +21,37 @@ from app.models import (
     WeeklyKitItem,
     WeeklyTechniqueKit,
 )
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 from app.services.mission_crud_service import _cleanup_kit_trailing_slots, upsert_academy_kit_missions
 from app.utils.iso_week import iso_week_key_for_date, utc_datetime_bounds_for_iso_week
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_KIT = "WeeklyTechniqueKit"
+
+
+def _weekly_kit_snapshot(kit: WeeklyTechniqueKit) -> dict:
+    """Requer `kit.items` já carregados (ex.: via selectinload); evita lazy-load em flush."""
+    snap = entity_snapshot_row(kit)
+    items = sorted(kit.items or [], key=lambda x: x.order_index)
+    snap["items"] = [
+        {"technique_id": str(it.technique_id), "order_index": it.order_index, "multiplier": it.multiplier}
+        for it in items
+    ]
+    return snap
+
+
+def _weekly_kit_snapshot_new_kit(kit: WeeklyTechniqueKit) -> dict:
+    """Snapshot após `flush` na criação (sem itens ainda — evita lazy IO no meio da transacção)."""
+    snap = entity_snapshot_row(kit)
+    snap["items"] = []
+    return snap
 
 
 async def list_active_kits_for_academy(db: AsyncSession, academy_id: UUID) -> list[WeeklyTechniqueKit]:
@@ -81,6 +108,7 @@ async def create_kit(
     *,
     label: str,
     sort_order: int = 0,
+    audit_user_id: UUID | None = None,
 ) -> WeeklyTechniqueKit:
     kit = WeeklyTechniqueKit(
         academy_id=academy_id,
@@ -88,6 +116,16 @@ async def create_kit(
         sort_order=sort_order,
     )
     db.add(kit)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_KIT,
+        entity_id=kit.id,
+        old_data=None,
+        new_data=_weekly_kit_snapshot_new_kit(kit),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(kit)
     logger.info("weekly_kit_created", extra={"kit_id": str(kit.id), "academy_id": str(academy_id)})
@@ -101,41 +139,77 @@ async def update_kit_meta(
     *,
     label: str | None = None,
     sort_order: int | None = None,
+    audit_user_id: UUID | None = None,
 ) -> WeeklyTechniqueKit | None:
     kit = await get_kit(db, kit_id, academy_id)
     if not kit:
         return None
+    before = _weekly_kit_snapshot(kit)
     if label is not None:
         kit.label = label.strip()
     if sort_order is not None:
         kit.sort_order = sort_order
     kit.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+    kit_after = await get_kit(db, kit_id, academy_id)
+    if not kit_after:
+        return None
+    after = _weekly_kit_snapshot(kit_after)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_KIT,
+            entity_id=kit_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
-    await db.refresh(kit)
-    return kit
+    return kit_after
 
 
-async def soft_delete_kit(db: AsyncSession, kit_id: UUID, academy_id: UUID) -> bool:
+async def soft_delete_kit(
+    db: AsyncSession,
+    kit_id: UUID,
+    academy_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     kit = (
         (
             await db.execute(
-                select(WeeklyTechniqueKit).where(
+                select(WeeklyTechniqueKit)
+                .where(
                     WeeklyTechniqueKit.id == kit_id,
                     WeeklyTechniqueKit.academy_id == academy_id,
                     WeeklyTechniqueKit.deleted_at.is_(None),
                 )
+                .options(selectinload(WeeklyTechniqueKit.items))
             )
         )
+        .unique()
         .scalars()
         .first()
     )
     if not kit:
         return False
+    before = _weekly_kit_snapshot(kit)
     now = datetime.now(timezone.utc)
     kit.deleted_at = now
     kit.updated_at = now
     await _cleanup_kit_trailing_slots(db, academy_id, kit_id, 0)
     await db.execute(sa_delete(WeeklyKitItem).where(WeeklyKitItem.kit_id == kit_id))
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_KIT,
+        entity_id=kit_id,
+        old_data=before,
+        new_data={"deleted_at": now.isoformat()},
+        user_id=audit_user_id,
+    )
     await db.commit()
     logger.info("weekly_kit_soft_deleted", extra={"kit_id": str(kit_id)})
     return True
@@ -146,6 +220,8 @@ async def replace_kit_items_and_sync_missions(
     kit_id: UUID,
     academy_id: UUID,
     items: list[tuple[UUID, int]],
+    *,
+    audit_user_id: UUID | None = None,
 ) -> WeeklyTechniqueKit:
     """
     Substitui itens do kit (ordem = ordem da lista) e sincroniza missões.
@@ -156,6 +232,7 @@ async def replace_kit_items_and_sync_missions(
     kit = await get_kit(db, kit_id, academy_id)
     if not kit:
         raise NotFoundError("Kit não encontrado.")
+    before = _weekly_kit_snapshot(kit)
     for tid, mult in items:
         tech = (
             (
@@ -175,19 +252,33 @@ async def replace_kit_items_and_sync_missions(
             raise AppError("A técnica não pertence à academia deste kit.", status_code=400)
         clamp_reward_points(mult)
 
-    await db.execute(sa_delete(WeeklyKitItem).where(WeeklyKitItem.kit_id == kit_id))
+    # Usar a coleção ORM (não DELETE em bulk): com cascade delete-orphan, o bulk
+    # não limpa `kit.items` em memória e o flush pode reconciliar só 1 filho.
+    kit.items.clear()
     for order_index, (tid, mult) in enumerate(items):
-        db.add(
+        kit.items.append(
             WeeklyKitItem(
-                kit_id=kit_id,
                 order_index=order_index,
                 technique_id=tid,
                 multiplier=clamp_reward_points(mult),
             )
         )
     kit.updated_at = datetime.now(timezone.utc)
-    await db.commit()
-    await db.refresh(kit)
+    await db.flush()
+    kit_after = await get_kit(db, kit_id, academy_id)
+    if not kit_after:
+        raise NotFoundError("Kit não encontrado.")
+    after = _weekly_kit_snapshot(kit_after)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_KIT,
+            entity_id=kit_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
 
     mission_items = [(tid, clamp_reward_points(m)) for tid, m in items]
     await upsert_academy_kit_missions(
@@ -198,7 +289,11 @@ async def replace_kit_items_and_sync_missions(
         date(2020, 1, 6),
         date(2099, 12, 31),
     )
-    return (await get_kit(db, kit_id, academy_id)) or kit
+    await db.commit()
+    out = await get_kit(db, kit_id, academy_id)
+    if not out:
+        raise NotFoundError("Kit não encontrado.")
+    return out
 
 
 async def get_user_kit_choice(

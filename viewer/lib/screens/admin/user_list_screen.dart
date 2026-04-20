@@ -138,17 +138,47 @@ class _UserListScreenState extends State<UserListScreen> {
   }
 
   Future<void> _delete(models.UserModel u) async {
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Excluir usuário'),
-      content: Text('Excluir "${u.email}"?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Excluir')),
-      ],
-    ));
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir usuário'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Esta ação é irreversível sem backup SQL. Para confirmar, digite o e-mail do utilizador:'),
+            const SizedBox(height: 8),
+            Text(u.email, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'E-mail de confirmação',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (controller.text.trim().toLowerCase() == u.email.trim().toLowerCase()) {
+                Navigator.pop(ctx, true);
+              }
+            },
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
     if (ok != true) return;
     try {
-      await _api.deleteUser(u.id);
+      await _api.deleteUser(u.id, confirmEmail: u.email);
       if (mounted) _load();
       if (mounted) {
         AppFeedback.show(

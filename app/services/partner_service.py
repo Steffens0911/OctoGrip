@@ -6,8 +6,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Partner
+from app.services.audit_service import (
+    AUDIT_ACTION_CREATE,
+    AUDIT_ACTION_DELETE,
+    AUDIT_ACTION_UPDATE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 
 logger = logging.getLogger(__name__)
+
+_ENTITY_PARTNER = "Partner"
 
 
 async def list_partners(db: AsyncSession, academy_id: UUID) -> list[Partner]:
@@ -33,6 +42,8 @@ async def create_partner(
     url: str | None = None,
     logo_url: str | None = None,
     highlight_on_login: bool = False,
+    *,
+    audit_user_id: UUID | None = None,
 ) -> Partner:
     """Cria um parceiro na academia."""
     partner = Partner(
@@ -44,6 +55,16 @@ async def create_partner(
         highlight_on_login=highlight_on_login,
     )
     db.add(partner)
+    await db.flush()
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_CREATE,
+        entity_label=_ENTITY_PARTNER,
+        entity_id=partner.id,
+        old_data=None,
+        new_data=entity_snapshot_row(partner),
+        user_id=audit_user_id,
+    )
     await db.commit()
     await db.refresh(partner)
     logger.info("create_partner", extra={"partner_id": str(partner.id), "partner_name": partner.name})
@@ -58,11 +79,14 @@ async def update_partner(
     url: str | None = None,
     logo_url: str | None = None,
     highlight_on_login: bool | None = None,
+    *,
+    audit_user_id: UUID | None = None,
 ) -> Partner | None:
     """Atualiza um parceiro. Retorna None se não existir."""
     partner = await get_partner(db, partner_id)
     if not partner:
         return None
+    before = entity_snapshot_row(partner)
     if name is not None:
         partner.name = name.strip()
     if description is not None:
@@ -73,17 +97,45 @@ async def update_partner(
         partner.logo_url = logo_url.strip() if logo_url else None
     if highlight_on_login is not None:
         partner.highlight_on_login = highlight_on_login
+    await db.flush()
+    await db.refresh(partner)
+    after = entity_snapshot_row(partner)
+    if after != before:
+        await write_audit_log(
+            db,
+            action=AUDIT_ACTION_UPDATE,
+            entity_label=_ENTITY_PARTNER,
+            entity_id=partner_id,
+            old_data=before,
+            new_data=after,
+            user_id=audit_user_id,
+        )
     await db.commit()
     await db.refresh(partner)
     logger.info("update_partner", extra={"partner_id": str(partner_id)})
     return partner
 
 
-async def delete_partner(db: AsyncSession, partner_id: UUID) -> bool:
+async def delete_partner(
+    db: AsyncSession,
+    partner_id: UUID,
+    *,
+    audit_user_id: UUID | None = None,
+) -> bool:
     """Remove um parceiro. Retorna True se removeu, False se não existir."""
     partner = await get_partner(db, partner_id)
     if not partner:
         return False
+    before = entity_snapshot_row(partner)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label=_ENTITY_PARTNER,
+        entity_id=partner_id,
+        old_data=before,
+        new_data=None,
+        user_id=audit_user_id,
+    )
     await db.delete(partner)
     await db.commit()
     logger.info("delete_partner", extra={"partner_id": str(partner_id)})

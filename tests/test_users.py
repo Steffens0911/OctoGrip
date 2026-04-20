@@ -87,7 +87,11 @@ async def test_excluir_usuario(client, admin_headers, db):
     await db.commit()
     await db.refresh(u)
 
-    r = await client.delete(f"/users/{u.id}", headers=admin_headers)
+    r = await client.delete(
+        f"/users/{u.id}",
+        params={"confirm_email": u.email},
+        headers=admin_headers,
+    )
     assert r.status_code == 204
 
 

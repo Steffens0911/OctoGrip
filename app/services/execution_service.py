@@ -847,3 +847,56 @@ async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offs
             })
 
     return entries
+
+
+async def admin_revert_execution_confirmation(
+    db: AsyncSession,
+    *,
+    execution_id: UUID,
+    admin_user_id: UUID,
+) -> TechniqueExecution:
+    """
+    Administrador global: volta uma execução confirmada a `pending_confirmation`,
+    remove pontos da confirmação e recalcula o nível do executor.
+    """
+    from app.services.audit_service import (
+        AUDIT_ACTION_UPDATE,
+        entity_snapshot_row,
+        write_audit_log,
+    )
+    from app.services.leveling_service import refresh_user_level
+
+    execution = await get_execution(db, execution_id)
+    if not execution:
+        raise NotFoundError("Execução não encontrada.")
+    if execution.status != "confirmed":
+        raise AppError(
+            "Só é possível reverter execuções no estado confirmado.",
+            status_code=400,
+        )
+    before = entity_snapshot_row(execution)
+    execution.status = "pending_confirmation"
+    execution.outcome = None
+    execution.points_awarded = None
+    execution.confirmed_at = None
+    execution.confirmed_by = None
+    await db.flush()
+    await db.refresh(execution)
+    after = entity_snapshot_row(execution)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_UPDATE,
+        entity_label="TechniqueExecution",
+        entity_id=execution_id,
+        old_data=before,
+        new_data=after,
+        user_id=admin_user_id,
+    )
+    await db.commit()
+    await db.refresh(execution)
+    await refresh_user_level(db, execution.user_id)
+    logger.info(
+        "admin_revert_execution_confirmation",
+        extra={"execution_id": str(execution_id), "admin_user_id": str(admin_user_id)},
+    )
+    return execution

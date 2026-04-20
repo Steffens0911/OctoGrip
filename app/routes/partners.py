@@ -74,6 +74,7 @@ async def partner_create(
         url=body.url,
         logo_url=body.logo_url,
         highlight_on_login=body.highlight_on_login,
+        audit_user_id=current_user.id,
     )
 
 
@@ -99,6 +100,7 @@ async def partner_update(
         url=payload.get("url"),
         logo_url=payload.get("logo_url"),
         highlight_on_login=payload.get("highlight_on_login"),
+        audit_user_id=current_user.id,
     )
     return updated
 
@@ -115,6 +117,6 @@ async def partner_remove(
     partner = await get_partner(db, partner_id)
     if not partner or partner.academy_id != academy_id:
         raise PartnerNotFoundError()
-    if not await delete_partner(db, partner_id):
+    if not await delete_partner(db, partner_id, audit_user_id=current_user.id):
         raise PartnerNotFoundError()
     return None

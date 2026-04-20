@@ -7,8 +7,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import UserNotFoundError
+from app.core.exceptions import NotFoundError, UserNotFoundError
 from app.models import Lesson, LessonProgress, MissionUsage, User
+from app.services.audit_service import (
+    AUDIT_ACTION_DELETE,
+    entity_snapshot_row,
+    write_audit_log,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,3 +183,40 @@ async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -
 
     items.sort(key=lambda x: x["completed_at"], reverse=True)
     return items[:limit]
+
+
+async def admin_void_mission_usage(
+    db: AsyncSession,
+    *,
+    usage_id: UUID,
+    admin_user_id: UUID,
+) -> UUID:
+    """
+    Remove um registo MissionUsage (conclusão) e recalcula nível/pontos do utilizador.
+    """
+    from app.services.execution_service import total_points_for_user
+    from app.services.leveling_service import refresh_user_level
+
+    row = (await db.execute(select(MissionUsage).where(MissionUsage.id == usage_id))).scalar_one_or_none()
+    if not row:
+        raise NotFoundError("Registo de missão não encontrado.")
+    user_id = row.user_id
+    before = entity_snapshot_row(row)
+    await write_audit_log(
+        db,
+        action=AUDIT_ACTION_DELETE,
+        entity_label="MissionUsage",
+        entity_id=usage_id,
+        old_data=before,
+        new_data=None,
+        user_id=admin_user_id,
+    )
+    await db.delete(row)
+    await db.commit()
+    pts = await total_points_for_user(db, user_id)
+    await refresh_user_level(db, user_id, total_points=pts)
+    logger.info(
+        "admin_void_mission_usage",
+        extra={"mission_usage_id": str(usage_id), "user_id": str(user_id)},
+    )
+    return user_id

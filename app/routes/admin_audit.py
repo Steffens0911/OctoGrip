@@ -27,7 +27,8 @@ async def admin_audit_feed(
     ),
     entity: str | None = Query(
         None,
-        description="Opcional: mission, lesson, technique, trophy.",
+        description="Opcional: mission, lesson, technique, trophy, academy, user, training_video, "
+        "marketplace_item, partner, weekly_kit, technique_execution, mission_usage.",
     ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),

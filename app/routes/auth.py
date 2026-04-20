@@ -134,5 +134,6 @@ async def patch_me(
         db,
         current_user.id,
         gallery_visible=payload.get("gallery_visible"),
+        audit_user_id=current_user.id,
     )
     return await user_read_with_login_streak(db, updated if updated else current_user)
