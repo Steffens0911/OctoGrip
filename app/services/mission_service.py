@@ -6,6 +6,7 @@ from sqlalchemy import or_, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.app_time import today_in_app_tz
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution
 from app.services.academy_service import ensure_weekly_missions_if_needed
@@ -28,7 +29,7 @@ async def get_today_mission(
     Retorna a missão ativa para o nível (e opcionalmente academia).
     Academia: busca por slot_index (0, 1, 2); sem datas. Global/legado: start_date/end_date.
     """
-    today = date.today()
+    today = today_in_app_tz()
     level_normalized = (level or "beginner").lower().strip()
     if level_normalized not in ("beginner", "intermediate"):
         level_normalized = "beginner"

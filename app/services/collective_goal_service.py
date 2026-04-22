@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.app_time import combine_local_date_exclusive_end_utc, combine_local_date_start_utc, today_in_app_tz
 from app.models import CollectiveGoal, Mission, TechniqueExecution, User
 
 
@@ -53,7 +54,7 @@ async def get_current_goal_for_academy(
     academy_id: UUID,
     today: date | None = None,
 ) -> CollectiveGoal | None:
-    day = today or date.today()
+    day = today or today_in_app_tz()
     return (
         await db.execute(
             select(CollectiveGoal)
@@ -76,8 +77,8 @@ async def count_executions_for_goal(
     Conta technique_executions confirmadas para a técnica da meta,
     no período da meta, de usuários da academia (se goal.academy_id) ou global.
     """
-    start_dt = datetime.combine(goal.start_date, time.min)
-    end_next = datetime.combine(goal.end_date, time.min) + timedelta(days=1)
+    start_dt = combine_local_date_start_utc(goal.start_date)
+    end_next = combine_local_date_exclusive_end_utc(goal.end_date)
     stmt = (
         select(func.count(TechniqueExecution.id))
         .join(Mission, TechniqueExecution.mission_id == Mission.id)

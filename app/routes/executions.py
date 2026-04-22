@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models import User
@@ -64,7 +64,7 @@ async def execution_create(
     request: Request,
     body: ExecutionCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Registra que o usuário logado aplicou a técnica no adversário. Aguarda confirmação do adversário."""
     execution = await create_execution(
@@ -111,7 +111,7 @@ async def execution_confirm(
     execution_id: UUID,
     body: ExecutionConfirmRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Confirma a execução (apenas o adversário logado). outcome: attempted_correctly | executed_successfully."""
     execution = await confirm_execution(
@@ -136,7 +136,7 @@ async def execution_reject(
     execution_id: UUID,
     body: ExecutionRejectRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Recusa a execução (apenas o adversário logado). reason=dont_remember notifica que não aceitou a posição."""
     execution = await reject_execution(

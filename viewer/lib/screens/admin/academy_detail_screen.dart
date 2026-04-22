@@ -1532,7 +1532,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (_hasActiveTurmas()) ...[
         const SizedBox(height: 8),
         Text(
-          '«Reiniciar semana (turmas)» remove a escolha de turma e as conclusões desta semana ISO (UTC) '
+          '«Reiniciar semana (turmas)» remove a escolha de turma e as conclusões desta semana ISO '
+          '(calendário horário de Brasília) '
           'para missões de turma; os pontos já ganhos mantêm-se (ajuste no perfil).',
           style: TextStyle(fontSize: 11, color: AppTheme.textSecondaryOf(context)),
         ),
@@ -1546,7 +1547,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Reiniciar semana das turmas?'),
         content: const Text(
-          'Isto aplica-se à semana ISO atual (UTC): todos os alunos perdem a escolha de turma '
+          'Isto aplica-se à semana ISO atual no horário de Brasília: todos os alunos perdem a escolha de turma '
           'e podem voltar a escolher; as conclusões dessa semana nas missões de turma são '
           'anuladas para refazer os focos. A pontuação já conquistada é preservada.',
         ),

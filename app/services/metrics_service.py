@@ -1,11 +1,16 @@
 import logging
-from datetime import date, datetime, time, timedelta, timezone
 import uuid
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.app_time import (
+    combine_local_date_end_utc,
+    combine_local_date_start_utc,
+    today_in_app_tz,
+)
 from app.models import LessonProgress, MissionUsage, User, UserLoginDay
 
 logger = logging.getLogger(__name__)
@@ -137,9 +142,9 @@ async def _compute_engagement_for_period(
     academy_id: uuid.UUID | None,
 ) -> dict:
     """Calcula % de alunos ativos em um período (start..end)."""
-    # Normalizar para datetimes com timezone para comparação com last_login_at
-    start_dt = datetime.combine(start, time.min, tzinfo=timezone.utc)
-    end_dt = datetime.combine(end, time.max, tzinfo=timezone.utc)
+    # Limites do calendário no fuso do app, comparados a last_login_at (UTC no banco).
+    start_dt = combine_local_date_start_utc(start)
+    end_dt = combine_local_date_end_utc(end)
 
     # Total de alunos (role=aluno), opcionalmente filtrando por academia
     total_query = select(func.count(User.id)).where(User.role == "aluno")
@@ -249,8 +254,8 @@ async def get_active_students_report(
         academy_id=academy_id,
     )
 
-    start_dt = datetime.combine(window_start, time.min, tzinfo=timezone.utc)
-    end_dt = datetime.combine(window_end, time.max, tzinfo=timezone.utc)
+    start_dt = combine_local_date_start_utc(window_start)
+    end_dt = combine_local_date_end_utc(window_end)
 
     users_query = (
         select(User)
@@ -327,7 +332,7 @@ async def get_weekly_panel_logins_report(
         week_start = range_start
         week_end = range_end
     else:
-        ref = reference_date if reference_date is not None else date.today()
+        ref = reference_date if reference_date is not None else today_in_app_tz()
         iso_year, iso_week, _ = ref.isocalendar()
         monday = datetime.fromisocalendar(iso_year, iso_week, 1).date()
         week_start = monday

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.app_time import today_in_app_tz, utc_now
 from app.models import TrainingVideo, TrainingVideoDailyView, User
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -169,7 +170,7 @@ async def get_training_videos_for_user_today(
 ) -> list[dict]:
     """Retorna vídeos ativos com status de conclusão diária para o usuário."""
     if today is None:
-        today = datetime.now(timezone.utc).date()
+        today = today_in_app_tz()
 
     # Vídeos globais (academy_id IS NULL) + vídeos locais da academia do usuário (se houver).
     base_query = select(TrainingVideo).where(TrainingVideo.is_active.is_(True))
@@ -233,7 +234,7 @@ async def complete_training_video_for_user(
     video: TrainingVideo,
 ) -> dict:
     """Registra uma visualização diária, garantindo no máximo 1 pontuação por dia."""
-    today = datetime.now(timezone.utc).date()
+    today = today_in_app_tz()
 
     existing = (await db.execute(
         select(TrainingVideoDailyView).where(
@@ -255,7 +256,7 @@ async def complete_training_video_for_user(
             "message": "Este vídeo já foi contabilizado hoje.",
         }
 
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     view = TrainingVideoDailyView(
         user_id=user.id,
         training_video_id=video.id,

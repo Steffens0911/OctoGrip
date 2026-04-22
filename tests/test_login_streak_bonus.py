@@ -1,9 +1,10 @@
-"""Bónus de pontos por sequência de login (múltiplos de 7 dias UTC)."""
-from datetime import datetime, timedelta, timezone
+"""Bónus de pontos por sequência de login (múltiplos de 7 dias no calendário APP_TIMEZONE)."""
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
 
+from app.core.app_time import today_in_app_tz
 from app.models.user_login_day import UserLoginDay
 from app.services.login_streak_service import login_streak_bonus_points_to_award
 
@@ -29,8 +30,8 @@ def test_login_streak_bonus_points_to_award(before, after, interval, bonus, expe
 
 @pytest.mark.asyncio
 async def test_login_awards_streak_bonus_on_day_7(client, db, admin_user):
-    """Com 6 dias UTC prévios, o login de hoje completa 7 e devolve streak_bonus_points=50."""
-    today = datetime.now(timezone.utc).date()
+    """Com 6 dias prévios no calendário do app, o login de hoje completa 7 e devolve streak_bonus_points=50."""
+    today = today_in_app_tz()
     for i in range(6, 0, -1):
         d = today - timedelta(days=i)
         db.add(UserLoginDay(user_id=admin_user.id, login_day=d))
@@ -57,7 +58,7 @@ async def test_login_awards_streak_bonus_on_day_7(client, db, admin_user):
 @pytest.mark.asyncio
 async def test_login_second_same_day_no_extra_bonus(client, db, admin_user):
     """Segundo login no mesmo dia (7.º da sequência) não volta a dar bónus."""
-    today = datetime.now(timezone.utc).date()
+    today = today_in_app_tz()
     for i in range(6, 0, -1):
         d = today - timedelta(days=i)
         db.add(UserLoginDay(user_id=admin_user.id, login_day=d))

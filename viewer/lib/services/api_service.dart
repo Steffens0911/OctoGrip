@@ -31,7 +31,9 @@ import 'package:viewer/services/backup_multipart_io.dart'
 class ApiException implements Exception {
   final int statusCode;
   final String message;
-  ApiException(this.statusCode, this.message);
+  /// Tipo da exceção no payload `error.type` (ex.: `AccountFrozenError`).
+  final String? errorType;
+  ApiException(this.statusCode, this.message, {this.errorType});
   @override
   String toString() => message;
 }
@@ -318,11 +320,15 @@ class ApiService {
       AuthService().logout(notifyInvalidated: true);
     }
     String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
+    String? errorType;
     if (data is Map) {
+      final err = data['error'];
+      if (err is Map && err['type'] != null) {
+        errorType = err['type'] as String?;
+      }
       if (data['detail'] != null) {
         msg = formatApiDetail(data['detail']);
       } else {
-        final err = data['error'];
         if (err is Map && err['message'] != null) {
           msg = '${err['message']}';
         }
@@ -331,7 +337,7 @@ class ApiService {
     if (r.statusCode == 404) {
       msg = 'Não encontrado (404). Verifique se a API está rodando em $baseUrl';
     }
-    throw ApiException(r.statusCode, msg);
+    throw ApiException(r.statusCode, msg, errorType: errorType);
   }
 
   // ---------- Academies ----------
@@ -929,7 +935,19 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<UserModel> updateUser(String id, {String? email, String? name, String? graduation, String? role, String? password, String? academyId, int? pointsAdjustment}) async {
+  Future<UserModel> updateUser(
+    String id, {
+    String? email,
+    String? name,
+    String? graduation,
+    String? role,
+    String? password,
+    String? academyId,
+    int? pointsAdjustment,
+    bool sendAccountFreezeFields = false,
+    bool? accountFrozen,
+    String? accountFreezeReason,
+  }) async {
     final body = <String, dynamic>{};
     if (email != null && email.isNotEmpty) body['email'] = email;
     if (name != null) body['name'] = name;
@@ -938,6 +956,10 @@ class ApiService {
     if (password != null && password.isNotEmpty) body['password'] = password;
     if (academyId != null) body['academy_id'] = academyId;
     if (pointsAdjustment != null) body['points_adjustment'] = pointsAdjustment;
+    if (sendAccountFreezeFields) {
+      body['account_frozen'] = accountFrozen ?? false;
+      body['account_freeze_reason'] = accountFreezeReason;
+    }
     final r = await _req(http.patch(
       Uri.parse('$baseUrl/users/$id'),
       headers: await _jsonHeaders(auth: true),
@@ -1673,7 +1695,7 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
-  /// Reinicia escolha de turma e progresso na semana ISO atual (UTC); pontos preservados.
+  /// Reinicia escolha de turma e progresso na semana ISO atual (calendário horário de Brasília); pontos preservados.
   Future<Map<String, dynamic>> resetAcademyWeeklyTurmasWeek(
       String academyId) async {
     final r = await _req(http.post(

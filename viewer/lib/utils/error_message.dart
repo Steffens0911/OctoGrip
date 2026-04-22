@@ -36,6 +36,9 @@ String userFacingMessage(Object e) {
     if (e.statusCode == 401) {
       return 'E-mail ou senha inválidos.';
     }
+    if (e.statusCode == 403 && e.errorType == 'AccountFrozenError') {
+      return e.message;
+    }
     return e.message;
   }
   final s = e.toString().toLowerCase();

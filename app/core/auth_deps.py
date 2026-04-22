@@ -6,7 +6,7 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AuthenticationError, ForbiddenError
+from app.core.exceptions import AccountFrozenError, AuthenticationError, ForbiddenError
 from app.core.middleware import set_request_context
 from app.core.security import decode_access_token
 from app.database import get_db
@@ -76,6 +76,15 @@ async def get_current_user(
         )
         raise ForbiddenError("Usuário para simulação não encontrado.")
     return real_user
+
+
+async def require_aluno_not_frozen(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Bloqueia alunos com account_frozen (operações mutáveis). Staff e supervisão não são afetados pelo flag."""
+    if current_user.role == "aluno" and getattr(current_user, "account_frozen", False):
+        raise AccountFrozenError()
+    return current_user
 
 
 async def get_current_user_optional(

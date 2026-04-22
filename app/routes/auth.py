@@ -89,7 +89,7 @@ async def login(
 
     _clear_failed_attempts(body.email)
 
-    # Atualiza last_login_at, regista dia UTC e aplica bónus de sequência (múltiplos de 7 dias) se aplicável
+    # Atualiza last_login_at, regista dia no fuso APP_TIMEZONE e aplica bónus de sequência se aplicável
     user.last_login_at = datetime.now(timezone.utc)
     streak_bonus_points = await apply_login_streak_bonus(db, user, now=user.last_login_at)
     await db.commit()

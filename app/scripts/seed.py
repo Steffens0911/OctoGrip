@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
+from app.core.app_time import combine_local_date_start_utc, now_in_app_tz, today_in_app_tz
 from app.core.security import hash_password_sync
 from app.database import SessionLocal
 from app.models import (
@@ -189,7 +190,7 @@ def run_seed():
         db.flush()
 
         # Missões por nível (PF-01): esta semana, beginner/intermediate = técnica da lição 0/1
-        today = date.today()
+        today = today_in_app_tz()
         week_end = today + timedelta(days=6)
         mission_beginner = Mission(
             technique_id=lessons[0].technique_id,
@@ -235,8 +236,9 @@ def run_seed():
 
         # LessonProgress: conclusões para ranking e relatório semanal não ficarem vazios
         # Semana atual (para relatório semanal) e últimos dias (para ranking 30 dias)
-        now = datetime.now(timezone.utc)
-        base_week = now - timedelta(days=now.weekday())  # início da semana (segunda)
+        local = now_in_app_tz()
+        monday_date = local.date() - timedelta(days=local.weekday())
+        base_week = combine_local_date_start_utc(monday_date)
         progress_data = [
             (user.id, lessons[0].id, base_week + timedelta(days=1)),   # Aluno Teste, lição 0
             (user.id, lessons[1].id, base_week + timedelta(days=2)),

@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.app_time import today_in_app_tz, utc_now
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
 from app.core.points_limits import clamp_reward_points
@@ -29,7 +30,7 @@ def _mission_active_today(mission: Mission) -> bool:
         return False
     if mission.slot_index is not None and mission.academy_id is not None:
         return True
-    today = date.today()
+    today = today_in_app_tz()
     return (
         mission.start_date is not None
         and mission.end_date is not None
@@ -445,7 +446,7 @@ async def confirm_execution(
         outcome,
         base_points=base_points,
     )
-    now = datetime.now(timezone.utc)
+    now = utc_now()
     execution.status = "confirmed"
     execution.outcome = outcome
     execution.points_awarded = points

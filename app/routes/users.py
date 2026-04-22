@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.cache import app_cache
 from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
 from app.core.rate_limit import limiter
@@ -16,9 +16,9 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.weekly_kit import WeeklyKitChoiceRequest, WeeklyKitChoiceResponse
 from app.services.weekly_kit_service import set_user_weekly_kit_choice
 from app.services.user_service import (
+    UNSET,
     create_user,
     delete_user,
-    get_user,
     get_user_by_email,
     get_user_or_raise,
     list_users,
@@ -36,7 +36,7 @@ _ALLOWED_NON_ADMIN_CREATE_ROLE = "aluno"
 async def me_weekly_kit_choice(
     body: WeeklyKitChoiceRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Aluno (ou utilizador com academia) escolhe o kit da semana ISO para seguir as missões corretas."""
     if current_user.academy_id is None:
@@ -188,6 +188,19 @@ async def user_update(
         payload.pop("academy_id", None)
         payload.pop("points_adjustment", None)
         payload.pop("password", None)
+    if current_user.role not in ("administrador", "gerente_academia"):
+        payload.pop("account_frozen", None)
+        payload.pop("account_freeze_reason", None)
+    if current_user.role == "gerente_academia":
+        if "account_frozen" in payload or "account_freeze_reason" in payload:
+            if target.role != "aluno":
+                raise ForbiddenError(
+                    "Apenas contas de aluno podem ter o congelamento alterado pelo gestor da academia."
+                )
+            if target.academy_id is None or target.academy_id != current_user.academy_id:
+                raise ForbiddenError(
+                    "Acesso negado. Só pode congelar alunos vinculados à sua academia."
+                )
     updated = await update_user(
         db,
         user_id,
@@ -199,6 +212,10 @@ async def user_update(
         points_adjustment=payload.get("points_adjustment"),
         password=payload.get("password"),
         gallery_visible=payload.get("gallery_visible"),
+        account_frozen=payload["account_frozen"] if "account_frozen" in payload else UNSET,
+        account_freeze_reason=payload["account_freeze_reason"]
+        if "account_freeze_reason" in payload
+        else UNSET,
         audit_user_id=current_user.id,
     )
     if not updated:

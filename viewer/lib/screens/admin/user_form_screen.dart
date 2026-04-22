@@ -118,6 +118,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
             Navigator.pop(context);
           }
         } else {
+          final showFreezeControls = isAdmin ||
+              (AuthService().isManager() && widget.user!.role == 'aluno');
+          final reasonRaw = (values['account_freeze_reason'] as String?)?.trim();
           await _api.updateUser(
             widget.user!.id,
             email: email.trim(),
@@ -126,6 +129,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
             role: role,
             password: password?.isEmpty == true ? null : password,
             academyId: isAdmin ? (values['academyId'] as String?) : null,
+            sendAccountFreezeFields: showFreezeControls,
+            accountFrozen: showFreezeControls
+                ? (values['account_frozen'] as bool? ?? false)
+                : null,
+            accountFreezeReason: showFreezeControls
+                ? (reasonRaw?.isEmpty == true ? null : reasonRaw)
+                : null,
           );
           if (mounted) {
             AppFeedback.show(
@@ -169,6 +179,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 : null,
             'role': widget.user?.role ?? 'aluno',
             'academyId': isAdmin ? widget.user?.academyId : fixedAcademyId,
+            'account_frozen': widget.user?.accountFrozen ?? false,
+            'account_freeze_reason': widget.user?.accountFreezeReason ?? '',
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -334,6 +346,33 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           initialValue: fixedAcademyId,
                           onChanged: null,
                         ),
+              if (isEdit &&
+                  (isAdmin ||
+                      (AuthService().isManager() &&
+                          widget.user?.role == 'aluno'))) ...[
+                const SizedBox(height: 20),
+                FormBuilderField<bool>(
+                  name: 'account_frozen',
+                  builder: (field) {
+                    return SwitchListTile(
+                      title: const Text('Conta congelada'),
+                      subtitle: const Text(
+                        'O aluno permanece com login, mas não pode treinar nem pontuar até desmarcar.',
+                      ),
+                      value: field.value ?? false,
+                      onChanged: field.didChange,
+                    );
+                  },
+                ),
+                FormBuilderTextField(
+                  name: 'account_freeze_reason',
+                  decoration: const InputDecoration(
+                    labelText: 'Motivo (opcional)',
+                    hintText: 'Ex.: mensalidade em atraso',
+                  ),
+                  maxLines: 2,
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 16),
                 Text(_error!, style: const TextStyle(color: Colors.red))

@@ -46,8 +46,8 @@ void showPointsRulesSheet(BuildContext context) {
               const _RuleBlock(
                 title: 'Sequência de login',
                 body:
-                    'Conta um dia por calendário em UTC em que você entra no app. '
-                    'Se perder um dia (UTC), a sequência zera.',
+                    'Conta um dia por calendário no horário de Brasília em que você entra no app. '
+                    'Se perder um dia nesse calendário, a sequência zera.',
               ),
               const SizedBox(height: 14),
               const _RuleBlock(

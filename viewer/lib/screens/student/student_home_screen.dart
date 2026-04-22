@@ -37,6 +37,7 @@ import 'package:viewer/widgets/academy_login_notice_dialog.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
+import 'package:viewer/widgets/account_frozen_banner.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -127,6 +128,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       default:
         return g;
     }
+  }
+
+  void _notifyAccountFrozen() {
+    if (!mounted) return;
+    final r = AuthService().currentUser?.accountFreezeReason?.trim();
+    AppFeedback.show(
+      context,
+      message: r != null && r.isNotEmpty
+          ? r
+          : 'Conta congelada. Regularize com a academia para treinar e pontuar.',
+      type: AppFeedbackType.warning,
+    );
   }
 
   @override
@@ -630,6 +643,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   void _openLesson(LessonViewData data) async {
+    if (AuthService().isEffectiveStudentFrozen) {
+      _notifyAccountFrozen();
+      return;
+    }
     final openedMissionId = data.missionId;
     final trackCelebrate =
         openedMissionId != null && openedMissionId.isNotEmpty && !data.alreadyCompleted;
@@ -721,6 +738,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   void _onDailyVideoTap() {
+    if (AuthService().isEffectiveStudentFrozen) {
+      _notifyAccountFrozen();
+      return;
+    }
     if (_dailyVideo == null) return;
     Navigator.push(
       context,
@@ -771,6 +792,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _missionWeek == null &&
         u != null &&
         (u.academyId != null && u.academyId!.isNotEmpty);
+    final frozenStudent =
+        u != null && u.role == 'aluno' && u.accountFrozen;
 
     return Scaffold(
       body: Stack(
@@ -807,8 +830,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                           : null,
                       dailyVideoPoints: _dailyVideoPoints,
                       dailyVideoCompleted: _dailyVideoCompleted,
-                      onDailyVideoTap: _onDailyVideoTap,
+                      onDailyVideoTap:
+                          frozenStudent ? _notifyAccountFrozen : _onDailyVideoTap,
                     ),
+                  if (frozenStudent) ...[
+                    const SizedBox(height: 10),
+                    AccountFrozenBanner(reason: u.accountFreezeReason),
+                  ],
                   if (_pendingConfirmationsCount > 0 &&
                       !_pendingBannerDismissed &&
                       u != null) ...[
@@ -1096,6 +1124,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   void _openPendingConfirmationsScreen() {
     final u = _selectedUser;
     if (u == null) return;
+    if (AuthService().isEffectiveStudentFrozen) {
+      _notifyAccountFrozen();
+      return;
+    }
     Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
@@ -1308,7 +1340,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     borderRadius: BorderRadius.circular(12),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      onTap: _savingWeeklyTurmaChoice
+                      onTap: _savingWeeklyTurmaChoice ||
+                              AuthService().isEffectiveStudentFrozen
                           ? null
                           : () => setState(() => _weeklyKitChoiceLocal = k.kitId),
                       child: Padding(
@@ -1353,9 +1386,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               FilledButton(
                 onPressed: switch (groupValue) {
                   null => null,
-                  final g => _savingWeeklyTurmaChoice
+                  final g => _savingWeeklyTurmaChoice ||
+                          AuthService().isEffectiveStudentFrozen
                       ? null
                       : () async {
+                          if (AuthService().isEffectiveStudentFrozen) {
+                            _notifyAccountFrozen();
+                            return;
+                          }
                           setState(() => _savingWeeklyTurmaChoice = true);
                           try {
                             await _api.putWeeklyKitChoice(kitId: g);

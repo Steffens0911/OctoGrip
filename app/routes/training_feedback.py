@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import require_aluno_not_frozen
 from app.models import User
 from app.schemas.training_feedback import TrainingFeedbackRequest, TrainingFeedbackResponse
 from app.services.training_feedback_service import create_feedback
@@ -15,7 +15,7 @@ router = APIRouter()
 async def training_feedback(
     body: TrainingFeedbackRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Registra dificuldade do treino (observação opcional), sem Position."""
     try:

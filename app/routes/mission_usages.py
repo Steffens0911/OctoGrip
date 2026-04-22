@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.models import User
 from app.schemas.mission_history import MissionHistoryItem, MissionHistoryResponse
 from app.schemas.mission_usage import MissionUsageSyncRequest, MissionUsageSyncResponse
@@ -16,7 +16,7 @@ router = APIRouter()
 async def mission_usages_sync(
     body: MissionUsageSyncRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Recebe lista de usos de missão do app e persiste para o usuário logado (PB-01)."""
     usages_dict = [u.model_dump() for u in body.usages]

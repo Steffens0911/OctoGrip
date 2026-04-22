@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.app_time import today_in_app_tz
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
@@ -521,7 +522,7 @@ async def list_user_trophies_with_earned(
     )
 
     result = []
-    today = date.today()
+    today = today_in_app_tz()
     for t in trophies:
         in_period = _executions_in_period_from_list(all_executions, t)
         mcpo = getattr(t, "max_count_per_opponent", None)

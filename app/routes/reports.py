@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.app_time import today_in_app_tz
 from app.core.exceptions import AppError, ForbiddenError
 from app.core.role_deps import require_admin_manager_or_supervisor, verify_academy_access
 from app.database import get_db
@@ -116,7 +117,7 @@ async def reports_weekly_panel_logins(
             range_end=end_date,
         )
     else:
-        ref = reference_date if reference_date is not None else date.today()
+        ref = reference_date if reference_date is not None else today_in_app_tz()
         result = await get_weekly_panel_logins_report(
             db,
             reference_date=ref,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -61,6 +61,18 @@ class User(Base, UUIDMixin):
         nullable=True,
         index=True,
         comment="Data/hora do último login bem-sucedido.",
+    )
+    account_frozen: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
+        comment="Se true (e role=aluno), a API bloqueia ações mutáveis; login e leitura seguem permitidos.",
+    )
+    account_freeze_reason: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Motivo opcional exibido ao aluno (ex.: mensalidade). Gestor/admin define.",
     )
 
     academy: Mapped["Academy | None"] = relationship(

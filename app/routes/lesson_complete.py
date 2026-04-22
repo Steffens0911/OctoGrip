@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.models import User
 from app.schemas.lesson_complete import (
     LessonCompleteRequest,
@@ -31,7 +31,7 @@ async def lesson_complete_status(
 async def lesson_complete(
     body: LessonCompleteRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_aluno_not_frozen),
 ):
     """Registra conclusão da lição para o usuário logado. Impede conclusão duplicada."""
     progress = await complete_lesson(db, current_user.id, body.lesson_id)

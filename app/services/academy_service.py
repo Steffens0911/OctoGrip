@@ -7,6 +7,11 @@ from uuid import UUID
 from sqlalchemy import func, select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.app_time import (
+    combine_local_date_exclusive_end_utc,
+    combine_local_date_start_utc,
+    today_in_app_tz,
+)
 from app.core.exceptions import AppError
 from app.core.points_limits import clamp_reward_points
 from app.models import (
@@ -155,7 +160,7 @@ async def reset_academy_missions(db: AsyncSession, academy_id: UUID) -> dict:
 
 async def reset_academy_weekly_turmas_week(db: AsyncSession, academy_id: UUID) -> dict:
     """
-    Reinicia escolhas de turma (kit) e progresso na semana ISO atual (UTC):
+    Reinicia escolhas de turma (kit) e progresso na semana ISO atual (fusos APP_TIMEZONE):
     remove `user_weekly_kit_choices` dessa semana e `MissionUsage` / `TechniqueExecution`
     confirmadas ligadas a missões com `weekly_kit_id`, apenas com timestamps na janela
     da semana. Pontos dessas linhas somam em `points_adjustment` (como `reset_academy_missions`).
@@ -274,7 +279,7 @@ async def reset_academy_weekly_turmas_week(db: AsyncSession, academy_id: UUID) -
         },
     )
     return {
-        "message": "Semana das turmas reiniciada (UTC). Pontuação preservada.",
+        "message": "Semana das turmas reiniciada (horário de Brasília). Pontuação preservada.",
         "users_affected": len(user_points),
         "choices_removed": choices_removed,
         "iso_week_year": iso_y,
@@ -575,8 +580,8 @@ async def get_academy_ranking(
     (POST /mission_complete) e execuções confirmadas (TechniqueExecution).
     Retorna lista de { rank, user_id, name, completions_count } ordenada por count desc.
 
-    - Com `range_start` e `range_end` (datas inclusive em UTC): filtra o intervalo
-      [início do dia range_start, fim exclusivo do dia seguinte a range_end).
+    - Com `range_start` e `range_end` (datas inclusive no fuso APP_TIMEZONE): filtra o intervalo
+      [início do dia local range_start, fim exclusivo do dia seguinte a range_end).
     - Caso contrário: últimos `period_days` dias a partir do instante atual (UTC).
     """
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
@@ -584,10 +589,8 @@ async def get_academy_ranking(
         return []
 
     if range_start is not None and range_end is not None:
-        start_dt = datetime.combine(range_start, datetime.min.time()).replace(tzinfo=timezone.utc)
-        end_dt = datetime.combine(range_end + timedelta(days=1), datetime.min.time()).replace(
-            tzinfo=timezone.utc
-        )
+        start_dt = combine_local_date_start_utc(range_start)
+        end_dt = combine_local_date_exclusive_end_utc(range_end)
         lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
             db, academy_id, start_dt, end_dt
         )
@@ -629,7 +632,7 @@ async def get_academy_weekly_report(
     Inclui conclusões por lição (LessonProgress), por missão do dia (MissionUsage)
     e execuções confirmadas (TechniqueExecution).
 
-    - Com `start_date` e `end_date` (inclusive): usa esse intervalo em calendário UTC
+    - Com `start_date` e `end_date` (inclusive): intervalo em calendário no fuso APP_TIMEZONE
       (ignora year/week).
     - Senão, se year/week informados: semana ISO correspondente.
     - Senão: semana ISO atual.
@@ -640,20 +643,23 @@ async def get_academy_weekly_report(
         return None
 
     if start_date is not None and end_date is not None:
-        d = start_date
-        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
-        week_end = datetime.combine(end_date + timedelta(days=1), datetime.min.time()).replace(
-            tzinfo=timezone.utc
-        )
+        label_start = start_date
+        label_end = end_date
+        week_start = combine_local_date_start_utc(start_date)
+        week_end = combine_local_date_exclusive_end_utc(end_date)
     elif year is not None and week is not None:
-        d = datetime.fromisocalendar(year, week, 1).date()
-        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
-        week_end = week_start + timedelta(days=7)
+        monday_d = datetime.fromisocalendar(year, week, 1).date()
+        label_start = monday_d
+        label_end = monday_d + timedelta(days=6)
+        week_start = combine_local_date_start_utc(monday_d)
+        week_end = combine_local_date_exclusive_end_utc(monday_d + timedelta(days=6))
     else:
-        today = date.today()
-        d = today - timedelta(days=today.weekday())
-        week_start = datetime.combine(d, datetime.min.time()).replace(tzinfo=timezone.utc)
-        week_end = week_start + timedelta(days=7)
+        today = today_in_app_tz()
+        monday_d = today - timedelta(days=today.weekday())
+        label_start = monday_d
+        label_end = monday_d + timedelta(days=6)
+        week_start = combine_local_date_start_utc(monday_d)
+        week_end = combine_local_date_exclusive_end_utc(monday_d + timedelta(days=6))
 
     # Usar função comum para buscar completions
     lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
@@ -673,13 +679,6 @@ async def get_academy_weekly_report(
             "total_users": len(merged),
         },
     )
-
-    if start_date is not None and end_date is not None:
-        label_start = start_date
-        label_end = end_date
-    else:
-        label_start = d
-        label_end = d + timedelta(days=6)
 
     if not merged:
         return {

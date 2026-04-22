@@ -1,4 +1,4 @@
-"""Reset da semana ISO atual (turmas): escolhas + conclusões em janela UTC; pontos preservados."""
+"""Reset da semana ISO atual (turmas): escolhas + conclusões na janela do fuso APP_TIMEZONE; pontos preservados."""
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
@@ -106,7 +106,7 @@ async def test_reset_weekly_turmas_week_clears_choice_usage_preserves_points(
     await db.refresh(aluno_user)
     assert (aluno_user.points_adjustment or 0) == adj_before + int(pts_awarded)
 
-    # Conclusão fora da semana ISO atual (UTC) não deve ser removida pelo reset desta semana
+    # Conclusão fora da semana ISO atual (app) não deve ser removida pelo reset desta semana
     old_completed = datetime.now(timezone.utc) - timedelta(days=14)
     mu_old = MissionUsage(
         user_id=aluno_user.id,

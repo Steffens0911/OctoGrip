@@ -60,7 +60,7 @@ class WeeklyKitChoiceRequest(BaseModel):
     kit_id: UUID = Field(description="Identificador da turma (registo `weekly_technique_kits`).")
     reference_date: str | None = Field(
         None,
-        description="Data YYYY-MM-DD para calcular a semana ISO (default: hoje em UTC).",
+        description="Data YYYY-MM-DD para calcular a semana ISO (default: hoje no fuso APP_TIMEZONE).",
     )
 
 

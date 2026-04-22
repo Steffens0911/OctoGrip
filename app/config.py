@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import List
+from zoneinfo import ZoneInfo
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
@@ -42,7 +43,10 @@ class Settings(BaseSettings):
     # Rate limiting (login)
     LOGIN_RATE_LIMIT: str = "5/minute"
 
-    # Bónus de sequência de login (UTC): a cada N dias consecutivos no login, +X pts (points_adjustment).
+    # Fuso para "hoje", sequência de login, semana ISO de turmas, relatórios por dia, etc.
+    APP_TIMEZONE: str = "America/Sao_Paulo"
+
+    # Bónus de sequência de login: a cada N dias consecutivos (calendário no fuso APP_TIMEZONE), +X pts.
     LOGIN_STREAK_BONUS_POINTS: int = 50
     LOGIN_STREAK_BONUS_INTERVAL_DAYS: int = 7
 
@@ -93,6 +97,18 @@ class Settings(BaseSettings):
             )
         
         return v
+
+    @field_validator("APP_TIMEZONE")
+    @classmethod
+    def validate_app_timezone(cls, v: str) -> str:
+        key = (v or "").strip()
+        if not key:
+            raise ValueError("APP_TIMEZONE não pode ser vazio.")
+        try:
+            ZoneInfo(key)
+        except Exception as e:
+            raise ValueError(f"APP_TIMEZONE inválido: {key!r}") from e
+        return key
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

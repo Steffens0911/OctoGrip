@@ -13,9 +13,14 @@ class UserRead(BaseModel):
     academy_id: UUID | None = None
     points_adjustment: int = 0
     gallery_visible: bool = True
+    account_frozen: bool = False
+    account_freeze_reason: str | None = Field(
+        None,
+        description="Motivo opcional quando a conta está congelada (definido pelo gestor/admin).",
+    )
     login_streak_days: int = Field(
         0,
-        description="Dias consecutivos com login (UTC); valor correto em GET/PATCH /auth/me.",
+        description="Dias consecutivos com login (calendário no fuso APP_TIMEZONE); valor em GET/PATCH /auth/me.",
     )
 
     class Config:
@@ -114,6 +119,15 @@ class UserUpdate(BaseModel):
     academy_id: UUID | None = None
     points_adjustment: int | None = None
     gallery_visible: bool | None = None
+    account_frozen: bool | None = Field(
+        None,
+        description="Congela conta (efeito em alunos: bloqueia ações mutáveis na API). Apenas administrador ou gerente_academia.",
+    )
+    account_freeze_reason: str | None = Field(
+        None,
+        max_length=2000,
+        description="Texto opcional para o aluno. Omitir para não alterar; null para limpar.",
+    )
     password: str | None = Field(
         None,
         min_length=1,

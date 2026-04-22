@@ -13,7 +13,7 @@ from app.models import (
     TrainingVideoDailyView,
     User,
 )
-from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
+from app.core.exceptions import ConflictError, UserNotFoundError
 from app.core.security import hash_password
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -26,6 +26,7 @@ from app.services.audit_service import (
 logger = logging.getLogger(__name__)
 
 _ENTITY_USER = "User"
+UNSET = object()
 
 
 async def get_user_or_raise(db: AsyncSession, user_id: UUID) -> User:
@@ -119,6 +120,8 @@ async def update_user(
     role: str | None = None,
     password: str | None = None,
     gallery_visible: bool | None = None,
+    account_frozen: bool | None | object = UNSET,
+    account_freeze_reason: str | None | object = UNSET,
     *,
     audit_user_id: UUID | None = None,
 ) -> User | None:
@@ -147,6 +150,15 @@ async def update_user(
         user.points_adjustment = points_adjustment
     if gallery_visible is not None:
         user.gallery_visible = gallery_visible
+    if account_frozen is not UNSET:
+        user.account_frozen = bool(account_frozen)
+    if account_freeze_reason is not UNSET:
+        if account_freeze_reason is None or (
+            isinstance(account_freeze_reason, str) and not str(account_freeze_reason).strip()
+        ):
+            user.account_freeze_reason = None
+        else:
+            user.account_freeze_reason = str(account_freeze_reason).strip()
     if password is not None and password.strip():
         user.password_hash = await hash_password(password.strip())
     await db.flush()

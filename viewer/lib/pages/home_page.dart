@@ -12,6 +12,8 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 import 'package:viewer/widgets/header_widget.dart';
+import 'package:viewer/widgets/account_frozen_banner.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/mission_card.dart';
 import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/schedule_card.dart';
@@ -195,6 +197,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _onDailyVideoTap() {
+    final auth = AuthService();
+    if (auth.isEffectiveStudentFrozen) {
+      final r = auth.currentUser?.accountFreezeReason?.trim();
+      AppFeedback.show(
+        context,
+        message: r != null && r.isNotEmpty
+            ? r
+            : 'Conta congelada. Regularize com a academia para treinar e pontuar.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
     if (_dailyVideo == null) return;
     Navigator.push(
       context,
@@ -223,6 +237,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
     }
     final academyId = user?.academyId;
+    final frozenStudent =
+        user != null && user.role == 'aluno' && user.accountFrozen;
     final screenPadding = AppTheme.screenPadding(context);
     final width = MediaQuery.sizeOf(context).width;
     final isWide = width >= AppTheme.breakpointTablet;
@@ -259,6 +275,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     dailyVideoCompleted: _dailyVideoCompleted,
                     onDailyVideoTap: _onDailyVideoTap,
                   ),
+                  if (frozenStudent) ...[
+                    const SizedBox(height: 12),
+                    AccountFrozenBanner(reason: user.accountFreezeReason),
+                  ],
                   if (academyId != null && academyId.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Material(
@@ -395,6 +415,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   /// Centro de treinamento: abre a tela com Missões da semana, Troféus e Confirmações e solicitações.
   void _openMissions(BuildContext context) {
+    final auth = AuthService();
+    if (auth.isEffectiveStudentFrozen) {
+      final r = auth.currentUser?.accountFreezeReason?.trim();
+      AppFeedback.show(
+        context,
+        message: r != null && r.isNotEmpty
+            ? r
+            : 'Conta congelada. Regularize com a academia para treinar e pontuar.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute<void>(

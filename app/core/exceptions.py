@@ -27,6 +27,16 @@ class ForbiddenError(AppError):
         super().__init__(message, status_code=403)
 
 
+class AccountFrozenError(ForbiddenError):
+    """Aluno com conta congelada (gestor/admin); resposta inclui type AccountFrozenError no handler global."""
+
+    def __init__(
+        self,
+        message: str = "Conta congelada. Regularize sua situação com a academia para voltar a treinar e pontuar.",
+    ):
+        super().__init__(message)
+
+
 # --- Not Found (404) ---
 
 

@@ -206,4 +206,8 @@ class AuthService extends ChangeNotifier {
   bool canAccessAcademyPanel() =>
       isAdmin() || isManager() || isProfessor() || isSupervisor();
   bool canEditResources() => !isSupervisor() && canAccessAcademyPanel();
+
+  /// Aluno efetivo com conta congelada (modo leitura para treinos/pontos).
+  bool get isEffectiveStudentFrozen =>
+      isStudent() && (currentUser?.accountFrozen == true);
 }
