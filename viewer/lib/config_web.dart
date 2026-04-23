@@ -1,6 +1,6 @@
 /// Implementação para web: **primeiro** `?api_base=` e sessionStorage (correcção sem rebuild),
 /// depois `index.html`, **`--dart-define=API_BASE_URL`** (build Docker/Coolify), e por fim
-/// localhost:8001 ou mesmo host:8001.
+/// localhost:8001 (dev local) ou mesma origem sem porta (produção).
 /// Em `*.trycloudflare.com` sem `api_base`, devolve string vazia: o browser bloqueia HTTPS→127.0.0.1 (PNA).
 library;
 
@@ -78,5 +78,7 @@ String getApiBaseUrl() {
   if (host.endsWith('.trycloudflare.com')) {
     return '';
   }
-  return '${Uri.base.scheme}://$host:$localApiPort';
+  // Em produção preferimos mesma origem (sem :8001) para evitar connection refused
+  // quando a API está atrás de proxy (ex.: Caddy/Nginx/Cloudflare).
+  return '${Uri.base.scheme}://$host';
 }

@@ -6,8 +6,23 @@ library;
 import 'dart:io' show Platform;
 
 const String? kApiHostOverride = null;
+const String _kApiBaseFromBuild = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: '',
+);
+const String _kProdApiBaseDefault = 'https://octogrip.com.br';
 
 String getApiBaseUrl() {
+  final fromBuild = _kApiBaseFromBuild.trim();
+  if (fromBuild.isNotEmpty) {
+    return fromBuild.replaceAll(RegExp(r'/+$'), '');
+  }
+
+  const isRelease = bool.fromEnvironment('dart.vm.product');
+  if (isRelease) {
+    return _kProdApiBaseDefault;
+  }
+
   if (kApiHostOverride != null && kApiHostOverride!.isNotEmpty) {
     return 'http://$kApiHostOverride:8000';
   }

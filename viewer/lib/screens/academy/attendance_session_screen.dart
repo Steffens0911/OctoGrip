@@ -34,6 +34,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   Timer? _countdownTimer;
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
+  bool _isRefreshingSession = false;
   String? _qrError;
 
   @override
@@ -64,7 +65,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   void _startAutoRefresh() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_session?.id != null) {
         unawaited(_refreshSession());
       }
@@ -73,7 +74,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   Future<void> _refreshSession() async {
     final s = _session;
-    if (s == null) return;
+    if (s == null || _isRefreshingSession) return;
+    _isRefreshingSession = true;
     try {
       final updated = await _api.getAttendanceSession(s.id);
       final recs = await _api.getAttendanceSessionRecords(s.id, limit: 500);
@@ -85,6 +87,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       await _hydrateUsersForRecords(recs);
     } catch (_) {
       // Silencioso no auto refresh
+    } finally {
+      _isRefreshingSession = false;
     }
   }
 
@@ -97,6 +101,15 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _qrError = null;
     });
     try {
+      final qr = await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
+      if (!mounted) return;
+      _applyQrPayload(qr);
+      return;
+    } catch (_) {
+      // Retry curto para rede/proxy intermitente.
+    }
+    try {
+      await Future.delayed(const Duration(milliseconds: 600));
       final qr = await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
       if (!mounted) return;
       _applyQrPayload(qr);

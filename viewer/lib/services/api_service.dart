@@ -53,7 +53,7 @@ class ApiService {
 
   /// Lida sempre com [kApiBaseUrl] para `?api_base=` / sessionStorage surtirem efeito sem reload rígido.
   String get baseUrl => kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
-  static const _timeout = Duration(seconds: 15);
+  static const _timeout = Duration(seconds: 30);
 
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort = 45; // mission_today, week, pending count (pull-to-refresh pode servir cache válido)
@@ -100,7 +100,14 @@ class ApiService {
     invalidateCache('GET:$baseUrl/attendance');
   }
 
-  Future<http.Response> _req(Future<http.Response> f) => f.timeout(_timeout);
+  Future<http.Response> _req(Future<http.Response> f) => f.timeout(
+        _timeout,
+        onTimeout: () {
+          throw TimeoutException(
+            'Tempo esgotado ao chamar a API. Verifique conectividade da API e tente novamente.',
+          );
+        },
+      );
 
   /// GET com cache. [ttlSeconds] 0 = sem cache. Retorna body (string); em cache hit não chama a rede.
   Future<http.Response> _getWithCache(Uri uri, int ttlSeconds) async {
