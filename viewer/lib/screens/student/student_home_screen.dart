@@ -38,6 +38,7 @@ import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
+import 'package:viewer/screens/student/attendance_scan_screen.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -920,6 +921,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (_showGlobalSupporters) const GlobalSupportersSection(),
                   if (u != null) ...[
                     const SizedBox(height: 16),
+                    _buildAttendanceScanCard(),
+                    const SizedBox(height: 16),
                     _buildConfirmationsAndRequestsSection(),
                     const SizedBox(height: 16),
                     _buildMarketplaceEntryCard(),
@@ -1630,6 +1633,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildAttendanceScanCard() {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+          child: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary),
+        ),
+        title: const Text(
+          'Chamada por QR',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text('Escanear QR para registrar presença no treino'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const AttendanceScanScreen()),
+        ),
+      ),
     );
   }
 

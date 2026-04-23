@@ -22,6 +22,7 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'dart:typed_data';
+import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -93,6 +94,10 @@ class ApiService {
 
   void _invalidateHomeHeaderCache() {
     invalidateCache('GET:$baseUrl/me/header_stats');
+  }
+
+  void _invalidateAttendanceCache() {
+    invalidateCache('GET:$baseUrl/attendance');
   }
 
   Future<http.Response> _req(Future<http.Response> f) => f.timeout(_timeout);
@@ -672,6 +677,90 @@ class ApiService {
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
     return raw.map((e) => UserModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  // --- Attendance (Chamada por QR) ---
+
+  Future<AttendanceSessionModel> createAttendanceSession({String? title, int? expiresInMinutes}) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions');
+    final body = <String, dynamic>{};
+    if (title != null) body['title'] = title;
+    if (expiresInMinutes != null) body['expires_in_minutes'] = expiresInMinutes;
+    final r = await _req(http.post(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceSessionModel> getAttendanceSession(String sessionId) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId');
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<List<AttendanceRecordModel>> getAttendanceSessionRecords(
+    String sessionId, {
+    int limit = 300,
+    int offset = 0,
+  }) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records')
+        .replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = (data as List<dynamic>? ?? const []);
+    return list.map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId, {int ttlSeconds = 60}) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/qr')
+        .replace(queryParameters: {'ttl_seconds': '$ttlSeconds'});
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceQrPayloadModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceSessionModel> closeAttendanceSession(String sessionId) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/close');
+    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceRecordModel> scanAttendance(String payload) async {
+    final uri = Uri.parse('$baseUrl/attendance/scan');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'payload': payload}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceUserSummaryModel> getAttendanceMeSummary({int fromDays = 30}) async {
+    final uri = Uri.parse('$baseUrl/attendance/me/summary').replace(queryParameters: {'from_days': '$fromDays'});
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceUserSummaryModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceUserSummaryModel> getAttendanceUserSummary(String userId, {int fromDays = 30}) async {
+    final uri = Uri.parse('$baseUrl/attendance/users/$userId/summary')
+        .replace(queryParameters: {'from_days': '$fromDays'});
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceUserSummaryModel.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<Map<String, dynamic>> getUserPoints(String userId) async {

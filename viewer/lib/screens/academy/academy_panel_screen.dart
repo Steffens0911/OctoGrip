@@ -9,6 +9,7 @@ import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/screens/academy/attendance_session_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
@@ -84,7 +85,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      count += kPushNotificationsEnabled ? 5 : 4; // vídeos + loja (+ push se activo)
+      // Cards fixos do painel: usuários + chamada(QR) + técnicas + vídeos + loja (+ push se activo)
+      count += kPushNotificationsEnabled ? 6 : 5;
     }
     return count;
   }
@@ -113,6 +115,24 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         ),
       );
     } else if (isManagerOrProfessor && index == 1) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.qr_code_rounded, color: AppTheme.primary),
+          ),
+          title: const Text('Chamada (QR)',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          subtitle: const Text('Iniciar chamada e ver presenças em tempo real'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AttendanceSessionScreen()),
+          ),
+        ),
+      );
+    } else if (isManagerOrProfessor && index == 2) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -148,7 +168,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           },
         ),
       );
-    } else if (isManagerOrProfessor && index == 2) {
+    } else if (isManagerOrProfessor && index == 3) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -175,7 +195,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
-    } else if (isManagerOrProfessor && index == 3) {
+    } else if (isManagerOrProfessor && index == 4) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -216,7 +236,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     } else if (isManagerOrProfessor &&
         kPushNotificationsEnabled &&
-        index == 4) {
+        index == 5) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -258,7 +278,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
     // Cards fixos no topo; academias após Usuários + lista de técnicas + vídeos tarefa diária + Loja (+ push se activo).
     final managerOffset =
-        isManagerOrProfessor ? (kPushNotificationsEnabled ? 5 : 4) : 0;
+        isManagerOrProfessor ? (kPushNotificationsEnabled ? 6 : 5) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();

@@ -107,3 +107,18 @@ class ConflictError(AppError):
 
     def __init__(self, message: str = "Recurso já existe."):
         super().__init__(message, status_code=409)
+
+
+class AttendanceSessionNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Sessão de chamada não encontrada."):
+        super().__init__(message)
+
+
+class AttendanceSessionClosedError(AppError):
+    def __init__(self, message: str = "Sessão de chamada encerrada."):
+        super().__init__(message, status_code=409)
+
+
+class AttendanceQrInvalidError(AppError):
+    def __init__(self, message: str = "QR inválido ou expirado."):
+        super().__init__(message, status_code=400)

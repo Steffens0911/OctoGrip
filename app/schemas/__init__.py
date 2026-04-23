@@ -3,6 +3,14 @@ from app.schemas.lesson_complete import LessonCompleteRequest, LessonCompleteRes
 from app.schemas.mission import MissionTodayResponse
 from app.schemas.mission_usage import MissionUsageSyncRequest, MissionUsageSyncResponse
 from app.schemas.training_feedback import TrainingFeedbackRequest, TrainingFeedbackResponse
+from app.schemas.attendance import (
+    AttendanceQrPayloadResponse,
+    AttendanceRecordRead,
+    AttendanceScanRequest,
+    AttendanceSessionCreate,
+    AttendanceSessionRead,
+    AttendanceUserSummaryResponse,
+)
 
 __all__ = [
     "LessonCreate",
@@ -15,4 +23,10 @@ __all__ = [
     "MissionUsageSyncResponse",
     "TrainingFeedbackRequest",
     "TrainingFeedbackResponse",
+    "AttendanceQrPayloadResponse",
+    "AttendanceRecordRead",
+    "AttendanceScanRequest",
+    "AttendanceSessionCreate",
+    "AttendanceSessionRead",
+    "AttendanceUserSummaryResponse",
 ]

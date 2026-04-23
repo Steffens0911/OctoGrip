@@ -21,6 +21,8 @@ from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 from app.models.academy_marketplace_item import AcademyMarketplaceItem
 from app.models.user_device_token import UserDeviceToken
 from app.models.weekly_technique_kit import UserWeeklyKitChoice, WeeklyKitItem, WeeklyTechniqueKit
+from app.models.attendance_session import AttendanceSession
+from app.models.attendance_record import AttendanceRecord
 
 __all__ = [
     "Base",
@@ -48,4 +50,6 @@ __all__ = [
     "WeeklyTechniqueKit",
     "WeeklyKitItem",
     "UserWeeklyKitChoice",
+    "AttendanceSession",
+    "AttendanceRecord",
 ]

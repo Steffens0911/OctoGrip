@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from app.routes import (
     academies,
     academy_weekly_kits,
+    attendance,
     admin,
     admin_audit,
     admin_backup,
@@ -71,3 +72,4 @@ api_router.include_router(marketplace_items.router, prefix="/marketplace_items",
 api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
 api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])
+api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
