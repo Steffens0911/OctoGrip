@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/student/featured_partners_banner.dart';
 
 import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
@@ -23,11 +25,22 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
   bool _loading = true;
   String? _error;
   Map<String, dynamic>? _headerStats;
+  Future<List<Partner>>? _featuredFuture;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _setupFeaturedFuture();
+  }
+
+  void _setupFeaturedFuture() {
+    final academyId = AuthService().currentUser?.academyId;
+    if (academyId == null || academyId.isEmpty) {
+      _featuredFuture = null;
+      return;
+    }
+    _featuredFuture = _api.getFeaturedPartners(academyId);
   }
 
   Future<void> _load() async {
@@ -135,11 +148,32 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     // AppBar fica no [MainScaffold] (aba "Central"); evita barra extra com seta e título duplicado.
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () async {
+          _api.invalidateCache('GET:${_api.baseUrl}/partners/featured');
+          setState(() => _setupFeaturedFuture());
+          await _load();
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
+            if (_featuredFuture != null)
+              Padding(
+                padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
+                child: FutureBuilder<List<Partner>>(
+                  future: _featuredFuture,
+                  builder: (context, snapshot) {
+                    final list = snapshot.data ?? const <Partner>[];
+                    if (snapshot.connectionState == ConnectionState.waiting && list.isEmpty) {
+                      return const SizedBox.shrink();
+                    }
+                    if (snapshot.hasError) return const SizedBox.shrink();
+                    if (list.isEmpty) return const SizedBox.shrink();
+                    return FeaturedPartnersBanner(partners: list);
+                  },
+                ),
+              ),
+
             if (_loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),

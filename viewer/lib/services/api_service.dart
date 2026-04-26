@@ -1090,6 +1090,18 @@ class ApiService {
     return raw.map((e) => Partner.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// Lista parceiros em destaque para o banner da Central (máximo 5 no servidor).
+  Future<List<Partner>> getFeaturedPartners(String academyId) async {
+    final uri = Uri.parse('$baseUrl/partners/featured').replace(
+      queryParameters: {'academy_id': academyId},
+    );
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => Partner.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   /// Cria parceiro na academia.
   Future<Partner> createPartner({
     required String academyId,
@@ -1098,6 +1110,11 @@ class ApiService {
     String? url,
     String? logoUrl,
     bool highlightOnLogin = false,
+    bool isFeatured = false,
+    int? featuredOrder,
+    String? offerText,
+    String? externalUrl,
+    bool isActive = true,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
@@ -1107,6 +1124,11 @@ class ApiService {
     if (url != null && url.isNotEmpty) body['url'] = url;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
      body['highlight_on_login'] = highlightOnLogin;
+    body['is_active'] = isActive;
+    body['is_featured'] = isFeatured;
+    if (featuredOrder != null) body['featured_order'] = featuredOrder;
+    if (offerText != null) body['offer_text'] = offerText;
+    if (externalUrl != null) body['external_url'] = externalUrl;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/partners'),
       headers: await _jsonHeaders(auth: true),
@@ -1115,6 +1137,7 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/partners');
+    invalidateCache('GET:$baseUrl/partners/featured');
     return Partner.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1127,6 +1150,11 @@ class ApiService {
     String? url,
     String? logoUrl,
     bool? highlightOnLogin,
+    bool? isActive,
+    bool? isFeatured,
+    int? featuredOrder,
+    String? offerText,
+    String? externalUrl,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -1134,11 +1162,17 @@ class ApiService {
     if (url != null) body['url'] = url;
     if (logoUrl != null) body['logo_url'] = logoUrl;
     if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
+    if (isActive != null) body['is_active'] = isActive;
+    if (isFeatured != null) body['is_featured'] = isFeatured;
+    if (featuredOrder != null) body['featured_order'] = featuredOrder;
+    if (offerText != null) body['offer_text'] = offerText;
+    if (externalUrl != null) body['external_url'] = externalUrl;
     final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/partners');
+    invalidateCache('GET:$baseUrl/partners/featured');
     return Partner.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1148,6 +1182,7 @@ class ApiService {
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/partners');
+    invalidateCache('GET:$baseUrl/partners/featured');
   }
 
   Future<UserModel> getUser(String id) async {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -29,5 +29,18 @@ class Partner(Base, UUIDMixin):
         nullable=False,
         server_default="false",
     )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="true",
+    )
+    is_featured: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+    )
+    featured_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    offer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    external_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     academy: Mapped["Academy"] = relationship("Academy", back_populates="partners")

@@ -175,6 +175,12 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                         itemCount: _list.length,
                         itemBuilder: (context, i) {
                           final p = _list[i];
+                          final subtitleParts = <String>[
+                            if (p.isFeatured) 'Destaque na Central',
+                            if (p.highlightOnLogin) 'Pop-up inicial',
+                            if ((p.description ?? '').trim().isNotEmpty) p.description!.trim(),
+                            if ((p.description ?? '').trim().isEmpty && (p.url ?? '').trim().isNotEmpty) p.url!.trim(),
+                          ];
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
@@ -183,7 +189,7 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                               subtitle: Text(
-                                p.description ?? (p.url ?? ''),
+                                subtitleParts.join(' • '),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -205,6 +211,11 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                                           ),
                                           onPressed: () => _toggleHighlight(p),
                                         ),
+                                        if (p.isFeatured)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.star, color: AppTheme.primary, size: 18),
+                                          ),
                                         IconButton(
                                           icon: const Icon(Icons.edit, color: AppTheme.primary),
                                           onPressed: () => _openForm(p),
