@@ -74,6 +74,7 @@ Ver documentação detalhada em **[docs/ACADEMIAS.md](docs/ACADEMIAS.md)**.
 | GET | `/academies/{id}/difficulties` | Posições mais reportadas como difíceis |
 | GET | `/academies/{id}/report/weekly` | Conclusões no período (`year`/`week` ISO ou `start_date`+`end_date`) |
 | GET | `/academies/{id}/report/weekly/csv` | Export CSV (mesmos parâmetros) |
+| POST | `/academies/{id}/students/bulk-import` | Importa alunos em lote via Excel `.xlsx` (colunas: E-MAIL, NOME, SENHA, GRADUAÇÃO). E-mails existentes são pulados; resposta traz resumo + erros por linha |
 | GET | `/missions` | Lista missões (academy_id, limit opcionais) |
 | GET | `/missions/{id}` | Detalhe de uma missão |
 | POST | `/missions` | Criar missão (lesson_id, start_date, end_date, level, theme?, academy_id?) |
@@ -193,7 +194,8 @@ Documentação detalhada para replicar o padrão em lições, missões, etc.: **
 
 - **Loja da academia (marketplace):** na aba **Campo de treinamento** (`StudentHomeScreen`), **último bloco** do scroll (após **Confirmações e solicitações**): atalho **Loja da academia** → `MarketplaceScreen` (preço; botão WhatsApp só se o anúncio tiver telefone). Visível para **qualquer utilizador logado**; sem `academy_id` a API pode devolver lista vazia. Cadastro com **DDD e número opcionais**; mensagem do `wa.me` é fixa no backend. **Painel Academia** / **Admin**: `MarketplaceListScreen` / `MarketplaceFormScreen`; admin indica `academy_id` ao criar. (`HomePage` mantém o mesmo atalho se for reutilizada noutro fluxo.)
 - **Biblioteca de lições** (aba Lições): lista GET /lessons; toque abre a lição como LessonScreen (e envia POST /lesson_complete ao concluir).
-- **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Itens podem aparecer **trancados** até o aluno atingir o **nível mínimo** e a **faixa** definidos no troféu. Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
+- **Galeria de troféus e medalhas:** lista em cards com filtros (tier, tipo), switch "Galeria visível para outros" (PATCH /auth/me), "Indicar adversário". Itens podem aparecer **trancados** até o aluno atingir o **nível mínimo** e a **faixa** definidos no troféu. **Regra:** só é permitido **indicar o mesmo colega 1 vez por dia** (por usuário → adversário, no fuso do app). Ícone da AppBar **"Ver como estante"** abre a visão gamificada (prateleiras, glow ouro, modal de detalhes). Ver [docs/TROPHY_SHELF.md](docs/TROPHY_SHELF.md).
+- **Importação em lote de alunos (Excel):** na lista **Usuários** existe a ação **“Importar alunos (Excel)”** (gera upload `.xlsx` para a academia e recarrega a lista).
 - **Reportar dificuldade** (Perfil): GET /positions, escolha da posição e observação opcional; POST /training_feedback.
 - **Histórico de missões** (Progresso): seção "Últimas missões concluídas" com GET /mission_usages/history.
 - **Métricas de uso** (Perfil): GET /metrics/usage com totais e % antes/depois do treino.

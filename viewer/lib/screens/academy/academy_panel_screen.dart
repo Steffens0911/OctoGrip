@@ -9,6 +9,8 @@ import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
+import 'package:viewer/screens/academy/attendance_frequency_screen.dart';
+import 'package:viewer/screens/academy/attendance_history_screen.dart';
 import 'package:viewer/screens/academy/attendance_session_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -85,8 +87,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      // Cards fixos do painel: usuários + chamada(QR) + técnicas + vídeos + loja (+ push se activo)
-      count += kPushNotificationsEnabled ? 6 : 5;
+      // Cards fixos: usuários + chamada + histórico + frequência + técnicas + vídeos + loja (+ push)
+      count += kPushNotificationsEnabled ? 8 : 7;
     }
     return count;
   }
@@ -138,6 +140,50 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         child: ListTile(
           leading: CircleAvatar(
             backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.history_rounded, color: AppTheme.primary),
+          ),
+          title: const Text(
+            'Histórico de chamadas',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Ver sessões, corrigir presenças (adicionar ou remover)',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AttendanceHistoryScreen()),
+          ),
+        ),
+      );
+    } else if (isManagerOrProfessor && index == 3) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+            child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
+          ),
+          title: const Text(
+            'Frequência',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text(
+            'Minhas sessões no período e frequência dos alunos da academia',
+          ),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AttendanceFrequencyScreen()),
+          ),
+        ),
+      );
+    } else if (isManagerOrProfessor && index == 4) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
             child: const Icon(Icons.alt_route_rounded, color: AppTheme.primary),
           ),
           title: const Text(
@@ -168,7 +214,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           },
         ),
       );
-    } else if (isManagerOrProfessor && index == 3) {
+    } else if (isManagerOrProfessor && index == 5) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -195,7 +241,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           ),
         ),
       );
-    } else if (isManagerOrProfessor && index == 4) {
+    } else if (isManagerOrProfessor && index == 6) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -236,7 +282,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     } else if (isManagerOrProfessor &&
         kPushNotificationsEnabled &&
-        index == 5) {
+        index == 7) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -276,9 +322,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     }
 
-    // Cards fixos no topo; academias após Usuários + lista de técnicas + vídeos tarefa diária + Loja (+ push se activo).
+    // Cards fixos no topo; academias após Usuários + chamada + histórico + frequência + técnicas + vídeos + Loja (+ push).
     final managerOffset =
-        isManagerOrProfessor ? (kPushNotificationsEnabled ? 6 : 5) : 0;
+        isManagerOrProfessor ? (kPushNotificationsEnabled ? 8 : 7) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();

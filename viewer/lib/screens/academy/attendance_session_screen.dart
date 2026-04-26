@@ -1,4 +1,4 @@
-import 'dart:async' show Timer, unawaited;
+import 'dart:async' show StreamSubscription, Timer, unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -6,11 +6,13 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/attendance_live_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
+import 'package:viewer/widgets/attendance_add_student_dialog.dart';
 
 class AttendanceSessionScreen extends StatefulWidget {
   const AttendanceSessionScreen({super.key});
@@ -21,6 +23,8 @@ class AttendanceSessionScreen extends StatefulWidget {
 
 class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   final _api = ApiService();
+  AttendanceLiveService? _live;
+  StreamSubscription<AttendanceLiveEvent>? _liveSub;
 
   AttendanceSessionModel? _session;
   AttendanceQrPayloadModel? _qr;
@@ -35,6 +39,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
+  bool _qrPrefetchTriggered = false;
   String? _qrError;
 
   @override
@@ -45,9 +50,156 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   @override
   void dispose() {
+    _stopLive();
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  void _stopLive() {
+    _liveSub?.cancel();
+    _liveSub = null;
+    _live?.dispose();
+    _live = null;
+  }
+
+  void _startLive(String sessionId) {
+    _stopLive();
+    final live = AttendanceLiveService();
+    _live = live;
+    _liveSub = live.stream.listen(_onLiveEvent);
+    live.connect(sessionId);
+  }
+
+  void _onLiveEvent(AttendanceLiveEvent event) {
+    final s = _session;
+    if (!mounted || s == null) return;
+    if (event is AttendanceCheckinLiveEvent) {
+      final e = event;
+      if (s.id != e.record.sessionId) return;
+      setState(() {
+        _session = AttendanceSessionModel(
+          id: s.id,
+          academyId: s.academyId,
+          createdByUserId: s.createdByUserId,
+          status: s.status,
+          title: s.title,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+          expiresAt: s.expiresAt,
+          presentCount: e.presentCount,
+        );
+        final others = _records.where((r) => r.userId != e.record.userId).toList()..add(e.record);
+        others.sort((a, b) => a.checkedInAt.compareTo(b.checkedInAt));
+        _records = others;
+      });
+      unawaited(_hydrateMissingUsers([e.record]));
+    } else if (event is AttendanceRecordRemovedLiveEvent) {
+      if (s.id != event.sessionId) return;
+      setState(() {
+        _session = AttendanceSessionModel(
+          id: s.id,
+          academyId: s.academyId,
+          createdByUserId: s.createdByUserId,
+          status: s.status,
+          title: s.title,
+          startsAt: s.startsAt,
+          endsAt: s.endsAt,
+          expiresAt: s.expiresAt,
+          presentCount: event.presentCount,
+        );
+        _records = _records.where((r) => r.id != event.recordId).toList();
+      });
+    }
+  }
+
+  Set<String> get _presentUserIds => _records.map((r) => r.userId).toSet();
+
+  Future<void> _addStudentDialog() async {
+    final sid = _session?.id;
+    if (sid == null || _busy) return;
+    final academyId = AuthService().currentUser?.academyId;
+    if (academyId == null && !AuthService().isAdmin()) {
+      AppFeedback.show(
+        context,
+        message: 'Utilizador sem academia vinculada.',
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AttendanceAddStudentDialog(
+        api: _api,
+        academyId: academyId,
+        presentUserIds: _presentUserIds,
+        onPick: (userId) async {
+          Navigator.pop(ctx);
+          await _addStudentManual(sid, userId);
+        },
+      ),
+    );
+  }
+
+  Future<void> _addStudentManual(String sessionId, String userId) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await _api.addAttendanceRecord(sessionId, userId);
+      final updated = await _api.getAttendanceSession(sessionId);
+      final recs = await _api.getAttendanceSessionRecords(sessionId, limit: 500);
+      if (!mounted) return;
+      setState(() {
+        _session = updated;
+        _records = recs;
+        _busy = false;
+      });
+      await _hydrateUsersForRecords(recs);
+      if (!mounted) return;
+      AppFeedback.show(context, message: 'Presença adicionada', type: AppFeedbackType.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+    }
+  }
+
+  Future<void> _confirmRemoveRecord(AttendanceRecordModel r) async {
+    final sid = _session?.id;
+    if (sid == null || _busy) return;
+    final u = _userById[r.userId];
+    final label = u != null
+        ? '${u.email}${u.name != null && u.name!.trim().isNotEmpty ? ' · ${u.name}' : ''}'
+        : r.userId;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remover presença'),
+        content: Text('Remover presença de $label?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() => _busy = true);
+    try {
+      await _api.deleteAttendanceRecord(r.id);
+      final updated = await _api.getAttendanceSession(sid);
+      final recs = await _api.getAttendanceSessionRecords(sid, limit: 500);
+      if (!mounted) return;
+      setState(() {
+        _session = updated;
+        _records = recs;
+        _busy = false;
+      });
+      AppFeedback.show(context, message: 'Presença removida', type: AppFeedbackType.success);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+    }
   }
 
   Future<void> _loadInitial() async {
@@ -65,7 +217,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   void _startAutoRefresh() {
     _refreshTimer?.cancel();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 6), (_) {
+    // Fallback lento se o WebSocket falhar (reconexão cobre a maioria dos casos).
+    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_session?.id != null) {
         unawaited(_refreshSession());
       }
@@ -142,6 +295,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _qr = qr;
       _qrError = null;
       _qrSecondsLeft = initialSeconds;
+      _qrPrefetchTriggered = false;
     });
     _startCountdown();
   }
@@ -160,6 +314,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         unawaited(_handleQrExpired());
         return;
       }
+      if (_qrSecondsLeft <= 5 && !_qrPrefetchTriggered && !_isRefreshingQr) {
+        _qrPrefetchTriggered = true;
+        unawaited(_refreshQr());
+      }
       setState(() => _qrSecondsLeft -= 1);
     });
   }
@@ -174,26 +332,41 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     await _refreshQr();
   }
 
-  Future<void> _hydrateUsersForRecords(List<AttendanceRecordModel> recs) async {
-    // Hoje a API não tem endpoint específico de "users/byIds". Para manter simples:
-    // - em Admin/Academy panel já existe listagem de usuários; reutilizamos cache do ApiService getUsers.
-    // - carregamos só uma vez e indexamos em memória.
-    if (_userById.isNotEmpty) return;
-    try {
-      final isAdmin = AuthService().isAdmin();
-      final academyId = AuthService().currentUser?.academyId;
-      final users = await _api.getUsers(
-        academyId: isAdmin ? null : academyId,
-        offset: 0,
-        limit: 500,
-      );
-      if (!mounted) return;
-      setState(() {
-        _userById = {for (final u in users) u.id: u};
-      });
-    } catch (_) {
-      // ok
+  Future<void> _hydrateMissingUsers(Iterable<AttendanceRecordModel> recs) async {
+    for (final r in recs) {
+      if (_userById.containsKey(r.userId)) continue;
+      try {
+        final u = await _api.getUser(r.userId);
+        if (!mounted) return;
+        setState(() {
+          _userById = {..._userById, r.userId: u};
+        });
+      } catch (_) {
+        // ok
+      }
     }
+  }
+
+  /// Pré-carrega o mapa de utilizadores (batch) e completa nomes em falta.
+  Future<void> _hydrateUsersForRecords(List<AttendanceRecordModel> recs) async {
+    if (_userById.isEmpty) {
+      try {
+        final isAdmin = AuthService().isAdmin();
+        final academyId = AuthService().currentUser?.academyId;
+        final users = await _api.getUsers(
+          academyId: isAdmin ? null : academyId,
+          offset: 0,
+          limit: 500,
+        );
+        if (!mounted) return;
+        setState(() {
+          _userById = {for (final u in users) u.id: u};
+        });
+      } catch (_) {
+        // ok
+      }
+    }
+    await _hydrateMissingUsers(recs);
   }
 
   Future<void> _startSession() async {
@@ -233,6 +406,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
       _applyQrPayload(qr);
       _startAutoRefresh();
+      _startLive(s.id);
       AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
@@ -257,6 +431,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     );
     if (ok != true) return;
 
+    _stopLive();
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
@@ -350,6 +525,18 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             ],
           ),
           const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _addStudentDialog,
+                icon: const Icon(Icons.person_add_rounded, size: 18),
+                label: const Text('Adicionar aluno'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Text(
             'Presentes: ${s.presentCount}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -431,15 +618,22 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
               final label = u != null
                   ? '${u.email}${u.name != null && u.name!.trim().isNotEmpty ? ' • ${u.name}' : ''}'
                   : r.userId;
+              final methodLabel =
+                  r.method == 'manual' ? 'Manual' : (r.method == 'qr' ? 'QR' : r.method);
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.check_circle_rounded, color: AppTheme.primary),
                 title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                  _formatDateTime(r.checkedInAt),
+                  '${_formatDateTime(r.checkedInAt)} · $methodLabel',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.textSecondaryOf(context),
                       ),
+                ),
+                trailing: IconButton(
+                  tooltip: 'Remover presença',
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  onPressed: _busy ? null : () => _confirmRemoveRecord(r),
                 ),
               );
             }),

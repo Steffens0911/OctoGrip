@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
@@ -29,11 +30,13 @@ class OpponentPickerSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) => OpponentPickerSheet(
-        academyId: academyId,
-        currentUserId: currentUserId,
-        title: title,
-        allowSkip: allowSkip,
+      builder: (context) => PointerInterceptor(
+        child: OpponentPickerSheet(
+          academyId: academyId,
+          currentUserId: currentUserId,
+          title: title,
+          allowSkip: allowSkip,
+        ),
       ),
     );
   }

@@ -5,6 +5,17 @@ import 'package:viewer/utils/youtube_utils.dart';
 import 'youtube_player_embed_stub.dart'
     if (dart.library.html) 'youtube_player_embed_web.dart' as impl;
 
+/// Habilita/desabilita eventos de mouse/scroll no iframe do YouTube (somente web).
+/// Em outras plataformas é no-op.
+void setYoutubeEmbedPointerEventsFromUrl({
+  required String? videoUrl,
+  required bool enabled,
+}) {
+  final videoId = extractYouTubeVideoId(videoUrl);
+  if (videoId == null) return;
+  impl.setYoutubePointerEvents(videoId: videoId, enabled: enabled);
+}
+
 /// Player de vídeo YouTube: embed (web) ou link (outras plataformas).
 /// [reelsMode] = true usa aspect ratio vertical 9:16 (estilo shorts/reels).
 /// [onEnded] é chamado quando o vídeo chega ao fim, se suportado pela plataforma.

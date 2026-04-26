@@ -1,5 +1,7 @@
 """Rotas de Academia (A-03 tema semanal, A-04 ranking)."""
+import io
 import json
+import unicodedata
 from datetime import date
 import urllib.parse
 import urllib.request
@@ -9,6 +11,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import PlainTextResponse
+from openpyxl import load_workbook
+from pydantic import EmailStr, TypeAdapter, ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -62,9 +66,64 @@ from app.services.collective_goal_service import (
 from app.services.execution_service import batch_total_points_for_users
 from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
 from app.services.push_token_service import delete_device_token, list_fcm_tokens_for_academy
-from app.services.user_service import list_users
+from app.services.user_service import create_user, get_user_by_email, list_users
 
 _MAX_ACADEMY_REPORT_RANGE_DAYS = 366
+_MAX_BULK_IMPORT_XLSX_MB = 10
+_email_adapter = TypeAdapter(EmailStr)
+
+
+def _normalize_header_name(value: object) -> str:
+    """
+    Normaliza header de planilha (remove acentos, símbolos e espaços) para casar colunas.
+
+    Exemplos: "E-MAIL" -> "email", "GRADUAÇÃO" -> "graduacao".
+    """
+    raw = "" if value is None else str(value)
+    raw = raw.strip().lower()
+    raw = unicodedata.normalize("NFKD", raw)
+    raw = "".join(ch for ch in raw if not unicodedata.combining(ch))
+    raw = raw.replace("-", " ").replace("_", " ")
+    raw = "".join(ch for ch in raw if ch.isalnum() or ch.isspace())
+    return "".join(raw.split())
+
+
+def _cell_to_str(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    return str(value).strip()
+
+
+def _normalize_graduation(value: str) -> str:
+    v = value.strip().lower()
+    # Aceitar PT-BR também, para facilitar planilhas.
+    mapping = {
+        "branca": "white",
+        "azul": "blue",
+        "roxa": "purple",
+        "roxo": "purple",
+        "marrom": "brown",
+        "preta": "black",
+        "preto": "black",
+    }
+    return mapping.get(v, v)
+
+
+async def _read_upload_with_limit(file: UploadFile, *, max_mb: int) -> bytes:
+    max_bytes = max(1, max_mb) * 1024 * 1024
+    total = 0
+    chunks: list[bytes] = []
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise AppError(f"Arquivo excede o limite de {max_mb} MB.", status_code=413)
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def _validate_academy_report_date_range(start: date, end: date) -> None:
@@ -416,6 +475,203 @@ async def academy_upload_schedule_image(
     await db.commit()
     await db.refresh(academy)
     return _academy_to_read(academy)
+
+
+@router.post("/{academy_id}/students/bulk-import")
+async def academy_bulk_import_students(
+    academy_id: UUID,
+    file: UploadFile = File(..., description="Planilha Excel .xlsx com colunas E-MAIL, NOME, SENHA, GRADUAÇÃO."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """
+    Importa alunos em lote para a academia.
+
+    Regras:
+    - sempre força role='aluno' e academy_id da URL
+    - e-mail é único globalmente: se já existir, a linha é pulada (skipped)
+    - valida colunas e valores por linha e devolve relatório
+    """
+    academy = await get_academy(db, academy_id)
+    if academy is None:
+        raise AcademyNotFoundError()
+    verify_academy_access(current_user, str(academy_id))
+
+    filename = (file.filename or "").strip()
+    if not filename.lower().endswith(".xlsx"):
+        raise AppError("Envie um arquivo .xlsx.", status_code=422)
+
+    data = await _read_upload_with_limit(file, max_mb=_MAX_BULK_IMPORT_XLSX_MB)
+    try:
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception as e:
+        raise AppError(f"Excel inválido: {e}", status_code=400) from e
+
+    try:
+        ws = wb.worksheets[0]
+    except Exception as e:
+        raise AppError("Excel inválido: não foi possível acessar a primeira aba.", status_code=400) from e
+
+    rows_iter = ws.iter_rows(values_only=True)
+    header = next(rows_iter, None)
+    if not header:
+        raise AppError("Planilha vazia (sem cabeçalho).", status_code=422)
+
+    header_map: dict[str, int] = {}
+    for idx, value in enumerate(header):
+        key = _normalize_header_name(value)
+        if key and key not in header_map:
+            header_map[key] = idx
+
+    required = {
+        "email": ("email", "e-mail", "e mail", "e_mail"),
+        "nome": ("nome", "name"),
+        "senha": ("senha", "password"),
+        "graduacao": ("graduacao", "graduação", "graduation", "faixa", "belt"),
+    }
+
+    def col_index(names: tuple[str, ...]) -> int | None:
+        for n in names:
+            i = header_map.get(_normalize_header_name(n))
+            if i is not None:
+                return i
+        return None
+
+    idx_email = col_index(required["email"])
+    idx_nome = col_index(required["nome"])
+    idx_senha = col_index(required["senha"])
+    idx_grad = col_index(required["graduacao"])
+    missing: list[str] = []
+    if idx_email is None:
+        missing.append("E-MAIL")
+    if idx_nome is None:
+        missing.append("NOME")
+    if idx_senha is None:
+        missing.append("SENHA")
+    if idx_grad is None:
+        missing.append("GRADUAÇÃO")
+    if missing:
+        raise AppError(f"Planilha inválida. Cabeçalho deve conter: {', '.join(missing)}.", status_code=422)
+
+    results: list[dict] = []
+    total_rows = 0
+    created = 0
+    skipped = 0
+    failed = 0
+
+    from app.schemas.user import VALID_GRADUATIONS
+
+    for row_index, row in enumerate(rows_iter, start=2):
+        total_rows += 1
+        email_raw = _cell_to_str(row[idx_email]) if idx_email is not None else ""
+        name_raw = _cell_to_str(row[idx_nome]) if idx_nome is not None else ""
+        password_raw = _cell_to_str(row[idx_senha]) if idx_senha is not None else ""
+        graduation_raw = _cell_to_str(row[idx_grad]) if idx_grad is not None else ""
+
+        if not (email_raw or name_raw or password_raw or graduation_raw):
+            # linha totalmente vazia: ignora (não conta como erro, mas conta como linha processada)
+            results.append({"row_number": row_index, "ok": True, "action": "empty", "skipped": True})
+            skipped += 1
+            continue
+
+        row_errors: list[dict] = []
+
+        email_norm = email_raw.strip().lower()
+        try:
+            _email_adapter.validate_python(email_norm)
+        except ValidationError:
+            row_errors.append({"field": "email", "code": "invalid", "message": "E-mail inválido."})
+
+        if not name_raw.strip():
+            row_errors.append({"field": "name", "code": "required", "message": "NOME é obrigatório."})
+
+        if not password_raw.strip():
+            row_errors.append({"field": "password", "code": "required", "message": "SENHA é obrigatória."})
+
+        grad_norm = _normalize_graduation(graduation_raw)
+        if not grad_norm.strip():
+            row_errors.append({"field": "graduation", "code": "required", "message": "GRADUAÇÃO é obrigatória."})
+        elif grad_norm not in VALID_GRADUATIONS:
+            row_errors.append(
+                {
+                    "field": "graduation",
+                    "code": "invalid",
+                    "message": f"GRADUAÇÃO inválida. Use: {', '.join(sorted(VALID_GRADUATIONS))}.",
+                }
+            )
+
+        if row_errors:
+            results.append(
+                {
+                    "row_number": row_index,
+                    "ok": False,
+                    "action": "create",
+                    "errors": row_errors,
+                }
+            )
+            failed += 1
+            continue
+
+        existing = await get_user_by_email(db, email_norm)
+        if existing is not None:
+            results.append(
+                {
+                    "row_number": row_index,
+                    "ok": True,
+                    "action": "skipped",
+                    "reason": "email_already_exists",
+                    "email": email_norm,
+                    "existing_user_id": str(existing.id),
+                }
+            )
+            skipped += 1
+            continue
+
+        try:
+            user = await create_user(
+                db,
+                email=email_norm,
+                name=name_raw,
+                graduation=grad_norm,
+                role="aluno",
+                academy_id=academy_id,
+                password=password_raw,
+                audit_user_id=current_user.id,
+            )
+        except Exception as e:
+            results.append(
+                {
+                    "row_number": row_index,
+                    "ok": False,
+                    "action": "create",
+                    "errors": [{"field": None, "code": "exception", "message": str(e)[:500]}],
+                }
+            )
+            failed += 1
+            continue
+
+        results.append(
+            {
+                "row_number": row_index,
+                "ok": True,
+                "action": "created",
+                "id": str(user.id),
+                "email": user.email,
+            }
+        )
+        created += 1
+
+    return {
+        "ok": True,
+        "academy_id": str(academy_id),
+        "summary": {
+            "total_rows": total_rows,
+            "created": created,
+            "skipped": skipped,
+            "failed": failed,
+        },
+        "results": results,
+    }
 
 
 @router.get("/{academy_id}/difficulties", response_model=DifficultiesResponse)

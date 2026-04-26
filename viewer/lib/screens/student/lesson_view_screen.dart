@@ -182,13 +182,20 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
   Future<String?> _showOpponentDialog(
     String academyId, {
     bool allowSkip = true,
-  }) {
-    return OpponentPickerSheet.show(
-      context,
-      academyId: academyId,
-      currentUserId: widget.data.userId,
-      allowSkip: allowSkip,
-    );
+  }) async {
+    // No web, iframe do YouTube pode capturar eventos mesmo com bottom sheet por cima.
+    // Desabilitamos input do iframe enquanto o sheet estiver aberto.
+    setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: false);
+    try {
+      return await OpponentPickerSheet.show(
+        context,
+        academyId: academyId,
+        currentUserId: widget.data.userId,
+        allowSkip: allowSkip,
+      );
+    } finally {
+      setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: true);
+    }
   }
 
   Future<void> _completeLessonWithOpponent(

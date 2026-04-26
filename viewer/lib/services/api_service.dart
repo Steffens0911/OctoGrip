@@ -578,6 +578,37 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
+  /// Importa alunos em lote por Excel (.xlsx) para uma academia.
+  ///
+  /// Endpoint: `POST /academies/{academyId}/students/bulk-import` (multipart field `file`).
+  /// Retorna um JSON com `summary` e `results` (erros por linha, criados, pulados).
+  Future<Map<String, dynamic>> bulkImportStudentsXlsx({
+    required String academyId,
+    required Uint8List bytes,
+    required String filename,
+  }) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/students/bulk-import');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename.isNotEmpty ? filename : 'alunos.xlsx',
+        contentType: MediaType(
+          'application',
+          'vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ),
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    invalidateCache('GET:$baseUrl/users');
+    return (data ?? <String, dynamic>{}) as Map<String, dynamic>;
+  }
+
   /// Atualiza academia (nome, slug, tema, técnicas, lição visível). Campos omitidos não são alterados.
   /// Se [updateVisibleLesson] for true, envia [visibleLessonId] (null limpa a lição visível).
   Future<Academy> updateAcademy(
@@ -702,7 +733,8 @@ class ApiService {
 
   Future<AttendanceSessionModel> getAttendanceSession(String sessionId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId');
-    final r = await _getWithCache(uri, _cacheTtlShort);
+    // Sem cache: estado da chamada deve refletir presença em tempo real.
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
@@ -715,11 +747,133 @@ class ApiService {
   }) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records')
         .replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
-    final r = await _getWithCache(uri, _cacheTtlShort);
+    // Sem cache: lista precisa atualizar assim que o aluno confirma presença.
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
     return list.map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Lista sessões de chamada da academia (professor/gerente) ou todas (admin).
+  Future<List<AttendanceSessionModel>> listAttendanceSessions({
+    String? status,
+    bool mine = false,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final qp = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+      'mine': mine ? 'true' : 'false',
+    };
+    if (status != null && status.isNotEmpty) qp['status'] = status;
+    if (dateFrom != null) qp['date_from'] = dateFrom.toUtc().toIso8601String();
+    if (dateTo != null) qp['date_to'] = dateTo.toUtc().toIso8601String();
+    final uri = Uri.parse('$baseUrl/attendance/sessions').replace(queryParameters: qp);
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = (data as List<dynamic>? ?? const []);
+    return list.map((e) => AttendanceSessionModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Presença manual (professor/gestor) sem QR.
+  Future<AttendanceRecordModel> addAttendanceRecord(String sessionId, String userId) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'user_id': userId}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Remove um registo de presença (correção).
+  Future<void> deleteAttendanceRecord(String recordId) async {
+    final uri = Uri.parse('$baseUrl/attendance/records/$recordId');
+    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    _throwIfNotOk(r, await _decodeResponse(r));
+    _invalidateAttendanceCache();
+  }
+
+  /// Estatísticas: sessões criadas por um professor (`professor_id` omitido = utilizador atual).
+  Future<List<AttendanceSessionStatModel>> getAttendanceStatsSessions({
+    String? professorId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final qp = <String, String>{};
+    if (professorId != null && professorId.isNotEmpty) qp['professor_id'] = professorId;
+    if (from != null) qp['from'] = from.toUtc().toIso8601String();
+    if (to != null) qp['to'] = to.toUtc().toIso8601String();
+    final uri = Uri.parse('$baseUrl/attendance/stats/sessions').replace(queryParameters: qp);
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = (data as List<dynamic>? ?? const []);
+    return list.map((e) => AttendanceSessionStatModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Estatísticas: frequência de todos os alunos da academia no período.
+  Future<List<AttendanceStudentStatModel>> getAttendanceStatsStudents({
+    String? academyId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final qp = <String, String>{};
+    if (academyId != null && academyId.isNotEmpty) qp['academy_id'] = academyId;
+    if (from != null) qp['from'] = from.toUtc().toIso8601String();
+    if (to != null) qp['to'] = to.toUtc().toIso8601String();
+    final uri = Uri.parse('$baseUrl/attendance/stats/students').replace(queryParameters: qp);
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = (data as List<dynamic>? ?? const []);
+    return list.map((e) => AttendanceStudentStatModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Detalhe de frequência de um aluno (histórico de presenças no período).
+  Future<AttendanceStudentDetailModel> getAttendanceStatsStudent(
+    String studentId, {
+    String? academyId,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final qp = <String, String>{};
+    if (academyId != null && academyId.isNotEmpty) qp['academy_id'] = academyId;
+    if (from != null) qp['from'] = from.toUtc().toIso8601String();
+    if (to != null) qp['to'] = to.toUtc().toIso8601String();
+    final uri = Uri.parse('$baseUrl/attendance/stats/students/$studentId').replace(queryParameters: qp);
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceStudentDetailModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Frequência do utilizador logado (`/attendance/stats/me`): período, buckets para gráfico e histórico paginado.
+  Future<AttendanceMyStatsModel> getAttendanceMyStats({
+    DateTime? from,
+    DateTime? to,
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final qp = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+    };
+    if (from != null) qp['from'] = from.toUtc().toIso8601String();
+    if (to != null) qp['to'] = to.toUtc().toIso8601String();
+    final uri = Uri.parse('$baseUrl/attendance/stats/me').replace(queryParameters: qp);
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceMyStatsModel.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId, {int ttlSeconds = 60}) async {
