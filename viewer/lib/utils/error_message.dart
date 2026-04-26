@@ -42,6 +42,9 @@ String userFacingMessage(Object e) {
     return e.message;
   }
   final s = e.toString().toLowerCase();
+  if (s.contains('future not completed')) {
+    return 'A geração do QR demorou além do esperado. Tentando novamente...';
+  }
   if (_looksLikeNetworkFailure(s)) {
     if (kIsWeb) {
       return 'Falha de conexão. Em produção configure API_BASE_URL no deploy (ex.: Coolify) com a URL HTTPS da API, ou abra o site com ?api_base=URL_DA_API. Em desenvolvimento local, confirme que a API está em execução.';

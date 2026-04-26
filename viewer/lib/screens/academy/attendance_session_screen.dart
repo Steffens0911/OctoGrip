@@ -1,4 +1,4 @@
-import 'dart:async' show StreamSubscription, Timer, unawaited;
+import 'dart:async' show StreamSubscription, TimeoutException, Timer, unawaited;
 
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -47,6 +47,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   DateTime? _qrRefreshStartedAt;
 
   static const Duration _qrRequestTimeout = Duration(seconds: 10);
+  static const String _qrTimeoutMessage =
+      'Tempo esgotado ao gerar QR. Tentando novamente...';
 
   @override
   void initState() {
@@ -270,7 +272,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     try {
       final qr = await _api
           .getAttendanceQrPayload(s.id, ttlSeconds: 60)
-          .timeout(_qrRequestTimeout);
+          .timeout(
+            _qrRequestTimeout,
+            onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
+          );
       if (!mounted) return;
       _applyQrPayload(qr);
       return;
@@ -282,7 +287,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       final qr = await _api
           .getAttendanceQrPayload(s.id, ttlSeconds: 60)
-          .timeout(_qrRequestTimeout);
+          .timeout(
+            _qrRequestTimeout,
+            onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
+          );
       if (!mounted) return;
       _applyQrPayload(qr);
     } catch (e) {
