@@ -26,67 +26,117 @@ void showStudentRulesSheet(BuildContext context) {
               ),
               const SizedBox(height: 8),
               Text(
-                'Resumo rápido para evitar dúvidas e garantir registros justos.',
+                'Para evitar dúvidas e garantir registros justos.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppTheme.textSecondaryOf(ctx),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
+              const _SectionTitle(title: 'Regras'),
+              const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Regra nº 1 (antes do rola)',
                 body:
                     'Antes de começar, combine com seu parceiro se aquele rola vai ser registrado no app. '
-                    'Assim ninguém é pego de surpresa com solicitações/confirmações depois.',
+                    'Assim ninguém é pego de surpresa com solicitações/confirmações depois.',
               ),
               const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Adversário é obrigatório',
                 body:
-                    'Nenhuma conclusão pode ser registrada sem adversário. Selecione um colega para registrar.',
-              ),
-              const SizedBox(height: 12),
-              const _RuleBlock(
-                title: 'Limite diário por adversário',
-                body:
-                    'Você só pode registrar 1 execução por dia para o mesmo adversário. Se já registrou hoje, tente amanhã.',
+                    'Nenhuma conclusão/registro pode ser feito sem adversário. Selecione um colega para registrar.',
               ),
               const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Confirmações',
                 body:
-                    'Quando você registra, o adversário precisa confirmar (ou recusar). '
-                    'Quando alguém te indica como adversário, responda as confirmações pendentes.',
+                    'Ao registrar uma execução, ela fica pendente até o adversário confirmar (ou recusar). '
+                    'Se você for indicado como adversário, responda as confirmações pendentes.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Limite diário por adversário (global)',
+                body:
+                    'Você só pode registrar 1 execução por dia para o mesmo adversário, independentemente do tipo.',
               ),
               const SizedBox(height: 18),
-              Text(
-                'Critérios técnicos (qualidade do registro)',
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 10),
+              const _SectionTitle(title: 'Critérios técnicos (regras do registro)'),
+              const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Finalizações',
                 body:
-                    'Não precisam terminar em “tap”. Para contar, precisam gerar perigo real (controle + ameaça clara). '
+                    'Não precisam terminar em “tap”. Para registrar, precisam gerar perigo real (controle + ameaça clara). '
                     'Não force a finalização só para “contar”.',
               ),
               const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Raspagens',
                 body:
-                    'Para contar, precisam gerar perigo real de raspagem (desequilíbrio, controle de base e progressão).',
+                    'Para registrar, devem ao menos gerar perigo real de raspagem (desequilíbrio, controle de base e progressão).',
               ),
               const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Defesas',
-                body: 'Para contar, precisam ser executadas com sucesso.',
+                body:
+                    'Para registrar, devem ser executadas com sucesso (defesa efetiva, resultado claro).',
               ),
               const SizedBox(height: 12),
               const _RuleBlock(
                 title: 'Transições',
                 body:
-                    'Para contar, precisam ser completas e estabilizadas (ex.: costas, montada, joelho na barriga, 100kg).',
+                    'Para registrar, devem ser completas e com a devida estabilização (costas, montada, joelho na barriga, 100kg, etc.).',
+              ),
+              const SizedBox(height: 18),
+              const _SectionTitle(title: 'Orientações'),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Pontos / XP / Nível',
+                body:
+                    'Seus pontos somam missões, lições, execuções confirmadas, ajustes da academia e, quando aplicável, o vídeo da tarefa diária. '
+                    'A barra no topo mostra o progresso até o próximo nível.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Tarefa diária (vídeo)',
+                body:
+                    'Para liberar os pontos do dia, assista o vídeo até o fim. O vídeo pontua apenas uma vez por dia.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Sequência de login',
+                body:
+                    'Conta 1 dia por calendário (horário de Brasília) em que você entra no app. Se perder um dia, a sequência zera. '
+                    'A cada 7 dias seguidos, você ganha +50 pontos de bônus.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Missões e lições',
+                body:
+                    'Missões só podem ser registradas quando estiverem ativas no período. Se uma missão já foi concluída, ela não deve ser registrada novamente.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Troféus / medalhas',
+                body:
+                    'Algumas premiações ficam trancadas até atingir nível mínimo e/ou faixa mínima. A academia pode configurar limites por adversário no período e sua galeria pode ser visível ou privada.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Vínculo com academia',
+                body:
+                    'Para usar algumas funções (parceiros, horários, frequência e registro com adversário), seu usuário precisa estar vinculado a uma academia.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Presença (chamada por QR)',
+                body:
+                    'A presença é registrada escaneando (ou colando) o código do QR exibido pelo professor; a confirmação depende da validação da API.',
+              ),
+              const SizedBox(height: 12),
+              const _RuleBlock(
+                title: 'Conta congelada',
+                body:
+                    'Se a conta estiver congelada, você fica em modo de restrição até regularizar com a academia.',
               ),
               const SizedBox(height: 22),
               FilledButton(
@@ -127,6 +177,34 @@ class _RuleBlock extends StatelessWidget {
             height: 1.35,
             color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: AppTheme.textPrimaryOf(context),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 1,
+          color: theme.dividerColor.withValues(alpha: 0.35),
         ),
       ],
     );
