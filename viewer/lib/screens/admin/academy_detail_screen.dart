@@ -563,7 +563,6 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildTrainingFieldSections(),
               const SizedBox(height: 24),
               _buildReportPeriodCard(),
               const SizedBox(height: 16),
