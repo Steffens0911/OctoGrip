@@ -374,9 +374,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
           else
             ..._records.map((r) {
               final u = _userById[r.userId];
-              final label = u != null
-                  ? '${u.email}${u.name != null && u.name!.trim().isNotEmpty ? ' • ${u.name}' : ''}'
-                  : r.userId;
+              final label = u != null ? ((u.name ?? '').trim().isNotEmpty ? u.name!.trim() : u.email) : r.userId;
               final methodLabel = r.method == 'manual' ? 'Manual' : (r.method == 'qr' ? 'QR' : r.method);
               return ListTile(
                 contentPadding: EdgeInsets.zero,

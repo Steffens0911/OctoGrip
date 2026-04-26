@@ -28,6 +28,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
   final _search = TextEditingController();
   List<UserModel> _allStudents = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -67,10 +68,16 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
         setState(() {
           _allStudents = students;
           _loading = false;
+          _error = null;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = 'Não foi possível carregar os alunos.';
+        });
+      }
     }
   }
 
@@ -96,6 +103,16 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                 padding: EdgeInsets.all(24),
                 child: CircularProgressIndicator(),
               )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(
+                  _error!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.red.shade400,
+                      ),
+                ),
+              )
             else
               SizedBox(
                 height: 320,
@@ -104,12 +121,18 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                   itemBuilder: (context, i) {
                     final u = _filtered[i];
                     final already = widget.presentUserIds.contains(u.id);
-                    final label =
-                        '${u.email}${u.name != null && u.name!.trim().isNotEmpty ? ' · ${u.name}' : ''}';
+                    final name = (u.name ?? '').trim();
+                    final title = name.isNotEmpty ? name : u.email;
                     return ListTile(
                       enabled: !already,
-                      title: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: already ? const Text('Já presente') : null,
+                      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      subtitle: already
+                          ? const Text('Já presente')
+                          : Text(
+                              u.email,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                       onTap: already
                           ? null
                           : () => unawaited(widget.onPick(u.id)),

@@ -285,8 +285,6 @@ class _AttendanceMyStatsScreenState extends State<AttendanceMyStatsScreen>
 
   Widget _buildGeneralTab(DateFormat df) {
     final s = _stats!;
-    final pctPeriod = (s.percentage * 100).toStringAsFixed(1);
-    final pctLife = (s.lifetimePercentage * 100).toStringAsFixed(1);
 
     return RefreshIndicator(
       onRefresh: () => _reload(resetHistory: true),
@@ -302,7 +300,7 @@ class _AttendanceMyStatsScreenState extends State<AttendanceMyStatsScreen>
                   Text('Desde o início', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    '$pctLife%',
+                    '${s.lifetimeTotalCheckins}',
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
                           color: AppTheme.primary,
                           fontWeight: FontWeight.bold,
@@ -310,7 +308,7 @@ class _AttendanceMyStatsScreenState extends State<AttendanceMyStatsScreen>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${s.lifetimeTotalCheckins} presenças em ${s.lifetimeTotalSessions} sessões da academia',
+                    'presenças',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -327,14 +325,14 @@ class _AttendanceMyStatsScreenState extends State<AttendanceMyStatsScreen>
                   Text('No período selecionado', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   Text(
-                    '$pctPeriod%',
+                    '${s.totalCheckins}',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           color: AppTheme.primary,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
                   Text(
-                    '${s.totalCheckins} de ${s.totalSessions} sessões',
+                    'presenças',
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),
                   if (s.lastSeenAt != null) ...[

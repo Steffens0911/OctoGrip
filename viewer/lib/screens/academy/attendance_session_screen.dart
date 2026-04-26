@@ -36,6 +36,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   String? _error;
   Timer? _refreshTimer;
   Timer? _countdownTimer;
+  Timer? _qrLoopTimer;
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
@@ -53,6 +54,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _stopLive();
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
+    _qrLoopTimer?.cancel();
     super.dispose();
   }
 
@@ -221,6 +223,18 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_session?.id != null) {
         unawaited(_refreshSession());
+      }
+    });
+  }
+
+  void _startQrLoop() {
+    _qrLoopTimer?.cancel();
+    _qrLoopTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      final s = _session;
+      if (!mounted || s == null) return;
+      if (s.status.toLowerCase() == 'closed') return;
+      if (_qr == null || _qrSecondsLeft <= 10) {
+        unawaited(_refreshQr());
       }
     });
   }
@@ -406,6 +420,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
       _applyQrPayload(qr);
       _startAutoRefresh();
+      _startQrLoop();
       _startLive(s.id);
       AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
@@ -432,6 +447,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (ok != true) return;
 
     _stopLive();
+    _qrLoopTimer?.cancel();
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
@@ -615,9 +631,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           else
             ..._records.map((r) {
               final u = _userById[r.userId];
-              final label = u != null
-                  ? '${u.email}${u.name != null && u.name!.trim().isNotEmpty ? ' • ${u.name}' : ''}'
-                  : r.userId;
+              final label = u != null ? ((u.name ?? '').trim().isNotEmpty ? u.name!.trim() : u.email) : r.userId;
               final methodLabel =
                   r.method == 'manual' ? 'Manual' : (r.method == 'qr' ? 'QR' : r.method);
               return ListTile(
