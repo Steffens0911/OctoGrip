@@ -36,12 +36,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   String? _error;
   Timer? _refreshTimer;
   Timer? _countdownTimer;
-  Timer? _qrLoopTimer;
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
   bool _qrPrefetchTriggered = false;
   String? _qrError;
+  int _qrRequestSeq = 0;
+
+  static const Duration _qrRequestTimeout = Duration(seconds: 10);
 
   @override
   void initState() {
@@ -54,7 +56,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _stopLive();
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
-    _qrLoopTimer?.cancel();
     super.dispose();
   }
 
@@ -227,18 +228,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     });
   }
 
-  void _startQrLoop() {
-    _qrLoopTimer?.cancel();
-    _qrLoopTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      final s = _session;
-      if (!mounted || s == null) return;
-      if (s.status.toLowerCase() == 'closed') return;
-      if (_qr == null || _qrSecondsLeft <= 10) {
-        unawaited(_refreshQr());
-      }
-    });
-  }
-
   Future<void> _refreshSession() async {
     final s = _session;
     if (s == null || _isRefreshingSession) return;
@@ -263,13 +252,16 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     final s = _session;
     if (s == null || _isRefreshingQr) return;
     if ((s.status.toLowerCase() == 'closed')) return;
+    final requestId = ++_qrRequestSeq;
     setState(() {
       _isRefreshingQr = true;
       _qrError = null;
     });
     try {
-      final qr = await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
-      if (!mounted) return;
+      final qr = await _api
+          .getAttendanceQrPayload(s.id, ttlSeconds: 60)
+          .timeout(_qrRequestTimeout);
+      if (!mounted || requestId != _qrRequestSeq) return;
       _applyQrPayload(qr);
       return;
     } catch (_) {
@@ -277,11 +269,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
     try {
       await Future.delayed(const Duration(milliseconds: 600));
-      final qr = await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
-      if (!mounted) return;
+      if (!mounted || requestId != _qrRequestSeq) return;
+      final qr = await _api
+          .getAttendanceQrPayload(s.id, ttlSeconds: 60)
+          .timeout(_qrRequestTimeout);
+      if (!mounted || requestId != _qrRequestSeq) return;
       _applyQrPayload(qr);
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _qrRequestSeq) return;
       final msg = userFacingMessage(e);
       setState(() {
         _qr = null;
@@ -296,10 +291,26 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         );
       }
     } finally {
-      if (mounted) {
+      if (mounted && requestId == _qrRequestSeq) {
         setState(() => _isRefreshingQr = false);
       }
     }
+  }
+
+  void _invalidateCurrentQrForRefresh() {
+    _countdownTimer?.cancel();
+    setState(() {
+      _qr = null;
+      _qrSecondsLeft = 0;
+      _qrError = null;
+      _qrPrefetchTriggered = false;
+    });
+  }
+
+  Future<void> _forceRefreshQr() async {
+    if (_busy || _isRefreshingQr) return;
+    _invalidateCurrentQrForRefresh();
+    await _refreshQr(showErrors: true);
   }
 
   void _applyQrPayload(AttendanceQrPayloadModel qr) {
@@ -339,10 +350,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   Future<void> _handleQrExpired() async {
     final s = _session;
     if (s == null || s.status.toLowerCase() == 'closed') return;
-    // Invalida visualmente o QR expirado antes de buscar o próximo.
-    if (mounted) {
-      setState(() => _qr = null);
-    }
+    _invalidateCurrentQrForRefresh();
     await _refreshQr();
   }
 
@@ -420,7 +428,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
       _applyQrPayload(qr);
       _startAutoRefresh();
-      _startQrLoop();
       _startLive(s.id);
       AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
@@ -447,7 +454,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (ok != true) return;
 
     _stopLive();
-    _qrLoopTimer?.cancel();
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
@@ -604,16 +610,17 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                               ),
                         ),
                       ),
+                  ],
+                  if (!isClosed)
                     OutlinedButton.icon(
                       onPressed: (_busy || _isRefreshingQr)
                           ? null
                           : () {
-                              unawaited(_refreshQr(showErrors: true));
+                              unawaited(_forceRefreshQr());
                             },
                       icon: const Icon(Icons.refresh_rounded),
                       label: Text(_isRefreshingQr ? 'Gerando...' : 'Gerar novo QR'),
                     ),
-                  ],
                 ],
               ),
             ),
