@@ -4,7 +4,6 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/app_feedback.dart';
-import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
@@ -133,8 +132,8 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     final showSchedule = _flagFromHeaderStats('show_schedule', fallback: true);
     final scheduleUrl = _scheduleUrlFromHeaderStats();
 
+    // AppBar fica no [MainScaffold] (aba "Central"); evita barra extra com seta e título duplicado.
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Central da academia'),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
