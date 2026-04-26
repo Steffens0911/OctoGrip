@@ -36,6 +36,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   String? _error;
   Timer? _refreshTimer;
   Timer? _countdownTimer;
+  Timer? _qrRetryTimer;
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
@@ -56,6 +57,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _stopLive();
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
+    _qrRetryTimer?.cancel();
     super.dispose();
   }
 
@@ -119,10 +121,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   Set<String> get _presentUserIds => _records.map((r) => r.userId).toSet();
 
   Future<void> _addStudentDialog() async {
-    final sid = _session?.id;
-    if (sid == null || _busy) return;
-    final academyId = AuthService().currentUser?.academyId;
-    if (academyId == null && !AuthService().isAdmin()) {
+    final session = _session;
+    final sid = session?.id;
+    if (sid == null || session == null || _busy) return;
+    final sessionAcademyId = session.academyId;
+    final academyId = (sessionAcademyId != null && sessionAcademyId.isNotEmpty)
+        ? sessionAcademyId
+        : AuthService().currentUser?.academyId;
+    if ((academyId == null || academyId.isEmpty) && !AuthService().isAdmin()) {
       AppFeedback.show(
         context,
         message: 'Utilizador sem academia vinculada.',
@@ -252,6 +258,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     final s = _session;
     if (s == null || _isRefreshingQr) return;
     if ((s.status.toLowerCase() == 'closed')) return;
+    _qrRetryTimer?.cancel();
     final requestId = ++_qrRequestSeq;
     setState(() {
       _isRefreshingQr = true;
@@ -290,11 +297,26 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           type: AppFeedbackType.error,
         );
       }
+      _scheduleQrRetry();
     } finally {
       if (mounted && requestId == _qrRequestSeq) {
         setState(() => _isRefreshingQr = false);
       }
     }
+  }
+
+  void _scheduleQrRetry({Duration delay = const Duration(seconds: 3)}) {
+    final s = _session;
+    if (!mounted || s == null) return;
+    if (s.status.toLowerCase() == 'closed') return;
+    _qrRetryTimer?.cancel();
+    _qrRetryTimer = Timer(delay, () {
+      if (!mounted) return;
+      final current = _session;
+      if (current == null || current.status.toLowerCase() == 'closed') return;
+      if (_isRefreshingQr) return;
+      unawaited(_refreshQr());
+    });
   }
 
   void _invalidateCurrentQrForRefresh() {
@@ -315,6 +337,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   void _applyQrPayload(AttendanceQrPayloadModel qr) {
     final initialSeconds = _secondsUntil(qr.expiresAt);
+    _qrRetryTimer?.cancel();
     _countdownTimer?.cancel();
     setState(() {
       _qr = qr;
@@ -454,6 +477,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (ok != true) return;
 
     _stopLive();
+    _qrRetryTimer?.cancel();
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);

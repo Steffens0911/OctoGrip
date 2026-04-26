@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/utils/error_message.dart';
 
 /// Diálogo com busca e lista de alunos da academia para presença manual.
 class AttendanceAddStudentDialog extends StatefulWidget {
@@ -55,14 +56,33 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
 
   void _applyFilter() => setState(() {});
 
-  Future<void> _loadUsers() async {
-    setState(() => _loading = true);
+  Future<List<UserModel>> _fetchUsers() async {
+    final academyId = widget.academyId?.trim();
+    final hasAcademyId = academyId != null && academyId.isNotEmpty;
     try {
-      final list = await widget.api.getUsers(
-        academyId: AuthService().isAdmin() ? null : widget.academyId,
+      return await widget.api.getUsers(
+        academyId: hasAcademyId ? academyId : null,
         offset: 0,
         limit: 500,
       );
+    } on ApiException catch (e) {
+      // Em "atuar como", alguns cenários retornam 403 para usuário efetivo.
+      if (e.statusCode == 403 && AuthService().isRealUserAdmin) {
+        return widget.api.getUsers(
+          academyId: hasAcademyId ? academyId : null,
+          asRealUser: true,
+          offset: 0,
+          limit: 500,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _loadUsers() async {
+    setState(() => _loading = true);
+    try {
+      final list = await _fetchUsers();
       final students = list.where((u) => u.role == 'aluno').toList();
       if (mounted) {
         setState(() {
@@ -71,11 +91,11 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
           _error = null;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Não foi possível carregar os alunos.';
+          _error = userFacingMessage(e);
         });
       }
     }
