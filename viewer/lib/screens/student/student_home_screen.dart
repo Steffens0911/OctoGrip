@@ -36,6 +36,7 @@ import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
 import 'package:viewer/widgets/student/student_rules_sheet.dart';
+import 'package:viewer/widgets/student/academy_partners_training_banner.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -81,6 +82,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   String? _error;
   String? _academyLogoUrl;
   bool _showTrophies = true;
+  bool _showPartners = true;
   bool _showGlobalSupporters = true;
   /// Aviso ao logar (dados da academia; modal uma vez por sessão).
   String? _loginNoticeTitle;
@@ -91,6 +93,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   String? _celebrateMissionId;
   /// Rede a sincronizar (header + missões, etc.): barra no topo e skeletons opcionais.
   bool _syncingHomeData = false;
+  Future<List<Partner>>? _trainingPartnersFuture;
+
+  void _setupTrainingPartnersFuture(String? academyId) {
+    if (academyId == null || academyId.isEmpty) {
+      _trainingPartnersFuture = null;
+      return;
+    }
+    _trainingPartnersFuture = _api.getPartners(academyId);
+  }
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
   static String _levelFromGraduation(String? g) {
@@ -196,6 +207,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (!mounted) return;
     setState(() {
       _selectedUser = currentUser;
+      _setupTrainingPartnersFuture(currentUser?.academyId);
       if (currentUser != null) {
         _syncingHomeData = true;
       }
@@ -205,6 +217,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       setState(() {
         _loading = false;
         _syncingHomeData = false;
+        _trainingPartnersFuture = null;
         _pendingConfirmationsCount = 0;
       });
       widget.onPendingConfirmationsCountChanged?.call(0);
@@ -411,6 +424,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       setState(() {
         _academyLogoUrl = academy.logoUrl;
         _showTrophies = academy.showTrophies;
+        _showPartners = academy.showPartners;
         _showGlobalSupporters = academy.showGlobalSupporters;
         _loginNoticeTitle = academy.loginNoticeTitle;
         _loginNoticeBody = academy.loginNoticeBody;
@@ -423,6 +437,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         setState(() {
           _academyLogoUrl = null;
           _showTrophies = true;
+          _showPartners = true;
           _showGlobalSupporters = true;
           _loginNoticeTitle = null;
           _loginNoticeBody = null;
@@ -462,6 +477,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               kBaseLevelThreshold;
       _academyLogoUrl = logoUrl;
       _showTrophies = academy?['show_trophies'] as bool? ?? true;
+      _showPartners = academy?['show_partners'] as bool? ?? true;
       _showGlobalSupporters =
           academy?['show_global_supporters'] as bool? ?? true;
       _loginNoticeTitle = academy?['login_notice_title'] as String?;
@@ -837,6 +853,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                         onOpenPointsRules: () => showPointsRulesSheet(context),
                       ),
                     ),
+                  if (_showPartners && _trainingPartnersFuture != null) ...[
+                    const SizedBox(height: 10),
+                    FutureBuilder<List<Partner>>(
+                      future: _trainingPartnersFuture,
+                      builder: (context, snapshot) {
+                        final list = snapshot.data ?? const <Partner>[];
+                        if (snapshot.connectionState == ConnectionState.waiting &&
+                            list.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        if (snapshot.hasError || list.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        return AcademyPartnersTrainingBanner(partners: list);
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   if (_collectiveGoal != null) ...[
                     _buildCollectiveGoalCard(),
