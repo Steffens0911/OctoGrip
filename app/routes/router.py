@@ -11,6 +11,7 @@ from app.routes import (
     admin,
     admin_audit,
     admin_backup,
+    admin_global_partners,
     admin_push,
     admin_undo,
     auth,
@@ -40,6 +41,7 @@ from app.routes import (
 api_router = APIRouter()
 
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
+api_router.include_router(admin_global_partners.router, prefix="/admin", tags=["admin-global-partners"])
 api_router.include_router(admin_push.router, prefix="/admin", tags=["admin-push"])
 api_router.include_router(admin_backup.router, prefix="/admin", tags=["admin-backup"])
 api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audit"])

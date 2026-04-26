@@ -8,12 +8,13 @@ from app.core.exceptions import AppError, ForbiddenError, PartnerNotFoundError
 from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
+from app.schemas.global_partner import GlobalPartnerRead
 from app.schemas.partner import PartnerCreate, PartnerRead, PartnerUpdate
+from app.services.global_partner_service import list_active_global_featured
 from app.services.partner_service import (
     create_partner,
     delete_partner,
     get_partner,
-    list_featured_partners,
     list_partners,
     update_partner,
 )
@@ -44,15 +45,13 @@ async def partners_list(
     return await list_partners(db, academy_id=resolved)
 
 
-@router.get("/featured", response_model=list[PartnerRead])
+@router.get("/featured", response_model=list[GlobalPartnerRead])
 async def partners_featured(
-    academy_id: UUID | None = Query(None, description="Filtra por academia"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
-    """Lista parceiros em destaque (ativos) para o banner da Central."""
-    resolved = _resolve_academy_id(current_user, academy_id)
-    return await list_featured_partners(db, academy_id=resolved, limit=5)
+    """Lista parceiros globais em destaque para o banner da Central."""
+    return await list_active_global_featured(db, limit=5)
 
 
 @router.get("/{partner_id}", response_model=PartnerRead)
@@ -86,11 +85,6 @@ async def partner_create(
         url=body.url,
         logo_url=body.logo_url,
         highlight_on_login=body.highlight_on_login,
-        is_active=body.is_active,
-        is_featured=body.is_featured,
-        featured_order=body.featured_order,
-        offer_text=body.offer_text,
-        external_url=body.external_url,
         audit_user_id=current_user.id,
     )
 
@@ -117,11 +111,6 @@ async def partner_update(
         url=payload.get("url"),
         logo_url=payload.get("logo_url"),
         highlight_on_login=payload.get("highlight_on_login"),
-        is_active=payload.get("is_active"),
-        is_featured=payload.get("is_featured"),
-        featured_order=payload.get("featured_order"),
-        offer_text=payload.get("offer_text"),
-        external_url=payload.get("external_url"),
         audit_user_id=current_user.id,
     )
     return updated

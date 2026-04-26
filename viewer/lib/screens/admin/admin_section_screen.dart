@@ -7,6 +7,7 @@ import 'package:viewer/screens/admin/engagement_reports_screen.dart';
 import 'package:viewer/screens/admin/execution_reports_screen.dart';
 import 'package:viewer/screens/admin/audit_recovery_screen.dart';
 import 'package:viewer/screens/admin/database_backup_screen.dart';
+import 'package:viewer/screens/admin/global_partner_list_screen.dart';
 import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/user_list_screen.dart';
@@ -73,6 +74,18 @@ class AdminSectionScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const MarketplaceListScreen(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppNavigationTile(
+            icon: Icons.handshake_outlined,
+            title: 'Parceiros globais',
+            subtitle: 'Banner da Central para todas as academias',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const GlobalPartnerListScreen(),
               ),
             ),
           ),

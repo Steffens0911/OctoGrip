@@ -9,6 +9,7 @@ import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
+import 'package:viewer/models/global_partner.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
@@ -1090,16 +1091,14 @@ class ApiService {
     return raw.map((e) => Partner.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Lista parceiros em destaque para o banner da Central (máximo 5 no servidor).
-  Future<List<Partner>> getFeaturedPartners(String academyId) async {
-    final uri = Uri.parse('$baseUrl/partners/featured').replace(
-      queryParameters: {'academy_id': academyId},
-    );
+  /// Lista parceiros globais em destaque para o banner da Central.
+  Future<List<GlobalPartner>> getFeaturedPartners() async {
+    final uri = Uri.parse('$baseUrl/partners/featured');
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
-    return raw.map((e) => Partner.fromJson(e as Map<String, dynamic>)).toList();
+    return raw.map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   /// Cria parceiro na academia.
@@ -1110,11 +1109,6 @@ class ApiService {
     String? url,
     String? logoUrl,
     bool highlightOnLogin = false,
-    bool isFeatured = false,
-    int? featuredOrder,
-    String? offerText,
-    String? externalUrl,
-    bool isActive = true,
   }) async {
     final body = <String, dynamic>{
       'academy_id': academyId,
@@ -1124,11 +1118,6 @@ class ApiService {
     if (url != null && url.isNotEmpty) body['url'] = url;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
      body['highlight_on_login'] = highlightOnLogin;
-    body['is_active'] = isActive;
-    body['is_featured'] = isFeatured;
-    if (featuredOrder != null) body['featured_order'] = featuredOrder;
-    if (offerText != null) body['offer_text'] = offerText;
-    if (externalUrl != null) body['external_url'] = externalUrl;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/partners'),
       headers: await _jsonHeaders(auth: true),
@@ -1137,7 +1126,6 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/partners');
-    invalidateCache('GET:$baseUrl/partners/featured');
     return Partner.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1150,11 +1138,6 @@ class ApiService {
     String? url,
     String? logoUrl,
     bool? highlightOnLogin,
-    bool? isActive,
-    bool? isFeatured,
-    int? featuredOrder,
-    String? offerText,
-    String? externalUrl,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -1162,17 +1145,11 @@ class ApiService {
     if (url != null) body['url'] = url;
     if (logoUrl != null) body['logo_url'] = logoUrl;
     if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
-    if (isActive != null) body['is_active'] = isActive;
-    if (isFeatured != null) body['is_featured'] = isFeatured;
-    if (featuredOrder != null) body['featured_order'] = featuredOrder;
-    if (offerText != null) body['offer_text'] = offerText;
-    if (externalUrl != null) body['external_url'] = externalUrl;
     final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/partners');
-    invalidateCache('GET:$baseUrl/partners/featured');
     return Partner.fromJson(data! as Map<String, dynamic>);
   }
 
@@ -1182,6 +1159,85 @@ class ApiService {
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/partners');
+  }
+
+  /// Lista parceiros globais (somente admin global).
+  Future<List<GlobalPartner>> getGlobalPartnersAdmin() async {
+    final uri = Uri.parse('$baseUrl/admin/global_partners');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Cria parceiro global (somente admin global).
+  Future<GlobalPartner> createGlobalPartner({
+    required String name,
+    String? description,
+    String? logoUrl,
+    String? offerText,
+    String? externalUrl,
+    int? featuredOrder,
+    bool isActive = true,
+  }) async {
+    final body = <String, dynamic>{
+      'name': name,
+      'is_active': isActive,
+    };
+    if (description != null && description.isNotEmpty) body['description'] = description;
+    if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
+    if (offerText != null && offerText.isNotEmpty) body['offer_text'] = offerText;
+    if (externalUrl != null && externalUrl.isNotEmpty) body['external_url'] = externalUrl;
+    if (featuredOrder != null) body['featured_order'] = featuredOrder;
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/admin/global_partners'),
+      headers: await _jsonHeaders(auth: true, realUserOnly: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/partners/featured');
+    return GlobalPartner.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Atualiza parceiro global (somente admin global).
+  Future<GlobalPartner> updateGlobalPartner({
+    required String id,
+    String? name,
+    String? description,
+    String? logoUrl,
+    String? offerText,
+    String? externalUrl,
+    int? featuredOrder,
+    bool? isActive,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description;
+    if (logoUrl != null) body['logo_url'] = logoUrl;
+    if (offerText != null) body['offer_text'] = offerText;
+    if (externalUrl != null) body['external_url'] = externalUrl;
+    if (featuredOrder != null) body['featured_order'] = featuredOrder;
+    if (isActive != null) body['is_active'] = isActive;
+    final r = await _req(http.put(
+      Uri.parse('$baseUrl/admin/global_partners/$id'),
+      headers: await _jsonHeaders(auth: true, realUserOnly: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/partners/featured');
+    return GlobalPartner.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Remove parceiro global (somente admin global).
+  Future<void> deleteGlobalPartner(String id) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/admin/global_partners/$id'),
+      headers: await _headers(auth: true, realUserOnly: true),
+    ));
+    _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/partners/featured');
   }
 

@@ -2,7 +2,7 @@
 import logging
 from uuid import UUID
 
-from sqlalchemy import nulls_last, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Partner
@@ -28,20 +28,6 @@ async def list_partners(db: AsyncSession, academy_id: UUID) -> list[Partner]:
     )
     return (await db.execute(stmt)).scalars().all()
 
-
-async def list_featured_partners(db: AsyncSession, academy_id: UUID, *, limit: int = 5) -> list[Partner]:
-    """Lista parceiros em destaque (ativos) para o banner da Central."""
-    stmt = (
-        select(Partner)
-        .where(Partner.academy_id == academy_id)
-        .where(Partner.is_featured.is_(True))
-        .where(Partner.is_active.is_(True))
-        .order_by(nulls_last(Partner.featured_order.asc()))
-        .limit(limit)
-    )
-    return (await db.execute(stmt)).scalars().all()
-
-
 async def get_partner(db: AsyncSession, partner_id: UUID) -> Partner | None:
     """Retorna um parceiro por ID."""
     return (await db.execute(select(Partner).where(Partner.id == partner_id))).scalar_one_or_none()
@@ -55,11 +41,6 @@ async def create_partner(
     url: str | None = None,
     logo_url: str | None = None,
     highlight_on_login: bool = False,
-    is_active: bool = True,
-    is_featured: bool = False,
-    featured_order: int | None = None,
-    offer_text: str | None = None,
-    external_url: str | None = None,
     *,
     audit_user_id: UUID | None = None,
 ) -> Partner:
@@ -71,11 +52,6 @@ async def create_partner(
         url=url.strip() if url else None,
         logo_url=logo_url.strip() if logo_url else None,
         highlight_on_login=highlight_on_login,
-        is_active=is_active,
-        is_featured=is_featured,
-        featured_order=featured_order,
-        offer_text=offer_text.strip() if offer_text else None,
-        external_url=external_url.strip() if external_url else None,
     )
     db.add(partner)
     await db.flush()
@@ -102,11 +78,6 @@ async def update_partner(
     url: str | None = None,
     logo_url: str | None = None,
     highlight_on_login: bool | None = None,
-    is_active: bool | None = None,
-    is_featured: bool | None = None,
-    featured_order: int | None = None,
-    offer_text: str | None = None,
-    external_url: str | None = None,
     *,
     audit_user_id: UUID | None = None,
 ) -> Partner | None:
@@ -125,16 +96,6 @@ async def update_partner(
         partner.logo_url = logo_url.strip() if logo_url else None
     if highlight_on_login is not None:
         partner.highlight_on_login = highlight_on_login
-    if is_active is not None:
-        partner.is_active = is_active
-    if is_featured is not None:
-        partner.is_featured = is_featured
-    if featured_order is not None:
-        partner.featured_order = featured_order
-    if offer_text is not None:
-        partner.offer_text = offer_text.strip() if offer_text else None
-    if external_url is not None:
-        partner.external_url = external_url.strip() if external_url else None
     await db.flush()
     await db.refresh(partner)
     after = entity_snapshot_row(partner)

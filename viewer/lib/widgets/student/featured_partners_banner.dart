@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:viewer/app_theme.dart';
-import 'package:viewer/models/partner.dart';
+import 'package:viewer/models/global_partner.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 
 class FeaturedPartnersBanner extends StatefulWidget {
-  final List<Partner> partners;
+  final List<GlobalPartner> partners;
 
   const FeaturedPartnersBanner({
     super.key,
@@ -65,12 +65,10 @@ class _FeaturedPartnersBannerState extends State<FeaturedPartnersBanner> {
     super.dispose();
   }
 
-  Future<void> _openOffer(Partner p) async {
+  Future<void> _openOffer(GlobalPartner p) async {
     final raw = (p.externalUrl?.trim().isNotEmpty ?? false)
         ? p.externalUrl!.trim()
-        : (p.url?.trim().isNotEmpty ?? false)
-            ? p.url!.trim()
-            : null;
+        : null;
     if (raw == null) return;
 
     final uri = Uri.tryParse(raw.startsWith('http') ? raw : 'https://$raw');
@@ -96,10 +94,10 @@ class _FeaturedPartnersBannerState extends State<FeaturedPartnersBanner> {
     final primary = Theme.of(context).colorScheme.primary;
     final tagColor = primary;
     final dotActive = primary;
-    final dotInactive = const Color(0xFF2E3547);
+    const dotInactive = Color(0xFF2E3547);
 
-    final bg1 = AppTheme.premiumSurfaceElevatedDark;
-    final bg2 = AppTheme.premiumBackgroundDark;
+    const bg1 = AppTheme.premiumSurfaceElevatedDark;
+    const bg2 = AppTheme.premiumBackgroundDark;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -145,7 +143,7 @@ class _FeaturedPartnersBannerState extends State<FeaturedPartnersBanner> {
 }
 
 class _Card extends StatelessWidget {
-  final Partner partner;
+  final GlobalPartner partner;
   final VoidCallback onOpen;
   final Color tagColor;
   final Color bg1;

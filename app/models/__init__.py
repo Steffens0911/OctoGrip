@@ -17,6 +17,7 @@ from app.models.technique_execution import TechniqueExecution
 from app.models.collective_goal import CollectiveGoal
 from app.models.trophy import Trophy
 from app.models.partner import Partner
+from app.models.global_partner import GlobalPartner
 from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 from app.models.academy_marketplace_item import AcademyMarketplaceItem
 from app.models.user_device_token import UserDeviceToken
@@ -43,6 +44,7 @@ __all__ = [
     "CollectiveGoal",
     "Trophy",
     "Partner",
+    "GlobalPartner",
     "TrainingVideo",
     "TrainingVideoDailyView",
     "AcademyMarketplaceItem",

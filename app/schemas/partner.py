@@ -12,11 +12,6 @@ class PartnerRead(BaseModel):
     url: str | None
     logo_url: str | None
     highlight_on_login: bool
-    is_active: bool
-    is_featured: bool
-    featured_order: int | None
-    offer_text: str | None
-    external_url: str | None
 
     class Config:
         from_attributes = True
@@ -33,11 +28,6 @@ class PartnerCreate(BaseModel):
     url: str | None = Field(None, max_length=512)
     logo_url: str | None = Field(None, max_length=512)
     highlight_on_login: bool = False
-    is_active: bool = True
-    is_featured: bool = False
-    featured_order: int | None = None
-    offer_text: str | None = Field(None, max_length=2000)
-    external_url: str | None = Field(None, max_length=512)
 
 
 class PartnerUpdate(BaseModel):
@@ -50,8 +40,3 @@ class PartnerUpdate(BaseModel):
     url: str | None = Field(None, max_length=512)
     logo_url: str | None = Field(None, max_length=512)
     highlight_on_login: bool | None = None
-    is_active: bool | None = None
-    is_featured: bool | None = None
-    featured_order: int | None = None
-    offer_text: str | None = Field(None, max_length=2000)
-    external_url: str | None = Field(None, max_length=512)

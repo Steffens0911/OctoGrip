@@ -455,7 +455,7 @@ class _AcademyCustomizationBusinessSectionsState
           ),
         ),
         AppSpacing.verticalM,
-        if (AuthService().isAdmin() || AuthService().isManager())
+        if (AuthService().isManager() || AuthService().isProfessor())
           Card(
             child: ListTile(
               leading: CircleAvatar(
@@ -465,7 +465,7 @@ class _AcademyCustomizationBusinessSectionsState
               title: const Text('Parceiros',
                   style: TextStyle(fontWeight: FontWeight.w600)),
               subtitle: const Text(
-                'Divulgação para os alunos: empresas e academias parceiras',
+                'Parceiros da academia para divulgação local aos alunos',
               ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.push(
