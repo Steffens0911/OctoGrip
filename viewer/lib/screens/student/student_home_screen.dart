@@ -13,11 +13,9 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
-import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
-import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/models/partner.dart';
@@ -34,12 +32,9 @@ import 'package:viewer/widgets/header_widget.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/academy_login_notice_dialog.dart';
-import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
-import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
-import 'package:viewer/screens/student/attendance_scan_screen.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -83,12 +78,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _dailyVideoCompleted = false;
   bool _loading = true;
   String? _error;
-  int _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
   String? _academyLogoUrl;
-  String? _academyScheduleImageUrl;
   bool _showTrophies = true;
-  bool _showPartners = true;
-  bool _showSchedule = true;
   bool _showGlobalSupporters = true;
   /// Aviso ao logar (dados da academia; modal uma vez por sessão).
   String? _loginNoticeTitle;
@@ -417,12 +408,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       final academy = await _api.getAcademy(academyId);
       if (!mounted) return;
       setState(() {
-        _scheduleLocalVersion = DateTime.now().millisecondsSinceEpoch;
         _academyLogoUrl = academy.logoUrl;
-        _academyScheduleImageUrl = academy.scheduleImageUrl;
         _showTrophies = academy.showTrophies;
-        _showPartners = academy.showPartners;
-        _showSchedule = academy.showSchedule;
         _showGlobalSupporters = academy.showGlobalSupporters;
         _loginNoticeTitle = academy.loginNoticeTitle;
         _loginNoticeBody = academy.loginNoticeBody;
@@ -434,10 +421,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       if (mounted) {
         setState(() {
           _academyLogoUrl = null;
-          _academyScheduleImageUrl = null;
           _showTrophies = true;
-          _showPartners = true;
-          _showSchedule = true;
           _showGlobalSupporters = true;
           _loginNoticeTitle = null;
           _loginNoticeBody = null;
@@ -476,10 +460,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               _nextLevelThreshold ??
               kBaseLevelThreshold;
       _academyLogoUrl = logoUrl;
-      _academyScheduleImageUrl = academy?['schedule_image_url'] as String?;
       _showTrophies = academy?['show_trophies'] as bool? ?? true;
-      _showPartners = academy?['show_partners'] as bool? ?? true;
-      _showSchedule = academy?['show_schedule'] as bool? ?? true;
       _showGlobalSupporters =
           academy?['show_global_supporters'] as bool? ?? true;
       _loginNoticeTitle = academy?['login_notice_title'] as String?;
@@ -908,29 +889,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                       const SizedBox(height: 16),
                       _buildTrophiesHomeSection(),
                     ],
-                    if (u.academyId != null && u.academyId!.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      if (_showPartners) _buildPartnersSection(),
-                    ],
-                  ],
-                  if (_academyScheduleImageUrl != null &&
-                      _academyScheduleImageUrl!.isNotEmpty &&
-                      _showSchedule) ...[
-                    const SizedBox(height: 16),
-                    _buildScheduleCard(),
                   ],
                   if (_showGlobalSupporters) const GlobalSupportersSection(),
                   if (u != null) ...[
-                    const SizedBox(height: 16),
-                    _buildAttendanceScanCard(),
-                    if (u.academyId != null && u.academyId!.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      _buildMyAttendanceStatsCard(),
-                    ],
-                    const SizedBox(height: 16),
                     _buildConfirmationsAndRequestsSection(),
-                    const SizedBox(height: 16),
-                    _buildMarketplaceEntryCard(),
                   ],
                 ],
               ),
@@ -956,174 +918,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  /// Atalho no fim do Campo de treinamento (após confirmações): `GET /me/marketplace_items`.
-  Widget _buildMarketplaceEntryCard() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          Navigator.push<void>(
-            context,
-            MaterialPageRoute<void>(
-              builder: (context) => const MarketplaceScreen(),
-            ),
-          );
-        },
-        borderRadius: FantasyTheme.cardBorderRadius,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: FantasyTheme.cardBorderRadius,
-            border: Border.all(
-              color: FantasyTheme.gold.withValues(alpha: 0.45),
-            ),
-            color: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest
-                .withValues(alpha: 0.35),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.storefront_rounded,
-                  color: FantasyTheme.gold,
-                  size: 28,
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Loja da academia',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: FantasyTheme.textPrimaryOf(context),
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Produtos, preços e contato no WhatsApp',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: FantasyTheme.textSecondaryOf(context),
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: FantasyTheme.textSecondaryOf(context),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openScheduleUrl(String? url) async {
-    if (url == null || url.isEmpty) return;
-    final uri = Uri.tryParse(url.startsWith('http') ? url : 'https://$url');
-    if (uri == null) return;
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  Widget _buildScheduleCard() {
-    final rawUrl = _academyScheduleImageUrl;
-    if (rawUrl == null || rawUrl.isEmpty) return const SizedBox.shrink();
-    final baseUrl = rawUrl.startsWith('/') ? '${_api.baseUrl}$rawUrl' : rawUrl;
-    // Cache-buster local: sempre que recarregamos a academia (_loadAcademyLogoWith),
-    // _scheduleLocalVersion é atualizado, garantindo que a URL mude após um novo upload.
-    final v = _scheduleLocalVersion.toString();
-    final sep = baseUrl.contains('?') ? '&' : '?';
-    final openUrl = '$baseUrl${sep}v=$v';
-    final maxH = MediaQuery.of(context).size.height * 0.35;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _openScheduleUrl(openUrl),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceOf(context),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppTheme.borderOf(context)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Horários da academia',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppTheme.textPrimaryOf(context),
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(maxHeight: maxH.clamp(200.0, 320.0)),
-                  child: Image.network(
-                    openUrl,
-                    width: double.infinity,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) =>
-                        _schedulePlaceholder(context, openUrl),
-                  ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Toque para abrir',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primary,
-                      ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _schedulePlaceholder(BuildContext context, String? openUrl) {
-    return Container(
-      height: 100,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: AppTheme.borderOf(context).withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.schedule,
-              size: 32, color: AppTheme.textSecondaryOf(context)),
-          const SizedBox(width: 12),
-          Text(
-            openUrl != null && openUrl.isNotEmpty
-                ? 'Toque para ver horários'
-                : 'Não foi possível carregar a imagem',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.textSecondaryOf(context),
-                ),
-            textAlign: TextAlign.center,
-          ),
         ],
       ),
     );
@@ -1641,49 +1435,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildAttendanceScanCard() {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-          child: const Icon(Icons.qr_code_scanner_rounded, color: AppTheme.primary),
-        ),
-        title: const Text(
-          'Chamada por QR',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: const Text('Escanear QR para registrar presença no treino'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => const AttendanceScanScreen()),
-        ),
-      ),
-    );
-  }
-
-  /// Atalho para [AttendanceMyStatsScreen] — frequência própria (`GET /attendance/stats/me`).
-  Widget _buildMyAttendanceStatsCard() {
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-          child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
-        ),
-        title: const Text(
-          'Minha frequência',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: const Text('Veja seu histórico e gráficos de presença'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute<void>(builder: (context) => const AttendanceMyStatsScreen()),
-        ),
-      ),
-    );
-  }
-
   Widget _buildTrophiesHomeSection() {
     final u = _selectedUser;
     if (u == null) return const SizedBox.shrink();
@@ -1711,21 +1462,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               )
           : null,
       showClassmatesRow: hasAcademy,
-    );
-  }
-
-  Widget _buildPartnersSection() {
-    final u = _selectedUser;
-    if (u == null || u.academyId == null || u.academyId!.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return PartnersCard(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PartnersScreen(academyId: u.academyId!),
-        ),
-      ),
     );
   }
 

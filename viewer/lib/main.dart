@@ -13,6 +13,7 @@ import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/screens/academy/academy_panel_screen.dart';
 import 'package:viewer/screens/admin/admin_section_screen.dart';
 import 'package:viewer/screens/auth/login_screen.dart';
+import 'package:viewer/screens/student/student_academy_hub_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/services/api_service.dart';
@@ -330,7 +331,33 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                tabs.isNotEmpty ? tabs[tabIndex] : 'Campo de treinamento',
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (effectiveUser != null &&
+                tabs.isNotEmpty &&
+                tabs[tabIndex] == 'Campo de treinamento') ...[
+              const SizedBox(width: 6),
+              IconButton(
+                tooltip: 'Abrir Academia',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.school_rounded),
+                onPressed: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (context) => const StudentAcademyHubScreen(),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         // Último item da lista = extremo direito da tela → [Sair] fica na borda direita.
         // +/− antes do logout; em telas muito estreitas o [ClipRect] pode cortar pela esquerda do grupo.
         actions: [
