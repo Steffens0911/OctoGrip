@@ -93,6 +93,34 @@ class AttendanceRecordWithSessionRead(BaseModel):
     method: str
 
 
+class AttendanceRankingEntryRead(BaseModel):
+    position: int
+    student_id: UUID
+    name: str
+    avatar_url: str | None = None
+    belt: str | None = None
+    total_checkins: int
+    attendance_percentage: int = Field(..., ge=0, le=100)
+    position_change: int | None = None
+
+
+class AttendanceMyPositionRead(BaseModel):
+    position: int
+    total_checkins: int
+    attendance_percentage: int = Field(..., ge=0, le=100)
+    position_change: int | None = None
+
+
+class AttendanceRankingRead(BaseModel):
+    month: str | None = None
+    period_kind: Literal["month", "quarter", "year", "custom"]
+    period_label: str
+    period_start: date
+    period_end: date
+    ranking: list[AttendanceRankingEntryRead]
+    my_position: AttendanceMyPositionRead | None = None
+
+
 class AttendanceStudentDetailRead(BaseModel):
     user_id: UUID
     email: str

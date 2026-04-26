@@ -8,6 +8,7 @@ import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/student/featured_partners_banner.dart';
 
 import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
+import 'package:viewer/screens/student/attendance_ranking_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
@@ -227,6 +228,21 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                 onOk: () => Navigator.push<void>(
                   context,
                   MaterialPageRoute<void>(builder: (context) => const AttendanceMyStatsScreen()),
+                ),
+              ),
+            ),
+
+            _entry(
+              icon: Icons.emoji_events_outlined,
+              title: 'Ranking',
+              subtitle: 'Compare a frequência da academia por período',
+              enabled: hasAcademy,
+              onTap: () => _requireAcademy(
+                onOk: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (context) => AttendanceRankingScreen(academyId: academyId!),
+                  ),
                 ),
               ),
             ),

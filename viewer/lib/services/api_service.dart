@@ -24,6 +24,7 @@ import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'dart:typed_data';
 import 'package:viewer/models/attendance.dart';
+import 'package:viewer/models/attendance_ranking.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -875,6 +876,92 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return AttendanceMyStatsModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Uri _buildAttendanceRankingUri({
+    required String academyId,
+    required String periodKind,
+    String? month,
+    int? year,
+    int? quarter,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int limit = 10,
+  }) {
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final qp = <String, String>{
+      'academy_id': academyId,
+      'period': periodKind,
+      'limit': '$limit',
+    };
+    if (periodKind == 'month' && month != null && month.isNotEmpty) {
+      qp['month'] = month;
+    }
+    if ((periodKind == 'quarter' || periodKind == 'year') && year != null) {
+      qp['year'] = '$year';
+    }
+    if (periodKind == 'quarter' && quarter != null) {
+      qp['quarter'] = '$quarter';
+    }
+    if (periodKind == 'custom' && dateFrom != null && dateTo != null) {
+      qp['date_from'] = ymd(dateFrom);
+      qp['date_to'] = ymd(dateTo);
+    }
+    return Uri.parse('$baseUrl/attendance/ranking').replace(queryParameters: qp);
+  }
+
+  Future<AttendanceRankingModel> fetchAttendanceRanking({
+    required String academyId,
+    required String periodKind,
+    String? month,
+    int? year,
+    int? quarter,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int limit = 10,
+  }) async {
+    final uri = _buildAttendanceRankingUri(
+      academyId: academyId,
+      periodKind: periodKind,
+      month: month,
+      year: year,
+      quarter: quarter,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      limit: limit,
+    );
+    final r = await _getWithCache(uri, _cacheTtlShort);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return AttendanceRankingModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  void invalidateAttendanceRankingCache({
+    String? academyId,
+    String? periodKind,
+    String? month,
+    int? year,
+    int? quarter,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    int limit = 10,
+  }) {
+    if (academyId == null || academyId.isEmpty || periodKind == null || periodKind.isEmpty) {
+      invalidateCache('GET:$baseUrl/attendance/ranking');
+      return;
+    }
+    final uri = _buildAttendanceRankingUri(
+      academyId: academyId,
+      periodKind: periodKind,
+      month: month,
+      year: year,
+      quarter: quarter,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      limit: limit,
+    );
+    invalidateCache('GET:${uri.toString()}');
   }
 
   Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId, {int ttlSeconds = 60}) async {

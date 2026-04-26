@@ -1,21 +1,25 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
-from app.core.role_deps import require_write_access
+from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models import AttendanceRecord, AttendanceSession, User
 from app.schemas.attendance import (
     AttendanceManualCheckinRequest,
+    AttendanceMyPositionRead,
     AttendanceMyStatsRead,
     AttendancePeriodBucketRead,
     AttendanceQrPayloadResponse,
+    AttendanceRankingEntryRead,
+    AttendanceRankingRead,
     AttendanceRecordRead,
     AttendanceRecordWithSessionRead,
     AttendanceScanRequest,
@@ -29,6 +33,7 @@ from app.schemas.attendance import (
 from app.services.attendance_realtime import attendance_manager
 from app.services.attendance_service import (
     add_record_manual,
+    attendance_ranking as attendance_ranking_service,
     close_attendance_session,
     create_attendance_session,
     delete_attendance_record,
@@ -117,6 +122,65 @@ async def attendance_stats_students(
         )
         for r in rows
     ]
+
+
+@router.get("/ranking", response_model=AttendanceRankingRead)
+async def attendance_get_ranking(
+    academy_id: UUID | None = Query(None),
+    period: Literal["month", "quarter", "year", "custom"] = Query(
+        "month", description="month | quarter | year | custom"
+    ),
+    month: str | None = Query(None, description="Formato YYYY-MM (usado em period=month)"),
+    year: int | None = Query(None, ge=2000, le=2100, description="Ano para period=quarter/year"),
+    quarter: int | None = Query(None, ge=1, le=4, description="Trimestre 1..4 (usado em period=quarter)"),
+    date_from: date | None = Query(None, description="Início YYYY-MM-DD (usado em period=custom)"),
+    date_to: date | None = Query(None, description="Fim YYYY-MM-DD (usado em period=custom)"),
+    limit: int = Query(10, ge=1, le=10),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_read_access),
+):
+    data = await attendance_ranking_service(
+        db,
+        current_user=current_user,
+        academy_id=academy_id,
+        period=period,  # validated in service with clear 400 errors
+        month=month,
+        year=year,
+        quarter=quarter,
+        date_from=date_from,
+        date_to=date_to,
+        limit=limit,
+    )
+    return AttendanceRankingRead(
+        month=data.month,
+        period_kind=data.period_kind,
+        period_label=data.period_label,
+        period_start=data.period_start,
+        period_end=data.period_end,
+        ranking=[
+            AttendanceRankingEntryRead(
+                position=r.position,
+                student_id=r.student_id,
+                name=r.name,
+                avatar_url=r.avatar_url,
+                belt=r.belt,
+                total_checkins=r.total_checkins,
+                attendance_percentage=r.attendance_percentage,
+                position_change=r.position_change,
+            )
+            for r in data.ranking
+        ],
+        my_position=(
+            AttendanceMyPositionRead(
+                position=data.my_position.position,
+                total_checkins=data.my_position.total_checkins,
+                attendance_percentage=data.my_position.attendance_percentage,
+                position_change=data.my_position.position_change,
+            )
+            if data.my_position is not None
+            else None
+        ),
+    )
 
 
 @router.get("/stats/me", response_model=AttendanceMyStatsRead)

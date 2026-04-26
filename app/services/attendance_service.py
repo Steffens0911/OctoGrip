@@ -703,6 +703,12 @@ def _month_add1(d: date) -> date:
     return date(d.year, d.month + 1, 1)
 
 
+def _month_sub1(d: date) -> date:
+    if d.month == 1:
+        return date(d.year - 1, 12, 1)
+    return date(d.year, d.month - 1, 1)
+
+
 def _last_day_of_month(d: date) -> date:
     nxt = _month_add1(date(d.year, d.month, 1))
     return nxt - timedelta(days=1)
@@ -766,6 +772,368 @@ class AttendanceMyStatsData(NamedTuple):
     history_total: int
     history_limit: int
     history_offset: int
+
+
+class AttendanceRankingSqlRow(NamedTuple):
+    student_id: UUID
+    name: str | None
+    email: str
+    belt: str | None
+    total_checkins: int
+    position: int
+
+
+class AttendanceRankingRow(NamedTuple):
+    position: int
+    student_id: UUID
+    name: str
+    avatar_url: str | None
+    belt: str | None
+    total_checkins: int
+    attendance_percentage: int
+    position_change: int | None
+
+
+class AttendanceMyPositionRow(NamedTuple):
+    position: int
+    total_checkins: int
+    attendance_percentage: int
+    position_change: int | None
+
+
+class AttendanceRankingResult(NamedTuple):
+    month: str | None
+    period_kind: Literal["month", "quarter", "year", "custom"]
+    period_label: str
+    period_start: date
+    period_end: date
+    ranking: list[AttendanceRankingRow]
+    my_position: AttendanceMyPositionRow | None
+
+
+class AttendanceRankingPeriodWindow(NamedTuple):
+    kind: Literal["month", "quarter", "year", "custom"]
+    label: str
+    start: datetime
+    end: datetime
+    start_date: date
+    end_date: date
+    prev_start: datetime | None
+    prev_end: datetime | None
+
+
+def _parse_ranking_month(month: str | None, *, default_month: date | None = None) -> date:
+    if month is None or not month.strip():
+        base = default_month or _now_utc().date()
+        return date(base.year, base.month, 1)
+    try:
+        parsed = datetime.strptime(month.strip(), "%Y-%m").date()
+        return date(parsed.year, parsed.month, 1)
+    except ValueError as exc:
+        raise AppError("Parâmetro month inválido. Use YYYY-MM.", status_code=400) from exc
+
+
+def _month_range_utc(month_start: date) -> tuple[datetime, datetime]:
+    start = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
+    nxt = _month_add1(month_start)
+    end = datetime(nxt.year, nxt.month, 1, tzinfo=timezone.utc)
+    return start, end
+
+
+def _year_range_utc(year_value: int) -> tuple[datetime, datetime]:
+    start = datetime(year_value, 1, 1, tzinfo=timezone.utc)
+    end = datetime(year_value + 1, 1, 1, tzinfo=timezone.utc)
+    return start, end
+
+
+def _quarter_start_date(year_value: int, quarter_value: int) -> date:
+    month_value = ((quarter_value - 1) * 3) + 1
+    return date(year_value, month_value, 1)
+
+
+def _quarter_range_utc(year_value: int, quarter_value: int) -> tuple[datetime, datetime]:
+    start_date = _quarter_start_date(year_value, quarter_value)
+    if quarter_value == 4:
+        next_start = _quarter_start_date(year_value + 1, 1)
+    else:
+        next_start = _quarter_start_date(year_value, quarter_value + 1)
+    start = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
+    end = datetime(next_start.year, next_start.month, next_start.day, tzinfo=timezone.utc)
+    return start, end
+
+
+def _custom_range_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
+    start = datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc)
+    next_day = date_to + timedelta(days=1)
+    end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=timezone.utc)
+    return start, end
+
+
+def _resolve_ranking_period_window(
+    *,
+    period: Literal["month", "quarter", "year", "custom"],
+    month: str | None,
+    year: int | None,
+    quarter: int | None,
+    date_from: date | None,
+    date_to: date | None,
+) -> AttendanceRankingPeriodWindow:
+    now = _now_utc().date()
+    period_kind = period.strip().lower()
+    if period_kind not in {"month", "quarter", "year", "custom"}:
+        raise AppError("Parâmetro period inválido. Use month, quarter, year ou custom.", status_code=400)
+
+    if period_kind == "month":
+        month_start = _parse_ranking_month(month, default_month=now)
+        start, end = _month_range_utc(month_start)
+        prev_month_start = _month_sub1(month_start)
+        prev_start, prev_end = _month_range_utc(prev_month_start)
+        return AttendanceRankingPeriodWindow(
+            kind="month",
+            label=_month_label(month_start),
+            start=start,
+            end=end,
+            start_date=month_start,
+            end_date=_month_add1(month_start) - timedelta(days=1),
+            prev_start=prev_start,
+            prev_end=prev_end,
+        )
+
+    if period_kind == "quarter":
+        year_value = year or now.year
+        quarter_value = quarter or (((now.month - 1) // 3) + 1)
+        if quarter_value < 1 or quarter_value > 4:
+            raise AppError("Parâmetro quarter inválido. Use 1, 2, 3 ou 4.", status_code=400)
+        start, end = _quarter_range_utc(year_value, quarter_value)
+        if quarter_value == 1:
+            prev_year = year_value - 1
+            prev_quarter = 4
+        else:
+            prev_year = year_value
+            prev_quarter = quarter_value - 1
+        prev_start, prev_end = _quarter_range_utc(prev_year, prev_quarter)
+        start_date = _quarter_start_date(year_value, quarter_value)
+        return AttendanceRankingPeriodWindow(
+            kind="quarter",
+            label=f"{year_value}-Q{quarter_value}",
+            start=start,
+            end=end,
+            start_date=start_date,
+            end_date=(end - timedelta(days=1)).date(),
+            prev_start=prev_start,
+            prev_end=prev_end,
+        )
+
+    if period_kind == "year":
+        year_value = year or now.year
+        start, end = _year_range_utc(year_value)
+        prev_start, prev_end = _year_range_utc(year_value - 1)
+        return AttendanceRankingPeriodWindow(
+            kind="year",
+            label=f"{year_value}",
+            start=start,
+            end=end,
+            start_date=date(year_value, 1, 1),
+            end_date=date(year_value, 12, 31),
+            prev_start=prev_start,
+            prev_end=prev_end,
+        )
+
+    if date_from is None or date_to is None:
+        raise AppError("Para period=custom, informe date_from e date_to (YYYY-MM-DD).", status_code=400)
+    if date_from > date_to:
+        raise AppError("date_from não pode ser maior que date_to.", status_code=400)
+    span_days = (date_to - date_from).days + 1
+    if span_days > 366:
+        raise AppError("Intervalo custom excede o máximo de 366 dias.", status_code=400)
+    start, end = _custom_range_utc(date_from, date_to)
+    return AttendanceRankingPeriodWindow(
+        kind="custom",
+        label=f"{date_from.isoformat()}_{date_to.isoformat()}",
+        start=start,
+        end=end,
+        start_date=date_from,
+        end_date=date_to,
+        prev_start=None,
+        prev_end=None,
+    )
+
+
+def _attendance_percentage_int(total_checkins: int, total_sessions: int) -> int:
+    if total_sessions <= 0:
+        return 0
+    pct = round((total_checkins / total_sessions) * 100)
+    return max(0, min(int(pct), 100))
+
+
+async def _ranking_rows_for_range(
+    db: AsyncSession,
+    *,
+    academy_id: UUID,
+    range_start: datetime,
+    range_end: datetime,
+) -> list[AttendanceRankingSqlRow]:
+    counts_subq = (
+        select(
+            AttendanceRecord.user_id.label("student_id"),
+            func.count(AttendanceRecord.id).label("total_checkins"),
+        )
+        .select_from(AttendanceRecord)
+        .join(AttendanceSession, AttendanceSession.id == AttendanceRecord.session_id)
+        .join(User, User.id == AttendanceRecord.user_id)
+        .where(
+            AttendanceSession.academy_id == academy_id,
+            AttendanceSession.starts_at >= range_start,
+            AttendanceSession.starts_at < range_end,
+            User.academy_id == academy_id,
+            User.role == "aluno",
+        )
+        .group_by(AttendanceRecord.user_id)
+        .subquery()
+    )
+
+    name_sort = func.lower(func.coalesce(func.nullif(func.trim(User.name), ""), User.email))
+    ranked_stmt = (
+        select(
+            counts_subq.c.student_id,
+            User.name,
+            User.email,
+            User.graduation.label("belt"),
+            counts_subq.c.total_checkins,
+            func.row_number()
+            .over(
+                order_by=(
+                    counts_subq.c.total_checkins.desc(),
+                    name_sort.asc(),
+                    User.email.asc(),
+                )
+            )
+            .label("position"),
+        )
+        .select_from(counts_subq)
+        .join(User, User.id == counts_subq.c.student_id)
+        .order_by("position")
+    )
+
+    rows = (await db.execute(ranked_stmt)).all()
+    return [
+        AttendanceRankingSqlRow(
+            student_id=row[0],
+            name=row[1],
+            email=row[2],
+            belt=row[3],
+            total_checkins=int(row[4] or 0),
+            position=int(row[5] or 0),
+        )
+        for row in rows
+    ]
+
+
+async def attendance_ranking(
+    db: AsyncSession,
+    *,
+    current_user: User,
+    academy_id: UUID | None,
+    period: Literal["month", "quarter", "year", "custom"] = "month",
+    month: str | None = None,
+    year: int | None = None,
+    quarter: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 10,
+) -> AttendanceRankingResult:
+    aid = academy_id or current_user.academy_id
+    if aid is None:
+        raise AppError("Informe academy_id (administrador sem academia vinculada).", status_code=400)
+
+    if current_user.role != "administrador":
+        if not current_user.academy_id:
+            raise ForbiddenError("Usuário não está vinculado a uma academia.")
+        if aid != current_user.academy_id:
+            raise ForbiddenError("academy_id inválido para o seu perfil.")
+
+    verify_academy_access(current_user, str(aid), allow_none=False)
+
+    window = _resolve_ranking_period_window(
+        period=period,
+        month=month,
+        year=year,
+        quarter=quarter,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    total_sessions_raw = (
+        await db.execute(
+            select(func.count(AttendanceSession.id)).where(
+                AttendanceSession.academy_id == aid,
+                AttendanceSession.starts_at >= window.start,
+                AttendanceSession.starts_at < window.end,
+            )
+        )
+    ).scalar_one()
+    total_sessions = int(total_sessions_raw or 0)
+
+    current_rows = await _ranking_rows_for_range(
+        db,
+        academy_id=aid,
+        range_start=window.start,
+        range_end=window.end,
+    )
+    prev_rows: list[AttendanceRankingSqlRow] = []
+    if window.prev_start is not None and window.prev_end is not None:
+        prev_rows = await _ranking_rows_for_range(
+            db,
+            academy_id=aid,
+            range_start=window.prev_start,
+            range_end=window.prev_end,
+        )
+    prev_pos_by_student = {r.student_id: r.position for r in prev_rows}
+
+    lim = min(max(limit, 1), 10)
+    ranking: list[AttendanceRankingRow] = []
+    my_position: AttendanceMyPositionRow | None = None
+
+    for row in current_rows:
+        if window.kind == "custom":
+            position_change = None
+        else:
+            prev_pos = prev_pos_by_student.get(row.student_id)
+            position_change = None if prev_pos is None else int(prev_pos - row.position)
+        pct = _attendance_percentage_int(row.total_checkins, total_sessions)
+        display_name = (row.name or "").strip() or row.email
+
+        if row.position <= lim:
+            ranking.append(
+                AttendanceRankingRow(
+                    position=row.position,
+                    student_id=row.student_id,
+                    name=display_name,
+                    avatar_url=None,
+                    belt=row.belt,
+                    total_checkins=row.total_checkins,
+                    attendance_percentage=pct,
+                    position_change=position_change,
+                )
+            )
+
+        if row.student_id == current_user.id:
+            my_position = AttendanceMyPositionRow(
+                position=row.position,
+                total_checkins=row.total_checkins,
+                attendance_percentage=pct,
+                position_change=position_change,
+            )
+
+    return AttendanceRankingResult(
+        month=window.label if window.kind == "month" else None,
+        period_kind=window.kind,
+        period_label=window.label,
+        period_start=window.start_date,
+        period_end=window.end_date,
+        ranking=ranking,
+        my_position=my_position,
+    )
 
 
 async def stats_me(
