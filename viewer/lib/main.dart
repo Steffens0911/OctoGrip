@@ -20,7 +20,6 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
-import 'package:viewer/theme/fantasy_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -220,13 +219,13 @@ class _MainShellState extends State<MainShell> {
     final role = (auth.currentUser?.role ?? 'aluno').trim().toLowerCase();
     // Aba Admin só com papel **efetivo** administrador global (não basta ser admin real em «Atuar como» gerente/aluno).
     if (role == 'administrador') {
-      return ['Campo de treinamento', 'Academia', 'Admin'];
+      return ['Campo de treinamento', 'Central', 'Academia', 'Admin'];
     }
     // Aluno não usa o painel da academia na navegação inferior.
     if (role == 'aluno') {
-      return ['Campo de treinamento'];
+      return ['Campo de treinamento', 'Central'];
     }
-    return ['Campo de treinamento', 'Academia'];
+    return ['Campo de treinamento', 'Central', 'Academia'];
   }
 
   Widget _missionsHome() {
@@ -251,6 +250,8 @@ class _MainShellState extends State<MainShell> {
   Widget _currentBody(AuthService auth, List<String> tabs) {
     final i = _safeTabIndex(tabs);
     switch (tabs[i]) {
+      case 'Central':
+        return const StudentAcademyHubScreen();
       case 'Academia':
         return const AcademyPanelScreen();
       case 'Admin':
@@ -341,48 +342,7 @@ class _MainShellState extends State<MainShell> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (effectiveUser != null &&
-                tabs.isNotEmpty &&
-                tabs[tabIndex] == 'Campo de treinamento') ...[
-              const SizedBox(width: 10),
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(12),
-                  onTap: () => Navigator.push<void>(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (context) => const StudentAcademyHubScreen(),
-                    ),
-                  ),
-                  child: Ink(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: FantasyTheme.xpGreen.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.dashboard_rounded,
-                          size: 20,
-                          color: FantasyTheme.xpGreen,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Central',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: FantasyTheme.xpGreen,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            // "Central" agora é uma aba na navegação inferior (ao lado de Campo de treinamento).
           ],
         ),
         // Último item da lista = extremo direito da tela → [Sair] fica na borda direita.
@@ -526,6 +486,13 @@ class _MainShellState extends State<MainShell> {
                       _selected = tabs.indexOf('Campo de treinamento');
                       _inicioRefreshKey++;
                     }),
+                  ),
+                if (tabs.contains('Central'))
+                  _NavItem(
+                    icon: Icons.dashboard_rounded,
+                    label: 'Central',
+                    selected: tabIndex == tabs.indexOf('Central'),
+                    onTap: () => setState(() => _selected = tabs.indexOf('Central')),
                   ),
                 if (tabs.contains('Academia'))
                   _NavItem(
