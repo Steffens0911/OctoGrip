@@ -20,6 +20,7 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
+import 'package:viewer/theme/fantasy_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -347,7 +348,7 @@ class _MainShellState extends State<MainShell> {
               Material(
                 color: Colors.transparent,
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => Navigator.push<void>(
                     context,
                     MaterialPageRoute<void>(
@@ -355,36 +356,24 @@ class _MainShellState extends State<MainShell> {
                     ),
                   ),
                   child: Ink(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.12),
-                      ),
+                      color: FantasyTheme.xpGreen.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.dashboard_rounded,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.onSurface,
+                          size: 20,
+                          color: FantasyTheme.xpGreen,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Central',
                           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface,
+                                color: FantasyTheme.xpGreen,
                                 fontWeight: FontWeight.w700,
                               ),
                         ),
