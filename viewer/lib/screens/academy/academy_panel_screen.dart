@@ -5,19 +5,13 @@ import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
-import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/marketplace_list_screen.dart';
-import 'package:viewer/screens/admin/training_video_list_screen.dart';
-import 'package:viewer/screens/admin/user_list_screen.dart';
-import 'package:viewer/screens/academy/attendance_frequency_screen.dart';
-import 'package:viewer/screens/academy/attendance_history_screen.dart';
-import 'package:viewer/screens/academy/attendance_session_screen.dart';
 import 'package:viewer/screens/academy/academy_training_field_screen.dart';
+import 'package:viewer/screens/academy/academy_students_screen.dart';
+import 'package:viewer/screens/academy/academy_attendance_hub_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
-import 'package:viewer/screens/admin/academy_active_students_screen.dart';
-import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {
@@ -32,7 +26,6 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   List<Academy> _academies = [];
   bool _loading = true;
   String? _error;
-  String? _selectedAcademyId;
 
   @override
   void initState() {
@@ -48,16 +41,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     try {
       final list = await _api.getAcademies();
       if (mounted) {
-        final currentAcademyId = AuthService().currentUser?.academyId;
-        final nextSelected = _selectedAcademyId ??
-            (currentAcademyId != null &&
-                    currentAcademyId.isNotEmpty &&
-                    list.any((a) => a.id == currentAcademyId)
-                ? currentAcademyId
-                : (list.length == 1 ? list.first.id : null));
         setState(() {
           _academies = list;
-          _selectedAcademyId = nextSelected;
           _loading = false;
         });
       }
@@ -100,22 +85,13 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      // Cards fixos: usuários + chamada + histórico + frequência + técnicas + vídeos + loja (+ push)
-      count += kPushNotificationsEnabled ? 8 : 7;
+      // Cards fixos: loja (+ push)
+      count += kPushNotificationsEnabled ? 2 : 1;
     }
     return count;
   }
 
-  Academy? get _selectedAcademy {
-    final id = _selectedAcademyId;
-    if (id == null || id.isEmpty) return null;
-    for (final a in _academies) {
-      if (a.id == id) return a;
-    }
-    return null;
-  }
-
-  Academy? get _resolvedTrainingAcademy {
+  Academy? get _resolvedAcademy {
     if (_academies.length == 1) return _academies.first;
     final currentAcademyId = AuthService().currentUser?.academyId;
     if (currentAcademyId != null && currentAcademyId.isNotEmpty) {
@@ -123,7 +99,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         if (a.id == currentAcademyId) return a;
       }
     }
-    return _selectedAcademy;
+    return null;
   }
 
   Widget _buildListItem(BuildContext context, int index) {
@@ -131,150 +107,6 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
         AuthService().isManager() || AuthService().isProfessor();
 
     if (isManagerOrProfessor && index == 0) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.people_rounded, color: AppTheme.primary),
-          ),
-          title: const Text('Usuários da academia',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          subtitle:
-              const Text('Cadastrar e gerenciar usuários da sua academia'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const UserListScreen()),
-          ),
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 1) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.qr_code_rounded, color: AppTheme.primary),
-          ),
-          title: const Text('Chamada (QR)',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          subtitle: const Text('Iniciar chamada e ver presenças em tempo real'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AttendanceSessionScreen()),
-          ),
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 2) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.history_rounded, color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Histórico de chamadas',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Ver sessões, corrigir presenças (adicionar ou remover)',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AttendanceHistoryScreen()),
-          ),
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 3) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Frequência',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Minhas sessões no período e frequência dos alunos da academia',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AttendanceFrequencyScreen()),
-          ),
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 4) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.alt_route_rounded, color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Técnicas (para serem vinculadas aos troféus e posições da semana)',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            final academyId = AuthService().currentUser?.academyId;
-            if (academyId == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Seu usuário não está vinculado a uma academia. Peça ao administrador para vincular seu perfil.',
-                  ),
-                ),
-              );
-              return;
-            }
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => TechniqueListScreen(
-                  academyId: academyId,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 5) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.ondemand_video_rounded,
-                color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Vídeo da tarefa diária',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Cadastrar vídeos da tarefa diária da sua academia',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const TrainingVideoListScreen(
-                localOnly: true,
-              ),
-            ),
-          ),
-        ),
-      );
-    } else if (isManagerOrProfessor && index == 6) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -315,7 +147,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       );
     } else if (isManagerOrProfessor &&
         kPushNotificationsEnabled &&
-        index == 7) {
+        index == 1) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -357,7 +189,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
     // Cards fixos no topo; academias após Usuários + chamada + histórico + frequência + técnicas + vídeos + Loja (+ push).
     final managerOffset =
-        isManagerOrProfessor ? (kPushNotificationsEnabled ? 8 : 7) : 0;
+        isManagerOrProfessor ? (kPushNotificationsEnabled ? 2 : 1) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();
@@ -384,7 +216,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final resolvedTrainingAcademy = _resolvedTrainingAcademy;
+    final resolvedAcademy = _resolvedAcademy;
     return RoleGuard(
       allowedRoles: const [
         'administrador',
@@ -450,99 +282,78 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                                   style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
-                                  resolvedTrainingAcademy != null
+                                  resolvedAcademy != null
                                       ? 'Posições e técnicas + troféus e missões semanais'
-                                      : 'Selecione uma academia para liberar este atalho',
+                                      : 'Seu usuário não está vinculado a uma academia',
                                 ),
                                 trailing: const Icon(Icons.chevron_right),
-                                enabled: resolvedTrainingAcademy != null,
-                                onTap: resolvedTrainingAcademy == null
+                                enabled: resolvedAcademy != null,
+                                onTap: resolvedAcademy == null
                                     ? null
                                     : () => Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (context) => AcademyTrainingFieldScreen(
-                                              academy: resolvedTrainingAcademy,
+                                              academy: resolvedAcademy,
                                             ),
                                           ),
                                         ),
                               ),
                             ),
 
-                            // Cards “Editar pontos” e “Alunos ativos” ficam apenas na página inicial do Gestão.
-                            if (AuthService().isAdmin() || AuthService().isManager() || AuthService().isSupervisor()) ...[
-                              DropdownButtonFormField<String>(
-                                initialValue: _selectedAcademyId,
-                                decoration: const InputDecoration(
-                                  labelText: 'Academia',
-                                  border: OutlineInputBorder(),
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.qr_code_rounded, color: AppTheme.primary),
                                 ),
-                                items: _academies
-                                    .map(
-                                      (a) => DropdownMenuItem<String>(
-                                        value: a.id,
-                                        child: Text(a.name, overflow: TextOverflow.ellipsis),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (v) => setState(() => _selectedAcademyId = v),
+                                title: const Text(
+                                  'Chamada e frequência',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: const Text(
+                                  'Chamada (QR), histórico e frequência',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const AcademyAttendanceHubScreen(),
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 12),
-                              if (_selectedAcademy != null) ...[
-                                Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                      child: const Icon(Icons.edit_note, color: AppTheme.primary),
-                                    ),
-                                    title: const Text(
-                                      'Editar pontos dos alunos',
-                                      style: TextStyle(fontWeight: FontWeight.w600),
-                                    ),
-                                    subtitle: const Text(
-                                      'Ajustar pontuação manual dos alunos desta academia',
-                                    ),
-                                    trailing: const Icon(Icons.chevron_right),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AcademyPointsEditScreen(
-                                          academyId: _selectedAcademy!.id,
-                                          academyName: _selectedAcademy!.name,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                            ),
+
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.school_rounded, color: AppTheme.primary),
                                 ),
-                                Card(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  child: ListTile(
-                                    leading: CircleAvatar(
-                                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                      child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
-                                    ),
-                                    title: const Text(
-                                      'Alunos ativos (últimos 7 dias)',
-                                      style: TextStyle(fontWeight: FontWeight.w600),
-                                    ),
-                                    subtitle: const Text(
-                                      'Ver quem está usando o app recentemente nesta academia',
-                                    ),
-                                    trailing: const Icon(Icons.chevron_right),
-                                    onTap: () => Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => AcademyActiveStudentsScreen(
-                                          academy: _selectedAcademy!,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                title: const Text(
+                                  'Alunos',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
                                 ),
-                              ],
-                              const SizedBox(height: 8),
-                            ],
+                                subtitle: Text(
+                                  resolvedAcademy != null
+                                      ? 'Usuários, pontos e alunos ativos'
+                                      : 'Seu usuário não está vinculado a uma academia',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                enabled: resolvedAcademy != null,
+                                onTap: resolvedAcademy == null
+                                    ? null
+                                    : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AcademyStudentsScreen(academy: resolvedAcademy),
+                                          ),
+                                        ),
+                              ),
+                            ),
 
                             // Lista existente (cards fixos + academias).
                             ...List.generate(_getItemCount(), (index) => _buildListItem(context, index)),

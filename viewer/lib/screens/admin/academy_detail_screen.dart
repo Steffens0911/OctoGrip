@@ -10,6 +10,7 @@ import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:viewer/screens/admin/partner_list_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
+import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/trophy_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -686,7 +687,33 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-            child: _buildTrainingFieldSections(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                      child: const Icon(Icons.ondemand_video_rounded, color: AppTheme.primary),
+                    ),
+                    title: const Text(
+                      'Vídeo da tarefa diária',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: const Text('Cadastrar vídeos da tarefa diária da sua academia'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TrainingVideoListScreen(localOnly: true),
+                      ),
+                    ),
+                  ),
+                ),
+                AppSpacing.verticalM,
+                _buildTrainingFieldSections(),
+              ],
+            ),
           ),
         ),
       );

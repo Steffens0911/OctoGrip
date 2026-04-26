@@ -219,13 +219,13 @@ class _MainShellState extends State<MainShell> {
     final role = (auth.currentUser?.role ?? 'aluno').trim().toLowerCase();
     // Aba Admin só com papel **efetivo** administrador global (não basta ser admin real em «Atuar como» gerente/aluno).
     if (role == 'administrador') {
-      return ['Campo de treinamento', 'Central', 'Academia', 'Admin'];
+      return ['Campo de treinamento', 'Central', 'Gestão', 'Admin'];
     }
     // Aluno não usa o painel da academia na navegação inferior.
     if (role == 'aluno') {
       return ['Campo de treinamento', 'Central'];
     }
-    return ['Campo de treinamento', 'Central', 'Academia'];
+    return ['Campo de treinamento', 'Central', 'Gestão'];
   }
 
   Widget _missionsHome() {
@@ -252,7 +252,7 @@ class _MainShellState extends State<MainShell> {
     switch (tabs[i]) {
       case 'Central':
         return const StudentAcademyHubScreen();
-      case 'Academia':
+      case 'Gestão':
         return const AcademyPanelScreen();
       case 'Admin':
         return const AdminSectionScreen();
@@ -494,12 +494,12 @@ class _MainShellState extends State<MainShell> {
                     selected: tabIndex == tabs.indexOf('Central'),
                     onTap: () => setState(() => _selected = tabs.indexOf('Central')),
                   ),
-                if (tabs.contains('Academia'))
+                if (tabs.contains('Gestão'))
                   _NavItem(
                     icon: Icons.dashboard_rounded,
-                    label: 'Academia',
-                    selected: tabIndex == tabs.indexOf('Academia'),
-                    onTap: () => setState(() => _selected = tabs.indexOf('Academia')),
+                    label: 'Gestão',
+                    selected: tabIndex == tabs.indexOf('Gestão'),
+                    onTap: () => setState(() => _selected = tabs.indexOf('Gestão')),
                   ),
                 if (tabs.contains('Admin'))
                   _NavItem(
