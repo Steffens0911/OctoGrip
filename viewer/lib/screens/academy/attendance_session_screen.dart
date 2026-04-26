@@ -315,6 +315,24 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
   }
 
+  Future<void> _safeRefreshQr({bool showErrors = false}) async {
+    try {
+      await _refreshQr(showErrors: showErrors);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = userFacingMessage(e);
+      setState(() {
+        _isRefreshingQr = false;
+        _qrRefreshStartedAt = null;
+        _qrError = msg;
+      });
+      if (showErrors) {
+        AppFeedback.show(context, message: msg, type: AppFeedbackType.error);
+      }
+      _scheduleQrRetry();
+    }
+  }
+
   void _scheduleQrRetry({Duration delay = const Duration(seconds: 3)}) {
     final s = _session;
     if (!mounted || s == null) return;
@@ -325,7 +343,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       final current = _session;
       if (current == null || current.status.toLowerCase() == 'closed') return;
       if (_isRefreshingQr) return;
-      unawaited(_refreshQr());
+      unawaited(_safeRefreshQr());
     });
   }
 
@@ -348,7 +366,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
     }
     _invalidateCurrentQrForRefresh();
-    await _refreshQr(showErrors: true);
+    await _safeRefreshQr(showErrors: true);
   }
 
   void _applyQrPayload(AttendanceQrPayloadModel qr) {
@@ -403,7 +421,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       }
 
       if (_qr == null || _qrSecondsLeft <= 0) {
-        unawaited(_refreshQr());
+        unawaited(_safeRefreshQr());
       }
     });
   }
@@ -417,7 +435,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       return;
     }
     _invalidateCurrentQrForRefresh();
-    await _refreshQr();
+    await _safeRefreshQr();
   }
 
   Future<void> _hydrateMissingUsers(Iterable<AttendanceRecordModel> recs) async {
@@ -593,7 +611,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     return RefreshIndicator(
       onRefresh: () async {
         await _refreshSession();
-        await _refreshQr(showErrors: true);
+        await _safeRefreshQr(showErrors: true);
       },
       child: ListView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
@@ -688,7 +706,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                               unawaited(_forceRefreshQr());
                             },
                       icon: const Icon(Icons.refresh_rounded),
-                      label: Text(_isRefreshingQr ? 'Gerando...' : 'Gerar novo QR'),
+                      label: const Text('Gerar novo QR'),
                     ),
                 ],
               ),
