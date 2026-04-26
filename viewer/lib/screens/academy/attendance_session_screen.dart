@@ -39,10 +39,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   Timer? _refreshTimer;
   Timer? _countdownTimer;
   Timer? _qrRetryTimer;
+  Timer? _qrHeartbeatTimer;
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
   String? _qrError;
+  DateTime? _qrRefreshStartedAt;
 
   static const Duration _qrRequestTimeout = Duration(seconds: 10);
 
@@ -58,6 +60,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _refreshTimer?.cancel();
     _countdownTimer?.cancel();
     _qrRetryTimer?.cancel();
+    _qrHeartbeatTimer?.cancel();
     super.dispose();
   }
 
@@ -262,6 +265,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     setState(() {
       _isRefreshingQr = true;
       _qrError = null;
+      _qrRefreshStartedAt = DateTime.now();
     });
     try {
       final qr = await _api
@@ -299,7 +303,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _scheduleQrRetry();
     } finally {
       if (mounted) {
-        setState(() => _isRefreshingQr = false);
+        setState(() {
+          _isRefreshingQr = false;
+          _qrRefreshStartedAt = null;
+        });
       }
       // Garantia extra: se sair sem QR, tenta novamente em breve.
       if (_qr == null) {
@@ -332,7 +339,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   }
 
   Future<void> _forceRefreshQr() async {
-    if (_busy || _isRefreshingQr) return;
+    if (_busy) return;
+    // Se travar em "Gerando...", o botão manual destrava o estado local.
+    if (_isRefreshingQr && mounted) {
+      setState(() {
+        _isRefreshingQr = false;
+        _qrRefreshStartedAt = null;
+      });
+    }
     _invalidateCurrentQrForRefresh();
     await _refreshQr(showErrors: true);
   }
@@ -364,6 +378,33 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         return;
       }
       setState(() => _qrSecondsLeft -= 1);
+    });
+  }
+
+  void _startQrHeartbeat() {
+    _qrHeartbeatTimer?.cancel();
+    _qrHeartbeatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      final s = _session;
+      if (!mounted || s == null) return;
+      if (s.status.toLowerCase() == 'closed') return;
+
+      if (_isRefreshingQr) {
+        final startedAt = _qrRefreshStartedAt;
+        if (startedAt != null &&
+            DateTime.now().difference(startedAt) >
+                (_qrRequestTimeout + const Duration(seconds: 2))) {
+          setState(() {
+            _isRefreshingQr = false;
+            _qrRefreshStartedAt = null;
+          });
+          _scheduleQrRetry(delay: const Duration(seconds: 1));
+        }
+        return;
+      }
+
+      if (_qr == null || _qrSecondsLeft <= 0) {
+        unawaited(_refreshQr());
+      }
     });
   }
 
@@ -453,6 +494,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
       _applyQrPayload(qr);
       _startAutoRefresh();
+      _startQrHeartbeat();
       _startLive(s.id);
       AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
@@ -480,6 +522,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
     _stopLive();
     _qrRetryTimer?.cancel();
+    _qrHeartbeatTimer?.cancel();
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
@@ -639,7 +682,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                   ],
                   if (!isClosed)
                     OutlinedButton.icon(
-                      onPressed: (_busy || _isRefreshingQr)
+                      onPressed: _busy
                           ? null
                           : () {
                               unawaited(_forceRefreshQr());
