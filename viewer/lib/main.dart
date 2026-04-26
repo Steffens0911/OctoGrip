@@ -496,7 +496,7 @@ class _MainShellState extends State<MainShell> {
                   ),
                 if (tabs.contains('Gestão'))
                   _NavItem(
-                    icon: Icons.dashboard_rounded,
+                    icon: Icons.business_center,
                     label: 'Gestão',
                     selected: tabIndex == tabs.indexOf('Gestão'),
                     onTap: () => setState(() => _selected = tabs.indexOf('Gestão')),
