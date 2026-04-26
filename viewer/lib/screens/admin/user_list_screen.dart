@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
@@ -25,6 +26,7 @@ class _UserListScreenState extends State<UserListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
   Timer? _debounceTimer;
+  bool _importing = false;
   List<models.UserModel> _allItems = [];
   List<models.UserModel> _filteredItems = [];
   List<Academy> _academies = [];
@@ -137,6 +139,131 @@ class _UserListScreenState extends State<UserListScreen> {
     if (mounted) _load();
   }
 
+  Future<void> _bulkImportStudents() async {
+    if (_importing) return;
+    final isAdmin = AuthService().isAdmin();
+    final academyId = isAdmin ? _filterAcademyId : AuthService().currentUser?.academyId;
+    if (academyId == null || academyId.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: isAdmin
+            ? 'Selecione uma academia no filtro para importar alunos.'
+            : 'Seu usuário não está vinculado a uma academia.',
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+
+    final pick = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx'],
+      withData: true,
+    );
+    if (!mounted) return;
+    if (pick == null || pick.files.isEmpty) return;
+    final f = pick.files.single;
+    final bytes = f.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: 'Não foi possível ler o arquivo. Tente novamente.',
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+
+    setState(() => _importing = true);
+    try {
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const AlertDialog(
+            content: SizedBox(
+              height: 64,
+              child: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Expanded(child: Text('Importando alunos...')),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      final result = await _api.bulkImportStudentsXlsx(
+        academyId: academyId,
+        bytes: bytes,
+        filename: f.name,
+      );
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+
+      final summary = (result['summary'] as Map?) ?? const {};
+      final created = summary['created'] ?? 0;
+      final skipped = summary['skipped'] ?? 0;
+      final failed = summary['failed'] ?? 0;
+
+      final results = (result['results'] as List?) ?? const [];
+      final failedLines = results.where((e) => e is Map && e['ok'] == false).take(10).toList();
+
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Importação concluída'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Criados: $created'),
+                  Text('Pulados: $skipped'),
+                  Text('Com erro: $failed'),
+                  if (failedLines.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Text('Primeiros erros:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    ...failedLines.map((e) {
+                      final m = e as Map;
+                      final row = m['row_number'] ?? '?';
+                      final errs = (m['errors'] as List?) ?? const [];
+                      final first = errs.isNotEmpty && errs.first is Map ? (errs.first as Map)['message'] : null;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text('Linha $row: ${first ?? 'Erro na linha'}'),
+                      );
+                    }),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (mounted) _load();
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        AppFeedback.show(
+          context,
+          message: userFacingMessage(e),
+          type: AppFeedbackType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _importing = false);
+    }
+  }
+
   Future<void> _delete(models.UserModel u) async {
     final controller = TextEditingController();
     final ok = await showDialog<bool>(
@@ -147,7 +274,9 @@ class _UserListScreenState extends State<UserListScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Esta ação é irreversível sem backup SQL. Para confirmar, digite o e-mail do utilizador:'),
+            const Text(
+              'Esta ação é irreversível sem backup SQL. Para confirmar, digite o e-mail do utilizador:',
+            ),
             const SizedBox(height: 8),
             Text(u.email, style: const TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
@@ -202,7 +331,17 @@ class _UserListScreenState extends State<UserListScreen> {
   Widget build(BuildContext context) {
     final hasFilters = _searchController.text.isNotEmpty || _filterAcademyId != null || _filterGraduation != null;
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Usuários'),
+      appBar: AppStandardAppBar(
+        title: 'Usuários',
+        actions: [
+          if (AuthService().canEditResources())
+            IconButton(
+              tooltip: 'Importar alunos (Excel)',
+              onPressed: _importing ? null : _bulkImportStudents,
+              icon: const Icon(Icons.upload_file),
+            ),
+        ],
+      ),
       body: _loading
           ? const AppScreenState.loading()
           : _error != null

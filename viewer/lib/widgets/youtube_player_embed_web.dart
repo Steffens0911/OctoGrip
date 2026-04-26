@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 final _registered = <String>{};
+final _iframesByVideoId = <String, html.IFrameElement>{};
 
 /// Web: embed do YouTube via iframe (permite modo reels com aspect ratio vertical).
 Widget buildYoutubeEmbed({
@@ -28,6 +29,7 @@ Widget buildYoutubeEmbed({
         ..height = '100%'
         ..allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
         ..allowFullscreen = true;
+      _iframesByVideoId[videoId] = iframe;
       return iframe;
     });
   }
@@ -38,4 +40,12 @@ Widget buildYoutubeEmbed({
       child: HtmlElementView(viewType: viewType),
     ),
   );
+}
+
+/// Controla se o iframe pode receber eventos de mouse/scroll.
+/// Útil para garantir que overlays (dialogs/bottom sheets) capturem input no Flutter Web.
+void setYoutubePointerEvents({required String videoId, required bool enabled}) {
+  final iframe = _iframesByVideoId[videoId];
+  if (iframe == null) return;
+  iframe.style.pointerEvents = enabled ? 'auto' : 'none';
 }

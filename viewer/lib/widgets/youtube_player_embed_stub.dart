@@ -45,3 +45,6 @@ Widget buildYoutubeEmbed({
     ),
   );
 }
+
+/// No-op fora do web.
+void setYoutubePointerEvents({required String videoId, required bool enabled}) {}

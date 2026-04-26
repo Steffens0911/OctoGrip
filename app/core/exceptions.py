@@ -114,6 +114,11 @@ class AttendanceSessionNotFoundError(NotFoundError):
         super().__init__(message)
 
 
+class AttendanceRecordNotFoundError(NotFoundError):
+    def __init__(self, message: str = "Registo de presença não encontrado."):
+        super().__init__(message)
+
+
 class AttendanceSessionClosedError(AppError):
     def __init__(self, message: str = "Sessão de chamada encerrada."):
         super().__init__(message, status_code=409)

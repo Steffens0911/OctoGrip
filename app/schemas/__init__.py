@@ -4,11 +4,18 @@ from app.schemas.mission import MissionTodayResponse
 from app.schemas.mission_usage import MissionUsageSyncRequest, MissionUsageSyncResponse
 from app.schemas.training_feedback import TrainingFeedbackRequest, TrainingFeedbackResponse
 from app.schemas.attendance import (
+    AttendanceManualCheckinRequest,
+    AttendanceMyStatsRead,
+    AttendancePeriodBucketRead,
     AttendanceQrPayloadResponse,
     AttendanceRecordRead,
+    AttendanceRecordWithSessionRead,
     AttendanceScanRequest,
     AttendanceSessionCreate,
     AttendanceSessionRead,
+    AttendanceSessionStatRead,
+    AttendanceStudentDetailRead,
+    AttendanceStudentStatRead,
     AttendanceUserSummaryResponse,
 )
 
@@ -23,10 +30,17 @@ __all__ = [
     "MissionUsageSyncResponse",
     "TrainingFeedbackRequest",
     "TrainingFeedbackResponse",
+    "AttendanceManualCheckinRequest",
+    "AttendanceMyStatsRead",
+    "AttendancePeriodBucketRead",
     "AttendanceQrPayloadResponse",
     "AttendanceRecordRead",
+    "AttendanceRecordWithSessionRead",
     "AttendanceScanRequest",
     "AttendanceSessionCreate",
     "AttendanceSessionRead",
+    "AttendanceSessionStatRead",
+    "AttendanceStudentDetailRead",
+    "AttendanceStudentStatRead",
     "AttendanceUserSummaryResponse",
 ]

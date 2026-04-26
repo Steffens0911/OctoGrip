@@ -38,6 +38,7 @@ import 'package:viewer/widgets/partners_card.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
+import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
@@ -922,6 +923,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (u != null) ...[
                     const SizedBox(height: 16),
                     _buildAttendanceScanCard(),
+                    if (u.academyId != null && u.academyId!.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      _buildMyAttendanceStatsCard(),
+                    ],
                     const SizedBox(height: 16),
                     _buildConfirmationsAndRequestsSection(),
                     const SizedBox(height: 16),
@@ -1652,6 +1657,28 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (context) => const AttendanceScanScreen()),
+        ),
+      ),
+    );
+  }
+
+  /// Atalho para [AttendanceMyStatsScreen] — frequência própria (`GET /attendance/stats/me`).
+  Widget _buildMyAttendanceStatsCard() {
+    return Card(
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
+          child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
+        ),
+        title: const Text(
+          'Minha frequência',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text('Veja seu histórico e gráficos de presença'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute<void>(builder: (context) => const AttendanceMyStatsScreen()),
         ),
       ),
     );
