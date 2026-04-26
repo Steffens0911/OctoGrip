@@ -22,6 +22,8 @@ class AttendanceSessionScreen extends StatefulWidget {
 }
 
 class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
+  static const int _usersQueryLimit = 200;
+
   final _api = ApiService();
   AttendanceLiveService? _live;
   StreamSubscription<AttendanceLiveEvent>? _liveSub;
@@ -40,9 +42,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   int _qrSecondsLeft = 0;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
-  bool _qrPrefetchTriggered = false;
   String? _qrError;
-  int _qrRequestSeq = 0;
 
   static const Duration _qrRequestTimeout = Duration(seconds: 10);
 
@@ -259,7 +259,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (s == null || _isRefreshingQr) return;
     if ((s.status.toLowerCase() == 'closed')) return;
     _qrRetryTimer?.cancel();
-    final requestId = ++_qrRequestSeq;
     setState(() {
       _isRefreshingQr = true;
       _qrError = null;
@@ -268,7 +267,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       final qr = await _api
           .getAttendanceQrPayload(s.id, ttlSeconds: 60)
           .timeout(_qrRequestTimeout);
-      if (!mounted || requestId != _qrRequestSeq) return;
+      if (!mounted) return;
       _applyQrPayload(qr);
       return;
     } catch (_) {
@@ -276,14 +275,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
     try {
       await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted || requestId != _qrRequestSeq) return;
+      if (!mounted) return;
       final qr = await _api
           .getAttendanceQrPayload(s.id, ttlSeconds: 60)
           .timeout(_qrRequestTimeout);
-      if (!mounted || requestId != _qrRequestSeq) return;
+      if (!mounted) return;
       _applyQrPayload(qr);
     } catch (e) {
-      if (!mounted || requestId != _qrRequestSeq) return;
+      if (!mounted) return;
       final msg = userFacingMessage(e);
       setState(() {
         _qr = null;
@@ -299,8 +298,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       }
       _scheduleQrRetry();
     } finally {
-      if (mounted && requestId == _qrRequestSeq) {
+      if (mounted) {
         setState(() => _isRefreshingQr = false);
+      }
+      // Garantia extra: se sair sem QR, tenta novamente em breve.
+      if (_qr == null) {
+        _scheduleQrRetry();
       }
     }
   }
@@ -325,7 +328,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _qr = null;
       _qrSecondsLeft = 0;
       _qrError = null;
-      _qrPrefetchTriggered = false;
     });
   }
 
@@ -343,7 +345,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _qr = qr;
       _qrError = null;
       _qrSecondsLeft = initialSeconds;
-      _qrPrefetchTriggered = false;
     });
     _startCountdown();
   }
@@ -362,10 +363,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         unawaited(_handleQrExpired());
         return;
       }
-      if (_qrSecondsLeft <= 5 && !_qrPrefetchTriggered && !_isRefreshingQr) {
-        _qrPrefetchTriggered = true;
-        unawaited(_refreshQr());
-      }
       setState(() => _qrSecondsLeft -= 1);
     });
   }
@@ -373,6 +370,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   Future<void> _handleQrExpired() async {
     final s = _session;
     if (s == null || s.status.toLowerCase() == 'closed') return;
+    // Evita corrida entre expiração e refresh já em andamento.
+    if (_isRefreshingQr) {
+      _scheduleQrRetry(delay: const Duration(seconds: 1));
+      return;
+    }
     _invalidateCurrentQrForRefresh();
     await _refreshQr();
   }
@@ -401,7 +403,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         final users = await _api.getUsers(
           academyId: isAdmin ? null : academyId,
           offset: 0,
-          limit: 500,
+          limit: _usersQueryLimit,
         );
         if (!mounted) return;
         setState(() {
