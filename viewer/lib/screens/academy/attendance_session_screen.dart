@@ -35,6 +35,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   bool _loading = true;
   bool _busy = false;
+  bool _startingSession = false;
   String? _error;
   Timer? _refreshTimer;
   Timer? _countdownTimer;
@@ -100,7 +101,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           presentCount: e.presentCount,
         );
         final others = _records.where((r) => r.userId != e.record.userId).toList()..add(e.record);
-        others.sort((a, b) => a.checkedInAt.compareTo(b.checkedInAt));
+        // Mais recente primeiro.
+        others.sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt));
         _records = others;
       });
       unawaited(_hydrateMissingUsers([e.record]));
@@ -165,7 +167,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = recs;
+        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _busy = false;
       });
       await _hydrateUsersForRecords(recs);
@@ -205,7 +207,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = recs;
+        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _busy = false;
       });
       AppFeedback.show(context, message: 'Presença removida', type: AppFeedbackType.success);
@@ -249,7 +251,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = recs;
+        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
       });
       await _hydrateUsersForRecords(recs);
     } catch (_) {
@@ -507,26 +509,55 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     titleController.dispose();
     if (ok != true) return;
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _startingSession = true;
+    });
     try {
       final s = await _api.createAttendanceSession(title: title.isEmpty ? null : title, expiresInMinutes: 20);
-      final qr = await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
-      final recs = await _api.getAttendanceSessionRecords(s.id, limit: 500);
       if (!mounted) return;
       setState(() {
         _session = s;
-        _records = recs;
-        _busy = false;
+        _records = const [];
       });
-      _applyQrPayload(qr);
       _startAutoRefresh();
       _startQrHeartbeat();
       _startLive(s.id);
+
+      // Busca QR e presenças em paralelo; prioriza o QR para reduzir espera.
+      final qrFuture = _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
+      final recsFuture = _api.getAttendanceSessionRecords(s.id, limit: 500);
+
+      final qr = await qrFuture;
+      if (!mounted) return;
+      _applyQrPayload(qr);
+
+      try {
+        final recs = await recsFuture;
+        if (!mounted) return;
+        setState(() => _records = recs);
+        await _hydrateUsersForRecords(recs);
+      } catch (_) {
+        // ok: lista pode falhar por rede; WS + refresh continuam atualizando.
+      }
+
+      if (!mounted) return;
       AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _busy = false);
+      setState(() {
+        _busy = false;
+        _startingSession = false;
+      });
       AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      return;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _startingSession = false;
+        });
+      }
     }
   }
 
@@ -556,7 +587,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = closed;
-        _records = recs;
+        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _qr = null;
         _qrError = null;
         _qrSecondsLeft = 0;
@@ -598,8 +629,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: _busy ? null : _startSession,
-              icon: const Icon(Icons.qr_code_rounded),
-              label: const Text('Iniciar chamada'),
+              icon: _startingSession
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.qr_code_rounded),
+              label: Text(_startingSession ? 'Iniciando...' : 'Iniciar chamada'),
             ),
             const SizedBox(height: 12),
             Text(
