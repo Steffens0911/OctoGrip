@@ -9,6 +9,7 @@ import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/academy/academy_training_field_screen.dart';
 import 'package:viewer/screens/academy/academy_students_screen.dart';
 import 'package:viewer/screens/academy/academy_attendance_hub_screen.dart';
+import 'package:viewer/screens/academy/academy_customization_business_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
@@ -296,6 +297,36 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                                             builder: (context) => AcademyTrainingFieldScreen(
                                               academy: resolvedAcademy,
                                             ),
+                                          ),
+                                        ),
+                              ),
+                            ),
+
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.palette_rounded, color: AppTheme.primary),
+                                ),
+                                title: const Text(
+                                  'Personalização e Negócios',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  resolvedAcademy != null
+                                      ? 'Logo, quadro de horários, parceiros, avisos e visibilidade'
+                                      : 'Seu usuário não está vinculado a uma academia',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                enabled: resolvedAcademy != null,
+                                onTap: resolvedAcademy == null
+                                    ? null
+                                    : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AcademyCustomizationBusinessScreen(academy: resolvedAcademy),
                                           ),
                                         ),
                               ),
