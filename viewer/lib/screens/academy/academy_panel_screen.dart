@@ -164,9 +164,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
           backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
           child: const Icon(Icons.school, color: AppTheme.primary),
         ),
-        title: Text(
-          academy.name,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+        title: const Text(
+          'Relatórios',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
         // Subtitle "Missão do dia" removido conforme solicitado.
         trailing: const Icon(Icons.chevron_right),
