@@ -16,6 +16,7 @@ class HeaderWidget extends StatelessWidget {
     this.dailyVideoPoints = 30,
     this.dailyVideoCompleted = false,
     this.onDailyVideoTap,
+    this.onOpenRules,
   });
 
   final String userName;
@@ -30,6 +31,7 @@ class HeaderWidget extends StatelessWidget {
   /// Se true, badge mostra "Tarefa concluída · Ver de novo" (ainda clicável para assistir sem pontuar).
   final bool dailyVideoCompleted;
   final VoidCallback? onDailyVideoTap;
+  final VoidCallback? onOpenRules;
 
   @override
   Widget build(BuildContext context) {
@@ -51,12 +53,29 @@ class HeaderWidget extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'Olá, $userName!',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: FantasyTheme.textPrimaryOf(context),
-                  fontWeight: FontWeight.bold,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  'Olá, $userName!',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        color: FantasyTheme.textPrimaryOf(context),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
+              ),
+              if (onOpenRules != null)
+                TextButton.icon(
+                  onPressed: onOpenRules,
+                  icon: const Icon(Icons.rule_rounded, size: 18),
+                  label: const Text('Regras'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: FantasyTheme.textSecondaryOf(context),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+            ],
           ),
           AppSpacing.verticalS,
           Text(

@@ -266,6 +266,25 @@ async def create_execution(
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
 
+    # Regra global: só pode solicitar/registrar 1 execução por dia para o mesmo colega (adversário),
+    # independentemente de ser mission_id, lesson_id ou technique_id.
+    today = today_in_app_tz()
+    day_start_utc = combine_local_date_start_utc(today)
+    day_end_utc = combine_local_date_exclusive_end_utc(today)
+    already_indicated_today = await db.scalar(
+        select(func.count(TechniqueExecution.id)).where(
+            TechniqueExecution.user_id == user_id,
+            TechniqueExecution.opponent_id == opponent_id,
+            TechniqueExecution.created_at >= day_start_utc,
+            TechniqueExecution.created_at < day_end_utc,
+        )
+    )
+    if (already_indicated_today or 0) > 0:
+        raise AppError(
+            "Você já registrou uma execução com este colega hoje. Tente novamente amanhã.",
+            status_code=400,
+        )
+
     # Criar execução baseada no tipo
     if technique_id is not None:
         if academy_id is None:
@@ -273,26 +292,6 @@ async def create_execution(
         # Validar que academy_id do usuário corresponde ao informado (não-admins)
         if user.role != "administrador" and user.academy_id != academy_id:
             raise AppError("A academia informada deve ser a sua academia.", status_code=403)
-
-        # Regra de indicação: só pode indicar (solicitar confirmação) 1x por dia para o mesmo colega.
-        # Aplicado no fluxo "technique_id" (galeria de troféus / indicar adversário).
-        today = today_in_app_tz()
-        day_start_utc = combine_local_date_start_utc(today)
-        day_end_utc = combine_local_date_exclusive_end_utc(today)
-        already_indicated_today = await db.scalar(
-            select(func.count(TechniqueExecution.id)).where(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.opponent_id == opponent_id,
-                TechniqueExecution.technique_id.isnot(None),
-                TechniqueExecution.created_at >= day_start_utc,
-                TechniqueExecution.created_at < day_end_utc,
-            )
-        )
-        if (already_indicated_today or 0) > 0:
-            raise AppError(
-                "Você já indicou este colega hoje. Tente novamente amanhã.",
-                status_code=400,
-            )
 
         execution = await _create_technique_execution(
             db, user_id, opponent_id, technique_id, academy_id, usage_type

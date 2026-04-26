@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.auth_deps import require_aluno_not_frozen
+from app.core.exceptions import AppError
 from app.models import User
 from app.schemas.mission_complete import MissionCompleteRequest, MissionCompleteResponse
 from app.services.mission_complete_service import complete_mission
@@ -17,14 +18,13 @@ async def mission_complete(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),
 ):
-    """Registra conclusão da missão pelo usuário logado. 409 se já concluiu."""
-    usage = await complete_mission(
-        db, current_user.id, body.mission_id, usage_type=body.usage_type
-    )
-    assert usage.mission_id is not None
-    return MissionCompleteResponse(
-        user_id=usage.user_id,
-        mission_id=usage.mission_id,
-        completed_at=usage.completed_at,
-        points_awarded=int(usage.points_awarded or 0),
+    """
+    Conclusão de missão sem adversário.
+
+    Regra do produto: nenhuma conclusão pode ser feita sem adversário.
+    O fluxo correto para aluno é criar uma execução em `POST /executions` com `mission_id` + `opponent_id`.
+    """
+    raise AppError(
+        "Conclusão sem adversário não é permitida. Selecione um adversário para registrar a execução.",
+        status_code=400,
     )

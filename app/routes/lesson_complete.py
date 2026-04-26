@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.exceptions import AppError
 from app.models import User
 from app.schemas.lesson_complete import (
     LessonCompleteRequest,
@@ -33,11 +34,13 @@ async def lesson_complete(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),
 ):
-    """Registra conclusão da lição para o usuário logado. Impede conclusão duplicada."""
-    progress = await complete_lesson(db, current_user.id, body.lesson_id)
-    return LessonCompleteResponse(
-        lesson_id=progress.lesson_id,
-        user_id=progress.user_id,
-        completed_at=progress.completed_at,
-        points_awarded=int(progress.points_awarded),
+    """
+    Conclusão de lição sem adversário.
+
+    Regra do produto: nenhuma conclusão pode ser feita sem adversário.
+    O fluxo correto para aluno é criar uma execução em `POST /executions` com `lesson_id` + `opponent_id`.
+    """
+    raise AppError(
+        "Conclusão sem adversário não é permitida. Selecione um adversário para registrar a execução.",
+        status_code=400,
     )

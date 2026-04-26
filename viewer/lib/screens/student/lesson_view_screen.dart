@@ -2,14 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
-import 'package:viewer/constants/reward_points.dart';
-import 'package:viewer/core/leveling.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/gamification/animated_button.dart';
-import 'package:viewer/widgets/gamification/reward_screen.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
@@ -67,61 +64,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     }
   }
 
-  /// Fallback se a resposta JSON não trouxer `points_awarded` (API antiga).
-  /// Alinhado ao backend: [clampRewardPoints] sobre o multiplicador da missão.
-  int _estimatedXpForMission() => clampRewardPoints(widget.data.multiplier);
-
-  int _estimatedXpForLessonOnly() => minRewardPoints;
-
-  int? _pointsAwardedFrom(Map<String, dynamic> body) {
-    final v = body['points_awarded'];
-    if (v is int) return v;
-    if (v is num) return v.toInt();
-    return null;
-  }
-
-  /// Após POST bem-sucedido: busca pontos reais, mostra [RewardScreen], fecha a lição.
-  Future<void> _showRewardThenPopLesson({
-    required Map<String, dynamic> completeResponse,
-    required int xpFallback,
-    required String title,
-    String? subtitle,
-  }) async {
-    if (!mounted) return;
-    setState(() => _completing = false);
-
-    final fromApi = _pointsAwardedFrom(completeResponse);
-    final xpGained = fromApi ?? xpFallback;
-    final xpFootnote = fromApi == null
-        ? 'Estimativa no app; atualize a API para ver o valor exato.'
-        : null;
-
-    Map<String, dynamic> pointsMap;
-    try {
-      pointsMap = await _api.getUserPoints(widget.data.userId);
-    } catch (_) {
-      pointsMap = {'points': 0};
-    }
-    if (!mounted) return;
-    final prog = levelProgressFromUserPointsMap(pointsMap);
-    final fraction = prog.nextThreshold > 0
-        ? (prog.levelPoints / prog.nextThreshold).clamp(0.0, 1.0)
-        : 0.0;
-
-    await RewardScreen.show(
-      context,
-      title: title,
-      subtitle: subtitle,
-      xpGained: xpGained,
-      level: prog.level,
-      levelProgressFraction: fraction,
-      levelPointsInLevel: prog.levelPoints,
-      nextThreshold: prog.nextThreshold,
-      xpFootnote: xpFootnote,
-    );
-    if (mounted) Navigator.of(context).pop();
-  }
-
   Future<void> _fetchLessonCompletedStatus() async {
     final lessonId = widget.data.lessonId;
     if (lessonId == null) return;
@@ -135,6 +77,17 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
 
   Future<void> _complete() async {
     final d = widget.data;
+    final academyId = d.academyId?.trim();
+    if (academyId == null || academyId.isEmpty) {
+      AppFeedback.show(
+        context,
+        message:
+            'Você precisa estar vinculado a uma academia para concluir e selecionar um adversário.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
+
     if (d.missionId != null) {
       final usageTypeUi = await _showUsageTypeDialog();
       if (usageTypeUi == null || !mounted) return;
@@ -143,36 +96,24 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
           : usageTypeUi == 'natural'
               ? 'before_training'
               : usageTypeUi;
-      if (d.academyId != null && d.academyId!.isNotEmpty) {
-        // Missões da semana: oponente obrigatório (sem "Sem oponente"; cancelar aborta).
-        final opponentId =
-            await _showOpponentDialog(d.academyId!, allowSkip: false);
-        if (!mounted) return;
-        if (opponentId == null || opponentId.isEmpty) return;
-        await _completeMissionWithOpponent(
-            d.missionId!, usageType, opponentId);
-      } else {
-        await _completeMissionLegacy(d.missionId!, usageType);
-      }
+      // Regra global: nenhuma conclusão sem adversário.
+      final opponentId = await _showOpponentDialog(academyId, allowSkip: false);
+      if (!mounted) return;
+      if (opponentId == null || opponentId.isEmpty) return;
+      await _completeMissionWithOpponent(d.missionId!, usageType, opponentId);
     } else if (d.lessonId != null) {
-      if (d.academyId != null && d.academyId!.isNotEmpty) {
-        final usageTypeUi = await _showUsageTypeDialog();
-        if (usageTypeUi == null || !mounted) return;
-        final usageType = usageTypeUi == 'planned'
-            ? 'after_training'
-            : usageTypeUi == 'natural'
-                ? 'before_training'
-                : usageTypeUi;
-        final opponentId = await _showOpponentDialog(d.academyId!);
-        if (!mounted) return;
-        if (opponentId != null && opponentId.isNotEmpty) {
-          await _completeLessonWithOpponent(d.lessonId!, usageType, opponentId);
-        } else {
-          await _completeLesson(d.lessonId!);
-        }
-      } else {
-        await _completeLesson(d.lessonId!);
-      }
+      final usageTypeUi = await _showUsageTypeDialog();
+      if (usageTypeUi == null || !mounted) return;
+      final usageType = usageTypeUi == 'planned'
+          ? 'after_training'
+          : usageTypeUi == 'natural'
+              ? 'before_training'
+              : usageTypeUi;
+      // Regra global: nenhuma conclusão sem adversário.
+      final opponentId = await _showOpponentDialog(academyId, allowSkip: false);
+      if (!mounted) return;
+      if (opponentId == null || opponentId.isEmpty) return;
+      await _completeLessonWithOpponent(d.lessonId!, usageType, opponentId);
     } else {
       setState(() => _error = 'Nada a concluir');
       return;
@@ -252,50 +193,17 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     } catch (e) {
       if (!mounted) return;
       if (_isMissionNotActiveError(e) && widget.data.lessonId != null) {
-        await _completeLessonAsFallback();
+        await _completeLessonWithOpponent(
+          widget.data.lessonId!,
+          usageType,
+          opponentId,
+        );
         return;
       }
       setState(() {
         _completing = false;
         _error = userFacingMessage(e);
       });
-    }
-  }
-
-  Future<void> _completeMissionLegacy(
-      String missionId, String usageType) async {
-    setState(() {
-      _completing = true;
-      _error = null;
-    });
-    try {
-      final res = await _api.postMissionComplete(
-        missionId: missionId,
-        usageType: usageType,
-      );
-      if (!mounted) return;
-      await _showRewardThenPopLesson(
-        completeResponse: res,
-        xpFallback: _estimatedXpForMission(),
-        title: 'Missão concluída!',
-        subtitle: 'Ótimo treino!',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      if (_isMissionNotActiveError(e) && widget.data.lessonId != null) {
-        await _completeLessonAsFallback();
-        return;
-      }
-      final msg = e.toString();
-      final is409 = (e is ApiException && e.statusCode == 409) ||
-          msg.toLowerCase().contains('já foi concluída');
-      if (mounted) {
-        setState(() {
-          _completing = false;
-          if (is409) _alreadyCompleted = true;
-          _error = is409 ? null : userFacingMessage(e);
-        });
-      }
     }
   }
 
@@ -308,27 +216,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         e.toString().toLowerCase().contains('ativa no período');
   }
 
-  Future<void> _completeLessonAsFallback() async {
-    final lessonId = widget.data.lessonId;
-    if (lessonId == null) return;
-    try {
-      final res = await _api.postLessonComplete(lessonId: lessonId);
-      if (!mounted) return;
-      await _showRewardThenPopLesson(
-        completeResponse: res,
-        xpFallback: _estimatedXpForLessonOnly(),
-        title: 'Registrado',
-        subtitle:
-            'Missão fora do período; registrada como visualização da lição.',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _completing = false;
-        _error = userFacingMessage(e);
-      });
-    }
-  }
 
   Future<String?> _showUsageTypeDialog() async {
     return showDialog<String>(
@@ -358,34 +245,6 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
     );
   }
 
-  Future<void> _completeLesson(String lessonId) async {
-    setState(() {
-      _completing = true;
-      _error = null;
-    });
-    try {
-      final res = await _api.postLessonComplete(lessonId: lessonId);
-      if (!mounted) return;
-      await _showRewardThenPopLesson(
-        completeResponse: res,
-        xpFallback: _estimatedXpForLessonOnly(),
-        title: 'Lição concluída!',
-        subtitle: 'Parabéns!',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      final msg = e.toString();
-      final is409 = (e is ApiException && e.statusCode == 409) ||
-          msg.toLowerCase().contains('já foi concluída');
-      if (mounted) {
-        setState(() {
-          _completing = false;
-          if (is409) _alreadyCompleted = true;
-          _error = is409 ? null : userFacingMessage(e);
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

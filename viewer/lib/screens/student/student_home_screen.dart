@@ -35,6 +35,7 @@ import 'package:viewer/widgets/academy_login_notice_dialog.dart';
 import 'package:viewer/widgets/trophies_home_section.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
+import 'package:viewer/widgets/student/student_rules_sheet.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -815,6 +816,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                       dailyVideoCompleted: _dailyVideoCompleted,
                       onDailyVideoTap:
                           frozenStudent ? _notifyAccountFrozen : _onDailyVideoTap,
+                      onOpenRules: () => showStudentRulesSheet(context),
                     ),
                   if (frozenStudent) ...[
                     const SizedBox(height: 10),
