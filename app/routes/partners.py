@@ -84,6 +84,7 @@ async def partner_create(
         description=body.description,
         url=body.url,
         logo_url=body.logo_url,
+        button_label=body.button_label,
         highlight_on_login=body.highlight_on_login,
         audit_user_id=current_user.id,
     )
@@ -110,6 +111,7 @@ async def partner_update(
         description=payload.get("description"),
         url=payload.get("url"),
         logo_url=payload.get("logo_url"),
+        button_label=payload.get("button_label"),
         highlight_on_login=payload.get("highlight_on_login"),
         audit_user_id=current_user.id,
     )

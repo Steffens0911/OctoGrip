@@ -51,6 +51,7 @@ async def create_global_partner(
     logo_url: str | None = None,
     offer_text: str | None = None,
     external_url: str | None = None,
+    button_label: str | None = None,
     featured_order: int | None = None,
     is_active: bool = True,
     audit_user_id: UUID | None = None,
@@ -61,6 +62,7 @@ async def create_global_partner(
         logo_url=logo_url.strip() if logo_url else None,
         offer_text=offer_text.strip() if offer_text else None,
         external_url=external_url.strip() if external_url else None,
+        button_label=button_label.strip() if button_label else None,
         featured_order=featured_order,
         is_active=is_active,
     )
@@ -90,6 +92,7 @@ async def update_global_partner(
     logo_url: str | None = None,
     offer_text: str | None = None,
     external_url: str | None = None,
+    button_label: str | None = None,
     featured_order: int | None = None,
     is_active: bool | None = None,
     audit_user_id: UUID | None = None,
@@ -108,6 +111,8 @@ async def update_global_partner(
         partner.offer_text = offer_text.strip() if offer_text else None
     if external_url is not None:
         partner.external_url = external_url.strip() if external_url else None
+    if button_label is not None:
+        partner.button_label = button_label.strip() if button_label else None
     if featured_order is not None:
         partner.featured_order = featured_order
     if is_active is not None:

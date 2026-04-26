@@ -16,6 +16,7 @@ class GlobalPartner(Base, UUIDMixin):
     logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     offer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     external_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    button_label: Mapped[str | None] = mapped_column(String(18), nullable=True)
     featured_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(
         Boolean,

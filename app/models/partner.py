@@ -24,6 +24,7 @@ class Partner(Base, UUIDMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     logo_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    button_label: Mapped[str | None] = mapped_column(String(18), nullable=True)
     highlight_on_login: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

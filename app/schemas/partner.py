@@ -11,6 +11,7 @@ class PartnerRead(BaseModel):
     description: str | None
     url: str | None
     logo_url: str | None
+    button_label: str | None
     highlight_on_login: bool
 
     class Config:
@@ -27,6 +28,7 @@ class PartnerCreate(BaseModel):
     description: str | None = Field(None, max_length=2000)
     url: str | None = Field(None, max_length=512)
     logo_url: str | None = Field(None, max_length=512)
+    button_label: str | None = Field(None, max_length=18)
     highlight_on_login: bool = False
 
 
@@ -39,4 +41,5 @@ class PartnerUpdate(BaseModel):
     description: str | None = Field(None, max_length=2000)
     url: str | None = Field(None, max_length=512)
     logo_url: str | None = Field(None, max_length=512)
+    button_label: str | None = Field(None, max_length=18)
     highlight_on_login: bool | None = None

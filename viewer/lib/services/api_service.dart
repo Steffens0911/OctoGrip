@@ -1108,6 +1108,7 @@ class ApiService {
     String? description,
     String? url,
     String? logoUrl,
+    String? buttonLabel,
     bool highlightOnLogin = false,
   }) async {
     final body = <String, dynamic>{
@@ -1117,7 +1118,8 @@ class ApiService {
     if (description != null && description.isNotEmpty) body['description'] = description;
     if (url != null && url.isNotEmpty) body['url'] = url;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
-     body['highlight_on_login'] = highlightOnLogin;
+    if (buttonLabel != null && buttonLabel.isNotEmpty) body['button_label'] = buttonLabel;
+    body['highlight_on_login'] = highlightOnLogin;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/partners'),
       headers: await _jsonHeaders(auth: true),
@@ -1137,6 +1139,7 @@ class ApiService {
     String? description,
     String? url,
     String? logoUrl,
+    String? buttonLabel,
     bool? highlightOnLogin,
   }) async {
     final body = <String, dynamic>{};
@@ -1144,6 +1147,7 @@ class ApiService {
     if (description != null) body['description'] = description;
     if (url != null) body['url'] = url;
     if (logoUrl != null) body['logo_url'] = logoUrl;
+    if (buttonLabel != null) body['button_label'] = buttonLabel;
     if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
     final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
@@ -1178,6 +1182,7 @@ class ApiService {
     String? logoUrl,
     String? offerText,
     String? externalUrl,
+    String? buttonLabel,
     int? featuredOrder,
     bool isActive = true,
   }) async {
@@ -1189,6 +1194,7 @@ class ApiService {
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
     if (offerText != null && offerText.isNotEmpty) body['offer_text'] = offerText;
     if (externalUrl != null && externalUrl.isNotEmpty) body['external_url'] = externalUrl;
+    if (buttonLabel != null && buttonLabel.isNotEmpty) body['button_label'] = buttonLabel;
     if (featuredOrder != null) body['featured_order'] = featuredOrder;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/admin/global_partners'),
@@ -1209,6 +1215,7 @@ class ApiService {
     String? logoUrl,
     String? offerText,
     String? externalUrl,
+    String? buttonLabel,
     int? featuredOrder,
     bool? isActive,
   }) async {
@@ -1218,6 +1225,7 @@ class ApiService {
     if (logoUrl != null) body['logo_url'] = logoUrl;
     if (offerText != null) body['offer_text'] = offerText;
     if (externalUrl != null) body['external_url'] = externalUrl;
+    if (buttonLabel != null) body['button_label'] = buttonLabel;
     if (featuredOrder != null) body['featured_order'] = featuredOrder;
     if (isActive != null) body['is_active'] = isActive;
     final r = await _req(http.put(

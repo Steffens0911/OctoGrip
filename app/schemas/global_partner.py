@@ -11,6 +11,7 @@ class GlobalPartnerRead(BaseModel):
     logo_url: str | None
     offer_text: str | None
     external_url: str | None
+    button_label: str | None
     featured_order: int | None
     is_active: bool
 
@@ -26,6 +27,7 @@ class GlobalPartnerCreate(BaseModel):
     logo_url: str | None = Field(None, max_length=512)
     offer_text: str | None = Field(None, max_length=2000)
     external_url: str | None = Field(None, max_length=512)
+    button_label: str | None = Field(None, max_length=18)
     featured_order: int | None = None
     is_active: bool = True
 
@@ -38,5 +40,6 @@ class GlobalPartnerUpdate(BaseModel):
     logo_url: str | None = Field(None, max_length=512)
     offer_text: str | None = Field(None, max_length=2000)
     external_url: str | None = Field(None, max_length=512)
+    button_label: str | None = Field(None, max_length=18)
     featured_order: int | None = None
     is_active: bool | None = None

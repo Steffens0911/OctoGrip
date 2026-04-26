@@ -24,6 +24,7 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
   final _logoUrlController = TextEditingController();
   final _offerTextController = TextEditingController();
   final _externalUrlController = TextEditingController();
+  final _buttonLabelController = TextEditingController();
   final _featuredOrderController = TextEditingController();
 
   bool _isActive = true;
@@ -40,6 +41,7 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
       _logoUrlController.text = p.logoUrl ?? '';
       _offerTextController.text = p.offerText ?? '';
       _externalUrlController.text = p.externalUrl ?? '';
+      _buttonLabelController.text = p.buttonLabel ?? '';
       _featuredOrderController.text = p.featuredOrder?.toString() ?? '';
       _isActive = p.isActive;
     }
@@ -52,6 +54,7 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
     _logoUrlController.dispose();
     _offerTextController.dispose();
     _externalUrlController.dispose();
+    _buttonLabelController.dispose();
     _featuredOrderController.dispose();
     super.dispose();
   }
@@ -80,6 +83,9 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
           externalUrl: _externalUrlController.text.trim().isEmpty
               ? null
               : _externalUrlController.text.trim(),
+          buttonLabel: _buttonLabelController.text.trim().isEmpty
+              ? null
+              : _buttonLabelController.text.trim(),
           featuredOrder: featuredOrder,
           isActive: _isActive,
         );
@@ -99,6 +105,9 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
           externalUrl: _externalUrlController.text.trim().isEmpty
               ? null
               : _externalUrlController.text.trim(),
+          buttonLabel: _buttonLabelController.text.trim().isEmpty
+              ? null
+              : _buttonLabelController.text.trim(),
           featuredOrder: featuredOrder,
           isActive: _isActive,
         );
@@ -190,6 +199,21 @@ class _GlobalPartnerFormScreenState extends State<GlobalPartnerFormScreen> {
                   hintText: 'https://... ou wa.me/...',
                 ),
                 keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _buttonLabelController,
+                decoration: const InputDecoration(
+                  labelText: 'Titulo do botao (ate 18)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ex.: Ver agora',
+                ),
+                maxLength: 18,
+                validator: (v) {
+                  final value = (v ?? '').trim();
+                  if (value.length > 18) return 'Use no maximo 18 caracteres';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               TextFormField(

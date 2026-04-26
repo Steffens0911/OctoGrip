@@ -147,6 +147,9 @@ class _Card extends StatelessWidget {
     final primaryText = AppTheme.textPrimaryOf(context);
     final secondaryText = AppTheme.textSecondaryOf(context);
     final description = (partner.description ?? '').trim();
+    final buttonText = (partner.buttonLabel ?? '').trim().isNotEmpty
+        ? (partner.buttonLabel ?? '').trim()
+        : 'Ver oferta';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -232,7 +235,7 @@ class _Card extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text('Ver oferta'),
+                  child: Text(buttonText),
                 ),
               ),
             ],

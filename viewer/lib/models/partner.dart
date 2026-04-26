@@ -6,6 +6,7 @@ class Partner {
   final String? description;
   final String? url;
   final String? logoUrl;
+  final String? buttonLabel;
   final bool highlightOnLogin;
 
   Partner({
@@ -15,6 +16,7 @@ class Partner {
     this.description,
     this.url,
     this.logoUrl,
+    this.buttonLabel,
     this.highlightOnLogin = false,
   });
 
@@ -26,6 +28,7 @@ class Partner {
       description: json['description'] as String?,
       url: json['url'] as String?,
       logoUrl: json['logo_url'] as String?,
+      buttonLabel: json['button_label'] as String?,
       highlightOnLogin: json['highlight_on_login'] as bool? ?? false,
     );
   }
@@ -38,6 +41,7 @@ class Partner {
       'description': description,
       'url': url,
       'logo_url': logoUrl,
+      'button_label': buttonLabel,
       'highlight_on_login': highlightOnLogin,
     };
   }

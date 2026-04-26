@@ -6,6 +6,7 @@ class GlobalPartner {
   final String? logoUrl;
   final String? offerText;
   final String? externalUrl;
+  final String? buttonLabel;
   final int? featuredOrder;
   final bool isActive;
 
@@ -16,6 +17,7 @@ class GlobalPartner {
     this.logoUrl,
     this.offerText,
     this.externalUrl,
+    this.buttonLabel,
     this.featuredOrder,
     this.isActive = true,
   });
@@ -28,6 +30,7 @@ class GlobalPartner {
       logoUrl: json['logo_url'] as String?,
       offerText: json['offer_text'] as String?,
       externalUrl: json['external_url'] as String?,
+      buttonLabel: json['button_label'] as String?,
       featuredOrder: json['featured_order'] as int?,
       isActive: json['is_active'] as bool? ?? true,
     );

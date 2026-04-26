@@ -26,6 +26,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
   final _descriptionController = TextEditingController();
   final _urlController = TextEditingController();
   final _logoUrlController = TextEditingController();
+  final _buttonLabelController = TextEditingController();
   bool _saving = false;
   String? _error;
   bool _highlightOnLogin = false;
@@ -39,6 +40,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
       _descriptionController.text = p.description ?? '';
       _urlController.text = p.url ?? '';
       _logoUrlController.text = p.logoUrl ?? '';
+      _buttonLabelController.text = p.buttonLabel ?? '';
       _highlightOnLogin = p.highlightOnLogin;
     }
   }
@@ -49,6 +51,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
     _descriptionController.dispose();
     _urlController.dispose();
     _logoUrlController.dispose();
+    _buttonLabelController.dispose();
     super.dispose();
   }
 
@@ -62,6 +65,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
     final description = _descriptionController.text.trim();
     final url = _urlController.text.trim();
     final logoUrl = _logoUrlController.text.trim();
+    final buttonLabel = _buttonLabelController.text.trim();
     try {
       if (widget.partner != null) {
         await _api.updatePartner(
@@ -71,6 +75,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
           description: description.isEmpty ? null : description,
           url: url.isEmpty ? null : url,
           logoUrl: logoUrl.isEmpty ? null : logoUrl,
+          buttonLabel: buttonLabel.isEmpty ? null : buttonLabel,
           highlightOnLogin: _highlightOnLogin,
         );
       } else {
@@ -80,6 +85,7 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
           description: description.isEmpty ? null : description,
           url: url.isEmpty ? null : url,
           logoUrl: logoUrl.isEmpty ? null : logoUrl,
+          buttonLabel: buttonLabel.isEmpty ? null : buttonLabel,
           highlightOnLogin: _highlightOnLogin,
         );
       }
@@ -164,6 +170,21 @@ class _PartnerFormScreenState extends State<PartnerFormScreen> {
                   hintText: 'https://... ou /media/...',
                 ),
                 keyboardType: TextInputType.url,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _buttonLabelController,
+                decoration: const InputDecoration(
+                  labelText: 'Titulo do botao (ate 18)',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ex.: Ver oferta',
+                ),
+                maxLength: 18,
+                validator: (v) {
+                  final value = (v ?? '').trim();
+                  if (value.length > 18) return 'Use no maximo 18 caracteres';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               SwitchListTile(

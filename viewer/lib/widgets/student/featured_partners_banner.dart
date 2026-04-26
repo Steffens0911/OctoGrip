@@ -161,6 +161,9 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final name = partner.name.trim();
     final offer = (partner.offerText ?? '').trim();
+    final buttonText = (partner.buttonLabel ?? '').trim().isNotEmpty
+        ? (partner.buttonLabel ?? '').trim()
+        : 'Ver oferta';
 
     final primaryText = AppTheme.textPrimaryOf(context);
     final secondaryText = AppTheme.textSecondaryOf(context);
@@ -242,7 +245,7 @@ class _Card extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text('Ver oferta'),
+                  child: Text(buttonText),
                 ),
               ),
             ],

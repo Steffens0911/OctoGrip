@@ -40,6 +40,7 @@ async def create_partner(
     description: str | None = None,
     url: str | None = None,
     logo_url: str | None = None,
+    button_label: str | None = None,
     highlight_on_login: bool = False,
     *,
     audit_user_id: UUID | None = None,
@@ -51,6 +52,7 @@ async def create_partner(
         description=description.strip() if description else None,
         url=url.strip() if url else None,
         logo_url=logo_url.strip() if logo_url else None,
+        button_label=button_label.strip() if button_label else None,
         highlight_on_login=highlight_on_login,
     )
     db.add(partner)
@@ -77,6 +79,7 @@ async def update_partner(
     description: str | None = None,
     url: str | None = None,
     logo_url: str | None = None,
+    button_label: str | None = None,
     highlight_on_login: bool | None = None,
     *,
     audit_user_id: UUID | None = None,
@@ -94,6 +97,8 @@ async def update_partner(
         partner.url = url.strip() if url else None
     if logo_url is not None:
         partner.logo_url = logo_url.strip() if logo_url else None
+    if button_label is not None:
+        partner.button_label = button_label.strip() if button_label else None
     if highlight_on_login is not None:
         partner.highlight_on_login = highlight_on_login
     await db.flush()
