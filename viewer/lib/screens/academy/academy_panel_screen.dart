@@ -5,7 +5,6 @@ import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
-import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/academy/academy_training_field_screen.dart';
 import 'package:viewer/screens/academy/academy_students_screen.dart';
 import 'package:viewer/screens/academy/academy_attendance_hub_screen.dart';
@@ -86,8 +85,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   int _getItemCount() {
     int count = _academies.length;
     if (AuthService().isManager() || AuthService().isProfessor()) {
-      // Cards fixos: loja (+ push)
-      count += kPushNotificationsEnabled ? 2 : 1;
+      // Cards fixos: push
+      count += kPushNotificationsEnabled ? 1 : 0;
     }
     return count;
   }
@@ -107,48 +106,9 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     final isManagerOrProfessor =
         AuthService().isManager() || AuthService().isProfessor();
 
-    if (isManagerOrProfessor && index == 0) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.storefront_rounded, color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Loja / anúncios',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Produtos da academia com preço e WhatsApp',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            final academyId = AuthService().currentUser?.academyId;
-            if (academyId == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Seu usuário não está vinculado a uma academia.',
-                  ),
-                ),
-              );
-              return;
-            }
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const MarketplaceListScreen(
-                  localOnly: true,
-                ),
-              ),
-            );
-          },
-        ),
-      );
-    } else if (isManagerOrProfessor &&
+    if (isManagerOrProfessor &&
         kPushNotificationsEnabled &&
-        index == 1) {
+        index == 0) {
       return Card(
         margin: const EdgeInsets.only(bottom: 12),
         child: ListTile(
@@ -190,7 +150,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
     // Cards fixos no topo; academias após Usuários + chamada + histórico + frequência + técnicas + vídeos + Loja (+ push).
     final managerOffset =
-        isManagerOrProfessor ? (kPushNotificationsEnabled ? 2 : 1) : 0;
+        isManagerOrProfessor ? (kPushNotificationsEnabled ? 1 : 0) : 0;
     final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
     if (academyIndex < 0 || academyIndex >= _academies.length) {
       return const SizedBox.shrink();

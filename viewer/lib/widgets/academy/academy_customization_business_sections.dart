@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/screens/admin/marketplace_list_screen.dart';
 import 'package:viewer/screens/admin/partner_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -429,6 +430,27 @@ class _AcademyCustomizationBusinessSectionsState
                     ),
                   ),
               ],
+            ),
+          ),
+        ),
+        AppSpacing.verticalM,
+        Card(
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+              child: const Icon(Icons.storefront_rounded, color: AppTheme.primary),
+            ),
+            title: const Text(
+              'Loja / anúncios',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            subtitle: const Text('Produtos da academia com preço e WhatsApp'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const MarketplaceListScreen(localOnly: true),
+              ),
             ),
           ),
         ),
