@@ -12,9 +12,12 @@ import 'package:viewer/screens/admin/user_list_screen.dart';
 import 'package:viewer/screens/academy/attendance_frequency_screen.dart';
 import 'package:viewer/screens/academy/attendance_history_screen.dart';
 import 'package:viewer/screens/academy/attendance_session_screen.dart';
+import 'package:viewer/screens/academy/academy_training_field_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/role_guard.dart';
+import 'package:viewer/screens/admin/academy_active_students_screen.dart';
+import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
 class AcademyPanelScreen extends StatefulWidget {
@@ -29,6 +32,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   List<Academy> _academies = [];
   bool _loading = true;
   String? _error;
+  String? _selectedAcademyId;
 
   @override
   void initState() {
@@ -44,8 +48,16 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     try {
       final list = await _api.getAcademies();
       if (mounted) {
+        final currentAcademyId = AuthService().currentUser?.academyId;
+        final nextSelected = _selectedAcademyId ??
+            (currentAcademyId != null &&
+                    currentAcademyId.isNotEmpty &&
+                    list.any((a) => a.id == currentAcademyId)
+                ? currentAcademyId
+                : (list.length == 1 ? list.first.id : null));
         setState(() {
           _academies = list;
+          _selectedAcademyId = nextSelected;
           _loading = false;
         });
       }
@@ -68,6 +80,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     } catch (_) {
       // Em caso de erro de rede, cai para os dados em cache.
     }
+    if (!mounted) return;
     await Navigator.push<void>(
       context,
       MaterialPageRoute(
@@ -91,6 +104,26 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       count += kPushNotificationsEnabled ? 8 : 7;
     }
     return count;
+  }
+
+  Academy? get _selectedAcademy {
+    final id = _selectedAcademyId;
+    if (id == null || id.isEmpty) return null;
+    for (final a in _academies) {
+      if (a.id == id) return a;
+    }
+    return null;
+  }
+
+  Academy? get _resolvedTrainingAcademy {
+    if (_academies.length == 1) return _academies.first;
+    final currentAcademyId = AuthService().currentUser?.academyId;
+    if (currentAcademyId != null && currentAcademyId.isNotEmpty) {
+      for (final a in _academies) {
+        if (a.id == currentAcademyId) return a;
+      }
+    }
+    return _selectedAcademy;
   }
 
   Widget _buildListItem(BuildContext context, int index) {
@@ -351,6 +384,7 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final resolvedTrainingAcademy = _resolvedTrainingAcademy;
     return RoleGuard(
       allowedRoles: const [
         'administrador',
@@ -401,12 +435,118 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                       )
                     : RefreshIndicator(
                         onRefresh: _load,
-                        child: ListView.builder(
+                        child: ListView(
                           padding: const EdgeInsets.all(16),
-                          itemCount: _getItemCount(),
-                          itemBuilder: (context, index) {
-                            return _buildListItem(context, index);
-                          },
+                          children: [
+                            Card(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                  child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primary),
+                                ),
+                                title: const Text(
+                                  'Campo de treinamento',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                subtitle: Text(
+                                  resolvedTrainingAcademy != null
+                                      ? 'Posições e técnicas + troféus e missões semanais'
+                                      : 'Selecione uma academia para liberar este atalho',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                enabled: resolvedTrainingAcademy != null,
+                                onTap: resolvedTrainingAcademy == null
+                                    ? null
+                                    : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => AcademyTrainingFieldScreen(
+                                              academy: resolvedTrainingAcademy,
+                                            ),
+                                          ),
+                                        ),
+                              ),
+                            ),
+
+                            // Cards “Editar pontos” e “Alunos ativos” ficam apenas na página inicial do Gestão.
+                            if (AuthService().isAdmin() || AuthService().isManager() || AuthService().isSupervisor()) ...[
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedAcademyId,
+                                decoration: const InputDecoration(
+                                  labelText: 'Academia',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: _academies
+                                    .map(
+                                      (a) => DropdownMenuItem<String>(
+                                        value: a.id,
+                                        child: Text(a.name, overflow: TextOverflow.ellipsis),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) => setState(() => _selectedAcademyId = v),
+                              ),
+                              const SizedBox(height: 12),
+                              if (_selectedAcademy != null) ...[
+                                Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                      child: const Icon(Icons.edit_note, color: AppTheme.primary),
+                                    ),
+                                    title: const Text(
+                                      'Editar pontos dos alunos',
+                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    subtitle: const Text(
+                                      'Ajustar pontuação manual dos alunos desta academia',
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AcademyPointsEditScreen(
+                                          academyId: _selectedAcademy!.id,
+                                          academyName: _selectedAcademy!.name,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Card(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  child: ListTile(
+                                    leading: CircleAvatar(
+                                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                                      child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
+                                    ),
+                                    title: const Text(
+                                      'Alunos ativos (últimos 7 dias)',
+                                      style: TextStyle(fontWeight: FontWeight.w600),
+                                    ),
+                                    subtitle: const Text(
+                                      'Ver quem está usando o app recentemente nesta academia',
+                                    ),
+                                    trailing: const Icon(Icons.chevron_right),
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => AcademyActiveStudentsScreen(
+                                          academy: _selectedAcademy!,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                            ],
+
+                            // Lista existente (cards fixos + academias).
+                            ...List.generate(_getItemCount(), (index) => _buildListItem(context, index)),
+                          ],
                         ),
                       ),
       ),

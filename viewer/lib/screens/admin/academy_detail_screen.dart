@@ -8,8 +8,6 @@ import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:viewer/screens/admin/academy_active_students_screen.dart';
-import 'package:viewer/screens/admin/academy_points_edit_screen.dart';
 import 'package:viewer/screens/admin/partner_list_screen.dart';
 import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/trophy_list_screen.dart';
@@ -17,6 +15,7 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
+import 'package:viewer/widgets/academy/training_field_sections.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
@@ -25,12 +24,14 @@ class AcademyDetailScreen extends StatefulWidget {
   final Academy academy;
   final VoidCallback onUpdated;
   final VoidCallback onDeleted;
+  final bool trainingFieldOnly;
 
   const AcademyDetailScreen({
     super.key,
     required this.academy,
     required this.onUpdated,
     required this.onDeleted,
+    this.trainingFieldOnly = false,
   });
 
   @override
@@ -113,10 +114,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _reportPeriodStart = _mondayOfIsoWeek(now);
     _reportPeriodEnd = _reportPeriodStart.add(const Duration(days: 6));
     _loadTechniques();
-    _loadRankingAndReport();
-    _loadUsageMetrics();
-    _loadWeeklyPanelLogins();
     _loadWeeklyKits(silentErrors: true);
+    if (!widget.trainingFieldOnly) {
+      _loadRankingAndReport();
+      _loadUsageMetrics();
+      _loadWeeklyPanelLogins();
+    }
   }
 
   /// Igual a [academy_has_active_weekly_kits] no backend: pelo menos uma turma com 1–5 técnicas.
@@ -669,6 +672,26 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.trainingFieldOnly) {
+      return Scaffold(
+        appBar: AppStandardAppBar(
+          title: 'Campo de treinamento',
+          subtitle: _academy.name,
+        ),
+        body: RefreshIndicator(
+          onRefresh: () async {
+            await _loadTechniques();
+            await _loadWeeklyKits();
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.all(AppTheme.screenPadding(context)),
+            child: _buildTrainingFieldSections(),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppStandardAppBar(
         title: _academy.name,
@@ -773,166 +796,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Card(
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                    child: const Icon(Icons.edit_note, color: AppTheme.primary),
-                  ),
-                  title: const Text('Editar pontos dos alunos', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Ajustar pontuação manual dos alunos desta academia'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AcademyPointsEditScreen(
-                        academyId: _academy.id,
-                        academyName: _academy.name,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              AppSpacing.verticalM,
-              if (AuthService().isAdmin() || AuthService().isManager() || AuthService().isSupervisor())
-                Card(
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                      child: const Icon(Icons.insights_rounded, color: AppTheme.primary),
-                    ),
-                    title: const Text('Alunos ativos (últimos 7 dias)', style: TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: const Text('Ver quem está usando o app recentemente nesta academia'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AcademyActiveStudentsScreen(
-                          academy: _academy,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              AppSpacing.verticalM,
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: Card(
-                  child: ExpansionTile(
-                    title: Text(
-                      'Posições e técnicas',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textPrimaryOf(context),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    initiallyExpanded: false,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    childrenPadding: EdgeInsets.zero,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.alt_route_rounded),
-                        title: const Text(
-                          'Técnicas (para serem vinculadas aos troféus e posições da semana)',
-                        ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TechniqueListScreen(
-                                academyId: _academy.id,
-                              ),
-                            ),
-                          );
-                          if (mounted) {
-                            await _loadTechniques();
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              AppSpacing.verticalM,
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: Card(
-                  child: ExpansionTile(
-                    title: Text(
-                      'Troféus e missões semanais',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppTheme.textPrimaryOf(context),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    initiallyExpanded: false,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    childrenPadding: EdgeInsets.zero,
-                    children: [
-                      ListTile(
-                        leading: const Icon(Icons.emoji_events_outlined),
-                        title: const Text('Troféus'),
-                        subtitle: const Text('Gerencie os troféus desta academia'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute<void>(
-                              builder: (context) => TrophyListScreen(
-                                academyId: _academy.id,
-                                academyName: _academy.name,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const Divider(height: 1),
-                      Theme(
-                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          title: const Text('Turmas (semana)'),
-                          subtitle: const Text(
-                            '1 a 5 técnicas por turma; o aluno escolhe a turma por semana.',
-                          ),
-                          childrenPadding: const EdgeInsets.all(16),
-                          initiallyExpanded: false,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          onExpansionChanged: (open) {
-                            if (open) _loadWeeklyKits();
-                          },
-                          children: _buildWeeklyKitsPanelChildren(),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      if (_hasActiveTurmas())
-                        ListTile(
-                          leading: const Icon(Icons.info_outline),
-                          title: const Text('Missões fixas (3 técnicas)'),
-                          subtitle: Text(
-                            'Ocultas: esta academia usa só turmas. Para voltar ao modo de três missões fixas, '
-                            'remova ou deixe sem técnicas válidas todas as turmas.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppTheme.textSecondaryOf(context),
-                            ),
-                          ),
-                        )
-                      else
-                        Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                          child: ExpansionTile(
-                            title: const Text('Missões semanais (legado)'),
-                            childrenPadding: const EdgeInsets.all(16),
-                            initiallyExpanded: false,
-                            controlAffinity: ListTileControlAffinity.leading,
-                            children: _buildWeeklyMissionsFormChildren(),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+              _buildTrainingFieldSections(),
               AppSpacing.verticalM,
               Card(
                 child: Padding(
@@ -1853,6 +1717,41 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTrainingFieldSections() {
+    return AcademyTrainingFieldSections(
+      onOpenTechniques: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TechniqueListScreen(
+              academyId: _academy.id,
+            ),
+          ),
+        );
+        if (mounted) {
+          await _loadTechniques();
+        }
+      },
+      onOpenTrophies: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute<void>(
+            builder: (context) => TrophyListScreen(
+              academyId: _academy.id,
+              academyName: _academy.name,
+            ),
+          ),
+        );
+      },
+      hasActiveTurmas: _hasActiveTurmas(),
+      onWeeklyKitsExpansionChanged: (open) {
+        if (open) _loadWeeklyKits();
+      },
+      weeklyKitsChildren: _buildWeeklyKitsPanelChildren(),
+      weeklyMissionsChildren: _buildWeeklyMissionsFormChildren(),
     );
   }
 
