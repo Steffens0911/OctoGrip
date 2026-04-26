@@ -134,7 +134,7 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     final scheduleUrl = _scheduleUrlFromHeaderStats();
 
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Academia'),
+      appBar: const AppStandardAppBar(title: 'Central da academia'),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
