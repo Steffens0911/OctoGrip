@@ -46,7 +46,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   String? _qrError;
   DateTime? _qrRefreshStartedAt;
 
-  static const Duration _qrRequestTimeout = Duration(seconds: 10);
+  static const Duration _qrRequestTimeout = Duration(seconds: 25);
   static const String _qrTimeoutMessage =
       'Tempo esgotado ao gerar QR. Tentando novamente...';
 

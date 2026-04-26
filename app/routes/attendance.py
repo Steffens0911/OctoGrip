@@ -33,6 +33,7 @@ from app.services.attendance_service import (
     create_attendance_session,
     delete_attendance_record,
     get_attendance_session,
+    get_attendance_session_basic,
     issue_qr_payload,
     list_attendance_sessions,
     scan_checkin,
@@ -417,7 +418,7 @@ async def attendance_session_qr(
     current_user: User = Depends(require_write_access),
     ttl_seconds: int = Query(60, ge=15, le=180),
 ):
-    await get_attendance_session(db, session_id, current_user=current_user)
+    await get_attendance_session_basic(db, session_id, current_user=current_user)
     payload, exp = issue_qr_payload(session_id=session_id, ttl_seconds=ttl_seconds)
     return AttendanceQrPayloadResponse(payload=payload, expires_at=exp)
 

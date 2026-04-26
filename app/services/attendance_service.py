@@ -107,16 +107,28 @@ async def get_attendance_session(
     *,
     current_user: User,
 ) -> tuple[AttendanceSession, int]:
-    s = await db.get(AttendanceSession, session_id)
-    if not s:
-        raise AttendanceSessionNotFoundError()
-    verify_academy_access(current_user, str(s.academy_id) if s.academy_id else None, allow_none=True)
+    s = await get_attendance_session_basic(
+        db, session_id, current_user=current_user
+    )
     present_count = (
         await db.execute(
             select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id)
         )
     ).scalar_one()
     return s, int(present_count or 0)
+
+
+async def get_attendance_session_basic(
+    db: AsyncSession,
+    session_id: UUID,
+    *,
+    current_user: User,
+) -> AttendanceSession:
+    s = await db.get(AttendanceSession, session_id)
+    if not s:
+        raise AttendanceSessionNotFoundError()
+    verify_academy_access(current_user, str(s.academy_id) if s.academy_id else None, allow_none=True)
+    return s
 
 
 async def list_attendance_sessions(
