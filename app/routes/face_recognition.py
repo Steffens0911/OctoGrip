@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -40,13 +41,21 @@ from app.services.attendance_realtime import attendance_manager
 from app.tasks.face_recognition_tasks import generate_student_embedding, process_face_recognition
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 
 def _jobs_dir() -> Path:
     path = Path(settings.FACE_JOBS_DIR)
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        logger.exception("Falha ao criar FACE_JOBS_DIR=%s", str(path))
+        raise AppError(
+            "Falha ao preparar diretório temporário de processamento de face.",
+            status_code=500,
+        ) from exc
     return path
 
 
@@ -110,7 +119,14 @@ async def face_recognition_submit(
     job_id = uuid4()
     ext = ".png" if (photo.content_type or "").lower() == "image/png" else ".jpg"
     photo_path = _jobs_dir() / f"{job_id}{ext}"
-    photo_path.write_bytes(content)
+    try:
+        photo_path.write_bytes(content)
+    except OSError as exc:
+        logger.exception("Falha ao gravar foto do job %s em %s", str(job_id), str(photo_path))
+        raise AppError(
+            "Falha ao gravar a foto para processamento. Tente novamente em instantes.",
+            status_code=500,
+        ) from exc
 
     job = FaceRecognitionJob(
         id=job_id,
@@ -122,7 +138,17 @@ async def face_recognition_submit(
     )
     db.add(job)
     await db.commit()
-    process_face_recognition.delay(str(job_id))
+    try:
+        process_face_recognition.delay(str(job_id))
+    except Exception as exc:  # noqa: BLE001 - queremos capturar falhas do broker/enqueue
+        logger.exception("Falha ao enfileirar processamento do job %s", str(job_id))
+        job.status = "failed"
+        job.error_message = "Falha ao enfileirar o processamento. Tente novamente."
+        await db.commit()
+        raise AppError(
+            "Falha ao iniciar o processamento. Tente novamente em instantes.",
+            status_code=503,
+        ) from exc
 
     return FaceRecognitionSubmitResponse(
         job_id=job_id,
