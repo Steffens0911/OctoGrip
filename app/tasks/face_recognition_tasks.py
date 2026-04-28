@@ -30,6 +30,8 @@ from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_messa
 from celery_app import celery_app
 
 logger = get_task_logger(__name__)
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+_MEDIA_ROOT = (_BASE_DIR / "app_media").resolve()
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -63,6 +65,22 @@ def _classify_match(similarity: float) -> str:
     if similarity >= 0.50:
         return "suggestion"
     return "unknown"
+
+
+def _read_avatar_bytes(avatar_url: str) -> bytes:
+    if avatar_url.startswith("http://") or avatar_url.startswith("https://"):
+        content = requests.get(avatar_url, timeout=20)
+        content.raise_for_status()
+        return content.content
+
+    if avatar_url.startswith("/media/"):
+        rel = avatar_url[len("/media/") :].lstrip("/")
+        media_path = (_MEDIA_ROOT / rel).resolve()
+        if _MEDIA_ROOT not in media_path.parents and media_path != _MEDIA_ROOT:
+            raise FileNotFoundError("Caminho de mídia inválido para avatar.")
+        return media_path.read_bytes()
+
+    raise ValueError("avatar_url inválido para geração de embedding.")
 
 
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
@@ -215,9 +233,7 @@ def generate_student_embedding(self, student_id: str) -> None:
 
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             tmp_path = tmp.name
-            content = requests.get(user.avatar_url, timeout=20)
-            content.raise_for_status()
-            tmp.write(content.content)
+            tmp.write(_read_avatar_bytes(user.avatar_url))
 
         try:
             represented = DeepFace.represent(

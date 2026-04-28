@@ -15,6 +15,7 @@ import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
+import 'package:viewer/screens/student/user_avatar_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
@@ -976,6 +977,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     ).then((_) => _loadPendingConfirmationsWith());
   }
 
+  void _openUserAvatarScreen() {
+    Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (context) => const UserAvatarScreen(),
+      ),
+    ).then((updated) {
+      if (updated == true) {
+        _load(silent: true);
+      }
+    });
+  }
+
   /// Banner sob o header: confirmações pendentes (fechar só oculta até o contador mudar).
   Widget _buildPendingConfirmationsBanner() {
     final n = _pendingConfirmationsCount;
@@ -1445,6 +1459,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 8),
+        AppNavigationTile(
+          icon: Icons.face_retouching_natural_outlined,
+          title: 'Foto de perfil',
+          subtitle: 'Usada na chamada por reconhecimento facial',
+          onTap: _openUserAvatarScreen,
         ),
         const SizedBox(height: 8),
         AppNavigationTile(

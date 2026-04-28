@@ -1,13 +1,15 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
 from datetime import date
+from pathlib import Path
+from typing import Final
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.cache import app_cache
-from app.core.exceptions import ConflictError, ForbiddenError, UserNotFoundError
+from app.core.exceptions import AppError, ConflictError, ForbiddenError, UserNotFoundError
 from app.core.rate_limit import limiter
 from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
@@ -31,6 +33,64 @@ from app.tasks.face_recognition_tasks import generate_student_embedding
 router = APIRouter()
 
 _ALLOWED_NON_ADMIN_CREATE_ROLE = "aluno"
+_MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
+_BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
+_MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
+_USER_AVATARS_DIR: Final[Path] = _MEDIA_ROOT / "user_avatars"
+_USER_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+async def _read_avatar_upload(file: UploadFile) -> tuple[bytes, str]:
+    data = await file.read()
+    if not data:
+        raise AppError("Arquivo de imagem vazio.", status_code=400)
+    if len(data) > _MAX_AVATAR_UPLOAD_BYTES:
+        raise AppError("Imagem excede 5MB.", status_code=413)
+
+    allowed = ("image/png", "image/jpeg", "image/jpg", "image/webp")
+    content_type = (file.content_type or "").strip().lower()
+    if content_type not in allowed:
+        name = (file.filename or "").lower()
+        if name.endswith(".png"):
+            content_type = "image/png"
+        elif name.endswith(".jpg") or name.endswith(".jpeg"):
+            content_type = "image/jpeg"
+        elif name.endswith(".webp"):
+            content_type = "image/webp"
+    if content_type not in allowed and len(data) >= 12:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            content_type = "image/png"
+        elif data[:2] == b"\xff\xd8":
+            content_type = "image/jpeg"
+        elif data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            content_type = "image/webp"
+    if content_type not in allowed:
+        raise AppError("Tipo de arquivo não suportado. Envie PNG, JPEG ou WEBP.", status_code=400)
+
+    extension = ".png"
+    if content_type in ("image/jpeg", "image/jpg"):
+        extension = ".jpg"
+    elif content_type == "image/webp":
+        extension = ".webp"
+    return data, extension
+
+
+async def _save_user_avatar_and_maybe_enqueue(
+    db: AsyncSession,
+    *,
+    target: User,
+    file: UploadFile,
+) -> User:
+    data, extension = await _read_avatar_upload(file)
+    filename = f"user-{target.id}{extension}"
+    dest = _USER_AVATARS_DIR / filename
+    dest.write_bytes(data)
+    target.avatar_url = f"/media/user_avatars/{filename}"
+    await db.commit()
+    await db.refresh(target)
+    if target.role == "aluno" and target.avatar_url:
+        generate_student_embedding.delay(str(target.id))
+    return target
 
 
 @router.put("/me/weekly-kit-choice", response_model=WeeklyKitChoiceResponse)
@@ -59,6 +119,31 @@ async def me_weekly_kit_choice(
         iso_week_number=row.iso_week_number,
         academy_id=row.academy_id,
     )
+
+
+@router.post("/me/avatar", response_model=UserRead)
+async def me_upload_avatar(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Faz upload da foto de perfil do utilizador autenticado."""
+    target = await get_user_or_raise(db, current_user.id)
+    return await _save_user_avatar_and_maybe_enqueue(db, target=target, file=file)
+
+
+@router.post("/{user_id}/avatar", response_model=UserRead)
+async def user_upload_avatar(
+    user_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Faz upload da foto de perfil de um utilizador."""
+    target = await get_user_or_raise(db, user_id)
+    if current_user.role != "administrador" and target.academy_id != current_user.academy_id:
+        raise ForbiddenError("Acesso negado. Você só pode editar usuários da sua academia.")
+    return await _save_user_avatar_and_maybe_enqueue(db, target=target, file=file)
 
 
 @router.get("", response_model=list[UserRead])

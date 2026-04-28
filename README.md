@@ -53,6 +53,13 @@ Variáveis novas:
 
 No Docker Compose, a API e o `celery-worker` partilham o volume nomeado **`face_jobs`** montado em `/tmp/face_jobs` para o worker aceder às fotos temporárias. Em produção com **Coolify**, usa `docker-compose.coolify.yml` (mesma stack, sem portas no host); detalhes em `docs/DEPLOY_COOLIFY_CONTABO.md`.
 
+Foto de referência de aluno para reconhecimento facial:
+
+- Upload no app: `POST /users/me/avatar` (aluno) e `POST /users/{user_id}/avatar` (staff).
+- Armazenamento local no backend: `app_media/user_avatars/`.
+- URL persistida em `users.avatar_url` no formato `/media/user_avatars/...`.
+- O worker de embedding aceita tanto URL HTTP/HTTPS quanto URL relativa `/media/...`.
+
 ### HTTPS na VPS (Caddy)
 
 Com domínios apontando para a máquina, use o override que adiciona **Caddy** (TLS automático com Let’s Encrypt) na frente do viewer e da API:

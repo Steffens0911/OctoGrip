@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
@@ -44,14 +47,25 @@ class _UserFormScreenState extends State<UserFormScreen> {
   List<Academy> _academies = [];
   bool _loadingAcademies = true;
   bool _saving = false;
+  bool _uploadingAvatar = false;
   String? _error;
   bool _obscurePassword = true;
   bool _obscurePasswordConfirm = true;
+  final _avatarPicker = ImagePicker();
+  XFile? _selectedAvatar;
+  Uint8List? _selectedAvatarBytes;
+  String? _currentAvatarUrl;
 
   @override
   void initState() {
     super.initState();
+    _currentAvatarUrl = widget.user?.avatarUrl;
     _loadAcademies();
+  }
+
+  String? _absoluteMediaUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return null;
+    return rawUrl.startsWith('/') ? '${_api.baseUrl}$rawUrl' : rawUrl;
   }
 
   Future<void> _loadAcademies() async {
@@ -157,12 +171,75 @@ class _UserFormScreenState extends State<UserFormScreen> {
     }
   }
 
+  Future<void> _pickAvatarFromGallery() async {
+    try {
+      final image = await _avatarPicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920,
+      );
+      if (image == null) return;
+      final bytes = await image.readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _selectedAvatar = image;
+        _selectedAvatarBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    }
+  }
+
+  Future<void> _uploadAvatarForEditedUser() async {
+    final target = widget.user;
+    final image = _selectedAvatar;
+    final bytes = _selectedAvatarBytes;
+    if (target == null || image == null || bytes == null || _uploadingAvatar) return;
+    setState(() => _uploadingAvatar = true);
+    try {
+      final updated = await _api.uploadUserAvatar(
+        target.id,
+        bytes: bytes,
+        filename: image.name,
+        contentType: image.mimeType,
+      );
+      if (!mounted) return;
+      setState(() {
+        _uploadingAvatar = false;
+        _currentAvatarUrl = updated.avatarUrl;
+        _selectedAvatar = null;
+        _selectedAvatarBytes = null;
+      });
+      AppFeedback.show(
+        context,
+        message: 'Foto do aluno atualizada.',
+        type: AppFeedbackType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploadingAvatar = false);
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.user != null;
     final isAdmin = AuthService().isAdmin();
     final fixedAcademyId =
         isEdit ? widget.user!.academyId : AuthService().currentUser?.academyId;
+    final canUploadAvatarInEdit = isEdit &&
+        widget.user?.role == 'aluno' &&
+        (isAdmin || AuthService().isManager() || AuthService().isProfessor());
     return Scaffold(
       appBar: AppStandardAppBar(
         title: isEdit ? 'Editar usuário' : 'Novo usuário',
@@ -346,6 +423,59 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           initialValue: fixedAcademyId,
                           onChanged: null,
                         ),
+              if (canUploadAvatarInEdit) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Foto de referência (reconhecimento facial)',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                if (_absoluteMediaUrl(_currentAvatarUrl) case final avatarUrl?)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      avatarUrl,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                else
+                  const Text('Aluno sem foto cadastrada.'),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _uploadingAvatar ? null : _pickAvatarFromGallery,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: Text(_selectedAvatar == null
+                      ? 'Selecionar foto do aluno'
+                      : 'Trocar foto selecionada'),
+                ),
+                if (_selectedAvatarBytes != null) ...[
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(
+                      _selectedAvatarBytes!,
+                      height: 160,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _uploadingAvatar ? null : _uploadAvatarForEditedUser,
+                    icon: _uploadingAvatar
+                        ? const SizedBox(
+                            height: 16,
+                            width: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_upload_outlined),
+                    label: const Text('Enviar foto do aluno'),
+                  ),
+                ],
+              ],
               if (isEdit &&
                   (isAdmin ||
                       (AuthService().isManager() &&

@@ -536,6 +536,25 @@ class ApiService {
     return 'png';
   }
 
+  static MediaType _mediaTypeFromContentTypeOrFilename(
+    String? contentType,
+    String filename,
+    Uint8List bytes,
+  ) {
+    final normalized = (contentType ?? '').toLowerCase();
+    if (normalized.contains('png')) return MediaType('image', 'png');
+    if (normalized.contains('webp')) return MediaType('image', 'webp');
+    if (normalized.contains('jpeg') || normalized.contains('jpg')) {
+      return MediaType('image', 'jpeg');
+    }
+    final fromName = _contentTypeFromFilename(filename);
+    if (fromName != null) return fromName;
+    final ext = _extensionFromBytes(bytes);
+    if (ext == 'webp') return MediaType('image', 'webp');
+    if (ext == 'jpg') return MediaType('image', 'jpeg');
+    return MediaType('image', 'png');
+  }
+
   Future<Academy> uploadAcademyLogo(
       String id, Uint8List bytes, String filename) async {
     var name = filename;
@@ -1569,6 +1588,61 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/users');
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<UserModel> uploadMyAvatar({
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final safeFilename = filename.trim().isEmpty ? 'avatar.jpg' : filename.trim();
+    final uri = Uri.parse('$baseUrl/users/me/avatar');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: safeFilename,
+        contentType:
+            _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    invalidateCache('GET:$baseUrl/users');
+    _invalidateHomeHeaderCache();
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<UserModel> uploadUserAvatar(
+    String userId, {
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final safeFilename = filename.trim().isEmpty ? 'avatar.jpg' : filename.trim();
+    final uri = Uri.parse('$baseUrl/users/$userId/avatar');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: safeFilename,
+        contentType:
+            _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    invalidateCache('GET:$baseUrl/users');
+    _invalidateHomeHeaderCache();
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
