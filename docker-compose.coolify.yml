@@ -59,7 +59,7 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
@@ -73,7 +73,7 @@ services:
         condition: service_healthy
     volumes:
       - api_media:/app/app_media
-      - face_jobs:/tmp/face_jobs
+      - face_jobs:/app/app_media/face_jobs
       # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
 
@@ -91,7 +91,7 @@ services:
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,7 +99,7 @@ services:
         condition: service_healthy
     volumes:
       - api_media:/app/app_media
-      - face_jobs:/tmp/face_jobs
+      - face_jobs:/app/app_media/face_jobs
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
 
   celery-beat:
@@ -114,7 +114,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}
     depends_on:
       postgres:
         condition: service_healthy
