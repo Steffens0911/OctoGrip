@@ -79,6 +79,7 @@ class Settings(BaseSettings):
     # Reconhecimento facial (fila assíncrona)
     REDIS_URL: str = "redis://localhost:6379/0"
     FACE_JOBS_DIR: str = "/tmp/face_jobs"
+    FACE_MAX_IMAGE_SIDE: int = 1280
 
     @field_validator("JWT_SECRET")
     @classmethod

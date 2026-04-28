@@ -3,7 +3,10 @@ import 'dart:async' show StreamSubscription, unawaited;
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
+import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
+import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/attendance_live_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -35,6 +38,9 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
 
   bool _loading = true;
   bool _busy = false;
+  bool _faceRecognitionEnabled = false;
+  bool _checkingFaceJob = false;
+  String? _faceJobId;
   String? _error;
 
   @override
@@ -113,6 +119,14 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     try {
       final session = await _api.getAttendanceSession(widget.sessionId);
       final recs = await _api.getAttendanceSessionRecords(widget.sessionId, limit: 500);
+      bool faceRecognitionEnabled = false;
+      try {
+        final academyId = session.academyId;
+        if (academyId != null && academyId.isNotEmpty) {
+          final academy = await _api.getAcademy(academyId);
+          faceRecognitionEnabled = academy.faceRecognitionEnabled;
+        }
+      } catch (_) {}
       UserModel? creator;
       try {
         creator = await _api.getUser(session.createdByUserId);
@@ -122,6 +136,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
         _session = session;
         _records = recs;
         _createdBy = creator;
+        _faceRecognitionEnabled = faceRecognitionEnabled;
         _loading = false;
       });
       await _hydrateUsersForRecords(recs);
@@ -295,6 +310,73 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
   }
 
+  Future<void> _openFaceRecognitionFlow() async {
+    final session = _session;
+    if (session == null || _busy) return;
+    final result = await Navigator.of(context).push<FaceRecognitionSubmitResponse>(
+      MaterialPageRoute(
+        builder: (_) => FaceRecognitionCheckinScreen(sessionId: session.id),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _faceJobId = result.jobId);
+    AppFeedback.show(
+      context,
+      message: 'Foto enviada. Abra o resultado quando o processamento terminar.',
+      type: AppFeedbackType.success,
+    );
+  }
+
+  Future<void> _checkFaceRecognitionJob() async {
+    final session = _session;
+    final jobId = _faceJobId;
+    if (session == null || jobId == null || _checkingFaceJob) return;
+    setState(() => _checkingFaceJob = true);
+    try {
+      final job = await _api.getFaceRecognitionJob(jobId);
+      if (!mounted) return;
+      if (job.status == 'completed') {
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => ReviewFaceResultsScreen(
+              sessionId: session.id,
+              jobId: jobId,
+            ),
+          ),
+        );
+        if (!mounted) return;
+        if (saved == true) {
+          setState(() => _faceJobId = null);
+          await _load();
+        }
+        return;
+      }
+      if (job.status == 'failed') {
+        AppFeedback.show(
+          context,
+          message: job.errorMessage ?? 'Processamento falhou. Envie outra foto.',
+          type: AppFeedbackType.error,
+        );
+        setState(() => _faceJobId = null);
+        return;
+      }
+      AppFeedback.show(
+        context,
+        message: 'Processamento ainda em andamento. Tente novamente em instantes.',
+        type: AppFeedbackType.warning,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _checkingFaceJob = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -349,6 +431,12 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
             spacing: 8,
             runSpacing: 8,
             children: [
+              if (!isClosed && _faceRecognitionEnabled)
+                FilledButton.icon(
+                  onPressed: _busy ? null : _openFaceRecognitionFlow,
+                  icon: const Icon(Icons.camera_alt_rounded),
+                  label: const Text('Chamada por foto'),
+                ),
               if (!isClosed)
                 FilledButton(
                   onPressed: _busy ? null : _closeSession,
@@ -359,6 +447,18 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
                 icon: const Icon(Icons.person_add_rounded),
                 label: const Text('Adicionar aluno'),
               ),
+              if (_faceJobId != null)
+                OutlinedButton.icon(
+                  onPressed: _checkingFaceJob ? null : _checkFaceRecognitionJob,
+                  icon: _checkingFaceJob
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.checklist_rounded),
+                  label: const Text('Ver resultado da foto'),
+                ),
             ],
           ),
           const SizedBox(height: 20),
