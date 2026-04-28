@@ -36,6 +36,7 @@ RUN chown -R app:app /home/app/.local
 RUN apt-get update && apt-get install -y --no-install-recommends \
       wget \
       ca-certificates \
+      gosu \
       libxcb1 \
       libgl1 \
       libglib2.0-0 \
@@ -50,7 +51,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --chown=app:app . .
 RUN mkdir -p /app/app_media && chown -R app:app /app
 
-USER app
+COPY deploy/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
@@ -63,4 +65,5 @@ LABEL org.opencontainers.image.title="JJB API" \
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()" || exit 1
 
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
