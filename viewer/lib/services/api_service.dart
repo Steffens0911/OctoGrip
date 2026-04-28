@@ -666,6 +666,7 @@ class ApiService {
     bool? showPartners,
     bool? showSchedule,
     bool? showGlobalSupporters,
+    bool? faceRecognitionEnabled,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -681,6 +682,9 @@ class ApiService {
     if (showSchedule != null) body['show_schedule'] = showSchedule;
     if (showGlobalSupporters != null) {
       body['show_global_supporters'] = showGlobalSupporters;
+    }
+    if (faceRecognitionEnabled != null) {
+      body['face_recognition_enabled'] = faceRecognitionEnabled;
     }
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(http.patch(

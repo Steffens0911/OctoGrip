@@ -38,6 +38,7 @@ class _AcademyCustomizationBusinessSectionsState
   bool _showPartners = true;
   bool _showSchedule = true;
   bool _showGlobalSupporters = true;
+  bool _faceRecognitionEnabled = false;
   bool _savingVisibility = false;
 
   int? _scheduleImageCacheBuster;
@@ -57,6 +58,7 @@ class _AcademyCustomizationBusinessSectionsState
     _showPartners = _academy.showPartners;
     _showSchedule = _academy.showSchedule;
     _showGlobalSupporters = _academy.showGlobalSupporters;
+    _faceRecognitionEnabled = _academy.faceRecognitionEnabled;
     _loginNoticeTitleController =
         TextEditingController(text: _academy.loginNoticeTitle ?? '');
     _loginNoticeBodyController =
@@ -77,6 +79,7 @@ class _AcademyCustomizationBusinessSectionsState
       _showPartners = _academy.showPartners;
       _showSchedule = _academy.showSchedule;
       _showGlobalSupporters = _academy.showGlobalSupporters;
+      _faceRecognitionEnabled = _academy.faceRecognitionEnabled;
       _loginNoticeTitleController.text = _academy.loginNoticeTitle ?? '';
       _loginNoticeBodyController.text = _academy.loginNoticeBody ?? '';
       _loginNoticeUrlController.text = _academy.loginNoticeUrl ?? '';
@@ -205,6 +208,7 @@ class _AcademyCustomizationBusinessSectionsState
     bool? showPartners,
     bool? showSchedule,
     bool? showGlobalSupporters,
+    bool? faceRecognitionEnabled,
   }) async {
     if (_savingVisibility) return;
     setState(() {
@@ -215,6 +219,9 @@ class _AcademyCustomizationBusinessSectionsState
       if (showGlobalSupporters != null) {
         _showGlobalSupporters = showGlobalSupporters;
       }
+      if (faceRecognitionEnabled != null) {
+        _faceRecognitionEnabled = faceRecognitionEnabled;
+      }
     });
     try {
       final updated = await _api.updateAcademy(
@@ -223,6 +230,7 @@ class _AcademyCustomizationBusinessSectionsState
         showPartners: _showPartners,
         showSchedule: _showSchedule,
         showGlobalSupporters: _showGlobalSupporters,
+        faceRecognitionEnabled: _faceRecognitionEnabled,
       );
       if (!mounted) return;
       setState(() {
@@ -231,6 +239,7 @@ class _AcademyCustomizationBusinessSectionsState
         _showPartners = updated.showPartners;
         _showSchedule = updated.showSchedule;
         _showGlobalSupporters = updated.showGlobalSupporters;
+        _faceRecognitionEnabled = updated.faceRecognitionEnabled;
         _savingVisibility = false;
       });
       widget.onUpdated();
@@ -551,6 +560,19 @@ class _AcademyCustomizationBusinessSectionsState
                             _updateHomeVisibility(showGlobalSupporters: value);
                           },
                   ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Ativar chamada por reconhecimento facial'),
+                  subtitle: const Text(
+                    'Habilita o botão "Chamada por foto" dentro das sessões de chamada.',
+                  ),
+                  value: _faceRecognitionEnabled,
+                  onChanged: _savingVisibility
+                      ? null
+                      : (value) {
+                          _updateHomeVisibility(faceRecognitionEnabled: value);
+                        },
+                ),
               ],
             ),
           ),
