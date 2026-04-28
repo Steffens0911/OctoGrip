@@ -11,6 +11,7 @@ import 'package:viewer/screens/admin/technique_list_screen.dart';
 import 'package:viewer/screens/admin/training_video_list_screen.dart';
 import 'package:viewer/screens/admin/trophy_list_screen.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/academy/training_field_sections.dart';
@@ -68,6 +69,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   late DateTime _reportPeriodEnd;
   List<WeeklyKitRead> _weeklyKits = [];
   bool _loadingWeeklyKits = false;
+  bool _showGlobalSupporters = true;
+  bool _faceRecognitionEnabled = false;
+  bool _savingAdminPersonalization = false;
 
   @override
   void initState() {
@@ -79,6 +83,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _weeklyMultiplier1 = clampRewardPoints(_academy.weeklyMultiplier1);
     _weeklyMultiplier2 = clampRewardPoints(_academy.weeklyMultiplier2);
     _weeklyMultiplier3 = clampRewardPoints(_academy.weeklyMultiplier3);
+    _showGlobalSupporters = _academy.showGlobalSupporters;
+    _faceRecognitionEnabled = _academy.faceRecognitionEnabled;
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
@@ -91,6 +97,23 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       _loadRankingAndReport();
       _loadUsageMetrics();
       _loadWeeklyPanelLogins();
+      if (AuthService().isAdmin()) {
+        _loadAdminPersonalizationFresh();
+      }
+    }
+  }
+
+  Future<void> _loadAdminPersonalizationFresh() async {
+    try {
+      final fresh = await _api.getAcademyFresh(_academy.id);
+      if (!mounted) return;
+      setState(() {
+        _academy = fresh;
+        _showGlobalSupporters = fresh.showGlobalSupporters;
+        _faceRecognitionEnabled = fresh.faceRecognitionEnabled;
+      });
+    } catch (_) {
+      // Mantém os dados já carregados no detalhe caso o refresh falhe.
     }
   }
 
@@ -258,6 +281,56 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _errorWeeklyPanelLogins = userFacingMessage(e);
         _loadingWeeklyPanelLogins = false;
       });
+    }
+  }
+
+  Future<void> _updateAdminPersonalization({
+    bool? showGlobalSupporters,
+    bool? faceRecognitionEnabled,
+  }) async {
+    if (_savingAdminPersonalization) return;
+    final previousShowGlobalSupporters = _showGlobalSupporters;
+    final previousFaceRecognitionEnabled = _faceRecognitionEnabled;
+    setState(() {
+      _savingAdminPersonalization = true;
+      if (showGlobalSupporters != null) {
+        _showGlobalSupporters = showGlobalSupporters;
+      }
+      if (faceRecognitionEnabled != null) {
+        _faceRecognitionEnabled = faceRecognitionEnabled;
+      }
+    });
+    try {
+      final updated = await _api.updateAcademy(
+        _academy.id,
+        showGlobalSupporters: showGlobalSupporters,
+        faceRecognitionEnabled: faceRecognitionEnabled,
+      );
+      if (!mounted) return;
+      setState(() {
+        _academy = updated;
+        _showGlobalSupporters = updated.showGlobalSupporters;
+        _faceRecognitionEnabled = updated.faceRecognitionEnabled;
+        _savingAdminPersonalization = false;
+      });
+      widget.onUpdated();
+      AppFeedback.show(
+        context,
+        message: 'Personalização da academia atualizada.',
+        type: AppFeedbackType.success,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _showGlobalSupporters = previousShowGlobalSupporters;
+        _faceRecognitionEnabled = previousFaceRecognitionEnabled;
+        _savingAdminPersonalization = false;
+      });
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
     }
   }
 
@@ -565,6 +638,56 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
             children: [
               const SizedBox(height: 24),
               _buildReportPeriodCard(),
+              if (AuthService().isAdmin()) ...[
+                const SizedBox(height: 16),
+                const _SectionTitle(title: 'Personalização da academia'),
+                Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                        child: Text(
+                          'Controle por academia o bloco de parceiros globais da Central e a chamada por foto.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondaryOf(context),
+                              ),
+                        ),
+                      ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text('Mostrar apoiadores do app'),
+                        subtitle: const Text(
+                          'Exibe parceiros globais na home dos alunos desta academia.',
+                        ),
+                        value: _showGlobalSupporters,
+                        onChanged: _savingAdminPersonalization
+                            ? null
+                            : (value) {
+                                _updateAdminPersonalization(
+                                  showGlobalSupporters: value,
+                                );
+                              },
+                      ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text('Ativar chamada por reconhecimento facial'),
+                        subtitle: const Text(
+                          'Habilita o botão "Chamada por foto" nas sessões de chamada.',
+                        ),
+                        value: _faceRecognitionEnabled,
+                        onChanged: _savingAdminPersonalization
+                            ? null
+                            : (value) {
+                                _updateAdminPersonalization(
+                                  faceRecognitionEnabled: value,
+                                );
+                              },
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               ..._buildExtraSections(),
             ],

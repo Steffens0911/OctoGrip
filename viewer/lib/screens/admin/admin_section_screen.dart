@@ -45,7 +45,7 @@ class AdminSectionScreen extends StatelessWidget {
           AppNavigationTile(
             icon: Icons.school_rounded,
             title: 'Academias',
-            subtitle: 'Criar, editar e gerenciar academias',
+            subtitle: 'Criar, editar e personalizar por academia (parceiros globais e chamada por foto)',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(

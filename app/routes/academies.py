@@ -325,6 +325,7 @@ async def academy_update(
     updates = body.model_dump(exclude_unset=True)
     if current_user.role != "administrador":
         updates.pop("face_recognition_enabled", None)
+        updates.pop("show_global_supporters", None)
     academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()
