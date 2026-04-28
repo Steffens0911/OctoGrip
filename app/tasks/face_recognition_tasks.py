@@ -86,6 +86,7 @@ def _read_avatar_bytes(avatar_url: str) -> bytes:
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
 def process_face_recognition(self, job_id: str) -> None:
     from deepface import DeepFace
+    from app.face_model import get_model
 
     uid = UUID(job_id)
     with SyncSessionLocal() as db:
@@ -114,10 +115,12 @@ def process_face_recognition(self, job_id: str) -> None:
             )
             student_by_id = {s.id: s for s in students}
 
+            # Garante que o modelo esteja aquecido no processo antes de representar.
+            get_model()
             represented = DeepFace.represent(
                 img_path=job.photo_path,
-                model_name="ArcFace",
-                detector_backend="retinaface",
+                model_name="Facenet512",
+                detector_backend="opencv",
                 enforce_detection=False,
             )
             faces = represented if isinstance(represented, list) else [represented]
@@ -224,6 +227,7 @@ def process_face_recognition(self, job_id: str) -> None:
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
 def generate_student_embedding(self, student_id: str) -> None:
     from deepface import DeepFace
+    from app.face_model import get_model
 
     uid = UUID(student_id)
     with SyncSessionLocal() as db:
@@ -236,10 +240,12 @@ def generate_student_embedding(self, student_id: str) -> None:
             tmp.write(_read_avatar_bytes(user.avatar_url))
 
         try:
+            # Garante que o modelo esteja aquecido no processo antes de representar.
+            get_model()
             represented = DeepFace.represent(
                 img_path=tmp_path,
-                model_name="ArcFace",
-                detector_backend="retinaface",
+                model_name="Facenet512",
+                detector_backend="opencv",
                 enforce_detection=False,
             )
             faces = represented if isinstance(represented, list) else [represented]

@@ -292,6 +292,15 @@ async def lifespan(app: FastAPI):
     # Inicializar Sentry se configurado
     init_sentry(settings.SENTRY_DSN)
 
+    # Pré-carrega modelo do DeepFace para reduzir cold start após startup.
+    # (Se o DeepFace estiver indisponível, não bloqueia o servidor subir; a feature falhará quando chamada.)
+    try:
+        from app.face_model import get_model
+
+        get_model()
+    except Exception:
+        logger.exception("Falha ao pré-carregar modelo DeepFace (Facenet512) no startup.")
+
     # Garante schema público/saneamento antes de criar tabelas e migrar.
     _ensure_public_schema_sync()
     # Garante que tabelas base (users, lessons, techniques, etc.) existam antes das migrações

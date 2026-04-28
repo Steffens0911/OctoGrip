@@ -96,6 +96,8 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
   @override
   Widget build(BuildContext context) {
     final currentUrl = _absoluteMediaUrl(_avatarUrl);
+    final screen = MediaQuery.sizeOf(context);
+    final previewMaxW = screen.width.clamp(240.0, 420.0);
     return Scaffold(
       appBar: const AppStandardAppBar(
         title: 'Foto de perfil',
@@ -109,12 +111,26 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
           ),
           const SizedBox(height: 12),
           if (currentUrl != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                currentUrl,
-                height: 180,
-                fit: BoxFit.cover,
+            Align(
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: previewMaxW),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.6),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Image.network(
+                        currentUrl,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           if (currentUrl == null)
@@ -128,12 +144,26 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
           ),
           const SizedBox(height: 12),
           if (_photoBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                _photoBytes!,
-                fit: BoxFit.cover,
-                height: 220,
+            Align(
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: previewMaxW),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.6),
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: Image.memory(
+                        _photoBytes!,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 16),

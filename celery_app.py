@@ -30,12 +30,12 @@ celery_app.conf.update(
 
 
 @worker_process_init.connect
-def preload_arcface_model(**_: object) -> None:
+def preload_facenet512_model(**_: object) -> None:
     """Pré-carrega o modelo no processo worker para reduzir cold start da primeira task."""
     try:
-        from deepface import DeepFace
+        from app.face_model import get_model
 
-        DeepFace.build_model("ArcFace")
+        get_model()
     except Exception:
         # Não bloqueia startup do worker; a task falhará com erro explícito se faltar dependência.
         pass

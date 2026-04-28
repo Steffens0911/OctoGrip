@@ -89,6 +89,9 @@ class _FaceRecognitionCheckinScreenState
 
   @override
   Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+    final previewMaxW = screen.width.clamp(260.0, 560.0);
+    final previewAspect = screen.width < 520 ? (4 / 3) : (16 / 9);
     return Scaffold(
       appBar: const AppStandardAppBar(title: 'Chamada por foto'),
       body: ListView(
@@ -107,12 +110,26 @@ class _FaceRecognitionCheckinScreenState
           ),
           const SizedBox(height: 12),
           if (_photoBytes != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.memory(
-                _photoBytes!,
-                fit: BoxFit.cover,
-                height: 220,
+            Align(
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: previewMaxW),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.6),
+                    child: AspectRatio(
+                      aspectRatio: previewAspect,
+                      child: Image.memory(
+                        _photoBytes!,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           const SizedBox(height: 12),
