@@ -122,12 +122,11 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
                         .colorScheme
                         .surfaceContainerHighest
                         .withValues(alpha: 0.6),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Image.network(
-                        currentUrl,
-                        fit: BoxFit.contain,
-                      ),
+                    child: Image.network(
+                      currentUrl,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      filterQuality: FilterQuality.high,
                     ),
                   ),
                 ),
@@ -155,12 +154,11 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
                         .colorScheme
                         .surfaceContainerHighest
                         .withValues(alpha: 0.6),
-                    child: AspectRatio(
-                      aspectRatio: 1,
-                      child: Image.memory(
-                        _photoBytes!,
-                        fit: BoxFit.contain,
-                      ),
+                    child: Image.memory(
+                      _photoBytes!,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      filterQuality: FilterQuality.high,
                     ),
                   ),
                 ),

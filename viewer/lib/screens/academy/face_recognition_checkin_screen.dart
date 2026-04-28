@@ -91,7 +91,6 @@ class _FaceRecognitionCheckinScreenState
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context);
     final previewMaxW = screen.width.clamp(260.0, 560.0);
-    final previewAspect = screen.width < 520 ? (4 / 3) : (16 / 9);
     return Scaffold(
       appBar: const AppStandardAppBar(title: 'Chamada por foto'),
       body: ListView(
@@ -121,12 +120,11 @@ class _FaceRecognitionCheckinScreenState
                         .colorScheme
                         .surfaceContainerHighest
                         .withValues(alpha: 0.6),
-                    child: AspectRatio(
-                      aspectRatio: previewAspect,
-                      child: Image.memory(
-                        _photoBytes!,
-                        fit: BoxFit.contain,
-                      ),
+                    child: Image.memory(
+                      _photoBytes!,
+                      fit: BoxFit.contain,
+                      width: double.infinity,
+                      filterQuality: FilterQuality.high,
                     ),
                   ),
                 ),
