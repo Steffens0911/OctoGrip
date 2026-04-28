@@ -42,6 +42,7 @@ services:
     build: .
     container_name: jjb_api
     restart: unless-stopped
+    user: "0:0"
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
@@ -80,6 +81,7 @@ services:
     build: .
     container_name: jjb_celery_worker
     restart: unless-stopped
+    user: "0:0"
     command: celery -A celery_app worker --loglevel=info --concurrency=2
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
