@@ -216,8 +216,13 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
   Set<String> get _presentUserIds => _records.map((r) => r.userId).toSet();
 
   Future<void> _addStudentDialog() async {
-    final academyId = AuthService().currentUser?.academyId;
-    if (academyId == null && !AuthService().isAdmin()) {
+    final session = _session;
+    if (session == null || _busy) return;
+    final sessionAcademyId = session.academyId;
+    final academyId = (sessionAcademyId != null && sessionAcademyId.isNotEmpty)
+        ? sessionAcademyId
+        : AuthService().currentUser?.academyId;
+    if ((academyId == null || academyId.isEmpty) && !AuthService().isAdmin()) {
       AppFeedback.show(
         context,
         message: 'Utilizador sem academia vinculada.',
@@ -225,41 +230,26 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
       );
       return;
     }
+    if (academyId == null || academyId.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: 'Sessão sem academia associada.',
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
     await showDialog<void>(
       context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => AttendanceAddStudentDialog(
         api: _api,
         academyId: academyId,
         presentUserIds: _presentUserIds,
-        onPick: (userId) async {
-          Navigator.pop(ctx);
-          await _addStudent(userId);
-        },
+        onConfirm: (ids) =>
+            _api.addAttendanceRecordsManualBatch(widget.sessionId, ids),
       ),
     );
-  }
-
-  Future<void> _addStudent(String userId) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await _api.addAttendanceRecord(widget.sessionId, userId);
-      final session = await _api.getAttendanceSession(widget.sessionId);
-      final recs = await _api.getAttendanceSessionRecordsAll(widget.sessionId);
-      if (!mounted) return;
-      setState(() {
-        _session = session;
-        _records = recs;
-        _busy = false;
-      });
-      await _hydrateUsersForRecords(recs);
-      if (!mounted) return;
-      AppFeedback.show(context, message: 'Presença adicionada', type: AppFeedbackType.success);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
-    }
   }
 
   Future<void> _confirmRemove(AttendanceRecordModel r) async {

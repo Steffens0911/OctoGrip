@@ -8,6 +8,7 @@ import 'package:viewer/config.dart';
 import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/academy_student_list_item.dart';
+import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
 import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/models/global_partner.dart';
