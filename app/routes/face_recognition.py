@@ -226,6 +226,7 @@ async def face_recognition_confirm(
             checked_in_at=datetime.now(UTC),
             method="face",
             face_recognition=True,
+            added_manually=False,
         )
         db.add(record)
         created_records.append(record)
@@ -241,6 +242,7 @@ async def face_recognition_confirm(
             checked_in_at=record.checked_in_at,
             method=record.method,
             face_recognition=record.face_recognition,
+            added_manually=record.added_manually,
         )
         await attendance_manager.broadcast(
             record.session_id,

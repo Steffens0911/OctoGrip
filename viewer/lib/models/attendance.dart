@@ -47,6 +47,7 @@ class AttendanceRecordModel {
   final DateTime checkedInAt;
   final String method;
   final bool faceRecognition;
+  final bool addedManually;
 
   AttendanceRecordModel({
     required this.id,
@@ -55,6 +56,7 @@ class AttendanceRecordModel {
     required this.checkedInAt,
     required this.method,
     required this.faceRecognition,
+    this.addedManually = false,
   });
 
   factory AttendanceRecordModel.fromJson(Map<String, dynamic> json) {
@@ -65,6 +67,7 @@ class AttendanceRecordModel {
       checkedInAt: DateTime.parse(json['checked_in_at'] as String),
       method: json['method'] as String? ?? 'qr',
       faceRecognition: json['face_recognition'] as bool? ?? false,
+      addedManually: json['added_manually'] as bool? ?? false,
     );
   }
 }

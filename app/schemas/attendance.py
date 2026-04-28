@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AttendanceSessionCreate(BaseModel):
@@ -39,9 +39,25 @@ class AttendanceScanRequest(BaseModel):
 
 
 class AttendanceManualCheckinRequest(BaseModel):
-    """Correção de presença: professor/gestor adiciona aluno sem QR."""
+    """Correção de presença: professor/gestor adiciona aluno(s) sem QR."""
 
-    user_id: UUID
+    user_id: UUID | None = Field(default=None, description="Um aluno (contrato legado).")
+    student_ids: list[UUID] | None = Field(
+        default=None,
+        description="Vários alunos na mesma requisição.",
+    )
+
+    @model_validator(mode="after")
+    def user_id_or_student_ids(self) -> AttendanceManualCheckinRequest:
+        has_uid = self.user_id is not None
+        has_sids = self.student_ids is not None
+        if has_uid and has_sids:
+            raise ValueError("Informe apenas user_id ou student_ids, não ambos.")
+        if not has_uid and not has_sids:
+            raise ValueError("Informe user_id ou student_ids.")
+        if has_sids and len(self.student_ids or ()) == 0:
+            raise ValueError("student_ids não pode ser uma lista vazia.")
+        return self
 
 
 class AttendanceRecordRead(BaseModel):
@@ -51,6 +67,11 @@ class AttendanceRecordRead(BaseModel):
     checked_in_at: datetime
     method: str
     face_recognition: bool = False
+    added_manually: bool = False
+
+
+class AttendanceManualBatchResponse(BaseModel):
+    records: list[AttendanceRecordRead]
 
 
 class AttendanceUserSummaryResponse(BaseModel):

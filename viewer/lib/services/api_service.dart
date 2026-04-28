@@ -7,7 +7,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:viewer/config.dart';
 import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
-import 'package:viewer/models/active_students_report.dart';
+import 'package:viewer/models/academy_student_list_item.dart';
 import 'package:viewer/models/engagement_report.dart';
 import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/models/global_partner.dart';
@@ -891,6 +891,53 @@ class ApiService {
     _throwIfNotOk(r, data);
     _invalidateAttendanceCache();
     return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  /// Lista compacta de alunos da academia (`GET /students/academy/{id}/list`).
+  Future<List<AcademyStudentListItem>> getAcademyStudentsList(String academyId,
+      {bool asRealUser = false}) async {
+    final uri = Uri.parse('$baseUrl/students/academy/$academyId/list');
+    http.Response r;
+    try {
+      r = asRealUser
+          ? await _req(http.get(uri,
+              headers: await _headers(auth: true, realUserOnly: true)))
+          : await _req(http.get(uri, headers: await _headers(auth: true)));
+    } on ApiException catch (e) {
+      if (e.statusCode == 403 &&
+          !asRealUser &&
+          AuthService().isRealUserAdmin) {
+        return getAcademyStudentsList(academyId, asRealUser: true);
+      }
+      rethrow;
+    }
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data as List<dynamic>? ?? const [];
+    return list
+        .map((e) =>
+            AcademyStudentListItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Várias presenças manuais (`POST .../records` com `student_ids`).
+  Future<List<AttendanceRecordModel>> addAttendanceRecordsManualBatch(
+      String sessionId, List<String> studentIds) async {
+    if (studentIds.isEmpty) return [];
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'student_ids': studentIds}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    final map = data! as Map<String, dynamic>;
+    final raw = map['records'] as List<dynamic>? ?? const [];
+    return raw
+        .map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<FaceRecognitionSubmitResponse> submitFaceRecognitionPhoto({

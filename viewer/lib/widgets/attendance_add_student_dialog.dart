@@ -1,168 +1,505 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
-import 'package:viewer/models/user.dart';
+import 'package:flutter/services.dart';
+import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/academy_student_list_item.dart';
+import 'package:viewer/models/attendance.dart';
 import 'package:viewer/services/api_service.dart';
-import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 
-/// Diálogo com busca e lista de alunos da academia para presença manual.
+/// Acento mint (chamada / print de referência).
+const Color _kAccentGreen = Color(0xFF4ECF8A);
+
+/// Modal de presença manual na chamada (multi-selecção).
 class AttendanceAddStudentDialog extends StatefulWidget {
   const AttendanceAddStudentDialog({
     super.key,
     required this.api,
     required this.academyId,
     required this.presentUserIds,
-    required this.onPick,
+    required this.onConfirm,
   });
 
   final ApiService api;
-  final String? academyId;
+  final String academyId;
   final Set<String> presentUserIds;
-  final Future<void> Function(String userId) onPick;
+
+  /// Devolve os registos criados (vazio se todos já estavam presentes).
+  final Future<List<AttendanceRecordModel>> Function(List<String> studentIds)
+      onConfirm;
 
   @override
-  State<AttendanceAddStudentDialog> createState() => _AttendanceAddStudentDialogState();
+  State<AttendanceAddStudentDialog> createState() =>
+      _AttendanceAddStudentDialogState();
 }
 
 class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog> {
   final _search = TextEditingController();
-  List<UserModel> _allStudents = [];
+  List<AcademyStudentListItem> _allStudents = [];
+  final Set<String> _selectedIds = {};
   bool _loading = true;
-  String? _error;
+  String? _loadError;
+  String? _submitError;
+  bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _search.addListener(_applyFilter);
-    unawaited(_loadUsers());
+    _search.addListener(_onSearchChanged);
+    unawaited(_loadStudents());
   }
+
+  void _onSearchChanged() => setState(() {});
 
   @override
   void dispose() {
-    _search.removeListener(_applyFilter);
+    _search.removeListener(_onSearchChanged);
     _search.dispose();
     super.dispose();
   }
 
-  List<UserModel> get _filtered {
-    final q = _search.text.trim().toLowerCase();
-    return _allStudents.where((u) {
-      if (q.isEmpty) return true;
-      final name = (u.name ?? '').toLowerCase();
-      return u.email.toLowerCase().contains(q) || name.contains(q);
-    }).toList();
-  }
-
-  void _applyFilter() => setState(() {});
-
-  Future<List<UserModel>> _fetchUsers() async {
-    final academyId = widget.academyId?.trim();
-    final hasAcademyId = academyId != null && academyId.isNotEmpty;
+  Future<void> _loadStudents() async {
+    setState(() {
+      _loading = true;
+      _loadError = null;
+    });
     try {
-      return await widget.api.getUsersAll(
-        academyId: hasAcademyId ? academyId : null,
-      );
-    } on ApiException catch (e) {
-      // Em "atuar como", alguns cenários retornam 403 para usuário efetivo.
-      if (e.statusCode == 403 && AuthService().isRealUserAdmin) {
-        return widget.api.getUsersAll(
-          academyId: hasAcademyId ? academyId : null,
-          asRealUser: true,
-        );
-      }
-      rethrow;
+      final list =
+          await widget.api.getAcademyStudentsList(widget.academyId.trim());
+      final filtered = list
+          .where((s) => !widget.presentUserIds.contains(s.id))
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _allStudents = filtered;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadError = userFacingMessage(e);
+      });
     }
   }
 
-  Future<void> _loadUsers() async {
-    setState(() => _loading = true);
+  List<AcademyStudentListItem> get _filtered {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return _allStudents;
+    return _allStudents.where((s) {
+      final name = (s.name ?? '').toLowerCase();
+      return name.contains(q);
+    }).toList();
+  }
+
+  void _toggleSelection(String id) {
+    setState(() {
+      if (_selectedIds.contains(id)) {
+        _selectedIds.remove(id);
+      } else {
+        _selectedIds.add(id);
+      }
+      _submitError = null;
+    });
+  }
+
+  String _beltLabel(String? belt) {
+    if (belt == null || belt.isEmpty) return 'Sem faixa';
+    switch (belt.toLowerCase()) {
+      case 'white':
+        return 'Faixa branca';
+      case 'blue':
+        return 'Faixa azul';
+      case 'purple':
+        return 'Faixa roxa';
+      case 'brown':
+        return 'Faixa marrom';
+      case 'black':
+        return 'Faixa preta';
+      default:
+        return belt;
+    }
+  }
+
+  String _initials(AcademyStudentListItem s) {
+    final n = (s.name ?? '').trim();
+    if (n.isEmpty) return '?';
+    final parts = n.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      final a = parts[0];
+      final b = parts[1];
+      final ca = a.isNotEmpty ? a[0] : '';
+      final cb = b.isNotEmpty ? b[0] : '';
+      return ('$ca$cb').toUpperCase();
+    }
+    return n.length >= 2 ? n.substring(0, 2).toUpperCase() : n.toUpperCase();
+  }
+
+  Future<void> _submit() async {
+    if (_selectedIds.isEmpty || _submitting) return;
+    setState(() {
+      _submitting = true;
+      _submitError = null;
+    });
     try {
-      final list = await _fetchUsers();
-      final students = list.where((u) => u.role == 'aluno').toList();
-      if (mounted) {
-        setState(() {
-          _allStudents = students;
-          _loading = false;
-          _error = null;
-        });
+      final created = await widget.onConfirm(_selectedIds.toList());
+      if (!mounted) return;
+      if (created.isEmpty) {
+        AppFeedback.show(
+          context,
+          message:
+              'Nenhuma presença nova — os alunos seleccionados já estavam presentes.',
+          type: AppFeedbackType.warning,
+        );
+      } else {
+        AppFeedback.show(
+          context,
+          message: 'Presença registada.',
+          type: AppFeedbackType.success,
+        );
       }
+      Navigator.of(context).pop();
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _error = userFacingMessage(e);
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _submitError = userFacingMessage(e);
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Adicionar presença'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _search,
-              decoration: const InputDecoration(
-                labelText: 'Buscar aluno',
-                hintText: 'Nome ou e-mail',
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
-              )
-            else if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  _error!,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.red.shade400,
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF252b3b) : AppTheme.surfaceOf(context);
+    final borderColor = AppTheme.borderOf(context);
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () {
+          if (_submitting) return;
+          Navigator.of(context).pop();
+        },
+      },
+      child: Dialog(
+        backgroundColor: surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SizedBox(
+          width: MediaQuery.sizeOf(context).width.clamp(280.0, 480.0),
+          height:
+              (MediaQuery.sizeOf(context).height * 0.72).clamp(400.0, 620.0),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Adicionar aluno',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppTheme.textPrimaryOf(context),
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Selecione um ou mais alunos',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: AppTheme.textSecondaryOf(context),
+                                ),
+                          ),
+                        ],
                       ),
-                ),
-              )
-            else
-              SizedBox(
-                height: 320,
-                child: ListView.builder(
-                  itemCount: _filtered.length,
-                  itemBuilder: (context, i) {
-                    final u = _filtered[i];
-                    final already = widget.presentUserIds.contains(u.id);
-                    final name = (u.name ?? '').trim();
-                    final title = name.isNotEmpty ? name : u.email;
-                    return ListTile(
-                      enabled: !already,
-                      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      subtitle: already
-                          ? const Text('Já presente')
-                          : Text(
-                              u.email,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                      onTap: already
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: _submitting
                           ? null
-                          : () => unawaited(widget.onPick(u.id)),
-                    );
-                  },
+                          : () => Navigator.of(context).pop(),
+                      tooltip: 'Fechar',
+                    ),
+                  ],
                 ),
-              ),
-          ],
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _search,
+                  enabled: !_submitting && !_loading && _loadError == null,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar aluno...',
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: isDark ? const Color(0xFF1e2435) : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 48),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_loadError != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Column(
+                      children: [
+                        Text(
+                          _loadError!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: scheme.error),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _submitting ? null : () => unawaited(_loadStudents()),
+                          child: const Text('Tentar novamente'),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_allStudents.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    child: Column(
+                      children: [
+                        Icon(Icons.event_available_outlined,
+                            size: 48, color: AppTheme.textSecondaryOf(context)),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Todos os alunos já estão presentes',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: _filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                              'Nenhum aluno encontrado',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.textSecondaryOf(context),
+                                  ),
+                            ),
+                          )
+                        : ListView.builder(
+                            itemCount: _filtered.length,
+                            itemBuilder: (context, i) {
+                              final s = _filtered[i];
+                              final selected = _selectedIds.contains(s.id);
+                              final title = (s.name ?? '').trim().isNotEmpty
+                                  ? s.name!.trim()
+                                  : s.id;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Material(
+                                  color: selected
+                                      ? _kAccentGreen.withValues(alpha: 0.14)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(10),
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(10),
+                                    onTap:
+                                        _submitting ? null : () => _toggleSelection(s.id),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: borderColor.withValues(alpha: 0.5)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          if (selected)
+                                            Container(
+                                              width: 4,
+                                              height: 56,
+                                              decoration: const BoxDecoration(
+                                                color: _kAccentGreen,
+                                                borderRadius: BorderRadius.only(
+                                                  topLeft: Radius.circular(9),
+                                                  bottomLeft: Radius.circular(9),
+                                                ),
+                                              ),
+                                            ),
+                                          Expanded(
+                                            child: Padding(
+                                              padding: EdgeInsets.only(
+                                                left: selected ? 8 : 12,
+                                                right: 8,
+                                                top: 8,
+                                                bottom: 8,
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  _StudentAvatar(
+                                                    api: widget.api,
+                                                    avatarUrl: s.avatarUrl,
+                                                    initials: _initials(s),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          title,
+                                                          maxLines: 1,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .titleSmall
+                                                              ?.copyWith(
+                                                                fontWeight:
+                                                                    FontWeight.w600,
+                                                                color: selected
+                                                                    ? _kAccentGreen
+                                                                    : AppTheme
+                                                                        .textPrimaryOf(
+                                                                            context),
+                                                              ),
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          _beltLabel(s.belt),
+                                                          maxLines: 1,
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                          style: Theme.of(context)
+                                                              .textTheme
+                                                              .bodySmall
+                                                              ?.copyWith(
+                                                                color:
+                                                                    AppTheme.textSecondaryOf(
+                                                                        context),
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Checkbox(
+                                                    value: selected,
+                                                    activeColor: _kAccentGreen,
+                                                    checkColor: const Color(0xFF1e2435),
+                                                    side: BorderSide(color: borderColor),
+                                                    onChanged: _submitting
+                                                        ? null
+                                                        : (_) =>
+                                                            _toggleSelection(s.id),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                if (_submitError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _submitError!,
+                    style: TextStyle(color: scheme.error, fontSize: 13),
+                  ),
+                ],
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    if (_selectedIds.isNotEmpty)
+                      Text(
+                        '${_selectedIds.length} selecionado(s)',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: _kAccentGreen,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    const Spacer(),
+                    OutlinedButton(
+                      onPressed:
+                          _submitting ? null : () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _kAccentGreen,
+                        foregroundColor: const Color(0xFF1e2435),
+                      ),
+                      onPressed: (_submitting ||
+                              _selectedIds.isEmpty ||
+                              _loading ||
+                              _loadError != null)
+                          ? null
+                          : () => unawaited(_submit()),
+                      child: _submitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Confirmar presença'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fechar')),
-        TextButton(onPressed: () => unawaited(_loadUsers()), child: const Text('Atualizar')),
-      ],
+    );
+  }
+}
+
+class _StudentAvatar extends StatelessWidget {
+  const _StudentAvatar({
+    required this.api,
+    required this.avatarUrl,
+    required this.initials,
+  });
+
+  final ApiService api;
+  final String? avatarUrl;
+  final String initials;
+
+  @override
+  Widget build(BuildContext context) {
+    final raw = avatarUrl?.trim();
+    final uri = raw != null && raw.isNotEmpty
+        ? (raw.startsWith('/') ? Uri.parse('${api.baseUrl}$raw') : Uri.tryParse(raw))
+        : null;
+
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: _kAccentGreen.withValues(alpha: 0.2),
+      foregroundImage:
+          uri != null ? NetworkImage(uri.toString()) : null,
+      child: uri == null
+          ? Text(
+              initials,
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+                color: _kAccentGreen,
+                fontSize: 14,
+              ),
+            )
+          : null,
     );
   }
 }

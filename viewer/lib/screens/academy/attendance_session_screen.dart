@@ -44,10 +44,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   DateTime? _faceJobSubmittedAt;
   bool _checkingFaceJob = false;
   Timer? _refreshTimer;
-  Timer? _countdownTimer;
   Timer? _qrRetryTimer;
   Timer? _qrHeartbeatTimer;
-  int _qrSecondsLeft = 0;
+  /// Último evento WebSocket útil (check-in/remoção); usado para não duplicar polling HTTP.
+  DateTime? _lastWsActivityAt;
   bool _isRefreshingQr = false;
   bool _isRefreshingSession = false;
   String? _qrError;
@@ -67,7 +67,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   void dispose() {
     _stopLive();
     _refreshTimer?.cancel();
-    _countdownTimer?.cancel();
     _qrRetryTimer?.cancel();
     _qrHeartbeatTimer?.cancel();
     super.dispose();
@@ -91,6 +90,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   void _onLiveEvent(AttendanceLiveEvent event) {
     final s = _session;
     if (!mounted || s == null) return;
+    _lastWsActivityAt = DateTime.now();
     if (event is AttendanceCheckinLiveEvent) {
       final e = event;
       if (s.id != e.record.sessionId) return;
@@ -154,43 +154,15 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
     await showDialog<void>(
       context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => AttendanceAddStudentDialog(
         api: _api,
-        academyId: academyId,
+        academyId: academyId!,
         presentUserIds: _presentUserIds,
-        onPick: (userId) async {
-          Navigator.pop(ctx);
-          await _addStudentManual(sid, userId);
-        },
+        onConfirm: (ids) => _api.addAttendanceRecordsManualBatch(sid, ids),
       ),
     );
-  }
-
-  Future<void> _addStudentManual(String sessionId, String userId) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await _api.addAttendanceRecord(sessionId, userId);
-      final updated = await _api.getAttendanceSession(sessionId);
-      final recs =
-          await _api.getAttendanceSessionRecordsAll(sessionId);
-      if (!mounted) return;
-      setState(() {
-        _session = updated;
-        _records = (recs.toList()
-          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
-        _busy = false;
-      });
-      await _hydrateUsersForRecords(recs);
-      if (!mounted) return;
-      AppFeedback.show(context,
-          message: 'Presença adicionada', type: AppFeedbackType.success);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _busy = false);
-      AppFeedback.show(context,
-          message: userFacingMessage(e), type: AppFeedbackType.error);
-    }
   }
 
   Future<void> _confirmRemoveRecord(AttendanceRecordModel r) async {
@@ -258,13 +230,21 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
   }
 
+  static const Duration _refreshPollInterval = Duration(seconds: 15);
+  /// Evita polling HTTP redundante quando o WS acabou de entregar atualização.
+  static const Duration _skipPollAfterWsActivity = Duration(seconds: 12);
+
   void _startAutoRefresh() {
     _refreshTimer?.cancel();
     // Fallback lento se o WebSocket falhar (reconexão cobre a maioria dos casos).
-    _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (_session?.id != null) {
-        unawaited(_refreshSession());
+    _refreshTimer = Timer.periodic(_refreshPollInterval, (_) {
+      if (_session?.id == null) return;
+      final last = _lastWsActivityAt;
+      if (last != null &&
+          DateTime.now().difference(last) < _skipPollAfterWsActivity) {
+        return;
       }
+      unawaited(_refreshSession());
     });
   }
 
@@ -405,7 +385,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       final msg = userFacingMessage(e);
       setState(() {
         _qr = null;
-        _qrSecondsLeft = 0;
         _qrError = msg;
       });
       if (showErrors) {
@@ -463,10 +442,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   }
 
   void _invalidateCurrentQrForRefresh() {
-    _countdownTimer?.cancel();
     setState(() {
       _qr = null;
-      _qrSecondsLeft = 0;
       _qrError = null;
     });
   }
@@ -485,32 +462,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   }
 
   void _applyQrPayload(AttendanceQrPayloadModel qr) {
-    final initialSeconds = _secondsUntil(qr.expiresAt);
     _qrRetryTimer?.cancel();
-    _countdownTimer?.cancel();
     setState(() {
       _qr = qr;
       _qrError = null;
-      _qrSecondsLeft = initialSeconds;
-    });
-    _startCountdown();
-  }
-
-  void _startCountdown() {
-    _countdownTimer?.cancel();
-    if (_qr == null) return;
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      if (_qrSecondsLeft <= 1) {
-        timer.cancel();
-        setState(() => _qrSecondsLeft = 0);
-        unawaited(_handleQrExpired());
-        return;
-      }
-      setState(() => _qrSecondsLeft -= 1);
     });
   }
 
@@ -535,7 +490,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         return;
       }
 
-      if (_qr == null || _qrSecondsLeft <= 0) {
+      final q = _qr;
+      if (q == null || _secondsUntilQrExpiry(q.expiresAt) <= 0) {
         unawaited(_safeRefreshQr());
       }
     });
@@ -555,18 +511,33 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   Future<void> _hydrateMissingUsers(
       Iterable<AttendanceRecordModel> recs) async {
-    for (final r in recs) {
-      if (_userById.containsKey(r.userId)) continue;
+    final missingIds = recs
+        .map((r) => r.userId)
+        .where((id) => !_userById.containsKey(id))
+        .toSet()
+        .toList();
+    if (missingIds.isEmpty) return;
+
+    Future<UserModel?> fetchOne(String id) async {
       try {
-        final u = await _api.getUser(r.userId);
-        if (!mounted) return;
-        setState(() {
-          _userById = {..._userById, r.userId: u};
-        });
+        return await _api.getUser(id);
       } catch (_) {
-        // ok
+        return null;
       }
     }
+
+    final results = await Future.wait(missingIds.map(fetchOne));
+    if (!mounted) return;
+
+    final additions = <String, UserModel>{};
+    for (final u in results) {
+      if (u != null) additions[u.id] = u;
+    }
+    if (additions.isEmpty) return;
+
+    setState(() {
+      _userById = {..._userById, ...additions};
+    });
   }
 
   /// Pré-carrega o mapa de utilizadores (batch) e completa nomes em falta.
@@ -708,10 +679,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _qr = null;
         _qrError = null;
-        _qrSecondsLeft = 0;
         _busy = false;
       });
-      _countdownTimer?.cancel();
       AppFeedback.show(context,
           message: 'Chamada encerrada', type: AppFeedbackType.success);
     } catch (e) {
@@ -867,12 +836,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
               child: Column(
                 children: [
                   if (qr != null && !isClosed)
-                    QrImageView(
-                      key: ValueKey<String>(qr.payload),
-                      data: qr.payload,
-                      size: 240,
-                      backgroundColor: Colors.white,
-                      errorCorrectionLevel: QrErrorCorrectLevel.M,
+                    RepaintBoundary(
+                      child: QrImageView(
+                        key: ValueKey<String>(qr.payload),
+                        data: qr.payload,
+                        size: 240,
+                        backgroundColor: Colors.white,
+                        errorCorrectionLevel: QrErrorCorrectLevel.M,
+                      ),
                     )
                   else
                     Container(
@@ -889,11 +860,13 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                     ),
                   const SizedBox(height: 12),
                   if (qr != null && !isClosed)
-                    Text(
-                      'QR expira em ${_formatCountdown(_qrSecondsLeft)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    _QrExpiryCountdownLabel(
+                      key: ValueKey<String>('${qr.payload}_${qr.expiresAt.toIso8601String()}'),
+                      expiresAt: qr.expiresAt,
+                      textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppTheme.textSecondaryOf(context),
                           ),
+                      onExpired: () => unawaited(_handleQrExpired()),
                     ),
                   if (qr == null && !isClosed) ...[
                     if (_qrError != null)
@@ -934,39 +907,45 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                   ),
             )
           else
-            ..._records.map((r) {
-              final u = _userById[r.userId];
-              final label = u != null
-                  ? ((u.name ?? '').trim().isNotEmpty
-                      ? u.name!.trim()
-                      : u.email)
-                  : r.userId;
-              final methodLabel = r.method == 'manual'
-                  ? 'Manual'
-                  : (r.method == 'qr'
-                      ? 'QR'
-                      : (r.method == 'face' || r.faceRecognition
-                          ? 'Facial'
-                          : r.method));
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.check_circle_rounded,
-                    color: AppTheme.primary),
-                title:
-                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                  '${_formatDateTime(r.checkedInAt)} · $methodLabel',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.textSecondaryOf(context),
-                      ),
-                ),
-                trailing: IconButton(
-                  tooltip: 'Remover presença',
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  onPressed: _busy ? null : () => _confirmRemoveRecord(r),
-                ),
-              );
-            }),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _records.length,
+              itemBuilder: (context, index) {
+                final r = _records[index];
+                final u = _userById[r.userId];
+                final label = u != null
+                    ? ((u.name ?? '').trim().isNotEmpty
+                        ? u.name!.trim()
+                        : u.email)
+                    : r.userId;
+                final methodLabel = r.method == 'manual'
+                    ? 'Manual'
+                    : (r.method == 'qr'
+                        ? 'QR'
+                        : (r.method == 'face' || r.faceRecognition
+                            ? 'Facial'
+                            : r.method));
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.check_circle_rounded,
+                      color: AppTheme.primary),
+                  title: Text(label,
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text(
+                    '${_formatDateTime(r.checkedInAt)} · $methodLabel',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.textSecondaryOf(context),
+                        ),
+                  ),
+                  trailing: IconButton(
+                    tooltip: 'Remover presença',
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: _busy ? null : () => _confirmRemoveRecord(r),
+                  ),
+                );
+              },
+            ),
           const SizedBox(height: 24),
         ],
       ),
@@ -979,18 +958,76 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
   }
 
-  int _secondsUntil(DateTime exp) {
-    final now = DateTime.now().toUtc();
-    final left = exp.difference(now).inSeconds;
-    return left < 0 ? 0 : left;
+}
+
+/// Atualiza apenas este texto ~1×/s; evita `setState` na raiz da [AttendanceSessionScreen].
+class _QrExpiryCountdownLabel extends StatefulWidget {
+  const _QrExpiryCountdownLabel({
+    super.key,
+    required this.expiresAt,
+    required this.onExpired,
+    required this.textStyle,
+  });
+
+  final DateTime expiresAt;
+  final VoidCallback onExpired;
+  final TextStyle? textStyle;
+
+  @override
+  State<_QrExpiryCountdownLabel> createState() =>
+      _QrExpiryCountdownLabelState();
+}
+
+class _QrExpiryCountdownLabelState extends State<_QrExpiryCountdownLabel> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _tick();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
   }
 
-  String _formatCountdown(int seconds) {
-    if (seconds < 60) return '${seconds}s';
-    final mins = seconds ~/ 60;
-    final secs = seconds % 60;
-    final mm = mins.toString().padLeft(2, '0');
-    final ss = secs.toString().padLeft(2, '0');
-    return '$mm:$ss';
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
+
+  void _tick() {
+    if (!mounted) return;
+    final left = _secondsUntilQrExpiry(widget.expiresAt);
+    if (left <= 0) {
+      _timer?.cancel();
+      widget.onExpired();
+      return;
+    }
+    setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final left = _secondsUntilQrExpiry(widget.expiresAt);
+    final suffix =
+        left <= 0 ? '0s' : _formatQrCountdown(left);
+    return Text(
+      'QR expira em $suffix',
+      style: widget.textStyle,
+    );
+  }
+}
+
+int _secondsUntilQrExpiry(DateTime exp) {
+  final now = DateTime.now().toUtc();
+  final left = exp.toUtc().difference(now).inSeconds;
+  return left < 0 ? 0 : left;
+}
+
+String _formatQrCountdown(int seconds) {
+  if (seconds < 60) return '${seconds}s';
+  final mins = seconds ~/ 60;
+  final secs = seconds % 60;
+  final mm = mins.toString().padLeft(2, '0');
+  final ss = secs.toString().padLeft(2, '0');
+  return '$mm:$ss';
 }

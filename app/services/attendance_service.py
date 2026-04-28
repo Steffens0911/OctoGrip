@@ -248,6 +248,7 @@ async def add_record_manual(
         user_id=target_user_id,
         checked_in_at=now,
         method="manual",
+        added_manually=True,
     )
     db.add(r)
     await db.commit()
@@ -362,6 +363,7 @@ async def scan_checkin(
         user_id=current_user.id,
         checked_in_at=now,
         method="qr",
+        added_manually=False,
     )
     db.add(r)
     await db.commit()

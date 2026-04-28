@@ -14,6 +14,7 @@ from app.core.security import decode_access_token
 from app.database import get_db
 from app.models import AttendanceRecord, AttendanceSession, User
 from app.schemas.attendance import (
+    AttendanceManualBatchResponse,
     AttendanceManualCheckinRequest,
     AttendanceMyPositionRead,
     AttendanceMyStatsRead,
@@ -61,6 +62,18 @@ async def _present_count_for_session(db: AsyncSession, session_id: UUID) -> int:
         )
     ).scalar_one()
     return int(n or 0)
+
+
+def _record_read(r: AttendanceRecord) -> AttendanceRecordRead:
+    return AttendanceRecordRead(
+        id=r.id,
+        session_id=r.session_id,
+        user_id=r.user_id,
+        checked_in_at=r.checked_in_at,
+        method=r.method,
+        face_recognition=r.face_recognition,
+        added_manually=r.added_manually,
+    )
 
 
 @router.get("/stats/sessions", response_model=list[AttendanceSessionStatRead])
@@ -365,13 +378,42 @@ async def attendance_session_close(
     )
 
 
-@router.post("/sessions/{session_id}/records", response_model=AttendanceRecordRead, status_code=201)
+@router.post(
+    "/sessions/{session_id}/records",
+    status_code=201,
+)
 async def attendance_session_add_record(
     session_id: UUID,
     body: AttendanceManualCheckinRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
-):
+) -> AttendanceRecordRead | AttendanceManualBatchResponse:
+    if body.student_ids is not None:
+        registered: list[AttendanceRecordRead] = []
+        for target_user_id in body.student_ids:
+            r, created = await add_record_manual(
+                db,
+                current_user=current_user,
+                session_id=session_id,
+                target_user_id=target_user_id,
+            )
+            if not created:
+                continue
+            present_count = await _present_count_for_session(db, r.session_id)
+            rec_read = _record_read(r)
+            await attendance_manager.broadcast(
+                r.session_id,
+                {
+                    "type": "checkin",
+                    "session_id": str(r.session_id),
+                    "record": rec_read.model_dump(mode="json"),
+                    "present_count": present_count,
+                },
+            )
+            registered.append(rec_read)
+        return AttendanceManualBatchResponse(records=registered)
+
+    assert body.user_id is not None
     r, created = await add_record_manual(
         db,
         current_user=current_user,
@@ -380,14 +422,7 @@ async def attendance_session_add_record(
     )
     if created:
         present_count = await _present_count_for_session(db, r.session_id)
-        rec_read = AttendanceRecordRead(
-            id=r.id,
-            session_id=r.session_id,
-            user_id=r.user_id,
-            checked_in_at=r.checked_in_at,
-            method=r.method,
-            face_recognition=r.face_recognition,
-        )
+        rec_read = _record_read(r)
         await attendance_manager.broadcast(
             r.session_id,
             {
@@ -397,14 +432,7 @@ async def attendance_session_add_record(
                 "present_count": present_count,
             },
         )
-    return AttendanceRecordRead(
-        id=r.id,
-        session_id=r.session_id,
-        user_id=r.user_id,
-        checked_in_at=r.checked_in_at,
-        method=r.method,
-        face_recognition=r.face_recognition,
-    )
+    return _record_read(r)
 
 
 @router.delete("/records/{record_id}", status_code=204)
@@ -468,17 +496,7 @@ async def attendance_session_records(
         .offset(offset)
     )
     rows = (await db.execute(q)).scalars().all()
-    return [
-        AttendanceRecordRead(
-            id=r.id,
-            session_id=r.session_id,
-            user_id=r.user_id,
-            checked_in_at=r.checked_in_at,
-            method=r.method,
-            face_recognition=r.face_recognition,
-        )
-        for r in rows
-    ]
+    return [_record_read(r) for r in rows]
 
 
 @router.get("/sessions/{session_id}/qr", response_model=AttendanceQrPayloadResponse)
@@ -549,14 +567,7 @@ async def attendance_scan(
     r, created = await scan_checkin(db, current_user=current_user, payload=body.payload)
     if created:
         present_count = await _present_count_for_session(db, r.session_id)
-        rec_read = AttendanceRecordRead(
-            id=r.id,
-            session_id=r.session_id,
-            user_id=r.user_id,
-            checked_in_at=r.checked_in_at,
-            method=r.method,
-            face_recognition=r.face_recognition,
-        )
+        rec_read = _record_read(r)
         await attendance_manager.broadcast(
             r.session_id,
             {
@@ -566,14 +577,7 @@ async def attendance_scan(
                 "present_count": present_count,
             },
         )
-    return AttendanceRecordRead(
-        id=r.id,
-        session_id=r.session_id,
-        user_id=r.user_id,
-        checked_in_at=r.checked_in_at,
-        method=r.method,
-        face_recognition=r.face_recognition,
-    )
+    return _record_read(r)
 
 
 @router.get("/me/summary", response_model=AttendanceUserSummaryResponse)

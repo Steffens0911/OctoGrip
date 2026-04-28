@@ -31,6 +31,12 @@ class AttendanceRecord(Base, UUIDMixin):
     )
     method: Mapped[str] = mapped_column(String(32), nullable=False, default="qr")
     face_recognition: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    added_manually: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="True quando o professor adicionou presença pelo modal manual; QR/scan usam false.",
+    )
 
     session: Mapped["AttendanceSession"] = relationship(
         "AttendanceSession",

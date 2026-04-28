@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.routes import (
     academies,
+    students,
     academy_weekly_kits,
     attendance,
     admin,
@@ -57,6 +58,7 @@ api_router.include_router(
 )
 api_router.include_router(professors.router, prefix="/professors", tags=["professors"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(students.router, prefix="/students", tags=["students"])
 api_router.include_router(lessons.router, prefix="/lessons", tags=["lessons"])
 api_router.include_router(techniques.router, prefix="/techniques", tags=["techniques"])
 api_router.include_router(partners.router, prefix="/partners", tags=["partners"])
