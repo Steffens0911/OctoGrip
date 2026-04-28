@@ -323,6 +323,8 @@ async def academy_update(
     exige current_user.academy_id == academy_id."""
     verify_academy_access(current_user, str(academy_id))
     updates = body.model_dump(exclude_unset=True)
+    if current_user.role != "administrador":
+        updates.pop("face_recognition_enabled", None)
     academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()

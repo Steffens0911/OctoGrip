@@ -230,7 +230,8 @@ class _AcademyCustomizationBusinessSectionsState
         showPartners: _showPartners,
         showSchedule: _showSchedule,
         showGlobalSupporters: _showGlobalSupporters,
-        faceRecognitionEnabled: _faceRecognitionEnabled,
+        faceRecognitionEnabled:
+            AuthService().isAdmin() ? _faceRecognitionEnabled : null,
       );
       if (!mounted) return;
       setState(() {
@@ -560,19 +561,20 @@ class _AcademyCustomizationBusinessSectionsState
                             _updateHomeVisibility(showGlobalSupporters: value);
                           },
                   ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Ativar chamada por reconhecimento facial'),
-                  subtitle: const Text(
-                    'Habilita o botão "Chamada por foto" dentro das sessões de chamada.',
+                if (AuthService().isAdmin())
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Ativar chamada por reconhecimento facial'),
+                    subtitle: const Text(
+                      'Habilita o botão "Chamada por foto" dentro das sessões de chamada.',
+                    ),
+                    value: _faceRecognitionEnabled,
+                    onChanged: _savingVisibility
+                        ? null
+                        : (value) {
+                            _updateHomeVisibility(faceRecognitionEnabled: value);
+                          },
                   ),
-                  value: _faceRecognitionEnabled,
-                  onChanged: _savingVisibility
-                      ? null
-                      : (value) {
-                          _updateHomeVisibility(faceRecognitionEnabled: value);
-                        },
-                ),
               ],
             ),
           ),

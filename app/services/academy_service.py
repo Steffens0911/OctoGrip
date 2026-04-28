@@ -406,6 +406,8 @@ async def update_academy(
             setattr(academy, key, clamp_reward_points(int(value)))
         elif key in visibility_keys and value is not None:
             setattr(academy, key, bool(value))
+        elif key == "face_recognition_enabled" and value is not None:
+            academy.face_recognition_enabled = bool(value)
         elif key == "login_notice_title":
             academy.login_notice_title = value.strip() if value and str(value).strip() else None
         elif key == "login_notice_body":
