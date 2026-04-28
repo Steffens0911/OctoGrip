@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import UserNotFoundError
 from app.core.points_limits import clamp_reward_points
 from app.models import Mission, MissionUsage, User
+from app.services.academy_service import invalidate_academy_analytics_cache
 from app.services.leveling_service import refresh_user_level
 from app.services.weekly_kit_service import assert_user_may_complete_kit_mission
 
@@ -93,6 +94,7 @@ async def complete_mission(
 
     # Atualiza o level imediatamente após pontuar.
     await refresh_user_level(db, user_id)
+    await invalidate_academy_analytics_cache(user.academy_id)
 
     logger.info("complete_mission", extra={"user_id": str(user_id), "mission_id": str(mission_id)})
     return usage

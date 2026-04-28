@@ -41,7 +41,7 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
       _error = null;
     });
     try {
-      final list = await _api.getUsers(academyId: widget.academyId);
+      final list = await _api.getUsersAll(academyId: widget.academyId);
       if (mounted) {
         setState(() {
           _users = list;

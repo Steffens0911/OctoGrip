@@ -26,8 +26,6 @@ class AttendanceAddStudentDialog extends StatefulWidget {
 }
 
 class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog> {
-  static const int _usersQueryLimit = 200;
-
   final _search = TextEditingController();
   List<UserModel> _allStudents = [];
   bool _loading = true;
@@ -62,19 +60,15 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
     final academyId = widget.academyId?.trim();
     final hasAcademyId = academyId != null && academyId.isNotEmpty;
     try {
-      return await widget.api.getUsers(
+      return await widget.api.getUsersAll(
         academyId: hasAcademyId ? academyId : null,
-        offset: 0,
-        limit: _usersQueryLimit,
       );
     } on ApiException catch (e) {
       // Em "atuar como", alguns cenários retornam 403 para usuário efetivo.
       if (e.statusCode == 403 && AuthService().isRealUserAdmin) {
-        return widget.api.getUsers(
+        return widget.api.getUsersAll(
           academyId: hasAcademyId ? academyId : null,
           asRealUser: true,
-          offset: 0,
-          limit: _usersQueryLimit,
         );
       }
       rethrow;

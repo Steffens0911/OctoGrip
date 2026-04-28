@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import nulls_last, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import app_cache
 from app.models import GlobalPartner
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -13,6 +14,9 @@ from app.services.audit_service import (
     entity_snapshot_row,
     write_audit_log,
 )
+
+_FEATURED_GLOBAL_TTL_SEC = 600
+_FEATURED_GLOBAL_PREFIX = "featured_global_partners:"
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +33,20 @@ async def list_global_partners(db: AsyncSession) -> list[GlobalPartner]:
 
 
 async def list_active_global_featured(db: AsyncSession, *, limit: int = 5) -> list[GlobalPartner]:
+    lim = max(1, min(limit, 50))
+    cache_key = f"{_FEATURED_GLOBAL_PREFIX}active:{lim}"
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
     stmt = (
         select(GlobalPartner)
         .where(GlobalPartner.is_active.is_(True))
         .order_by(nulls_last(GlobalPartner.featured_order.asc()))
-        .limit(limit)
+        .limit(lim)
     )
-    return (await db.execute(stmt)).scalars().all()
+    rows = (await db.execute(stmt)).scalars().all()
+    await app_cache.set(cache_key, rows, ttl=_FEATURED_GLOBAL_TTL_SEC)
+    return rows
 
 
 async def get_global_partner(db: AsyncSession, partner_id: UUID) -> GlobalPartner | None:
@@ -79,6 +90,7 @@ async def create_global_partner(
     )
     await db.commit()
     await db.refresh(partner)
+    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
     logger.info("create_global_partner", extra={"global_partner_id": str(partner.id)})
     return partner
 
@@ -132,6 +144,7 @@ async def update_global_partner(
         )
     await db.commit()
     await db.refresh(partner)
+    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
     logger.info("update_global_partner", extra={"global_partner_id": str(partner.id)})
     return partner
 
@@ -157,5 +170,6 @@ async def delete_global_partner(
     )
     await db.delete(partner)
     await db.commit()
+    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
     logger.info("delete_global_partner", extra={"global_partner_id": str(partner.id)})
     return True

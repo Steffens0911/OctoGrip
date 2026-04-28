@@ -87,7 +87,7 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
       _error = null;
     });
     try {
-      final data = await _api.getPointsLog(widget.userId, limit: 100);
+      final data = await _api.getPointsLog(widget.userId, limit: 50);
       final list = data['entries'] as List<dynamic>? ?? [];
       if (mounted) {
         setState(() {

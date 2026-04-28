@@ -12,6 +12,7 @@ from app.core.app_time import (
     combine_local_date_start_utc,
     today_in_app_tz,
 )
+from app.core.cache import app_cache
 from app.core.exceptions import AppError
 from app.core.points_limits import clamp_reward_points
 from app.models import (
@@ -33,12 +34,31 @@ from app.services.audit_service import (
     entity_snapshot_row,
     write_audit_log,
 )
+from app.services.metrics_service import invalidate_metrics_cache
 from app.services.mission_crud_service import upsert_academy_week_missions
 from app.services.weekly_kit_service import academy_has_active_weekly_kits
 
 logger = logging.getLogger(__name__)
 
 _ENTITY_ACADEMY = "Academy"
+
+# Cache read-heavy (ranking / relatório semanal). Invalidar com `invalidate_academy_analytics_cache`.
+ACADEMY_ANALYTICS_PREFIX = "academy_analytics:"
+_ACADEMY_RANKING_TTL_SEC = 300
+_ACADEMY_WEEKLY_REPORT_TTL_SEC = 300
+
+
+async def invalidate_academy_analytics_cache(academy_id: UUID | None) -> None:
+    """Remove entradas de cache de ranking e relatório semanal para uma academia."""
+    if academy_id is None:
+        return
+    removed = await app_cache.invalidate_prefix(f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:")
+    logger.debug(
+        "invalidate_academy_analytics_cache",
+        extra={"academy_id": str(academy_id), "keys_removed": removed},
+    )
+    # Métricas globais/por academia (painel) dependem das mesmas fontes de dados.
+    await invalidate_metrics_cache()
 
 
 async def ensure_weekly_missions_if_needed(
@@ -586,6 +606,16 @@ async def get_academy_ranking(
       [início do dia local range_start, fim exclusivo do dia seguinte a range_end).
     - Caso contrário: últimos `period_days` dias a partir do instante atual (UTC).
     """
+    cache_key = (
+        f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:ranking:"
+        f"{period_days}:{limit}:"
+        f"{range_start.isoformat() if range_start else '_'}:"
+        f"{range_end.isoformat() if range_end else '_'}"
+    )
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return []
@@ -615,10 +645,12 @@ async def get_academy_ranking(
         },
     )
     
-    return [
+    result = [
         {"rank": i + 1, "user_id": r[0], "name": r[1], "completions_count": r[2]}
         for i, r in enumerate(merged)
     ]
+    await app_cache.set(cache_key, result, ttl=_ACADEMY_RANKING_TTL_SEC)
+    return result
 
 
 async def get_academy_weekly_report(
@@ -640,6 +672,14 @@ async def get_academy_weekly_report(
     - Senão: semana ISO atual.
     Retorna week_start, week_end (datas do período), completions_count, active_users_count, entries.
     """
+    cache_key = (
+        f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:weekly:"
+        f"{start_date}:{end_date}:{year}:{week}"
+    )
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
     if not academy:
         return None
@@ -683,7 +723,7 @@ async def get_academy_weekly_report(
     )
 
     if not merged:
-        return {
+        empty = {
             "academy_id": academy_id,
             "week_start": label_start.isoformat(),
             "week_end": label_end.isoformat(),
@@ -691,9 +731,11 @@ async def get_academy_weekly_report(
             "active_users_count": 0,
             "entries": [],
         }
+        await app_cache.set(cache_key, empty, ttl=_ACADEMY_WEEKLY_REPORT_TTL_SEC)
+        return empty
 
     total_completions = sum(r[2] for r in merged)
-    return {
+    out = {
         "academy_id": academy_id,
         "week_start": label_start.isoformat(),
         "week_end": label_end.isoformat(),
@@ -704,6 +746,8 @@ async def get_academy_weekly_report(
             for i, r in enumerate(merged)
         ],
     }
+    await app_cache.set(cache_key, out, ttl=_ACADEMY_WEEKLY_REPORT_TTL_SEC)
+    return out
 
 
 async def get_academy_difficulties(

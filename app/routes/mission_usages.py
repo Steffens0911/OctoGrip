@@ -1,9 +1,10 @@
 """Rotas de sync de MissionUsage (PB-01) e histórico (PB-03). Requerem autenticação."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.list_pagination import MAX_LIST_LIMIT
+from app.database import get_db
 from app.models import User
 from app.schemas.mission_history import MissionHistoryItem, MissionHistoryResponse
 from app.schemas.mission_usage import MissionUsageSyncRequest, MissionUsageSyncResponse
@@ -26,12 +27,13 @@ async def mission_usages_sync(
 
 @router.get("/history", response_model=MissionHistoryResponse)
 async def mission_usages_history(
-    limit: int = 500,
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Últimas N missões concluídas do usuário logado (PB-03). Default 500."""
-    items = await get_mission_history(db, current_user.id, limit=min(limit, 500))
+    """Últimas conclusões do usuário logado (PB-03). Paginação: limit máximo 50 por página."""
+    items = await get_mission_history(db, current_user.id, limit=limit, offset=offset)
     return MissionHistoryResponse(
         missions=[MissionHistoryItem(**x) for x in items],
     )

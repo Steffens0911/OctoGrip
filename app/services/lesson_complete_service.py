@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.core.exceptions import AlreadyCompletedError, LessonNotFoundError, UserNotFoundError
 from app.core.points_limits import MIN_REWARD_POINTS
 from app.models import Lesson, LessonProgress, User
+from app.services.academy_service import invalidate_academy_analytics_cache
 from app.services.leveling_service import refresh_user_level
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ async def complete_lesson(db: AsyncSession, user_id: UUID, lesson_id: UUID) -> L
     await db.commit()
     await db.refresh(progress)
     await refresh_user_level(db, user_id)
+    await invalidate_academy_analytics_cache(user.academy_id)
 
     logger.info(
         "complete_lesson",

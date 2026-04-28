@@ -81,7 +81,7 @@ class _OpponentPickerSheetState extends State<OpponentPickerSheet> {
     });
 
     try {
-      final list = await _api.getUsers(academyId: widget.academyId);
+      final list = await _api.getUsersAll(academyId: widget.academyId);
       final colleagues = list
           .where((u) => u.id != widget.currentUserId)
           .toList()

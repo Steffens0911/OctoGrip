@@ -51,7 +51,7 @@ class _AcademyPointsEditScreenState extends State<AcademyPointsEditScreen> {
       _error = null;
     });
     try {
-      final users = await _api.getUsers(academyId: widget.academyId);
+      final users = await _api.getUsersAll(academyId: widget.academyId);
       for (final u in users) {
         _adjustmentControllers[u.id] = TextEditingController(
           text: (u.pointsAdjustment).toString(),

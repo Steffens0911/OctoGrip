@@ -26,8 +26,6 @@ class AttendanceSessionScreen extends StatefulWidget {
 }
 
 class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
-  static const int _usersQueryLimit = 200;
-
   final _api = ApiService();
   AttendanceLiveService? _live;
   StreamSubscription<AttendanceLiveEvent>? _liveSub;
@@ -175,7 +173,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       await _api.addAttendanceRecord(sessionId, userId);
       final updated = await _api.getAttendanceSession(sessionId);
       final recs =
-          await _api.getAttendanceSessionRecords(sessionId, limit: 500);
+          await _api.getAttendanceSessionRecordsAll(sessionId);
       if (!mounted) return;
       setState(() {
         _session = updated;
@@ -222,7 +220,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     try {
       await _api.deleteAttendanceRecord(r.id);
       final updated = await _api.getAttendanceSession(sid);
-      final recs = await _api.getAttendanceSessionRecords(sid, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(sid);
       if (!mounted) return;
       setState(() {
         _session = updated;
@@ -276,7 +274,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     _isRefreshingSession = true;
     try {
       final updated = await _api.getAttendanceSession(s.id);
-      final recs = await _api.getAttendanceSessionRecords(s.id, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(s.id);
       if (!mounted) return;
       setState(() {
         _session = updated;
@@ -577,10 +575,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       try {
         final isAdmin = AuthService().isAdmin();
         final academyId = AuthService().currentUser?.academyId;
-        final users = await _api.getUsers(
+        final users = await _api.getUsersAll(
           academyId: isAdmin ? null : academyId,
-          offset: 0,
-          limit: _usersQueryLimit,
         );
         if (!mounted) return;
         setState(() {
@@ -640,7 +636,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
       // Busca QR e presenças em paralelo; prioriza o QR para reduzir espera.
       final qrFuture = _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
-      final recsFuture = _api.getAttendanceSessionRecords(s.id, limit: 500);
+      final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
 
       final qr = await qrFuture;
       if (!mounted) return;
@@ -704,7 +700,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
-      final recs = await _api.getAttendanceSessionRecords(s.id, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(s.id);
       if (!mounted) return;
       setState(() {
         _session = closed;

@@ -12,6 +12,7 @@ import 'package:viewer/screens/student/attendance_ranking_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
+import 'package:viewer/screens/student/user_avatar_screen.dart';
 
 class StudentAcademyHubScreen extends StatefulWidget {
   const StudentAcademyHubScreen({super.key});
@@ -208,6 +209,22 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                 enabled: hasAcademy && scheduleUrl != null && scheduleUrl.isNotEmpty,
                 onTap: () => _requireAcademy(onOk: () => _openScheduleUrl(scheduleUrl)),
               ),
+
+            _entry(
+              icon: Icons.face_retouching_natural_outlined,
+              title: 'Foto de perfil',
+              subtitle: 'Usada na chamada por reconhecimento facial',
+              onTap: () {
+                Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute<bool>(
+                    builder: (context) => const UserAvatarScreen(),
+                  ),
+                ).then((updated) {
+                  if (updated == true && mounted) _load();
+                });
+              },
+            ),
 
             _entry(
               icon: Icons.qr_code_scanner_rounded,

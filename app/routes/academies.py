@@ -21,6 +21,7 @@ from app.config import settings
 from app.core.auth_deps import get_current_user
 from app.core.cache import app_cache
 from app.core.exceptions import AcademyNotFoundError, AppError, ForbiddenError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import (
     require_admin,
     require_admin_or_academy_access,
@@ -236,7 +237,7 @@ async def schedule_display_url(
 async def academy_list(
     db: AsyncSession = Depends(get_db),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
-    limit: int = Query(100, ge=1, le=500, description="Limite de resultados"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados"),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
     """Lista academias com paginação."""
@@ -302,12 +303,21 @@ async def academy_user_points(
     """Retorna pontos de todos os usuários da academia (evita 1+N requisições na tela de pontos)."""
     if current_user.role != "administrador" and current_user.academy_id != academy_id:
         raise ForbiddenError("Acesso negado. Você só pode acessar a academia à qual está vinculado.")
-    users = await list_users(db, academy_id=academy_id, limit=500, offset=0)
-    user_ids = [u.id for u in users]
-    points_map = await batch_total_points_for_users(db, user_ids)
+    points_map: dict = {}
+    offset = 0
+    while True:
+        users = await list_users(db, academy_id=academy_id, limit=MAX_LIST_LIMIT, offset=offset)
+        if not users:
+            break
+        batch_ids = [u.id for u in users]
+        batch_points = await batch_total_points_for_users(db, batch_ids)
+        points_map.update({str(k): v for k, v in batch_points.items()})
+        offset += len(users)
+        if len(users) < MAX_LIST_LIMIT:
+            break
     return {
         "academy_id": str(academy_id),
-        "points_by_user": {str(uid): pts for uid, pts in points_map.items()},
+        "points_by_user": points_map,
     }
 
 

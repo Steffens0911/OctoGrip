@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models import User
@@ -97,7 +98,7 @@ async def execution_pending_confirmations_count(
 @router.get("/pending_confirmations", response_model=list[ExecutionRead])
 async def execution_pending_confirmations(
     offset: int = Query(0, ge=0, description="Offset para paginação"),
-    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -151,7 +152,7 @@ async def execution_reject(
 @router.get("/my_executions", response_model=list[ExecutionRead])
 async def execution_my_executions(
     offset: int = Query(0, ge=0, description="Offset para paginação"),
-    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

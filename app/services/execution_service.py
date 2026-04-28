@@ -15,7 +15,9 @@ from app.core.app_time import (
 )
 from app.core.exceptions import AppError, NotFoundError, UserNotFoundError
 from app.core.graduation import calculate_points_awarded, graduation_label
+from app.core.list_pagination import clamp_list_limit
 from app.core.points_limits import clamp_reward_points
+from app.services.academy_service import invalidate_academy_analytics_cache
 from app.models import (
     Academy,
     Lesson,
@@ -308,11 +310,14 @@ async def create_execution(
     db.add(execution)
     await db.commit()
     await db.refresh(execution)
+    full = await get_execution(db, execution.id)
+    if full is None:
+        raise NotFoundError("Execução não encontrada após criação.")
     logger.info(
         "create_execution",
-        extra={"execution_id": str(execution.id), "user_id": str(user_id), "opponent_id": str(opponent_id)},
+        extra={"execution_id": str(full.id), "user_id": str(user_id), "opponent_id": str(opponent_id)},
     )
-    return execution
+    return full
 
 
 async def count_pending_confirmations(db: AsyncSession, opponent_id: UUID) -> int:
@@ -333,7 +338,7 @@ async def list_pending_confirmations(
     limit: int = 100,
 ):
     """Lista execuções onde opponent_id é o usuário e status = pending_confirmation com paginação."""
-    limit = min(max(1, limit), 500)  # Máximo 500 por página
+    limit = clamp_list_limit(limit)
     offset = max(0, offset)
     return (
         await db.execute(
@@ -363,7 +368,7 @@ async def list_my_executions(
     limit: int = 100,
 ):
     """Lista execuções criadas pelo usuário (executor), todos os status, com paginação."""
-    limit = min(max(1, limit), 500)  # Máximo 500 por página
+    limit = clamp_list_limit(limit)
     offset = max(0, offset)
     return (
         await db.execute(
@@ -484,6 +489,9 @@ async def confirm_execution(
     from app.services.leveling_service import refresh_user_level
 
     await refresh_user_level(db, execution.user_id)
+
+    executor_user = await db.get(User, execution.user_id)
+    await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
 
     logger.info(
         "confirm_execution",
@@ -744,6 +752,9 @@ async def get_points_log(db: AsyncSession, user_id: UUID, limit: int = 100, offs
     usando UNION ALL em SQL, ordenado por data.
     """
     from sqlalchemy import literal, union_all, text
+
+    limit = clamp_list_limit(limit)
+    offset = max(0, offset)
 
     exec_query = (
         select(

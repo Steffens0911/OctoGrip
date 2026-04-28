@@ -12,6 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.cache import app_cache
+from app.core.list_pagination import clamp_list_limit
 from app.core.exceptions import (
     AppError,
     AttendanceQrInvalidError,
@@ -28,6 +30,17 @@ from app.models import AttendanceRecord, AttendanceSession, User
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+_ATTENDANCE_RANKING_TTL_SEC = 300
+_ATTENDANCE_RANKING_PREFIX = "attendance_ranking:"
+
+
+async def invalidate_attendance_ranking_cache(academy_id: UUID | None) -> None:
+    """Invalida cache do ranking de presença para a academia."""
+    if academy_id is None:
+        return
+    await app_cache.invalidate_prefix(f"{_ATTENDANCE_RANKING_PREFIX}{academy_id}:")
 
 
 def _b64url(data: bytes) -> str:
@@ -178,7 +191,7 @@ async def list_attendance_sessions(
         )
         .outerjoin(present_subq, present_subq.c.sid == AttendanceSession.id)
         .order_by(AttendanceSession.starts_at.desc())
-        .limit(limit)
+        .limit(clamp_list_limit(limit))
         .offset(offset)
     )
     if conds:
@@ -239,6 +252,7 @@ async def add_record_manual(
     db.add(r)
     await db.commit()
     await db.refresh(r)
+    await invalidate_attendance_ranking_cache(s.academy_id)
     return r, True
 
 
@@ -266,6 +280,7 @@ async def delete_attendance_record(
     user_id = r.user_id
     await db.delete(r)
     await db.commit()
+    await invalidate_attendance_ranking_cache(s.academy_id)
     return session_id, user_id
 
 
@@ -351,6 +366,7 @@ async def scan_checkin(
     db.add(r)
     await db.commit()
     await db.refresh(r)
+    await invalidate_attendance_ranking_cache(s.academy_id)
     return r, True
 
 
@@ -473,7 +489,7 @@ async def stats_sessions_by_professor(
             AttendanceSession.starts_at <= dt,
         )
         .order_by(AttendanceSession.starts_at.desc())
-        .limit(min(max(limit, 1), 500))
+        .limit(clamp_list_limit(limit))
     )
 
     if current_user.role != "administrador":
@@ -539,7 +555,7 @@ async def stats_students(
         .group_by(AttendanceRecord.user_id)
     ).subquery()
 
-    lim = min(max(limit, 1), 1000)
+    lim = clamp_list_limit(limit)
     stmt = (
         select(
             User.id,
@@ -641,7 +657,7 @@ async def stats_student_detail(
     if rate > 1.0:
         rate = 1.0
 
-    lim = min(max(records_limit, 1), 1000)
+    lim = clamp_list_limit(records_limit)
     rec_rows = (
         await db.execute(
             select(
@@ -1065,6 +1081,14 @@ async def attendance_ranking(
         date_from=date_from,
         date_to=date_to,
     )
+    lim = min(max(limit, 1), 10)
+    cache_key = (
+        f"{_ATTENDANCE_RANKING_PREFIX}{aid}:{current_user.id}:"
+        f"{window.kind}:{window.label}:{lim}"
+    )
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
     total_sessions_raw = (
         await db.execute(
@@ -1093,7 +1117,6 @@ async def attendance_ranking(
         )
     prev_pos_by_student = {r.student_id: r.position for r in prev_rows}
 
-    lim = min(max(limit, 1), 10)
     ranking: list[AttendanceRankingRow] = []
     my_position: AttendanceMyPositionRow | None = None
 
@@ -1128,7 +1151,7 @@ async def attendance_ranking(
                 position_change=position_change,
             )
 
-    return AttendanceRankingResult(
+    result = AttendanceRankingResult(
         month=window.label if window.kind == "month" else None,
         period_kind=window.kind,
         period_label=window.label,
@@ -1137,6 +1160,8 @@ async def attendance_ranking(
         ranking=ranking,
         my_position=my_position,
     )
+    await app_cache.set(cache_key, result, ttl=_ATTENDANCE_RANKING_TTL_SEC)
+    return result
 
 
 async def stats_me(

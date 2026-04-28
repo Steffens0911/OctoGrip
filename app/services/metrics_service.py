@@ -11,9 +11,13 @@ from app.core.app_time import (
     combine_local_date_start_utc,
     today_in_app_tz,
 )
+from app.core.cache import app_cache
 from app.models import LessonProgress, MissionUsage, User, UserLoginDay
 
 logger = logging.getLogger(__name__)
+
+_METRICS_TTL_SEC = 120
+_METRICS_PREFIX = "metrics_report:"
 
 _PANEL_ROLES = ("administrador", "gerente_academia", "professor", "supervisor")
 # Relatório semanal de logins: painel + alunos (mesma fonte user_login_days).
@@ -47,6 +51,10 @@ async def get_usage_metrics(db: AsyncSession) -> dict:
     """
     Retorna métricas de uso globais (LessonProgress) e retenção (MissionUsage, PB-02).
     """
+    cache_key = f"{_METRICS_PREFIX}usage:global"
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
     total = await db.scalar(select(func.count(LessonProgress.id))) or 0
 
     since_7_days = datetime.now(timezone.utc) - timedelta(days=7)
@@ -71,6 +79,7 @@ async def get_usage_metrics(db: AsyncSession) -> dict:
         after_training_count=after,
     )
     logger.info("get_usage_metrics", extra=result)
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
     return result
 
 
@@ -78,6 +87,10 @@ async def get_usage_metrics_for_academy(db: AsyncSession, academy_id: uuid.UUID)
     """
     Retorna métricas de uso filtradas por academy_id (para gestor local/global).
     """
+    cache_key = f"{_METRICS_PREFIX}usage:academy:{academy_id}"
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
     # Filtro por academia via relação com User
     since_7_days = datetime.now(timezone.utc) - timedelta(days=7)
 
@@ -131,6 +144,7 @@ async def get_usage_metrics_for_academy(db: AsyncSession, academy_id: uuid.UUID)
         "get_usage_metrics_for_academy",
         extra={**result, "academy_id": str(academy_id)},
     )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
     return result
 
 
@@ -195,6 +209,11 @@ async def get_engagement_report(
     - Semana: últimos 7 dias em relação à reference_date (janela móvel).
     - Mês: do primeiro dia do mês até a reference_date.
     """
+    cache_key = f"{_METRICS_PREFIX}engagement:{reference_date}:{academy_id}"
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Semana: últimos 7 dias em relação à data de referência (janela móvel)
     week_end = reference_date
     week_start = reference_date - timedelta(days=6)
@@ -229,6 +248,7 @@ async def get_engagement_report(
             "monthly_active_rate": monthly["active_rate"],
         },
     )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
     return result
 
 
@@ -243,6 +263,11 @@ async def get_active_students_report(
 
     - Usa a mesma definição de período semanal do relatório de engajamento.
     """
+    cache_key = f"{_METRICS_PREFIX}active_students:{reference_date}:{academy_id}"
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     window_end = reference_date
     window_start = reference_date - timedelta(days=6)
 
@@ -303,6 +328,7 @@ async def get_active_students_report(
             "active_rate": result["active_rate"],
         },
     )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
     return result
 
 
@@ -338,6 +364,13 @@ async def get_weekly_panel_logins_report(
         week_start = monday
         week_end = monday + timedelta(days=6)
 
+    cache_key = (
+        f"{_METRICS_PREFIX}weekly_logins:{week_start}:{week_end}:{academy_id}:{reference_date}"
+    )
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     eligible_users_query = select(User).where(
         User.role.in_(_WEEKLY_LOGIN_REPORT_ROLES)
     ).order_by(User.email)
@@ -345,7 +378,7 @@ async def get_weekly_panel_logins_report(
         eligible_users_query = eligible_users_query.where(User.academy_id == academy_id)
     eligible_users = (await db.execute(eligible_users_query)).scalars().all()
     if not eligible_users:
-        return {
+        empty = {
             "academy_id": str(academy_id) if academy_id is not None else None,
             "week_start": week_start,
             "week_end": week_end,
@@ -353,6 +386,8 @@ async def get_weekly_panel_logins_report(
             "users_logged_at_least_once": 0,
             "users": [],
         }
+        await app_cache.set(cache_key, empty, ttl=_METRICS_TTL_SEC)
+        return empty
 
     eligible_user_ids = [u.id for u in eligible_users]
     login_rows = (
@@ -413,4 +448,16 @@ async def get_weekly_panel_logins_report(
             "users_logged_at_least_once": result["users_logged_at_least_once"],
         },
     )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
     return result
+
+
+async def invalidate_metrics_cache() -> None:
+    """
+    Remove todas as entradas de cache de métricas/agregações do painel (prefixo ``metrics_report:``).
+
+    Usado após alterações que afetam relatórios; também é chamado a partir de
+    ``invalidate_academy_analytics_cache`` quando dados da academia mudam.
+    """
+    removed = await app_cache.invalidate_prefix(_METRICS_PREFIX)
+    logger.debug("invalidate_metrics_cache", extra={"keys_removed": removed})

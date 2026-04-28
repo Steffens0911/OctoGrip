@@ -413,7 +413,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  /// Centro de treinamento: abre a tela com Missões da semana, Troféus e Confirmações e solicitações.
+  /// Centro de treinamento: abre Missões da semana, Troféus e Confirmações e solicitações.
+  /// A foto de perfil usada na chamada por reconhecimento facial fica na aba Central (junto à Chamada por QR).
   void _openMissions(BuildContext context) {
     final auth = AuthService();
     if (auth.isEffectiveStudentFrozen) {

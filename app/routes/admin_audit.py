@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_admin
 from app.database import get_db
 from app.models import User
@@ -30,7 +31,7 @@ async def admin_audit_feed(
         description="Opcional: mission, lesson, technique, trophy, academy, user, training_video, "
         "marketplace_item, partner, weekly_kit, technique_execution, mission_usage.",
     ),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0),
     action: str | None = Query(
         None,
@@ -71,7 +72,7 @@ async def admin_audit_feed(
 async def admin_audit_history(
     entity: str,
     entity_id: UUID,
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0),
     action: str | None = Query(
         None,

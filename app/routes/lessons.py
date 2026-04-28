@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import LessonNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
@@ -23,7 +24,7 @@ router = APIRouter()
 async def get_lessons(
     academy_id: UUID | None = Query(None, description="Se informado e academia tiver lição visível, retorna só ela."),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
-    limit: int = Query(100, ge=1, le=500, description="Limite de resultados (máximo 500)"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):

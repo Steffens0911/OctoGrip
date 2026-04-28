@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import NotFoundError, UserNotFoundError
 from app.models import Lesson, LessonProgress, MissionUsage, User
+from app.services.academy_service import invalidate_academy_analytics_cache
 from app.services.audit_service import (
     AUDIT_ACTION_DELETE,
     entity_snapshot_row,
@@ -105,6 +106,7 @@ async def sync_mission_usages(
 
     if synced > 0:
         await db.commit()
+        await invalidate_academy_analytics_cache(user.academy_id)
     logger.info(
         "sync_mission_usages",
         extra={"user_id": str(user_id), "synced": synced, "total_sent": len(usages)},
@@ -126,12 +128,21 @@ def _parse_dt(value) -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -> list[dict]:
+async def get_mission_history(
+    db: AsyncSession, user_id: UUID, limit: int = 7, offset: int = 0
+) -> list[dict]:
     """
-    Últimas N conclusões (por missão ou legado por lição).
+    Últimas conclusões (por missão ou legado por lição), com paginação sobre o feed unificado.
     Retorna dict com lesson_id (opcional), lesson_title, completed_at, usage_type.
     """
+    from app.core.list_pagination import clamp_list_limit
     from app.models import Mission
+
+    limit = clamp_list_limit(limit)
+    offset = max(0, offset)
+    window_end = offset + limit
+    # Busca ampla o suficiente para cobrir offset+limit após filtrar/merger (teto de segurança).
+    cap = min(max(window_end * 3, 60), 500)
 
     usage_rows = (
         await db.execute(
@@ -142,7 +153,7 @@ async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -
                 selectinload(MissionUsage.lesson),
             )
             .order_by(MissionUsage.completed_at.desc())
-            .limit(limit * 2)
+            .limit(cap)
         )
     ).unique().scalars().all()
     items = []
@@ -172,7 +183,7 @@ async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -
     )
     if lesson_ids_in_usage:
         stmt = stmt.where(~LessonProgress.lesson_id.in_(lesson_ids_in_usage))
-    progress_rows = (await db.execute(stmt.limit(limit * 2))).unique().scalars().all()
+    progress_rows = (await db.execute(stmt.limit(cap))).unique().scalars().all()
     for r in progress_rows:
         items.append({
             "lesson_id": r.lesson_id,
@@ -182,7 +193,8 @@ async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7) -
         })
 
     items.sort(key=lambda x: x["completed_at"], reverse=True)
-    return items[:limit]
+    page = items[offset:window_end]
+    return page[:limit]
 
 
 async def admin_void_mission_usage(

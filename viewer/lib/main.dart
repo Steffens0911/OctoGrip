@@ -292,7 +292,7 @@ class _MainShellState extends State<MainShell> {
           child:
               FutureBuilder<({List<UserModel> users, List<Academy> academies})>(
             future: () async {
-              final users = await ApiService().getUsers(asRealUser: true);
+              final users = await ApiService().getUsersAll(asRealUser: true);
               List<Academy> academies = [];
               try {
                 academies = await ApiService().getAcademies(asRealUser: true);

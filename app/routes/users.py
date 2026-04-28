@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.cache import app_cache
 from app.core.exceptions import AppError, ConflictError, ForbiddenError, UserNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
 from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
@@ -151,7 +152,7 @@ async def users_list(
     db: AsyncSession = Depends(get_db),
     academy_id: UUID | None = Query(None, description="Filtrar por academia (colegas da academia)"),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
-    limit: int = Query(50, ge=1, le=200, description="Limite de resultados (máximo 200)"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     current_user: User = Depends(get_current_user),
 ):
     """Lista usuários com paginação."""
@@ -210,7 +211,7 @@ async def user_points(
 async def user_points_log(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
     current_user: User = Depends(get_current_user),
 ):

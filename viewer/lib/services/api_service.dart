@@ -740,6 +740,7 @@ class ApiService {
 
   // ---------- Users ----------
   /// [asRealUser] true = não envia impersonation (para o seletor "Atuar como" carregar como admin e permitir voltar).
+  /// Lista utilizadores com paginação (máx. 50 por pedido na API).
   Future<List<UserModel>> getUsers(
       {String? academyId,
       bool asRealUser = false,
@@ -771,6 +772,26 @@ class ApiService {
         .toList();
   }
 
+  /// Acumula todas as páginas de utilizadores (50 por pedido).
+  Future<List<UserModel>> getUsersAll(
+      {String? academyId, bool asRealUser = false}) async {
+    const page = 50;
+    final all = <UserModel>[];
+    var offset = 0;
+    while (true) {
+      final batch = await getUsers(
+        academyId: academyId,
+        asRealUser: asRealUser,
+        offset: offset,
+        limit: page,
+      );
+      all.addAll(batch);
+      if (batch.length < page) break;
+      offset += page;
+    }
+    return all;
+  }
+
   // --- Attendance (Chamada por QR) ---
 
   Future<AttendanceSessionModel> createAttendanceSession(
@@ -798,7 +819,7 @@ class ApiService {
 
   Future<List<AttendanceRecordModel>> getAttendanceSessionRecords(
     String sessionId, {
-    int limit = 300,
+    int limit = 50,
     int offset = 0,
   }) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records')
@@ -811,6 +832,22 @@ class ApiService {
     return list
         .map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// A API limita a 50 registos por pedido; acumula todas as páginas (ordenadas por checked_in_at).
+  Future<List<AttendanceRecordModel>> getAttendanceSessionRecordsAll(
+      String sessionId) async {
+    const page = 50;
+    final all = <AttendanceRecordModel>[];
+    var offset = 0;
+    while (true) {
+      final batch = await getAttendanceSessionRecords(sessionId,
+          limit: page, offset: offset);
+      all.addAll(batch);
+      if (batch.length < page) break;
+      offset += page;
+    }
+    return all;
   }
 
   /// Lista sessões de chamada da academia (professor/gerente) ou todas (admin).
@@ -1194,9 +1231,12 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getPointsLog(String userId,
-      {int limit = 100}) async {
-    final uri = Uri.parse('$baseUrl/users/$userId/points_log')
-        .replace(queryParameters: {'limit': limit.toString()});
+      {int limit = 50, int offset = 0}) async {
+    final uri = Uri.parse('$baseUrl/users/$userId/points_log').replace(
+        queryParameters: {
+          'limit': limit.toString(),
+          'offset': offset.toString(),
+        });
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1685,7 +1725,7 @@ class ApiService {
   // ---------- Lessons ----------
   /// Lista lições. Se [academyId] for informado e a academia tiver lição visível, retorna só ela.
   Future<List<Lesson>> getLessons(
-      {String? academyId, int offset = 0, int limit = 100}) async {
+      {String? academyId, int offset = 0, int limit = 50}) async {
     var queryParams = <String, String>{};
     if (academyId != null) {
       queryParams['academy_id'] = academyId;
@@ -1693,7 +1733,7 @@ class ApiService {
     if (offset > 0) {
       queryParams['offset'] = offset.toString();
     }
-    if (limit != 100) {
+    if (limit != 50) {
       queryParams['limit'] = limit.toString();
     }
     final uri = queryParams.isNotEmpty
@@ -2210,10 +2250,15 @@ class ApiService {
     return list.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  Future<List<MissionHistoryItem>> getMissionUsagesHistory(
-      {int limit = 7}) async {
-    final uri = Uri.parse('$baseUrl/mission_usages/history')
-        .replace(queryParameters: {'limit': limit.toString()});
+  Future<List<MissionHistoryItem>> getMissionUsagesHistory({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final uri =
+        Uri.parse('$baseUrl/mission_usages/history').replace(queryParameters: {
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    });
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2222,6 +2267,20 @@ class ApiService {
     return list
         .map((e) => MissionHistoryItem.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Histórico completo (pagina na API a 50 itens por pedido).
+  Future<List<MissionHistoryItem>> getMissionUsagesHistoryAll() async {
+    const page = 50;
+    final all = <MissionHistoryItem>[];
+    var offset = 0;
+    while (true) {
+      final batch = await getMissionUsagesHistory(limit: page, offset: offset);
+      all.addAll(batch);
+      if (batch.length < page) break;
+      offset += page;
+    }
+    return all;
   }
 
   Future<void> postTrainingFeedback({

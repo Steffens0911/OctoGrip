@@ -118,7 +118,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     });
     try {
       final session = await _api.getAttendanceSession(widget.sessionId);
-      final recs = await _api.getAttendanceSessionRecords(widget.sessionId, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(widget.sessionId);
       bool faceRecognitionEnabled = false;
       try {
         final academyId = session.academyId;
@@ -168,10 +168,8 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
       try {
         final isAdmin = AuthService().isAdmin();
         final academyId = AuthService().currentUser?.academyId;
-        final users = await _api.getUsers(
+        final users = await _api.getUsersAll(
           academyId: isAdmin ? null : academyId,
-          offset: 0,
-          limit: 500,
         );
         if (!mounted) return;
         setState(() {
@@ -200,7 +198,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     setState(() => _busy = true);
     try {
       final closed = await _api.closeAttendanceSession(s.id);
-      final recs = await _api.getAttendanceSessionRecords(s.id, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(s.id);
       if (!mounted) return;
       setState(() {
         _session = closed;
@@ -247,7 +245,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     try {
       await _api.addAttendanceRecord(widget.sessionId, userId);
       final session = await _api.getAttendanceSession(widget.sessionId);
-      final recs = await _api.getAttendanceSessionRecords(widget.sessionId, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(widget.sessionId);
       if (!mounted) return;
       setState(() {
         _session = session;
@@ -289,7 +287,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     try {
       await _api.deleteAttendanceRecord(r.id);
       final session = await _api.getAttendanceSession(widget.sessionId);
-      final recs = await _api.getAttendanceSessionRecords(widget.sessionId, limit: 500);
+      final recs = await _api.getAttendanceSessionRecordsAll(widget.sessionId);
       if (!mounted) return;
       setState(() {
         _session = session;

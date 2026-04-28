@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response, WebSocket, WebSocketDis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
@@ -69,7 +70,7 @@ async def attendance_stats_sessions(
     professor_id: UUID | None = Query(None, description="Default: utilizador atual. Admin pode filtrar outro."),
     date_from: datetime | None = Query(None, alias="from"),
     date_to: datetime | None = Query(None, alias="to"),
-    limit: int = Query(200, ge=1, le=500),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
 ):
     rows = await stats_sessions_by_professor(
         db,
@@ -99,7 +100,7 @@ async def attendance_stats_students(
     academy_id: UUID | None = Query(None),
     date_from: datetime | None = Query(None, alias="from"),
     date_to: datetime | None = Query(None, alias="to"),
-    limit: int = Query(500, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
 ):
     total_sessions, rows = await stats_students(
         db,
@@ -189,7 +190,7 @@ async def attendance_stats_me(
     current_user: User = Depends(get_current_user),
     date_from: datetime | None = Query(None, alias="from"),
     date_to: datetime | None = Query(None, alias="to"),
-    limit: int = Query(30, ge=1, le=100),
+    limit: int = Query(30, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0),
 ):
     d = await stats_me(
@@ -246,7 +247,7 @@ async def attendance_stats_student_detail(
     academy_id: UUID | None = Query(None),
     date_from: datetime | None = Query(None, alias="from"),
     date_to: datetime | None = Query(None, alias="to"),
-    records_limit: int = Query(500, ge=1, le=1000),
+    records_limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
 ):
     d = await stats_student_detail(
         db,
@@ -289,7 +290,7 @@ async def attendance_sessions_list(
     mine: bool = Query(False, description="Apenas sessões criadas pelo utilizador atual."),
     date_from: datetime | None = Query(None, description="Início do intervalo (starts_at >= date_from)."),
     date_to: datetime | None = Query(None, description="Fim do intervalo (starts_at <= date_to)."),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0),
 ):
     rows = await list_attendance_sessions(
@@ -454,7 +455,7 @@ async def attendance_session_records(
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    limit: int = Query(300, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
     offset: int = Query(0, ge=0),
 ):
     # Reusa validação de acesso de get_attendance_session

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import ConflictError, LessonNotFoundError, TechniqueNotFoundError
+from app.core.list_pagination import clamp_list_limit
 from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Academy, Lesson, Mission, Technique
 from app.schemas.lesson import LessonCreate, LessonUpdate
@@ -55,8 +56,8 @@ async def list_lessons(
                 logger.debug("list_lessons", extra={"academy_id": str(academy_id), "count": 1})
                 return [lesson]
     
-    # Aplicar paginação
-    limit = min(max(1, limit), 500)  # Máximo 500 por página
+    # Aplicar paginação (teto alinhado à API: MAX_LIST_LIMIT)
+    limit = clamp_list_limit(limit)
     offset = max(0, offset)
     
     lessons = (

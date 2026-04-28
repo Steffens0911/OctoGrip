@@ -100,7 +100,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       final results = await Future.wait([
         widget.academyId != null
             ? _api.getLessons(
-                academyId: widget.academyId, offset: 0, limit: 100)
+                academyId: widget.academyId, offset: 0, limit: 50)
             : Future.value(<Lesson>[]),
         _api.getLessons(offset: page * _pageSize, limit: _pageSize),
         page == 0 && widget.academyId != null
