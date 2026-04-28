@@ -50,6 +50,7 @@ class AttendanceRecordRead(BaseModel):
     user_id: UUID
     checked_in_at: datetime
     method: str
+    face_recognition: bool = False
 
 
 class AttendanceUserSummaryResponse(BaseModel):
@@ -91,6 +92,7 @@ class AttendanceRecordWithSessionRead(BaseModel):
     session_starts_at: datetime
     checked_in_at: datetime
     method: str
+    face_recognition: bool = False
 
 
 class AttendanceRankingEntryRead(BaseModel):

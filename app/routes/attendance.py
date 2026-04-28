@@ -228,6 +228,7 @@ async def attendance_stats_me(
                 session_starts_at=r.session_starts_at,
                 checked_in_at=r.checked_in_at,
                 method=r.method,
+                face_recognition=r.face_recognition,
             )
             for r in d.history_rows
         ],
@@ -273,6 +274,7 @@ async def attendance_stats_student_detail(
                 session_starts_at=r.session_starts_at,
                 checked_in_at=r.checked_in_at,
                 method=r.method,
+                face_recognition=r.face_recognition,
             )
             for r in d.records
         ],
@@ -383,6 +385,7 @@ async def attendance_session_add_record(
             user_id=r.user_id,
             checked_in_at=r.checked_in_at,
             method=r.method,
+            face_recognition=r.face_recognition,
         )
         await attendance_manager.broadcast(
             r.session_id,
@@ -399,6 +402,7 @@ async def attendance_session_add_record(
         user_id=r.user_id,
         checked_in_at=r.checked_in_at,
         method=r.method,
+        face_recognition=r.face_recognition,
     )
 
 
@@ -470,6 +474,7 @@ async def attendance_session_records(
             user_id=r.user_id,
             checked_in_at=r.checked_in_at,
             method=r.method,
+            face_recognition=r.face_recognition,
         )
         for r in rows
     ]
@@ -549,6 +554,7 @@ async def attendance_scan(
             user_id=r.user_id,
             checked_in_at=r.checked_in_at,
             method=r.method,
+            face_recognition=r.face_recognition,
         )
         await attendance_manager.broadcast(
             r.session_id,
@@ -565,6 +571,7 @@ async def attendance_scan(
         user_id=r.user_id,
         checked_in_at=r.checked_in_at,
         method=r.method,
+        face_recognition=r.face_recognition,
     )
 
 

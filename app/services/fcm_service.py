@@ -45,6 +45,7 @@ async def send_fcm_data_message(
     title: str,
     body: str,
     access_token: str | None = None,
+    data: dict[str, str] | None = None,
 ) -> tuple[bool, bool]:
     """
     Envia uma notificação de sistema (barra de notificações).
@@ -65,6 +66,7 @@ async def send_fcm_data_message(
             "message": {
                 "token": device_token,
                 "notification": {"title": title, "body": body},
+                "data": {str(k): str(v) for k, v in (data or {}).items()},
                 "android": {"priority": "HIGH"},
                 "webpush": {
                     "headers": {"Urgency": "high"},

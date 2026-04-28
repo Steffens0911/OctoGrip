@@ -117,6 +117,7 @@ async def update_user(
     graduation: str | None = None,
     academy_id: UUID | None = None,
     points_adjustment: int | None = None,
+    avatar_url: str | None = None,
     role: str | None = None,
     password: str | None = None,
     gallery_visible: bool | None = None,
@@ -148,6 +149,8 @@ async def update_user(
         user.academy_id = academy_id
     if points_adjustment is not None:
         user.points_adjustment = points_adjustment
+    if avatar_url is not None:
+        user.avatar_url = avatar_url.strip() if avatar_url and avatar_url.strip() else None
     if gallery_visible is not None:
         user.gallery_visible = gallery_visible
     if account_frozen is not UNSET:

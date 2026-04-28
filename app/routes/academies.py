@@ -174,6 +174,7 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         login_notice_body=a.login_notice_body,
         login_notice_url=a.login_notice_url,
         login_notice_active=a.login_notice_active,
+        face_recognition_enabled=a.face_recognition_enabled,
         updated_at=getattr(a, "updated_at", None),
     )
 

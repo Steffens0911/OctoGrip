@@ -3,6 +3,9 @@
 # "Bind for 0.0.0.0:8080 failed: port is already allocated" quando 8080/8001/5432
 # já estão em uso (ex.: Traefik/Coolify na mesma VPS).
 #
+# Inclui Redis + Celery (worker + beat) para reconhecimento facial em fila.
+# Volume face_jobs: API grava fotos temporárias e o worker lê o mesmo caminho.
+#
 # No Coolify: Build Pack Docker Compose → Docker Compose Location: /docker-compose.coolify.yml
 # Domínios: viewer → porta 80 no contentor; api → porta 8000 no contentor.
 #
@@ -25,6 +28,16 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: jjb_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     container_name: jjb_api
@@ -45,6 +58,8 @@ services:
       # Push FCM (opcional): na VPS cria a pasta no host e copia o JSON da service account; ver docs/DEPLOY_COOLIFY_CONTABO.md
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
@@ -54,10 +69,57 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - api_media:/app/app_media
+      - face_jobs:/tmp/face_jobs
       # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
+
+  celery-worker:
+    build: .
+    container_name: jjb_celery_worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info --concurrency=2
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_media:/app/app_media
+      - face_jobs:/tmp/face_jobs
+      - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
+
+  celery-beat:
+    build: .
+    container_name: jjb_celery_beat
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   viewer:
     build:
@@ -81,3 +143,4 @@ services:
 volumes:
   postgres_data:
   api_media:
+  face_jobs:

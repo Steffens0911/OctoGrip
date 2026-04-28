@@ -26,6 +26,7 @@ from app.services.user_service import (
 )
 from app.services.execution_service import get_points_log, total_points_for_user
 from app.services.leveling_service import refresh_user_level
+from app.tasks.face_recognition_tasks import generate_student_embedding
 
 router = APIRouter()
 
@@ -210,6 +211,7 @@ async def user_update(
         role=payload.get("role"),
         academy_id=payload.get("academy_id"),
         points_adjustment=payload.get("points_adjustment"),
+        avatar_url=payload.get("avatar_url"),
         password=payload.get("password"),
         gallery_visible=payload.get("gallery_visible"),
         account_frozen=payload["account_frozen"] if "account_frozen" in payload else UNSET,
@@ -220,6 +222,8 @@ async def user_update(
     )
     if not updated:
         raise UserNotFoundError()
+    if "avatar_url" in payload and updated.role == "aluno" and updated.avatar_url:
+        generate_student_embedding.delay(str(updated.id))
     return updated
 
 

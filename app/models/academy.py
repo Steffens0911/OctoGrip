@@ -104,6 +104,12 @@ class Academy(Base, UUIDMixin):
         nullable=False,
         comment="Se verdadeiro e corpo preenchido, o app pode mostrar o aviso ao entrar na home.",
     )
+    face_recognition_enabled: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Feature premium: habilita chamada por reconhecimento facial na academia.",
+    )
 
     weekly_technique: Mapped["Technique | None"] = relationship(
         "Technique",

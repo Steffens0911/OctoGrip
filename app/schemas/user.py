@@ -12,6 +12,7 @@ class UserRead(BaseModel):
     role: str = "aluno"
     academy_id: UUID | None = None
     points_adjustment: int = 0
+    avatar_url: str | None = None
     gallery_visible: bool = True
     account_frozen: bool = False
     account_freeze_reason: str | None = Field(
@@ -118,6 +119,7 @@ class UserUpdate(BaseModel):
     role: str | None = Field(None, max_length=32)
     academy_id: UUID | None = None
     points_adjustment: int | None = None
+    avatar_url: str | None = Field(None, max_length=2048)
     gallery_visible: bool | None = None
     account_frozen: bool | None = Field(
         None,

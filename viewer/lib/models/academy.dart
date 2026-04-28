@@ -26,6 +26,7 @@ class Academy {
   final String? loginNoticeBody;
   final String? loginNoticeUrl;
   final bool loginNoticeActive;
+  final bool faceRecognitionEnabled;
   final String? updatedAt;
 
   Academy({
@@ -54,6 +55,7 @@ class Academy {
     this.loginNoticeBody,
     this.loginNoticeUrl,
     this.loginNoticeActive = false,
+    this.faceRecognitionEnabled = false,
     this.updatedAt,
   });
 
@@ -84,6 +86,8 @@ class Academy {
       loginNoticeBody: json['login_notice_body'] as String?,
       loginNoticeUrl: json['login_notice_url'] as String?,
       loginNoticeActive: json['login_notice_active'] as bool? ?? false,
+      faceRecognitionEnabled:
+          json['face_recognition_enabled'] as bool? ?? false,
       updatedAt: json['updated_at'] as String?,
     );
   }
@@ -106,6 +110,7 @@ class Academy {
         'login_notice_body': loginNoticeBody,
         'login_notice_url': loginNoticeUrl,
         'login_notice_active': loginNoticeActive,
+        'face_recognition_enabled': faceRecognitionEnabled,
         'updated_at': updatedAt,
       };
 }
@@ -175,8 +180,10 @@ class AcademyWeeklyReport {
 
   factory AcademyWeeklyReport.fromJson(Map<String, dynamic> json) {
     final entries = (json['entries'] as List<dynamic>?)
-        ?.map((e) => AcademyRankingEntry.fromJson(e as Map<String, dynamic>))
-        .toList() ?? [];
+            ?.map(
+                (e) => AcademyRankingEntry.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
     return AcademyWeeklyReport(
       academyId: json['academy_id'] as String,
       weekStart: json['week_start'] as String,

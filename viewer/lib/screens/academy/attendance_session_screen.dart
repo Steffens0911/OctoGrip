@@ -8,6 +8,9 @@ import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/attendance_live_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/models/face_recognition.dart';
+import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
+import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
@@ -18,7 +21,8 @@ class AttendanceSessionScreen extends StatefulWidget {
   const AttendanceSessionScreen({super.key});
 
   @override
-  State<AttendanceSessionScreen> createState() => _AttendanceSessionScreenState();
+  State<AttendanceSessionScreen> createState() =>
+      _AttendanceSessionScreenState();
 }
 
 class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
@@ -37,6 +41,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _busy = false;
   bool _startingSession = false;
   String? _error;
+  bool _faceRecognitionEnabled = false;
+  String? _faceJobId;
+  DateTime? _faceJobSubmittedAt;
+  bool _checkingFaceJob = false;
   Timer? _refreshTimer;
   Timer? _countdownTimer;
   Timer? _qrRetryTimer;
@@ -100,7 +108,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           expiresAt: s.expiresAt,
           presentCount: e.presentCount,
         );
-        final others = _records.where((r) => r.userId != e.record.userId).toList()..add(e.record);
+        final others = _records
+            .where((r) => r.userId != e.record.userId)
+            .toList()
+          ..add(e.record);
         // Mais recente primeiro.
         others.sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt));
         _records = others;
@@ -163,20 +174,24 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     try {
       await _api.addAttendanceRecord(sessionId, userId);
       final updated = await _api.getAttendanceSession(sessionId);
-      final recs = await _api.getAttendanceSessionRecords(sessionId, limit: 500);
+      final recs =
+          await _api.getAttendanceSessionRecords(sessionId, limit: 500);
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+        _records = (recs.toList()
+          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _busy = false;
       });
       await _hydrateUsersForRecords(recs);
       if (!mounted) return;
-      AppFeedback.show(context, message: 'Presença adicionada', type: AppFeedbackType.success);
+      AppFeedback.show(context,
+          message: 'Presença adicionada', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      AppFeedback.show(context,
+          message: userFacingMessage(e), type: AppFeedbackType.error);
     }
   }
 
@@ -193,8 +208,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         title: const Text('Remover presença'),
         content: Text('Remover presença de $label?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Remover')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Remover')),
         ],
       ),
     );
@@ -207,14 +226,17 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+        _records = (recs.toList()
+          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _busy = false;
       });
-      AppFeedback.show(context, message: 'Presença removida', type: AppFeedbackType.success);
+      AppFeedback.show(context,
+          message: 'Presença removida', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      AppFeedback.show(context,
+          message: userFacingMessage(e), type: AppFeedbackType.error);
     }
   }
 
@@ -225,9 +247,16 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     });
     try {
       // Não há "sessão ativa" persistida ainda; tela começa vazia.
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -251,13 +280,93 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = updated;
-        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+        _records = (recs.toList()
+          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
       });
+      await _loadFaceFeatureFlag();
       await _hydrateUsersForRecords(recs);
     } catch (_) {
       // Silencioso no auto refresh
     } finally {
       _isRefreshingSession = false;
+    }
+  }
+
+  Future<void> _loadFaceFeatureFlag() async {
+    final sid = _session?.academyId;
+    if (sid == null || sid.isEmpty) {
+      if (!mounted) return;
+      setState(() => _faceRecognitionEnabled = false);
+      return;
+    }
+    try {
+      final academy = await _api.getAcademy(sid);
+      if (!mounted) return;
+      setState(() => _faceRecognitionEnabled = academy.faceRecognitionEnabled);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _faceRecognitionEnabled = false);
+    }
+  }
+
+  Future<void> _openFaceRecognitionFlow() async {
+    final session = _session;
+    if (session == null || _busy) return;
+    final result =
+        await Navigator.of(context).push<FaceRecognitionSubmitResponse>(
+      MaterialPageRoute(
+        builder: (_) => FaceRecognitionCheckinScreen(sessionId: session.id),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _faceJobId = result.jobId;
+      _faceJobSubmittedAt = DateTime.now();
+    });
+  }
+
+  Future<void> _checkFaceRecognitionJob() async {
+    final session = _session;
+    final jobId = _faceJobId;
+    if (session == null || jobId == null || _checkingFaceJob) return;
+    setState(() => _checkingFaceJob = true);
+    try {
+      final job = await _api.getFaceRecognitionJob(jobId);
+      if (!mounted) return;
+      if (job.status == 'completed') {
+        final saved = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => ReviewFaceResultsScreen(
+              sessionId: session.id,
+              jobId: jobId,
+            ),
+          ),
+        );
+        if (saved == true) {
+          await _refreshSession();
+          if (!mounted) return;
+          setState(() {
+            _faceJobId = null;
+            _faceJobSubmittedAt = null;
+          });
+        }
+      } else {
+        AppFeedback.show(
+          context,
+          message:
+              'Processamento ainda em andamento. Tente novamente em instantes.',
+          type: AppFeedbackType.warning,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _checkingFaceJob = false);
     }
   }
 
@@ -272,12 +381,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _qrRefreshStartedAt = DateTime.now();
     });
     try {
-      final qr = await _api
-          .getAttendanceQrPayload(s.id, ttlSeconds: 60)
-          .timeout(
-            _qrRequestTimeout,
-            onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
-          );
+      final qr =
+          await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60).timeout(
+                _qrRequestTimeout,
+                onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
+              );
       if (!mounted) return;
       _applyQrPayload(qr);
       return;
@@ -287,12 +395,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     try {
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
-      final qr = await _api
-          .getAttendanceQrPayload(s.id, ttlSeconds: 60)
-          .timeout(
-            _qrRequestTimeout,
-            onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
-          );
+      final qr =
+          await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60).timeout(
+                _qrRequestTimeout,
+                onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
+              );
       if (!mounted) return;
       _applyQrPayload(qr);
     } catch (e) {
@@ -448,7 +555,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     await _safeRefreshQr();
   }
 
-  Future<void> _hydrateMissingUsers(Iterable<AttendanceRecordModel> recs) async {
+  Future<void> _hydrateMissingUsers(
+      Iterable<AttendanceRecordModel> recs) async {
     for (final r in recs) {
       if (_userById.containsKey(r.userId)) continue;
       try {
@@ -500,8 +608,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Iniciar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Iniciar')),
         ],
       ),
     );
@@ -514,12 +626,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _startingSession = true;
     });
     try {
-      final s = await _api.createAttendanceSession(title: title.isEmpty ? null : title, expiresInMinutes: 20);
+      final s = await _api.createAttendanceSession(
+          title: title.isEmpty ? null : title, expiresInMinutes: 20);
       if (!mounted) return;
       setState(() {
         _session = s;
         _records = const [];
       });
+      await _loadFaceFeatureFlag();
       _startAutoRefresh();
       _startQrHeartbeat();
       _startLive(s.id);
@@ -542,14 +656,16 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       }
 
       if (!mounted) return;
-      AppFeedback.show(context, message: 'Chamada iniciada', type: AppFeedbackType.success);
+      AppFeedback.show(context,
+          message: 'Chamada iniciada', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
         _startingSession = false;
       });
-      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      AppFeedback.show(context,
+          message: userFacingMessage(e), type: AppFeedbackType.error);
       return;
     } finally {
       if (mounted) {
@@ -568,10 +684,15 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Encerrar chamada'),
-        content: const Text('Depois de encerrar, alunos não conseguem mais registrar presença.'),
+        content: const Text(
+            'Depois de encerrar, alunos não conseguem mais registrar presença.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Encerrar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Encerrar')),
         ],
       ),
     );
@@ -587,18 +708,21 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (!mounted) return;
       setState(() {
         _session = closed;
-        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+        _records = (recs.toList()
+          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _qr = null;
         _qrError = null;
         _qrSecondsLeft = 0;
         _busy = false;
       });
       _countdownTimer?.cancel();
-      AppFeedback.show(context, message: 'Chamada encerrada', type: AppFeedbackType.success);
+      AppFeedback.show(context,
+          message: 'Chamada encerrada', type: AppFeedbackType.success);
     } catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
-      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      AppFeedback.show(context,
+          message: userFacingMessage(e), type: AppFeedbackType.error);
     }
   }
 
@@ -636,7 +760,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.qr_code_rounded),
-              label: Text(_startingSession ? 'Iniciando...' : 'Iniciar chamada'),
+              label:
+                  Text(_startingSession ? 'Iniciando...' : 'Iniciar chamada'),
             ),
             const SizedBox(height: 12),
             Text(
@@ -652,6 +777,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
     final qr = _qr;
     final isClosed = (s.status.toLowerCase() == 'closed');
+    final showFaceBanner = _faceJobId != null &&
+        _faceJobSubmittedAt != null &&
+        DateTime.now().difference(_faceJobSubmittedAt!).inMinutes >= 3;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -688,8 +816,47 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                 icon: const Icon(Icons.person_add_rounded, size: 18),
                 label: const Text('Adicionar aluno'),
               ),
+              if (_faceRecognitionEnabled)
+                OutlinedButton.icon(
+                  onPressed:
+                      _busy || isClosed ? null : _openFaceRecognitionFlow,
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: const Text('Chamada por foto'),
+                ),
             ],
           ),
+          if (showFaceBanner) ...[
+            const SizedBox(height: 8),
+            Material(
+              color: Colors.amber.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: _checkFaceRecognitionJob,
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.hourglass_top_rounded),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Processamento em andamento... Toque para verificar.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                      if (_checkingFaceJob)
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Text(
             'Presentes: ${s.presentCount}',
@@ -718,7 +885,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                       child: Text(
                         isClosed
                             ? 'Sessão encerrada'
-                            : (_isRefreshingQr ? 'Gerando novo QR...' : 'QR expirado'),
+                            : (_isRefreshingQr
+                                ? 'Gerando novo QR...'
+                                : 'QR expirado'),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
@@ -737,9 +906,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                         child: Text(
                           _qrError!,
                           textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.red.shade400,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.red.shade400,
+                                  ),
                         ),
                       ),
                   ],
@@ -770,13 +940,24 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           else
             ..._records.map((r) {
               final u = _userById[r.userId];
-              final label = u != null ? ((u.name ?? '').trim().isNotEmpty ? u.name!.trim() : u.email) : r.userId;
-              final methodLabel =
-                  r.method == 'manual' ? 'Manual' : (r.method == 'qr' ? 'QR' : r.method);
+              final label = u != null
+                  ? ((u.name ?? '').trim().isNotEmpty
+                      ? u.name!.trim()
+                      : u.email)
+                  : r.userId;
+              final methodLabel = r.method == 'manual'
+                  ? 'Manual'
+                  : (r.method == 'qr'
+                      ? 'QR'
+                      : (r.method == 'face' || r.faceRecognition
+                          ? 'Facial'
+                          : r.method));
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.check_circle_rounded, color: AppTheme.primary),
-                title: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+                leading: const Icon(Icons.check_circle_rounded,
+                    color: AppTheme.primary),
+                title:
+                    Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   '${_formatDateTime(r.checkedInAt)} · $methodLabel',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -817,4 +998,3 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     return '$mm:$ss';
   }
 }
-

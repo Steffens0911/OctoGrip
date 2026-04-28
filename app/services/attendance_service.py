@@ -415,6 +415,7 @@ class AttendanceRecordWithSessionRow(NamedTuple):
     session_starts_at: datetime
     checked_in_at: datetime
     method: str
+    face_recognition: bool
 
 
 class AttendanceStudentDetailResult(NamedTuple):
@@ -650,6 +651,7 @@ async def stats_student_detail(
                 AttendanceSession.starts_at,
                 AttendanceRecord.checked_in_at,
                 AttendanceRecord.method,
+                AttendanceRecord.face_recognition,
             )
             .select_from(AttendanceRecord)
             .join(AttendanceSession, AttendanceSession.id == AttendanceRecord.session_id)
@@ -672,6 +674,7 @@ async def stats_student_detail(
             session_starts_at=r[3],
             checked_in_at=r[4],
             method=r[5],
+            face_recognition=bool(r[6]),
         )
         for r in rec_rows
     ]
@@ -1274,6 +1277,7 @@ async def stats_me(
                 AttendanceSession.starts_at,
                 AttendanceRecord.checked_in_at,
                 AttendanceRecord.method,
+                AttendanceRecord.face_recognition,
             )
             .select_from(AttendanceRecord)
             .join(AttendanceSession, AttendanceSession.id == AttendanceRecord.session_id)
@@ -1297,6 +1301,7 @@ async def stats_me(
             session_starts_at=r[3],
             checked_in_at=r[4],
             method=r[5],
+            face_recognition=bool(r[6]),
         )
         for r in rec_rows
     ]

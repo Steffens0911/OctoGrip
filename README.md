@@ -33,6 +33,26 @@ Para subir API e Viewer (sem rebuild do Postgres):
 docker compose up -d --build api viewer
 ```
 
+Para subir o processamento assíncrono de reconhecimento facial (Redis + worker + beat):
+
+```bash
+docker compose up -d --build redis celery-worker celery-beat
+```
+
+Comandos diretos (ambiente local, fora do Docker):
+
+```bash
+celery -A celery_app worker --loglevel=info --concurrency=2
+celery -A celery_app beat --loglevel=info
+```
+
+Variáveis novas:
+
+- `REDIS_URL` (ex.: `redis://localhost:6379/0`)
+- `FACE_JOBS_DIR` (padrão `/tmp/face_jobs`)
+
+No Docker Compose, a API e o `celery-worker` partilham o volume nomeado **`face_jobs`** montado em `/tmp/face_jobs` para o worker aceder às fotos temporárias. Em produção com **Coolify**, usa `docker-compose.coolify.yml` (mesma stack, sem portas no host); detalhes em `docs/DEPLOY_COOLIFY_CONTABO.md`.
+
 ### HTTPS na VPS (Caddy)
 
 Com domínios apontando para a máquina, use o override que adiciona **Caddy** (TLS automático com Let’s Encrypt) na frente do viewer e da API:

@@ -15,6 +15,7 @@ import 'package:viewer/screens/admin/admin_section_screen.dart';
 import 'package:viewer/screens/auth/login_screen.dart';
 import 'package:viewer/screens/student/student_academy_hub_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
+import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -48,6 +49,8 @@ void main() async {
   );
 }
 
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 class OctoGripApp extends StatefulWidget {
   const OctoGripApp({super.key});
 
@@ -64,6 +67,20 @@ class _OctoGripAppState extends State<OctoGripApp> {
   @override
   void initState() {
     super.initState();
+    PushNotificationService.setNotificationOpenHandler((data) {
+      if (data['type'] != 'face_recognition_complete') return;
+      final jobId = data['job_id'];
+      final sessionId = data['session_id'];
+      if (jobId == null || sessionId == null) return;
+      appNavigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => ReviewFaceResultsScreen(
+            sessionId: sessionId,
+            jobId: jobId,
+          ),
+        ),
+      );
+    });
     ThemeService.load().then((mode) {
       if (mounted) setState(() => _themeMode = mode);
     });
@@ -108,6 +125,7 @@ class _OctoGripAppState extends State<OctoGripApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: AppBrand.name,
       theme: _useGameFont ? AppTheme.memoLight : AppTheme.memoLightSans,
       darkTheme: _useGameFont ? AppTheme.memoDark : AppTheme.memoDarkSans,
@@ -204,6 +222,7 @@ class _MainShellState extends State<MainShell> {
   int _selected = 0;
   int _inicioRefreshKey = 0;
   String? _lastEffectiveUserId;
+
   /// Último contador vindo da [StudentHomeScreen] (badge na aba Campo de treinamento).
   int _pendingConfirmationsNavBadge = 0;
 
@@ -268,8 +287,10 @@ class _MainShellState extends State<MainShell> {
       builder: (ctx) => AlertDialog(
         title: const Text('Atuar como'),
         content: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: double.infinity, maxHeight: 400),
-          child: FutureBuilder<({List<UserModel> users, List<Academy> academies})>(
+          constraints:
+              const BoxConstraints(maxWidth: double.infinity, maxHeight: 400),
+          child:
+              FutureBuilder<({List<UserModel> users, List<Academy> academies})>(
             future: () async {
               final users = await ApiService().getUsers(asRealUser: true);
               List<Academy> academies = [];
@@ -280,7 +301,10 @@ class _MainShellState extends State<MainShell> {
             }(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+                return const Center(
+                    child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator()));
               }
               if (snapshot.hasError) {
                 return Text('Erro ao carregar: ${snapshot.error}');
@@ -316,10 +340,10 @@ class _MainShellState extends State<MainShell> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           setState(() {
-          _lastEffectiveUserId = effectiveId;
-          _inicioRefreshKey++;
-          _pendingConfirmationsNavBadge = 0;
-        });
+            _lastEffectiveUserId = effectiveId;
+            _inicioRefreshKey++;
+            _pendingConfirmationsNavBadge = 0;
+          });
         }
       });
     }
@@ -415,10 +439,13 @@ class _MainShellState extends State<MainShell> {
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
-                        Icon(Icons.person_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+                        Icon(Icons.person_rounded,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            size: 20),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -428,7 +455,8 @@ class _MainShellState extends State<MainShell> {
                               Text(
                                 'Atuando como: ${effectiveUser.name ?? effectiveUser.email}',
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -437,7 +465,9 @@ class _MainShellState extends State<MainShell> {
                               Text(
                                 effectiveUser.email,
                                 style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
                                   fontSize: 11,
                                 ),
                                 overflow: TextOverflow.ellipsis,
@@ -463,7 +493,8 @@ class _MainShellState extends State<MainShell> {
           color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
+              color:
+                  Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -492,21 +523,24 @@ class _MainShellState extends State<MainShell> {
                     icon: Icons.dashboard_rounded,
                     label: 'Central',
                     selected: tabIndex == tabs.indexOf('Central'),
-                    onTap: () => setState(() => _selected = tabs.indexOf('Central')),
+                    onTap: () =>
+                        setState(() => _selected = tabs.indexOf('Central')),
                   ),
                 if (tabs.contains('Gestão'))
                   _NavItem(
                     icon: Icons.business_center,
                     label: 'Gestão',
                     selected: tabIndex == tabs.indexOf('Gestão'),
-                    onTap: () => setState(() => _selected = tabs.indexOf('Gestão')),
+                    onTap: () =>
+                        setState(() => _selected = tabs.indexOf('Gestão')),
                   ),
                 if (tabs.contains('Admin'))
                   _NavItem(
                     icon: Icons.settings_rounded,
                     label: 'Admin',
                     selected: tabIndex == tabs.indexOf('Admin'),
-                    onTap: () => setState(() => _selected = tabs.indexOf('Admin')),
+                    onTap: () =>
+                        setState(() => _selected = tabs.indexOf('Admin')),
                   ),
               ],
             ),
@@ -522,6 +556,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
+
   /// Se não nulo e > 0, exibe [Badge] no ícone (ex.: confirmações pendentes).
   final int? badgeCount;
 
@@ -563,7 +598,9 @@ class _NavItem extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
-              color: selected ? primary.withValues(alpha: 0.1) : Colors.transparent,
+              color: selected
+                  ? primary.withValues(alpha: 0.1)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -606,7 +643,8 @@ class _ImpersonateDialogContent extends StatefulWidget {
   });
 
   @override
-  State<_ImpersonateDialogContent> createState() => _ImpersonateDialogContentState();
+  State<_ImpersonateDialogContent> createState() =>
+      _ImpersonateDialogContentState();
 }
 
 class _ImpersonateDialogContentState extends State<_ImpersonateDialogContent> {
@@ -661,8 +699,10 @@ class _ImpersonateDialogContentState extends State<_ImpersonateDialogContent> {
               isDense: true,
             ),
             items: [
-              const DropdownMenuItem<String?>(value: null, child: Text('Todas')),
-              ...widget.academies.map((a) => DropdownMenuItem<String?>(value: a.id, child: Text(a.name))),
+              const DropdownMenuItem<String?>(
+                  value: null, child: Text('Todas')),
+              ...widget.academies.map((a) =>
+                  DropdownMenuItem<String?>(value: a.id, child: Text(a.name))),
             ],
             onChanged: (v) => setState(() => _selectedAcademyId = v),
           ),
@@ -672,7 +712,8 @@ class _ImpersonateDialogContentState extends State<_ImpersonateDialogContent> {
               padding: const EdgeInsets.all(16),
               child: Text(
                 'Nenhum usuário encontrado.',
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),
+                style: TextStyle(
+                    color: Theme.of(context).textTheme.bodySmall?.color),
               ),
             )
           else

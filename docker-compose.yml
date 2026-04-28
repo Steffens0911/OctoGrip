@@ -17,6 +17,18 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: jjb_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   api:
     build: .
     container_name: jjb_api
@@ -41,6 +53,8 @@ services:
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
@@ -50,10 +64,57 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - api_media:/app/app_media
+      - face_jobs:/tmp/face_jobs
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
+
+  celery-worker:
+    build: .
+    container_name: jjb_celery_worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info --concurrency=2
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_media:/app/app_media
+      - face_jobs:/tmp/face_jobs
+      - ./secrets:/app/secrets:ro
+
+  celery-beat:
+    build: .
+    container_name: jjb_celery_beat
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   viewer:
     build:
@@ -78,3 +139,4 @@ services:
 volumes:
   postgres_data:
   api_media:
+  face_jobs:

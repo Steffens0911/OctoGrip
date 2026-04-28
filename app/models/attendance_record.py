@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -29,7 +29,8 @@ class AttendanceRecord(Base, UUIDMixin):
         DateTime(timezone=True),
         nullable=False,
     )
-    method: Mapped[str] = mapped_column(String(16), nullable=False, default="qr")
+    method: Mapped[str] = mapped_column(String(32), nullable=False, default="qr")
+    face_recognition: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     session: Mapped["AttendanceSession"] = relationship(
         "AttendanceSession",

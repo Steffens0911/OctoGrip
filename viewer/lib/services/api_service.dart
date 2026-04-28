@@ -9,6 +9,7 @@ import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
+import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/models/global_partner.dart';
 import 'package:viewer/models/lesson.dart';
 import 'package:viewer/models/mission.dart';
@@ -29,11 +30,13 @@ import 'package:viewer/models/user.dart';
 import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/backup_multipart_io.dart'
-    if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart' as backup_multipart;
+    if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart'
+    as backup_multipart;
 
 class ApiException implements Exception {
   final int statusCode;
   final String message;
+
   /// Tipo da exceção no payload `error.type` (ex.: `AccountFrozenError`).
   final String? errorType;
   ApiException(this.statusCode, this.message, {this.errorType});
@@ -58,8 +61,10 @@ class ApiService {
   static const _timeout = Duration(seconds: 30);
 
   final Map<String, _CacheEntry> _getCache = {};
-  static const int _cacheTtlShort = 45; // mission_today, week, pending count (pull-to-refresh pode servir cache válido)
-  static const int _cacheTtlMedium = 60; // listas: academies, lessons, techniques, users
+  static const int _cacheTtlShort =
+      45; // mission_today, week, pending count (pull-to-refresh pode servir cache válido)
+  static const int _cacheTtlMedium =
+      60; // listas: academies, lessons, techniques, users
   static const int _cacheTtlHeader = 45; // snapshot do header da home
 
   /// Evita vários GET simultâneos ao mesmo endpoint (reduz pressão no browser / ERR_INSUFFICIENT_RESOURCES).
@@ -76,12 +81,15 @@ class ApiService {
       _getCache.remove(key);
       return null;
     }
-    return entry.statusCode >= 200 && entry.statusCode < 300 ? entry.body : null;
+    return entry.statusCode >= 200 && entry.statusCode < 300
+        ? entry.body
+        : null;
   }
 
   void _setCache(String key, String body, int statusCode, int ttlSeconds) {
     if (statusCode < 200 || statusCode >= 300) return;
-    final expiresAtMs = DateTime.now().millisecondsSinceEpoch + (ttlSeconds * 1000);
+    final expiresAtMs =
+        DateTime.now().millisecondsSinceEpoch + (ttlSeconds * 1000);
     _getCache[key] = _CacheEntry(body, statusCode, expiresAtMs);
   }
 
@@ -117,7 +125,8 @@ class ApiService {
     if (ttlSeconds > 0) {
       final cached = _getCached(key, ttlSeconds);
       if (cached != null) {
-        return http.Response(cached, 200, headers: {'content-type': 'application/json'});
+        return http.Response(cached, 200,
+            headers: {'content-type': 'application/json'});
       }
     }
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
@@ -131,7 +140,8 @@ class ApiService {
   Future<void> _ensureAuth() async => await AuthService().ensureLoaded();
 
   /// [realUserOnly] true = não envia X-Impersonate-User (para o admin conseguir listar usuários e voltar da simulação).
-  Future<Map<String, String>> _headers({bool auth = false, bool realUserOnly = false}) async {
+  Future<Map<String, String>> _headers(
+      {bool auth = false, bool realUserOnly = false}) async {
     if (auth) await _ensureAuth();
     final h = <String, String>{};
     if (auth) {
@@ -145,7 +155,8 @@ class ApiService {
     return h;
   }
 
-  Future<Map<String, String>> _jsonHeaders({bool auth = false, bool realUserOnly = false}) async {
+  Future<Map<String, String>> _jsonHeaders(
+      {bool auth = false, bool realUserOnly = false}) async {
     final h = await _headers(auth: auth, realUserOnly: realUserOnly);
     h['Content-Type'] = 'application/json';
     return h;
@@ -226,7 +237,8 @@ class ApiService {
   }
 
   /// Envia notificação push a usuários da academia com app e tokens registrados.
-  Future<({int targetTokens, int sent, int failed})> sendAcademyPushNotification(
+  Future<({int targetTokens, int sent, int failed})>
+      sendAcademyPushNotification(
     String academyId, {
     required String title,
     required String body,
@@ -359,7 +371,8 @@ class ApiService {
   Future<List<Academy>> getAcademies({bool asRealUser = false}) async {
     final uri = Uri.parse('$baseUrl/academies');
     final r = asRealUser
-        ? await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)))
+        ? await _req(http.get(uri,
+            headers: await _headers(auth: true, realUserOnly: true)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
@@ -368,7 +381,8 @@ class ApiService {
   }
 
   Future<Academy> getAcademy(String id) async {
-    final r = await _getWithCache(Uri.parse('$baseUrl/academies/$id'), _cacheTtlMedium);
+    final r = await _getWithCache(
+        Uri.parse('$baseUrl/academies/$id'), _cacheTtlMedium);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Academy.fromJson(data! as Map<String, dynamic>);
@@ -431,7 +445,8 @@ class ApiService {
     };
   }
 
-  Future<Map<String, dynamic>?> getCollectiveGoalCurrent(String academyId) async {
+  Future<Map<String, dynamic>?> getCollectiveGoalCurrent(
+      String academyId) async {
     Future<Map<String, dynamic>?> fetchOnce(String id) async {
       final r = await _getWithCache(
         Uri.parse('$baseUrl/academies/$id/collective_goals/current'),
@@ -507,18 +522,22 @@ class ApiService {
     if (bytes.length >= 8) {
       bool match(List<int> magic, int offset) {
         for (var i = 0; i < magic.length; i++) {
-          if (offset + i >= bytes.length || (bytes[offset + i] & 0xff) != magic[i]) return false;
+          if (offset + i >= bytes.length ||
+              (bytes[offset + i] & 0xff) != magic[i]) return false;
         }
         return true;
       }
+
       if (match(_pngMagic, 0)) return 'png';
       if (bytes.length >= 2 && match(_jpegMagic, 0)) return 'jpg';
-      if (bytes.length >= 12 && match(_webpMagic, 0) && match(_webpFourcc, 8)) return 'webp';
+      if (bytes.length >= 12 && match(_webpMagic, 0) && match(_webpFourcc, 8))
+        return 'webp';
     }
     return 'png';
   }
 
-  Future<Academy> uploadAcademyLogo(String id, Uint8List bytes, String filename) async {
+  Future<Academy> uploadAcademyLogo(
+      String id, Uint8List bytes, String filename) async {
     var name = filename;
     var contentType = _contentTypeFromFilename(filename);
     if (contentType == null && bytes.isNotEmpty) {
@@ -549,7 +568,8 @@ class ApiService {
     return Academy.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<Academy> uploadAcademyScheduleImage(String id, Uint8List bytes, String filename) async {
+  Future<Academy> uploadAcademyScheduleImage(
+      String id, Uint8List bytes, String filename) async {
     var name = filename;
     var contentType = _contentTypeFromFilename(filename);
     if (contentType == null && bytes.isNotEmpty) {
@@ -634,7 +654,8 @@ class ApiService {
     if (weeklyTheme != null) body['weekly_theme'] = weeklyTheme;
     if (logoUrl != null) body['logo_url'] = logoUrl;
     if (scheduleImageUrl != null) body['schedule_image_url'] = scheduleImageUrl;
-    if (weeklyTechniqueId != null) body['weekly_technique_id'] = weeklyTechniqueId;
+    if (weeklyTechniqueId != null)
+      body['weekly_technique_id'] = weeklyTechniqueId;
     if (updateVisibleLesson) body['visible_lesson_id'] = visibleLessonId;
     if (showTrophies != null) body['show_trophies'] = showTrophies;
     if (showPartners != null) body['show_partners'] = showPartners;
@@ -687,7 +708,8 @@ class ApiService {
   }
 
   Future<void> deleteAcademy(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'),
+        headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/academies');
@@ -695,7 +717,11 @@ class ApiService {
 
   // ---------- Users ----------
   /// [asRealUser] true = não envia impersonation (para o seletor "Atuar como" carregar como admin e permitir voltar).
-  Future<List<UserModel>> getUsers({String? academyId, bool asRealUser = false, int offset = 0, int limit = 50}) async {
+  Future<List<UserModel>> getUsers(
+      {String? academyId,
+      bool asRealUser = false,
+      int offset = 0,
+      int limit = 50}) async {
     var queryParams = <String, String>{};
     if (academyId != null && academyId.isNotEmpty) {
       queryParams['academy_id'] = academyId;
@@ -711,22 +737,27 @@ class ApiService {
       uri = uri.replace(queryParameters: queryParams);
     }
     final r = asRealUser
-        ? await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)))
+        ? await _req(http.get(uri,
+            headers: await _headers(auth: true, realUserOnly: true)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
-    return raw.map((e) => UserModel.fromJson(e as Map<String, dynamic>)).toList();
+    return raw
+        .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // --- Attendance (Chamada por QR) ---
 
-  Future<AttendanceSessionModel> createAttendanceSession({String? title, int? expiresInMinutes}) async {
+  Future<AttendanceSessionModel> createAttendanceSession(
+      {String? title, int? expiresInMinutes}) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions');
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (expiresInMinutes != null) body['expires_in_minutes'] = expiresInMinutes;
-    final r = await _req(http.post(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
+    final r = await _req(http.post(uri,
+        headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     _invalidateAttendanceCache();
@@ -754,7 +785,9 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
-    return list.map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => AttendanceRecordModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Lista sessões de chamada da academia (professor/gerente) ou todas (admin).
@@ -774,16 +807,20 @@ class ApiService {
     if (status != null && status.isNotEmpty) qp['status'] = status;
     if (dateFrom != null) qp['date_from'] = dateFrom.toUtc().toIso8601String();
     if (dateTo != null) qp['date_to'] = dateTo.toUtc().toIso8601String();
-    final uri = Uri.parse('$baseUrl/attendance/sessions').replace(queryParameters: qp);
+    final uri =
+        Uri.parse('$baseUrl/attendance/sessions').replace(queryParameters: qp);
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
-    return list.map((e) => AttendanceSessionModel.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => AttendanceSessionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Presença manual (professor/gestor) sem QR.
-  Future<AttendanceRecordModel> addAttendanceRecord(String sessionId, String userId) async {
+  Future<AttendanceRecordModel> addAttendanceRecord(
+      String sessionId, String userId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
     final r = await _req(http.post(
       uri,
@@ -794,6 +831,86 @@ class ApiService {
     _throwIfNotOk(r, data);
     _invalidateAttendanceCache();
     return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<FaceRecognitionSubmitResponse> submitFaceRecognitionPhoto({
+    required String sessionId,
+    required Uint8List bytes,
+    required String filename,
+    String contentType = 'image/jpeg',
+  }) async {
+    final uri = Uri.parse('$baseUrl/face-recognition/submit');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.fields['session_id'] = sessionId;
+    final media = contentType.toLowerCase().contains('png')
+        ? MediaType('image', 'png')
+        : MediaType('image', 'jpeg');
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'photo',
+        bytes,
+        filename: filename.isNotEmpty ? filename : 'face_checkin.jpg',
+        contentType: media,
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return FaceRecognitionSubmitResponse.fromJson(
+        data! as Map<String, dynamic>);
+  }
+
+  Future<FaceRecognitionJobStatusModel> getFaceRecognitionJob(
+      String jobId) async {
+    final uri = Uri.parse('$baseUrl/face-recognition/job/$jobId');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return FaceRecognitionJobStatusModel.fromJson(
+        data! as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> confirmFaceRecognition({
+    required String sessionId,
+    required String jobId,
+    required List<String> confirmedStudentIds,
+  }) async {
+    final uri = Uri.parse('$baseUrl/face-recognition/confirm');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({
+        'session_id': sessionId,
+        'job_id': jobId,
+        'confirmed_student_ids': confirmedStudentIds,
+      }),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return data! as Map<String, dynamic>;
+  }
+
+  Future<void> generateFaceEmbedding(String studentId) async {
+    final uri =
+        Uri.parse('$baseUrl/face-recognition/generate-embedding/$studentId');
+    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    _throwIfNotOk(r, await _decodeResponse(r));
+  }
+
+  Future<FaceRecognitionEmbeddingStatusModel> getFaceEmbeddingStatus(
+      {String? academyId}) async {
+    final uri = academyId != null && academyId.isNotEmpty
+        ? Uri.parse('$baseUrl/face-recognition/embedding-status')
+            .replace(queryParameters: {'academy_id': academyId})
+        : Uri.parse('$baseUrl/face-recognition/embedding-status');
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return FaceRecognitionEmbeddingStatusModel.fromJson(
+        data! as Map<String, dynamic>);
   }
 
   /// Remove um registo de presença (correção).
@@ -811,15 +928,20 @@ class ApiService {
     DateTime? to,
   }) async {
     final qp = <String, String>{};
-    if (professorId != null && professorId.isNotEmpty) qp['professor_id'] = professorId;
+    if (professorId != null && professorId.isNotEmpty)
+      qp['professor_id'] = professorId;
     if (from != null) qp['from'] = from.toUtc().toIso8601String();
     if (to != null) qp['to'] = to.toUtc().toIso8601String();
-    final uri = Uri.parse('$baseUrl/attendance/stats/sessions').replace(queryParameters: qp);
+    final uri = Uri.parse('$baseUrl/attendance/stats/sessions')
+        .replace(queryParameters: qp);
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
-    return list.map((e) => AttendanceSessionStatModel.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) =>
+            AttendanceSessionStatModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Estatísticas: frequência de todos os alunos da academia no período.
@@ -832,12 +954,16 @@ class ApiService {
     if (academyId != null && academyId.isNotEmpty) qp['academy_id'] = academyId;
     if (from != null) qp['from'] = from.toUtc().toIso8601String();
     if (to != null) qp['to'] = to.toUtc().toIso8601String();
-    final uri = Uri.parse('$baseUrl/attendance/stats/students').replace(queryParameters: qp);
+    final uri = Uri.parse('$baseUrl/attendance/stats/students')
+        .replace(queryParameters: qp);
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
-    return list.map((e) => AttendanceStudentStatModel.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) =>
+            AttendanceStudentStatModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Detalhe de frequência de um aluno (histórico de presenças no período).
@@ -851,7 +977,8 @@ class ApiService {
     if (academyId != null && academyId.isNotEmpty) qp['academy_id'] = academyId;
     if (from != null) qp['from'] = from.toUtc().toIso8601String();
     if (to != null) qp['to'] = to.toUtc().toIso8601String();
-    final uri = Uri.parse('$baseUrl/attendance/stats/students/$studentId').replace(queryParameters: qp);
+    final uri = Uri.parse('$baseUrl/attendance/stats/students/$studentId')
+        .replace(queryParameters: qp);
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -871,7 +998,8 @@ class ApiService {
     };
     if (from != null) qp['from'] = from.toUtc().toIso8601String();
     if (to != null) qp['to'] = to.toUtc().toIso8601String();
-    final uri = Uri.parse('$baseUrl/attendance/stats/me').replace(queryParameters: qp);
+    final uri =
+        Uri.parse('$baseUrl/attendance/stats/me').replace(queryParameters: qp);
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -908,7 +1036,8 @@ class ApiService {
       qp['date_from'] = ymd(dateFrom);
       qp['date_to'] = ymd(dateTo);
     }
-    return Uri.parse('$baseUrl/attendance/ranking').replace(queryParameters: qp);
+    return Uri.parse('$baseUrl/attendance/ranking')
+        .replace(queryParameters: qp);
   }
 
   Future<AttendanceRankingModel> fetchAttendanceRanking({
@@ -947,7 +1076,10 @@ class ApiService {
     DateTime? dateTo,
     int limit = 10,
   }) {
-    if (academyId == null || academyId.isEmpty || periodKind == null || periodKind.isEmpty) {
+    if (academyId == null ||
+        academyId.isEmpty ||
+        periodKind == null ||
+        periodKind.isEmpty) {
       invalidateCache('GET:$baseUrl/attendance/ranking');
       return;
     }
@@ -964,7 +1096,8 @@ class ApiService {
     invalidateCache('GET:${uri.toString()}');
   }
 
-  Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId, {int ttlSeconds = 60}) async {
+  Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId,
+      {int ttlSeconds = 60}) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/qr')
         .replace(queryParameters: {'ttl_seconds': '$ttlSeconds'});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
@@ -973,7 +1106,8 @@ class ApiService {
     return AttendanceQrPayloadModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<AttendanceSessionModel> closeAttendanceSession(String sessionId) async {
+  Future<AttendanceSessionModel> closeAttendanceSession(
+      String sessionId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/close');
     final r = await _req(http.post(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
@@ -995,15 +1129,18 @@ class ApiService {
     return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<AttendanceUserSummaryModel> getAttendanceMeSummary({int fromDays = 30}) async {
-    final uri = Uri.parse('$baseUrl/attendance/me/summary').replace(queryParameters: {'from_days': '$fromDays'});
+  Future<AttendanceUserSummaryModel> getAttendanceMeSummary(
+      {int fromDays = 30}) async {
+    final uri = Uri.parse('$baseUrl/attendance/me/summary')
+        .replace(queryParameters: {'from_days': '$fromDays'});
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return AttendanceUserSummaryModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  Future<AttendanceUserSummaryModel> getAttendanceUserSummary(String userId, {int fromDays = 30}) async {
+  Future<AttendanceUserSummaryModel> getAttendanceUserSummary(String userId,
+      {int fromDays = 30}) async {
     final uri = Uri.parse('$baseUrl/attendance/users/$userId/summary')
         .replace(queryParameters: {'from_days': '$fromDays'});
     final r = await _getWithCache(uri, _cacheTtlShort);
@@ -1013,7 +1150,8 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUserPoints(String userId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$userId/points'), headers: await _headers(auth: true)));
+    final r = await _req(http.get(Uri.parse('$baseUrl/users/$userId/points'),
+        headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
@@ -1032,8 +1170,10 @@ class ApiService {
     return byUser.map((k, v) => MapEntry(k, (v as num).toInt()));
   }
 
-  Future<Map<String, dynamic>> getPointsLog(String userId, {int limit = 100}) async {
-    final uri = Uri.parse('$baseUrl/users/$userId/points_log').replace(queryParameters: {'limit': limit.toString()});
+  Future<Map<String, dynamic>> getPointsLog(String userId,
+      {int limit = 100}) async {
+    final uri = Uri.parse('$baseUrl/users/$userId/points_log')
+        .replace(queryParameters: {'limit': limit.toString()});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1049,7 +1189,9 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
-    return raw.map((e) => TrophyWithEarned.fromJson(e as Map<String, dynamic>)).toList();
+    return raw
+        .map((e) => TrophyWithEarned.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Lista troféus da academia (admin). [cacheBust] evita resposta HTTP antiga no browser.
@@ -1096,8 +1238,10 @@ class ApiService {
     if (minRewardLevelToUnlock != 0) {
       body['min_reward_level_to_unlock'] = minRewardLevelToUnlock;
     }
-    if (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty) body['min_graduation_to_unlock'] = minGraduationToUnlock;
-    if (maxCountPerOpponent != null) body['max_count_per_opponent'] = maxCountPerOpponent;
+    if (minGraduationToUnlock != null && minGraduationToUnlock.isNotEmpty)
+      body['min_graduation_to_unlock'] = minGraduationToUnlock;
+    if (maxCountPerOpponent != null)
+      body['max_count_per_opponent'] = maxCountPerOpponent;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/trophies'),
       headers: await _jsonHeaders(auth: true),
@@ -1122,6 +1266,7 @@ class ApiService {
     int? minRewardLevelToUnlock,
     String? minGraduationToUnlock,
     int? maxCountPerOpponent,
+
     /// Quando true, envia [maxCountPerOpponent] no PATCH (inclui null para remover o limite).
     bool setMaxCountPerOpponent = false,
   }) async {
@@ -1169,8 +1314,11 @@ class ApiService {
 
   /// Lista parceiros da academia (alunos: sem academy_id usa a do usuário; gestor/admin: academy_id obrigatório para admin).
   Future<List<Partner>> getPartners([String? academyId]) async {
-    final queryParams = academyId != null && academyId.isNotEmpty ? {'academy_id': academyId} : null;
-    final uri = Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
+    final queryParams = academyId != null && academyId.isNotEmpty
+        ? {'academy_id': academyId}
+        : null;
+    final uri =
+        Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1185,7 +1333,9 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
-    return raw.map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>)).toList();
+    return raw
+        .map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Cria parceiro na academia.
@@ -1202,10 +1352,12 @@ class ApiService {
       'academy_id': academyId,
       'name': name,
     };
-    if (description != null && description.isNotEmpty) body['description'] = description;
+    if (description != null && description.isNotEmpty)
+      body['description'] = description;
     if (url != null && url.isNotEmpty) body['url'] = url;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
-    if (buttonLabel != null && buttonLabel.isNotEmpty) body['button_label'] = buttonLabel;
+    if (buttonLabel != null && buttonLabel.isNotEmpty)
+      body['button_label'] = buttonLabel;
     body['highlight_on_login'] = highlightOnLogin;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/partners'),
@@ -1236,8 +1388,10 @@ class ApiService {
     if (logoUrl != null) body['logo_url'] = logoUrl;
     if (buttonLabel != null) body['button_label'] = buttonLabel;
     if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
-    final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.put(uri, headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
+    final uri = Uri.parse('$baseUrl/partners/$partnerId')
+        .replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(http.put(uri,
+        headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/partners');
@@ -1246,7 +1400,8 @@ class ApiService {
 
   /// Remove parceiro.
   Future<void> deletePartner(String partnerId, String academyId) async {
-    final uri = Uri.parse('$baseUrl/partners/$partnerId').replace(queryParameters: {'academy_id': academyId});
+    final uri = Uri.parse('$baseUrl/partners/$partnerId')
+        .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/partners');
@@ -1255,11 +1410,14 @@ class ApiService {
   /// Lista parceiros globais (somente admin global).
   Future<List<GlobalPartner>> getGlobalPartnersAdmin() async {
     final uri = Uri.parse('$baseUrl/admin/global_partners');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true, realUserOnly: true)));
+    final r = await _req(
+        http.get(uri, headers: await _headers(auth: true, realUserOnly: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
-    return raw.map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>)).toList();
+    return raw
+        .map((e) => GlobalPartner.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// Cria parceiro global (somente admin global).
@@ -1277,11 +1435,15 @@ class ApiService {
       'name': name,
       'is_active': isActive,
     };
-    if (description != null && description.isNotEmpty) body['description'] = description;
+    if (description != null && description.isNotEmpty)
+      body['description'] = description;
     if (logoUrl != null && logoUrl.isNotEmpty) body['logo_url'] = logoUrl;
-    if (offerText != null && offerText.isNotEmpty) body['offer_text'] = offerText;
-    if (externalUrl != null && externalUrl.isNotEmpty) body['external_url'] = externalUrl;
-    if (buttonLabel != null && buttonLabel.isNotEmpty) body['button_label'] = buttonLabel;
+    if (offerText != null && offerText.isNotEmpty)
+      body['offer_text'] = offerText;
+    if (externalUrl != null && externalUrl.isNotEmpty)
+      body['external_url'] = externalUrl;
+    if (buttonLabel != null && buttonLabel.isNotEmpty)
+      body['button_label'] = buttonLabel;
     if (featuredOrder != null) body['featured_order'] = featuredOrder;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/admin/global_partners'),
@@ -1337,7 +1499,8 @@ class ApiService {
   }
 
   Future<UserModel> getUser(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.get(Uri.parse('$baseUrl/users/$id'),
+        headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UserModel.fromJson(data! as Map<String, dynamic>);
@@ -1380,6 +1543,7 @@ class ApiService {
     String? password,
     String? academyId,
     int? pointsAdjustment,
+    String? avatarUrl,
     bool sendAccountFreezeFields = false,
     bool? accountFrozen,
     String? accountFreezeReason,
@@ -1392,6 +1556,7 @@ class ApiService {
     if (password != null && password.isNotEmpty) body['password'] = password;
     if (academyId != null) body['academy_id'] = academyId;
     if (pointsAdjustment != null) body['points_adjustment'] = pointsAdjustment;
+    if (avatarUrl != null) body['avatar_url'] = avatarUrl;
     if (sendAccountFreezeFields) {
       body['account_frozen'] = accountFrozen ?? false;
       body['account_freeze_reason'] = accountFreezeReason;
@@ -1418,8 +1583,10 @@ class ApiService {
   }
 
   /// Administrador: reverte confirmação de uma execução (`POST /admin/executions/{id}/revert_confirmation`).
-  Future<Map<String, dynamic>> adminRevertExecutionConfirmation(String executionId) async {
-    final uri = Uri.parse('$baseUrl/admin/executions/$executionId/revert_confirmation');
+  Future<Map<String, dynamic>> adminRevertExecutionConfirmation(
+      String executionId) async {
+    final uri =
+        Uri.parse('$baseUrl/admin/executions/$executionId/revert_confirmation');
     final r = await _req(http.post(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1439,7 +1606,8 @@ class ApiService {
 
   // ---------- Lessons ----------
   /// Lista lições. Se [academyId] for informado e a academia tiver lição visível, retorna só ela.
-  Future<List<Lesson>> getLessons({String? academyId, int offset = 0, int limit = 100}) async {
+  Future<List<Lesson>> getLessons(
+      {String? academyId, int offset = 0, int limit = 100}) async {
     var queryParams = <String, String>{};
     if (academyId != null) {
       queryParams['academy_id'] = academyId;
@@ -1461,7 +1629,8 @@ class ApiService {
   }
 
   Future<Lesson> getLesson(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/lessons/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.get(Uri.parse('$baseUrl/lessons/$id'),
+        headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Lesson.fromJson(data! as Map<String, dynamic>);
@@ -1521,7 +1690,8 @@ class ApiService {
   }
 
   Future<void> deleteLesson(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id'),
+        headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/lessons');
   }
@@ -1537,16 +1707,20 @@ class ApiService {
     if (cacheBust) {
       params['_t'] = DateTime.now().microsecondsSinceEpoch.toString();
     }
-    final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
+    final uri =
+        Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
     final r = await _getWithCache(uri, 0);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
-    return raw.map((e) => Technique.fromJson(e as Map<String, dynamic>)).toList();
+    return raw
+        .map((e) => Technique.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Technique> getTechnique(String id, {required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
+    final uri = Uri.parse('$baseUrl/techniques/$id')
+        .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1595,7 +1769,8 @@ class ApiService {
     if (videoUrl != null) {
       body['video_url'] = videoUrl.trim().isEmpty ? null : videoUrl.trim();
     }
-    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
+    final uri = Uri.parse('$baseUrl/techniques/$id')
+        .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.put(
       uri,
       headers: await _jsonHeaders(auth: true),
@@ -1608,7 +1783,8 @@ class ApiService {
   }
 
   Future<void> deleteTechnique(String id, {required String academyId}) async {
-    final uri = Uri.parse('$baseUrl/techniques/$id').replace(queryParameters: {'academy_id': academyId});
+    final uri = Uri.parse('$baseUrl/techniques/$id')
+        .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/techniques');
@@ -1616,7 +1792,8 @@ class ApiService {
 
   // ---------- Missions ----------
   Future<List<Mission>> getMissions() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions'), headers: await _headers(auth: true)));
+    final r = await _req(http.get(Uri.parse('$baseUrl/missions'),
+        headers: await _headers(auth: true)));
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];
@@ -1624,7 +1801,8 @@ class ApiService {
   }
 
   Future<Mission> getMission(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.get(Uri.parse('$baseUrl/missions/$id'),
+        headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Mission.fromJson(data! as Map<String, dynamic>);
@@ -1688,7 +1866,8 @@ class ApiService {
   }
 
   Future<void> deleteMission(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id'), headers: await _headers(auth: true)));
+    final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id'),
+        headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/missions');
   }
@@ -1718,7 +1897,8 @@ class ApiService {
       'level': level,
       if (academyId != null) 'academy_id': academyId,
     };
-    var uri = Uri.parse('$baseUrl/mission_today/week').replace(queryParameters: params);
+    var uri = Uri.parse('$baseUrl/mission_today/week')
+        .replace(queryParameters: params);
     final r = await _getWithCache(uri, _cacheTtlShort);
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1750,7 +1930,9 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = data as List<dynamic>;
-    return list.map((e) => WeeklyKitRead.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => WeeklyKitRead.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<WeeklyKitRead> createWeeklyKit({
@@ -1810,7 +1992,8 @@ class ApiService {
 
   /// Indica se a lição já foi concluída pelo usuário logado (para botão desabilitado ao abrir).
   Future<bool> getLessonCompleteStatus({required String lessonId}) async {
-    final uri = Uri.parse('$baseUrl/lesson_complete/status').replace(queryParameters: {'lesson_id': lessonId});
+    final uri = Uri.parse('$baseUrl/lesson_complete/status')
+        .replace(queryParameters: {'lesson_id': lessonId});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1819,7 +2002,8 @@ class ApiService {
   }
 
   /// Corpo da resposta inclui `points_awarded` (pontos creditados nesta conclusão).
-  Future<Map<String, dynamic>> postLessonComplete({required String lessonId}) async {
+  Future<Map<String, dynamic>> postLessonComplete(
+      {required String lessonId}) async {
     final r = await _req(http.post(
       Uri.parse('$baseUrl/lesson_complete'),
       headers: await _jsonHeaders(auth: true),
@@ -1948,21 +2132,26 @@ class ApiService {
     return list.map((e) => e as Map<String, dynamic>).toList();
   }
 
-  Future<List<MissionHistoryItem>> getMissionUsagesHistory({int limit = 7}) async {
-    final uri = Uri.parse('$baseUrl/mission_usages/history').replace(queryParameters: {'limit': limit.toString()});
+  Future<List<MissionHistoryItem>> getMissionUsagesHistory(
+      {int limit = 7}) async {
+    final uri = Uri.parse('$baseUrl/mission_usages/history')
+        .replace(queryParameters: {'limit': limit.toString()});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
     final list = map['missions'] as List<dynamic>? ?? [];
-    return list.map((e) => MissionHistoryItem.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => MissionHistoryItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> postTrainingFeedback({
     String? observation,
   }) async {
     final body = <String, dynamic>{};
-    if (observation != null && observation.isNotEmpty) body['observation'] = observation;
+    if (observation != null && observation.isNotEmpty)
+      body['observation'] = observation;
     final r = await _req(http.post(
       Uri.parse('$baseUrl/training_feedback'),
       headers: await _jsonHeaders(auth: true),
@@ -2086,14 +2275,15 @@ class ApiService {
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
     final entries = (map['entries'] as List<dynamic>?)
-            ?.map((e) =>
-                AcademyRankingEntry.fromJson(e as Map<String, dynamic>))
+            ?.map(
+                (e) => AcademyRankingEntry.fromJson(e as Map<String, dynamic>))
             .toList() ??
         [];
     return {
       'academy_id': map['academy_id'],
       'period_days': map['period_days'] as int,
-      if (map['period_start'] != null) 'period_start': map['period_start'] as String,
+      if (map['period_start'] != null)
+        'period_start': map['period_start'] as String,
       if (map['period_end'] != null) 'period_end': map['period_end'] as String,
       'entries': entries,
     };
@@ -2162,8 +2352,7 @@ class ApiService {
       if (week != null) queryParams['week'] = week.toString();
     }
     final uri = Uri.parse('$baseUrl/academies/$academyId/report/weekly')
-        .replace(
-            queryParameters: queryParams.isNotEmpty ? queryParams : null);
+        .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     if (r.statusCode == 404) return null;
     final data = await _decodeResponse(r);
@@ -2546,6 +2735,7 @@ class ApiService {
   }
 
   static const _backupDownloadTimeout = Duration(minutes: 10);
+
   /// Alinhar com BACKUP_PSQL_RESTORE_TIMEOUT_SEC (até 2h) + upload de ZIP grande.
   static const _restoreBackupTimeout = Duration(hours: 2, minutes: 15);
 
@@ -2589,7 +2779,8 @@ class ApiService {
       data = null;
     }
     _throwIfNotOk(r, data);
-    throw ApiException(r.statusCode, r.reasonPhrase ?? 'Erro ao baixar arquivo ZIP');
+    throw ApiException(
+        r.statusCode, r.reasonPhrase ?? 'Erro ao baixar arquivo ZIP');
   }
 
   /// Restaura banco (destrutivo) e opcionalmente mídia. Web: [bytes]; nativo: [filePath] ou [bytes].
@@ -2633,7 +2824,8 @@ class ApiService {
           );
         }
         if (decoded is! Map) {
-          throw ApiException(response.statusCode, 'Resposta inesperada após restauração.');
+          throw ApiException(
+              response.statusCode, 'Resposta inesperada após restauração.');
         }
         return Map<String, dynamic>.from(decoded);
       }
@@ -2653,7 +2845,8 @@ class ApiService {
         );
       }
       _throwIfNotOk(response, data);
-      throw ApiException(response.statusCode, response.reasonPhrase ?? 'Erro na restauração');
+      throw ApiException(
+          response.statusCode, response.reasonPhrase ?? 'Erro na restauração');
     }).timeout(
       _restoreBackupTimeout,
       onTimeout: () {
@@ -2667,5 +2860,3 @@ class ApiService {
     );
   }
 }
-
-

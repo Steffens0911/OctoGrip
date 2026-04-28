@@ -68,3 +68,14 @@ async def list_all_fcm_tokens(db: AsyncSession) -> list[str]:
     stmt = select(UserDeviceToken.fcm_token).distinct()
     result = await db.execute(stmt)
     return [row[0] for row in result.fetchall()]
+
+
+async def list_fcm_tokens_for_user(db: AsyncSession, *, user_id: uuid.UUID) -> list[str]:
+    """Tokens FCM do utilizador alvo (distintos)."""
+    stmt = (
+        select(UserDeviceToken.fcm_token)
+        .where(UserDeviceToken.user_id == user_id)
+        .distinct()
+    )
+    result = await db.execute(stmt)
+    return [row[0] for row in result.fetchall()]

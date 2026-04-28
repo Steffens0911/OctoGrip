@@ -24,6 +24,8 @@ from app.models.user_device_token import UserDeviceToken
 from app.models.weekly_technique_kit import UserWeeklyKitChoice, WeeklyKitItem, WeeklyTechniqueKit
 from app.models.attendance_session import AttendanceSession
 from app.models.attendance_record import AttendanceRecord
+from app.models.student_face_embedding import StudentFaceEmbedding
+from app.models.face_recognition_job import FaceRecognitionJob
 
 __all__ = [
     "Base",
@@ -54,4 +56,6 @@ __all__ = [
     "UserWeeklyKitChoice",
     "AttendanceSession",
     "AttendanceRecord",
+    "StudentFaceEmbedding",
+    "FaceRecognitionJob",
 ]

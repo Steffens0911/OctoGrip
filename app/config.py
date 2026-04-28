@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     FIREBASE_PROJECT_ID: str | None = None
     FIREBASE_SERVICE_ACCOUNT_PATH: str | None = None
 
+    # Reconhecimento facial (fila assíncrona)
+    REDIS_URL: str = "redis://localhost:6379/0"
+    FACE_JOBS_DIR: str = "/tmp/face_jobs"
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:

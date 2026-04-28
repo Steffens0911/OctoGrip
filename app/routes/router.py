@@ -16,6 +16,7 @@ from app.routes import (
     admin_undo,
     auth,
     executions,
+    face_recognition,
     health,
     lesson_complete,
     lessons,
@@ -75,3 +76,4 @@ api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
 api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
+api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])

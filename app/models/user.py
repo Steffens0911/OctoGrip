@@ -74,6 +74,11 @@ class User(Base, UUIDMixin):
         nullable=True,
         comment="Motivo opcional exibido ao aluno (ex.: mensalidade). Gestor/admin define.",
     )
+    avatar_url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="URL pública da foto do utilizador usada por módulos de reconhecimento facial.",
+    )
 
     academy: Mapped["Academy | None"] = relationship(
         "Academy",

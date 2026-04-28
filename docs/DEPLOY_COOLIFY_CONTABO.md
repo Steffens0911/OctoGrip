@@ -1,6 +1,6 @@
 # Deploy na VPS Contabo com Coolify (AppBaby)
 
-Este guia descreve como publicar a stack **PostgreSQL + API (FastAPI) + viewer (Flutter Web)** usando [Coolify](https://coolify.io/) numa VPS da Contabo.
+Este guia descreve como publicar a stack **PostgreSQL + Redis + API (FastAPI) + Celery (worker + beat) + viewer (Flutter Web)** usando [Coolify](https://coolify.io/) numa VPS da Contabo. O Redis e o Celery são necessários para **reconhecimento facial** em fila (check-in por foto) e tarefas agendadas associadas.
 
 ## Pré-requisitos
 
@@ -40,7 +40,8 @@ O ficheiro `docker-compose.caddy.yml` deste repositório sobe **Caddy** nas port
 
 1. **Project** → **+ New Resource** → **Docker Compose**.
 2. Liga o **repositório Git**, branch (ex. `main`) e define o caminho do compose: **`docker-compose.coolify.yml`** (raiz do repo).
-   - Este ficheiro é igual ao `docker-compose.yml` mas **sem** `ports` no host — evita conflito com a **8080** (e outras) quando o Coolify/Traefik já usa essas portas na mesma VPS.
+   - Este ficheiro espelha o `docker-compose.yml` (Postgres, **Redis**, **API**, **celery-worker**, **celery-beat**, viewer) mas **sem** `ports` no host — evita conflito com a **8080** (e outras) quando o Coolify/Traefik já usa essas portas na mesma VPS.
+   - O volume Docker **`face_jobs`** partilha `/tmp/face_jobs` entre a **API** e o **celery-worker** para as fotos temporárias dos jobs de reconhecimento facial.
    - Se usares **`docker-compose.yml`**, cada **Reload Compose File** repõe as portas e o deploy volta a falhar com `port is already allocated` a menos que apagues manualmente os blocos `ports` no editor e **não** voltes a recarregar do Git sem os reaplicar.
 3. Coolify **≥ v4.0.0-beta.411**: variáveis “mágicas” (`SERVICE_URL_*`, etc.) funcionam com compose via Git; em versões antigas, ver [notas Coolify](https://coolify.io/docs/knowledge-base/docker/compose).
 
@@ -71,6 +72,8 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `FIREBASE_PROJECT_ID` | (Opcional) ID do projeto Firebase — necessário para **push** na API. |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | (Opcional) Caminho **dentro do contentor** ao JSON da service account; o compose Coolify usa por defeito `/app/secrets/firebase-service-account.json`. |
 | `FIREBASE_SECRETS_HOST_PATH` | (Opcional) Pasta **no disco da VPS** montada em `/app/secrets` (só leitura). Por defeito `/srv/octogrip/secrets`. Coloca aí o ficheiro `firebase-service-account.json` (ver secção abaixo). |
+| `REDIS_URL` | (Opcional) URL do broker Celery / Redis. Por defeito no compose: `redis://redis:6379/0` (serviço interno `redis`). Só precisas de definir se usares Redis externo. |
+| `FACE_JOBS_DIR` | (Opcional) Diretório **dentro do contentor** para ficheiros temporários dos jobs de face. Por defeito `/tmp/face_jobs`, alinhado com o volume `face_jobs` no compose Coolify. |
 
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
 
@@ -126,7 +129,7 @@ Segundo a [documentação Coolify — Docker Compose](https://coolify.io/docs/kn
 - Serviço **viewer**: escuta na porta **80** no contentor → atribui domínio HTTPS, ex. `https://app.seudominio.com` (sem sufixo de porta no URL público).
 - Serviço **api**: escuta na porta **8000** no contentor → ao configurar o domínio no Coolify, indica a porta **8000** na configuração do serviço (o UI do Coolify usa isso para rotear para o contentor; o utilizador acede sempre por 443 no domínio).
 
-O **postgres** não deve ter domínio público. Com **`docker-compose.coolify.yml`** não há `ports` no host — só acesso interno entre serviços e via proxy do Coolify.
+O **postgres**, **redis**, **celery-worker** e **celery-beat** não devem ter domínio público. Com **`docker-compose.coolify.yml`** não há `ports` no host — só acesso interno entre serviços e via proxy do Coolify para **viewer** e **api**.
 
 Se por algum motivo usares o `docker-compose.yml` no Coolify, remove manualmente os blocos `ports` dos três serviços no editor e **evita** “Reload Compose File” a partir do Git sem voltar a aplicar essa alteração (ou o erro **8080** volta).
 
@@ -152,7 +155,7 @@ A API executa **migrations** no arranque (`app/main.py` → `run_migrations`).
 - **PostgreSQL** como recurso “Database” gerido pelo Coolify e **API** como aplicação Docker (Dockerfile na raiz) — ajustas `DATABASE_URL` para o hostname interno que o Coolify indicar.
 - **Viewer** como recurso separado (build a partir de `viewer/Dockerfile` com build args `API_BASE_URL`, opcionalmente `FIREBASE_WEB_APP_ID` e `FCM_VAPID_KEY` para FCM Web).
 
-O caminho **um Docker Compose** costuma ser o mais simples para manter `postgres`, `api` e `viewer` alinhados com o `docker-compose.yml` do repositório.
+O caminho **um Docker Compose** costuma ser o mais simples para manter `postgres`, `redis`, `api`, `celery-worker`, `celery-beat` e `viewer` alinhados com o `docker-compose.yml` do repositório.
 
 ## 10. Resolução de problemas
 

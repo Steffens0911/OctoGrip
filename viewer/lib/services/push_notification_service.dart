@@ -34,6 +34,7 @@ class PushNotificationService {
   static const String _androidChannelName = 'Avisos OctoGrip';
 
   static FlutterLocalNotificationsPlugin? _androidLocalNotifications;
+  static void Function(Map<String, String> data)? _notificationOpenHandler;
 
   /// FCM no Android **não** mostra notificação de sistema com a app em primeiro plano;
   /// usamos notificações locais com o mesmo canal que o FCM usa em segundo plano.
@@ -59,7 +60,8 @@ class PushNotificationService {
     _androidLocalNotifications = plugin;
   }
 
-  static Future<void> _showAndroidForegroundNotification(RemoteMessage m) async {
+  static Future<void> _showAndroidForegroundNotification(
+      RemoteMessage m) async {
     final n = m.notification;
     final title = (n?.title ?? m.data['title'])?.trim();
     final body = (n?.body ?? m.data['body'])?.trim();
@@ -181,6 +183,7 @@ class PushNotificationService {
           unawaited(_showAndroidForegroundNotification(m));
         }
       });
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationOpened);
       final fm = FirebaseMessaging.instance;
       await fm.requestPermission(alert: true, badge: true, sound: true);
       if (defaultTargetPlatform == TargetPlatform.iOS) {
@@ -194,6 +197,10 @@ class PushNotificationService {
         await _ensureAndroidLocalNotifications();
       }
       FirebaseMessaging.instance.onTokenRefresh.listen(_registerTokenQuietly);
+      final initialMessage = await fm.getInitialMessage();
+      if (initialMessage != null) {
+        _handleNotificationOpened(initialMessage);
+      }
       _firebaseReady = true;
     } catch (e, st) {
       debugPrint('PushNotificationService.init: $e\n$st');
@@ -204,6 +211,19 @@ class PushNotificationService {
           'android/app/, o mesmo projectId que firebase_options.dart e Play Services.\n$e',
         );
       }
+    }
+  }
+
+  static void setNotificationOpenHandler(
+      void Function(Map<String, String> data)? handler) {
+    _notificationOpenHandler = handler;
+  }
+
+  static void _handleNotificationOpened(RemoteMessage m) {
+    final data = <String, String>{};
+    m.data.forEach((k, v) => data[k] = '$v');
+    if (_notificationOpenHandler != null) {
+      _notificationOpenHandler!(data);
     }
   }
 
