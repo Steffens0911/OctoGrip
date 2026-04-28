@@ -4,7 +4,7 @@
 # já estão em uso (ex.: Traefik/Coolify na mesma VPS).
 #
 # Inclui Redis + Celery (worker + beat) para reconhecimento facial em fila.
-# Volume face_jobs: API grava fotos temporárias e o worker lê o mesmo caminho.
+# Jobs temporários de face: FACE_JOBS_DIR dentro de api_media (mesmo volume em api e worker).
 #
 # No Coolify: Build Pack Docker Compose → Docker Compose Location: /docker-compose.coolify.yml
 # Domínios: viewer → porta 80 no contentor; api → porta 8000 no contentor.
@@ -73,7 +73,6 @@ services:
         condition: service_healthy
     volumes:
       - api_media:/app/app_media
-      - face_jobs:/app/app_media/face_jobs
       # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
 
@@ -99,7 +98,6 @@ services:
         condition: service_healthy
     volumes:
       - api_media:/app/app_media
-      - face_jobs:/app/app_media/face_jobs
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
 
   celery-beat:
@@ -143,4 +141,3 @@ services:
 volumes:
   postgres_data:
   api_media:
-  face_jobs:

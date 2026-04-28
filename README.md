@@ -51,7 +51,7 @@ Variáveis novas:
 - `REDIS_URL` (ex.: `redis://localhost:6379/0`)
 - `FACE_JOBS_DIR` (padrão `/tmp/face_jobs`)
 
-No Docker Compose, a API e o `celery-worker` partilham o volume nomeado **`face_jobs`** montado em `/tmp/face_jobs` para o worker aceder às fotos temporárias. Em produção com **Coolify**, usa `docker-compose.coolify.yml` (mesma stack, sem portas no host); detalhes em `docs/DEPLOY_COOLIFY_CONTABO.md`.
+No `docker-compose.yml` local, a API e o `celery-worker` partilham o volume nomeado **`face_jobs`** em `/tmp/face_jobs`. Em produção com **Coolify**, `docker-compose.coolify.yml` usa só **`api_media`** em `/app/app_media`; os jobs de face ficam em `FACE_JOBS_DIR` (por defeito `/app/app_media/face_jobs`). Detalhes em `docs/DEPLOY_COOLIFY_CONTABO.md`.
 
 Foto de referência de aluno para reconhecimento facial:
 

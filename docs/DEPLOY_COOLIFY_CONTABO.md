@@ -41,7 +41,7 @@ O ficheiro `docker-compose.caddy.yml` deste repositório sobe **Caddy** nas port
 1. **Project** → **+ New Resource** → **Docker Compose**.
 2. Liga o **repositório Git**, branch (ex. `main`) e define o caminho do compose: **`docker-compose.coolify.yml`** (raiz do repo).
    - Este ficheiro espelha o `docker-compose.yml` (Postgres, **Redis**, **API**, **celery-worker**, **celery-beat**, viewer) mas **sem** `ports` no host — evita conflito com a **8080** (e outras) quando o Coolify/Traefik já usa essas portas na mesma VPS.
-   - O volume Docker **`face_jobs`** partilha `/tmp/face_jobs` entre a **API** e o **celery-worker** para as fotos temporárias dos jobs de reconhecimento facial.
+   - Os jobs temporários de face usam **`FACE_JOBS_DIR`** dentro do volume **`api_media`** (montado em `/app/app_media` na API e no `celery-worker`), para evitar um segundo volume com permissões diferentes e `PermissionError` ao gravar.
    - Se usares **`docker-compose.yml`**, cada **Reload Compose File** repõe as portas e o deploy volta a falhar com `port is already allocated` a menos que apagues manualmente os blocos `ports` no editor e **não** voltes a recarregar do Git sem os reaplicar.
 3. Coolify **≥ v4.0.0-beta.411**: variáveis “mágicas” (`SERVICE_URL_*`, etc.) funcionam com compose via Git; em versões antigas, ver [notas Coolify](https://coolify.io/docs/knowledge-base/docker/compose).
 
@@ -73,7 +73,7 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | (Opcional) Caminho **dentro do contentor** ao JSON da service account; o compose Coolify usa por defeito `/app/secrets/firebase-service-account.json`. |
 | `FIREBASE_SECRETS_HOST_PATH` | (Opcional) Pasta **no disco da VPS** montada em `/app/secrets` (só leitura). Por defeito `/srv/octogrip/secrets`. Coloca aí o ficheiro `firebase-service-account.json` (ver secção abaixo). |
 | `REDIS_URL` | (Opcional) URL do broker Celery / Redis. Por defeito no compose: `redis://redis:6379/0` (serviço interno `redis`). Só precisas de definir se usares Redis externo. |
-| `FACE_JOBS_DIR` | (Opcional) Diretório **dentro do contentor** para ficheiros temporários dos jobs de face. Por defeito `/tmp/face_jobs`, alinhado com o volume `face_jobs` no compose Coolify. |
+| `FACE_JOBS_DIR` | (Opcional) Diretório **dentro do contentor** para ficheiros temporários dos jobs de face. Por defeito no compose Coolify: `/app/app_media/face_jobs` (subpasta do volume `api_media`). |
 
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
 
