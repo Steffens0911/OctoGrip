@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/global_partner.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/student/featured_partners_banner.dart';
 
 import 'package:viewer/screens/student/attendance_my_stats_screen.dart';
@@ -110,26 +112,64 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     onOk();
   }
 
-  Widget _entry({
+  void _pushAttendanceQr() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(builder: (context) => const AttendanceScanScreen()),
+    );
+  }
+
+  void _pushAttendanceFrequency() {
+    _requireAcademy(
+      onOk: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(builder: (context) => const AttendanceMyStatsScreen()),
+      ),
+    );
+  }
+
+  void _pushAttendanceRanking(String? academyId) {
+    _requireAcademy(
+      onOk: () => Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (context) => AttendanceRankingScreen(academyId: academyId!),
+        ),
+      ),
+    );
+  }
+
+  void _pushUserAvatarScreen() {
+    Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (context) => const UserAvatarScreen(),
+      ),
+    ).then((updated) {
+      if (updated == true && mounted) _load();
+    });
+  }
+
+  Widget _academyNavigationTile({
+    required bool enabled,
     required IconData icon,
     required String title,
     required String subtitle,
-    required VoidCallback onTap,
-    bool enabled = true,
+    required VoidCallback onTapWhenEnabled,
   }) {
-    return Card(
-      child: ListTile(
-        enabled: enabled,
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withValues(alpha: 0.15),
-          child: Icon(icon, color: AppTheme.primary),
-        ),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: enabled ? onTap : null,
-      ),
+    final tile = AppNavigationTile(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      onTap: enabled ? onTapWhenEnabled : () {},
     );
+    if (!enabled) {
+      return Opacity(
+        opacity: 0.45,
+        child: IgnorePointer(child: tile),
+      );
+    }
+    return tile;
   }
 
   @override
@@ -142,6 +182,9 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     final showSchedule = _flagFromHeaderStats('show_schedule', fallback: true);
     final scheduleUrl = _scheduleUrlFromHeaderStats();
 
+    final scheduleEnabled =
+        hasAcademy && scheduleUrl != null && scheduleUrl.isNotEmpty;
+
     // AppBar fica no [MainScaffold] (aba "Central"); evita barra extra com seta e título duplicado.
     return Scaffold(
       body: RefreshIndicator(
@@ -152,10 +195,11 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
         },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpacing.m),
           children: [
             if (_featuredFuture != null)
               Padding(
+                // Mesmo recorte horizontal do banner de antes do redesenho (parceiros em destaque no topo).
                 padding: const EdgeInsets.only(left: 12, right: 12, bottom: 4),
                 child: FutureBuilder<List<GlobalPartner>>(
                   future: _featuredFuture,
@@ -185,14 +229,80 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                 ),
               ),
 
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: AppSpacing.s),
+                const _HubSectionLabel('PRESENÇA'),
+                const SizedBox(height: AppSpacing.s),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _HubPresenceCard(
+                        featured: true,
+                        enabled: true,
+                        icon: Icons.qr_code_scanner_rounded,
+                        title: 'Chamada por QR',
+                        subtitle: 'Escanear QR para registrar presença no treino',
+                        onTap: _pushAttendanceQr,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    Expanded(
+                      child: _HubPresenceCard(
+                        featured: false,
+                        enabled: true,
+                        icon: Icons.face_retouching_natural_outlined,
+                        title: 'Foto de perfil',
+                        subtitle: 'Usada na chamada por reconhecimento facial',
+                        onTap: _pushUserAvatarScreen,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _HubPresenceCard(
+                        featured: false,
+                        enabled: hasAcademy,
+                        icon: Icons.insights_rounded,
+                        title: 'Minha frequência',
+                        subtitle: 'Histórico e gráficos de presença',
+                        onTap: hasAcademy ? _pushAttendanceFrequency : null,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    Expanded(
+                      child: _HubPresenceCard(
+                        featured: false,
+                        enabled: hasAcademy,
+                        icon: Icons.emoji_events_outlined,
+                        title: 'Ranking',
+                        subtitle: 'Frequência da academia por período',
+                        onTap: hasAcademy ? () => _pushAttendanceRanking(academyId) : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.m),
+                const _HubSectionLabel('ACADEMIA'),
+                const SizedBox(height: AppSpacing.s),
+              ],
+            ),
+
             if (showPartners)
-              _entry(
-                icon: Icons.handshake_outlined,
-                title: 'Parceiros',
-                subtitle: 'Conheça os parceiros da academia',
-                enabled: hasAcademy,
-                onTap: () => _requireAcademy(
-                  onOk: () => Navigator.push<void>(
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                child: _academyNavigationTile(
+                  enabled: hasAcademy,
+                  icon: Icons.handshake_outlined,
+                  title: 'Parceiros',
+                  subtitle: 'Conheça os parceiros da academia',
+                  onTapWhenEnabled: () => Navigator.push<void>(
                     context,
                     MaterialPageRoute<void>(
                       builder: (context) => PartnersScreen(academyId: academyId!),
@@ -202,69 +312,18 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
               ),
 
             if (showSchedule)
-              _entry(
-                icon: Icons.schedule_rounded,
-                title: 'Horário da academia',
-                subtitle: 'Abra o quadro de horários',
-                enabled: hasAcademy && scheduleUrl != null && scheduleUrl.isNotEmpty,
-                onTap: () => _requireAcademy(onOk: () => _openScheduleUrl(scheduleUrl)),
-              ),
-
-            _entry(
-              icon: Icons.face_retouching_natural_outlined,
-              title: 'Foto de perfil',
-              subtitle: 'Usada na chamada por reconhecimento facial',
-              onTap: () {
-                Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute<bool>(
-                    builder: (context) => const UserAvatarScreen(),
-                  ),
-                ).then((updated) {
-                  if (updated == true && mounted) _load();
-                });
-              },
-            ),
-
-            _entry(
-              icon: Icons.qr_code_scanner_rounded,
-              title: 'Chamada por QR',
-              subtitle: 'Escanear QR para registrar presença no treino',
-              onTap: () => Navigator.push<void>(
-                context,
-                MaterialPageRoute<void>(builder: (context) => const AttendanceScanScreen()),
-              ),
-            ),
-
-            _entry(
-              icon: Icons.insights_rounded,
-              title: 'Minha frequência',
-              subtitle: 'Veja seu histórico e gráficos de presença',
-              enabled: hasAcademy,
-              onTap: () => _requireAcademy(
-                onOk: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(builder: (context) => const AttendanceMyStatsScreen()),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.s),
+                child: _academyNavigationTile(
+                  enabled: scheduleEnabled,
+                  icon: Icons.schedule_rounded,
+                  title: 'Horário da academia',
+                  subtitle: 'Abra o quadro de horários',
+                  onTapWhenEnabled: () => _requireAcademy(onOk: () => _openScheduleUrl(scheduleUrl)),
                 ),
               ),
-            ),
 
-            _entry(
-              icon: Icons.emoji_events_outlined,
-              title: 'Ranking',
-              subtitle: 'Compare a frequência da academia por período',
-              enabled: hasAcademy,
-              onTap: () => _requireAcademy(
-                onOk: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (context) => AttendanceRankingScreen(academyId: academyId!),
-                  ),
-                ),
-              ),
-            ),
-
-            _entry(
+            AppNavigationTile(
               icon: Icons.storefront_rounded,
               title: 'Loja da academia',
               subtitle: 'Produtos, preços e contato no WhatsApp',
@@ -280,3 +339,136 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
   }
 }
 
+/// Label uppercase para secções da Central (Presença / Academia).
+class _HubSectionLabel extends StatelessWidget {
+  const _HubSectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              letterSpacing: 1.45,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textMutedOf(context),
+            ),
+      ),
+    );
+  }
+}
+
+/// Cartão compacto para atalhos de presença (destaque QR ou tile normal).
+class _HubPresenceCard extends StatelessWidget {
+  const _HubPresenceCard({
+    required this.featured,
+    required this.enabled,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final bool featured;
+  final bool enabled;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final surface = featured
+        ? scheme.primary.withValues(alpha: 0.14)
+        : AppTheme.surfaceOf(context);
+
+    final borderColor = featured
+        ? scheme.primary.withValues(alpha: 0.42)
+        : AppTheme.borderOf(context);
+
+    final iconBg = featured
+        ? scheme.primary.withValues(alpha: 0.26)
+        : scheme.primary.withValues(alpha: 0.1);
+
+    final titleStyleBase =
+        Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600);
+    final subtitleStyleBase = Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: 11,
+          height: 1.25,
+        );
+
+    final titleColor =
+        featured ? scheme.primary : AppTheme.textPrimaryOf(context);
+    final subtitleColor = featured
+        ? scheme.primary.withValues(alpha: 0.72)
+        : AppTheme.textMutedOf(context);
+
+    final inner = Material(
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.cardRadius,
+        side: BorderSide(color: borderColor, width: featured ? 1 : 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: AppRadius.cardRadius,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: AppRadius.tileRadius,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 20, color: scheme.primary),
+              ),
+              AppSpacing.verticalS,
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: titleStyleBase?.copyWith(color: titleColor, fontSize: 13.5),
+              ),
+              AppSpacing.verticalXs,
+              Text(
+                subtitle,
+                maxLines: featured ? 3 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: subtitleStyleBase?.copyWith(color: subtitleColor),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final decorated = featured ? inner : DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadow.card(context),
+      ),
+      child: inner,
+    );
+
+    final effective = enabled
+        ? decorated
+        : Opacity(
+            opacity: 0.45,
+            child: IgnorePointer(child: decorated),
+          );
+
+    return effective;
+  }
+}
