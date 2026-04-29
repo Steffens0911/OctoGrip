@@ -420,49 +420,112 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                   ),
                 ],
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    if (_selectedIds.isNotEmpty)
-                      Text(
-                        '${_selectedIds.length} selecionado(s)',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: _kAccentGreen,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    const Spacer(),
-                    OutlinedButton(
-                      onPressed:
-                          _submitting ? null : () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'),
-                    ),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _kAccentGreen,
-                        foregroundColor: const Color(0xFF1e2435),
-                      ),
-                      onPressed: (_submitting ||
-                              _selectedIds.isEmpty ||
-                              _loading ||
-                              _loadError != null)
+                _AttendanceDialogFooter(
+                  selectedCount: _selectedIds.length,
+                  submitting: _submitting,
+                  confirmEnabled: !_submitting &&
+                      _selectedIds.isNotEmpty &&
+                      !_loading &&
+                      _loadError == null,
+                  onCancel: _submitting
+                      ? null
+                      : () => Navigator.of(context).pop(),
+                  onConfirm:
+                      (_submitting || _selectedIds.isEmpty || _loading || _loadError != null)
                           ? null
                           : () => unawaited(_submit()),
-                      child: _submitting
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Confirmar presença'),
-                    ),
-                  ],
                 ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Rodapé do modal: em ecrãs estreitos empilha os botões para evitar overflow horizontal.
+class _AttendanceDialogFooter extends StatelessWidget {
+  const _AttendanceDialogFooter({
+    required this.selectedCount,
+    required this.submitting,
+    required this.confirmEnabled,
+    required this.onCancel,
+    required this.onConfirm,
+  });
+
+  final int selectedCount;
+  final bool submitting;
+  final bool confirmEnabled;
+  final VoidCallback? onCancel;
+  final VoidCallback? onConfirm;
+
+  static const double _narrowMaxWidth = 520;
+
+  @override
+  Widget build(BuildContext context) {
+    final narrow =
+        MediaQuery.sizeOf(context).width < _narrowMaxWidth;
+
+    final selection = selectedCount > 0
+        ? Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '$selectedCount selecionado(s)',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: _kAccentGreen,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+
+    final cancelButton = OutlinedButton(
+      onPressed: onCancel,
+      child: const Text('Cancelar'),
+    );
+
+    final confirmButton = FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: _kAccentGreen,
+        foregroundColor: const Color(0xFF1e2435),
+      ),
+      onPressed: confirmEnabled ? onConfirm : null,
+      child: submitting
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: Text('Confirmar presença'),
+            ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        selection,
+        if (narrow) ...[
+          cancelButton,
+          const SizedBox(height: 8),
+          confirmButton,
+        ] else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: cancelButton),
+              const SizedBox(width: 8),
+              Expanded(flex: 2, child: confirmButton),
+            ],
+          ),
+      ],
     );
   }
 }
