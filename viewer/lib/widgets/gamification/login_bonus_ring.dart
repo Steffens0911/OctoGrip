@@ -43,7 +43,7 @@ class LoginBonusRing extends StatelessWidget {
     final diskColor = isDark
         ? const Color(0xFF2B2B2B)
         : Theme.of(context).colorScheme.surfaceContainerHighest;
-    final accent = isDark ? mint : FantasyTheme.xpGreen;
+    final accent = isDark ? mint : FantasyTheme.xpGreenOf(context);
 
     return Tooltip(
       message: 'Toque para ver como funcionam os pontos e o bônus de login',

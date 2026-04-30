@@ -104,54 +104,6 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
     TrophyDetailModal.show(context, st, galleryOwnerName: galleryOwnerName);
   }
 
-  /// Lista mock para desenvolvimento quando [trophies] é passado explicitamente para testes.
-  static List<TrophyWithEarned> get mockTrophies {
-    return [
-      TrophyWithEarned(
-        trophyId: 'mock-1',
-        techniqueId: 't1',
-        name: 'Troféu Ouro',
-        techniqueName: 'Técnica A',
-        startDate: '2024-01-01',
-        endDate: '2024-12-31',
-        targetCount: 10,
-        awardKind: 'trophy',
-        earnedTier: 'gold',
-        goldCount: 10,
-        silverCount: 8,
-        bronzeCount: 5,
-      ),
-      TrophyWithEarned(
-        trophyId: 'mock-2',
-        techniqueId: 't2',
-        name: 'Medalha Prata',
-        techniqueName: 'Técnica B',
-        startDate: '2024-06-01',
-        endDate: '2024-11-30',
-        targetCount: 5,
-        awardKind: 'medal',
-        earnedTier: 'silver',
-        goldCount: 0,
-        silverCount: 5,
-        bronzeCount: 4,
-      ),
-      TrophyWithEarned(
-        trophyId: 'mock-3',
-        techniqueId: 't3',
-        name: 'A conquistar',
-        techniqueName: 'Técnica C',
-        startDate: '2024-09-01',
-        endDate: '2025-02-28',
-        targetCount: 8,
-        awardKind: 'trophy',
-        earnedTier: null,
-        goldCount: 0,
-        silverCount: 0,
-        bronzeCount: 2,
-      ),
-    ];
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_loading) {

@@ -16,10 +16,11 @@ class BottomNavigationWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: FantasyTheme.navBackground,
+        color: Theme.of(context).colorScheme.surface,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color:
+                Theme.of(context).colorScheme.shadow.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, -2),
           ),
@@ -83,7 +84,7 @@ class _NavItem extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             decoration: BoxDecoration(
               color: selected
-                  ? FantasyTheme.xpGreen.withValues(alpha: 0.2)
+                  ? FantasyTheme.xpGreenOf(context).withValues(alpha: 0.2)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
             ),
@@ -94,8 +95,8 @@ class _NavItem extends StatelessWidget {
                   icon,
                   size: 24,
                   color: selected
-                      ? FantasyTheme.xpGreen
-                      : FantasyTheme.textSecondary,
+                      ? FantasyTheme.xpGreenOf(context)
+                      : FantasyTheme.textSecondaryOf(context),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -104,8 +105,8 @@ class _NavItem extends StatelessWidget {
                     fontSize: 12,
                     fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                     color: selected
-                        ? FantasyTheme.xpGreen
-                        : FantasyTheme.textSecondary,
+                        ? FantasyTheme.xpGreenOf(context)
+                        : FantasyTheme.textSecondaryOf(context),
                   ),
                 ),
               ],

@@ -93,11 +93,10 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
     final notifier =
         ref.read(trophyListNotifierProvider(widget.academyId).notifier);
     final canEdit = AuthService().canEditResources();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1A1A2E) : Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Troféus'),
         leading: IconButton(
@@ -108,8 +107,8 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: state.mutationInProgress ? null : () => _openForm(),
-              backgroundColor: const Color(0xFF67E0A3),
-              foregroundColor: Colors.black,
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -127,7 +126,8 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
     bool canEdit,
   ) {
     if (state.isInitialLoading && state.allItems.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+      return Center(
+          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
     }
 
     if (state.errorMessage != null &&
@@ -162,7 +162,7 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
     return Stack(
       children: [
         RefreshIndicator(
-          color: AppTheme.primary,
+          color: Theme.of(context).colorScheme.primary,
           onRefresh: state.mutationInProgress ? () async {} : notifier.refresh,
           child: NotificationListener<ScrollNotification>(
             onNotification: (n) {
@@ -270,7 +270,7 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
                         state.searchQuery.trim().isNotEmpty
                             ? 'Nenhum troféu encontrado.'
                             : 'Nenhum troféu. Toque em + para criar.',
-                        style: const TextStyle(color: AppTheme.textSecondary),
+                        style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                       ),
                     ),
                   )
@@ -307,8 +307,9 @@ class _TrophiesListPageState extends ConsumerState<TrophiesListPage> {
             child: AbsorbPointer(
               child: ColoredBox(
                 color: Colors.black.withValues(alpha: 0.35),
-                child: const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary),
+                child: Center(
+                  child: CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),

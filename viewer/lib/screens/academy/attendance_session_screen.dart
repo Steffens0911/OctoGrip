@@ -793,7 +793,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           if (showFaceBanner) ...[
             const SizedBox(height: 8),
             Material(
-              color: Colors.amber.withValues(alpha: 0.2),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(8),
               child: InkWell(
                 borderRadius: BorderRadius.circular(8),

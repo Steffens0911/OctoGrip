@@ -277,9 +277,9 @@ class AppColors {
   /// Original name: Danger (Tertiary)
   static const Color dangerTertiary = Color(0xFFFFFFFF);
 
-  /// Default
+  /// Default (nome `default` é palavra-chave em Dart — usar `colorDefault`).
   /// Original name: Default
-  static const Color default = Color(0xFFFFFFFF);
+  static const Color colorDefault = Color(0xFFFFFFFF);
 
   /// Defaults
   /// Original name: Defaults
@@ -1218,9 +1218,9 @@ class AppColors {
   /// Original name: #9C81EA
   static const Color var9c81ea = Color(0xFFFFFFFF);
 
-  /// ✏️ page title
-  /// Original name: ✏️ Page Title
-  static const Color var✏️PageTitle = Color(0xFF9C80EA);
+  /// Page title (original Figma layer used emoji in name).
+  /// Original name: Page Title
+  static const Color varPageTitle = Color(0xFF9C80EA);
 
   /// Vector
   /// Original name: Vector
@@ -1322,7 +1322,7 @@ class AppColors {
     'dangerPrimary': dangerPrimary,
     'dangerSecondary': dangerSecondary,
     'dangerTertiary': dangerTertiary,
-    'default': default,
+    'default': colorDefault,
     'defaults': defaults,
     'description': description,
     'drag': drag,
@@ -1566,7 +1566,7 @@ class AppColors {
     'var8px': var8px,
     'var928ca6': var928ca6,
     'var9c81ea': var9c81ea,
-    'var✏️PageTitle': var✏️PageTitle,
+    'varPageTitle': varPageTitle,
     'vector': vector,
     'vectorStroke': vectorStroke,
     'warning': warning,

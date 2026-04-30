@@ -18,6 +18,7 @@ class PartnersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accent = FantasyTheme.accentOf(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: FantasyTheme.cardBoxDecoration(context),
@@ -28,12 +29,12 @@ class PartnersCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: FantasyTheme.gold.withValues(alpha: 0.2),
+              color: accent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.handshake_outlined,
-              color: FantasyTheme.gold,
+              color: accent,
               size: 28,
             ),
           ),
@@ -70,11 +71,12 @@ class PartnersCard extends StatelessWidget {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: FantasyTheme.gold.withValues(alpha: 0.9),
+                        color: FantasyTheme.accentStrongOf(context),
                         borderRadius: FantasyTheme.buttonBorderRadius,
                         boxShadow: [
                           BoxShadow(
-                            color: FantasyTheme.goldDark.withValues(alpha: 0.3),
+                            color:
+                                FantasyTheme.accentShadowOf(context),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -89,15 +91,17 @@ class PartnersCard extends StatelessWidget {
                                 .textTheme
                                 .labelLarge
                                 ?.copyWith(
-                                  color: FantasyTheme.goldButtonForeground,
+                                  color:
+                                      FantasyTheme.onAccentForegroundOf(context),
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
                           const SizedBox(width: 6),
-                          const Icon(
+                          Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 12,
-                            color: FantasyTheme.goldButtonForeground,
+                            color:
+                                FantasyTheme.onAccentForegroundOf(context),
                           ),
                         ],
                       ),

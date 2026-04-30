@@ -117,11 +117,10 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
     final notifier =
         ref.read(techniqueListNotifierProvider(widget.academyId).notifier);
     final canEdit = AuthService().canEditResources();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor:
-          isDark ? const Color(0xFF1A1A2E) : Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text(
           'Técnicas (para serem vinculadas aos troféus e posições da semana)',
@@ -136,8 +135,8 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
       floatingActionButton: canEdit
           ? FloatingActionButton(
               onPressed: state.mutationInProgress ? null : _showQuickCreate,
-              backgroundColor: const Color(0xFF67E0A3),
-              foregroundColor: Colors.black,
+              backgroundColor: cs.primary,
+              foregroundColor: cs.onPrimary,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -155,7 +154,8 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
     bool canEdit,
   ) {
     if (state.isInitialLoading && state.allItems.isEmpty) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
+      return Center(
+          child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
     }
 
     if (state.errorMessage != null &&
@@ -190,7 +190,7 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
     return Stack(
       children: [
         RefreshIndicator(
-          color: AppTheme.primary,
+          color: Theme.of(context).colorScheme.primary,
           onRefresh:
               state.mutationInProgress ? () async {} : notifier.refresh,
           child: NotificationListener<ScrollNotification>(
@@ -280,7 +280,7 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
                     state.searchQuery.trim().isNotEmpty
                         ? 'Nenhuma técnica encontrada.'
                         : 'Nenhuma técnica. Toque em + para criar (rápido).',
-                    style: const TextStyle(color: AppTheme.textSecondary),
+                    style: TextStyle(color: AppTheme.textSecondaryOf(context)),
                   ),
                 ),
               )
@@ -317,8 +317,9 @@ class _TechniquesListPageState extends ConsumerState<TechniquesListPage> {
             child: AbsorbPointer(
               child: ColoredBox(
                 color: Colors.black.withValues(alpha: 0.35),
-                child: const Center(
-                  child: CircularProgressIndicator(color: AppTheme.primary),
+                child: Center(
+                  child: CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.primary),
                 ),
               ),
             ),

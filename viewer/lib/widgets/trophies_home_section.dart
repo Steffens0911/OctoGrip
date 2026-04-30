@@ -92,10 +92,12 @@ class _TrophyRow extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: FantasyTheme.gold.withValues(alpha: 0.2),
+                  color:
+                      FantasyTheme.accentOf(context).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, color: FantasyTheme.gold, size: 24),
+                child: Icon(icon,
+                    color: FantasyTheme.accentOf(context), size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(

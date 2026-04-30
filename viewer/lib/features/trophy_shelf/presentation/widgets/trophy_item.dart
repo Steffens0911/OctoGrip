@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:viewer/features/trophy_shelf/domain/shelf_trophy.dart';
+import 'package:viewer/features/trophy_shelf/presentation/widgets/trophy_tier_color.dart';
 import 'package:viewer/models/trophy.dart';
 
 /// O troféu em si: ícone/imagem, estado bloqueado (opacidade), estado ouro (glow).
@@ -85,19 +86,6 @@ class _TrophyItemState extends State<TrophyItem>
     super.dispose();
   }
 
-  static Color _tierColor(String? tier) {
-    switch (tier) {
-      case 'gold':
-        return const Color(0xFFD97706);
-      case 'silver':
-        return const Color(0xFF9CA3AF);
-      case 'bronze':
-        return const Color(0xFF92400E);
-      default:
-        return Colors.grey;
-    }
-  }
-
   static IconData _iconForTierAndKind(String? tier, bool isMedal) {
     if (isMedal) {
       return Icons.military_tech;
@@ -115,7 +103,7 @@ class _TrophyItemState extends State<TrophyItem>
   @override
   Widget build(BuildContext context) {
     final t = widget.shelfTrophy.data;
-    final color = _tierColor(t.earnedTier);
+    final color = trophyTierColor(context, t.earnedTier);
     final icon = _iconForTierAndKind(t.earnedTier, t.isMedal);
     final isGold = widget.shelfTrophy.isGold;
     final isMedal = t.isMedal;

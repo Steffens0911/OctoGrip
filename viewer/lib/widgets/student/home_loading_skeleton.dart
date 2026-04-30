@@ -101,7 +101,8 @@ class HomeMissionSectionSkeleton extends StatelessWidget {
               3,
               (i) => Expanded(
                 child: Padding(
-                  padding: EdgeInsets.only(left: i == 0 ? 0 : 6, right: i == 2 ? 0 : 6),
+                  padding: EdgeInsets.only(
+                      left: i == 0 ? 0 : 6, right: i == 2 ? 0 : 6),
                   child: Column(
                     children: [
                       Container(

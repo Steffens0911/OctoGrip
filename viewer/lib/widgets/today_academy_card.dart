@@ -97,11 +97,11 @@ class TodayAcademyCard extends StatelessWidget {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: FantasyTheme.gold.withValues(alpha: 0.9),
+                  color: FantasyTheme.accentStrongOf(context),
                   borderRadius: FantasyTheme.buttonBorderRadius,
                   boxShadow: [
                     BoxShadow(
-                      color: FantasyTheme.goldDark.withValues(alpha: 0.3),
+                      color: FantasyTheme.accentShadowOf(context),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -114,7 +114,8 @@ class TodayAcademyCard extends StatelessWidget {
                       buttonLabel,
                       style:
                           Theme.of(context).textTheme.labelLarge?.copyWith(
-                                color: FantasyTheme.goldButtonForeground,
+                                color:
+                                    FantasyTheme.onAccentForegroundOf(context),
                                 fontWeight: FontWeight.w600,
                               ),
                     ),

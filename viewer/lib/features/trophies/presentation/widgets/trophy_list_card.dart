@@ -19,10 +19,8 @@ class TrophyListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark
-        ? const Color(0xFF2B2D42)
-        : Theme.of(context).colorScheme.surfaceContainerHighest;
+    final cs = Theme.of(context).colorScheme;
+    final cardColor = cs.surfaceContainerHighest;
     final sub = StringBuffer()
       ..write(entity.techniqueName ?? 'Técnica')
       ..write(' · ')
@@ -50,8 +48,8 @@ class TrophyListCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           child: Row(
             children: [
-              const Icon(Icons.emoji_events_outlined,
-                  color: AppTheme.primary, size: 28),
+              Icon(Icons.emoji_events_outlined,
+                  color: cs.primary, size: 28),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -60,7 +58,7 @@ class TrophyListCard extends StatelessWidget {
                     Text(
                       entity.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: isDark ? Colors.white : AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -70,9 +68,7 @@ class TrophyListCard extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: isDark
-                                ? Colors.white70
-                                : AppTheme.textSecondary,
+                            color: AppTheme.textSecondaryOf(context),
                           ),
                     ),
                   ],
@@ -81,7 +77,7 @@ class TrophyListCard extends StatelessWidget {
               if (canEdit) ...[
                 IconButton(
                   tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_rounded, color: AppTheme.primary),
+                  icon: Icon(Icons.edit_rounded, color: cs.primary),
                   onPressed: onEdit,
                 ),
                 IconButton(

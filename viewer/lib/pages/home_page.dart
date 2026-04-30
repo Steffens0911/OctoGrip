@@ -244,9 +244,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final isWide = width >= AppTheme.breakpointTablet;
 
     if (_loading && user == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(color: FantasyTheme.gold),
+          child: CircularProgressIndicator(
+            color: Theme.of(context).colorScheme.primary,
+          ),
         ),
       );
     }
@@ -257,7 +259,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Positioned.fill(child: _FantasyBackground()),
           RefreshIndicator(
             onRefresh: _load,
-            color: FantasyTheme.gold,
+            color: Theme.of(context).colorScheme.primary,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: EdgeInsets.fromLTRB(screenPadding, 0, screenPadding, 24),
@@ -297,7 +299,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           decoration: BoxDecoration(
                             borderRadius: FantasyTheme.cardBorderRadius,
                             border: Border.all(
-                              color: FantasyTheme.gold.withValues(alpha: 0.45),
+                              color: FantasyTheme.accentOf(context)
+                                  .withValues(alpha: 0.45),
                             ),
                             color: Theme.of(context)
                                 .colorScheme
@@ -311,9 +314,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             ),
                             child: Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.storefront_rounded,
-                                  color: FantasyTheme.gold,
+                                  color: FantasyTheme.accentOf(context),
                                   size: 28,
                                 ),
                                 const SizedBox(width: 14),
@@ -520,9 +523,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Fechar',
-              style: TextStyle(color: FantasyTheme.gold),
+              style: TextStyle(color: FantasyTheme.accentOf(context)),
             ),
           ),
         ],
@@ -531,20 +534,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 }
 
-/// Fundo: imagem espacial ou gradiente escuro como fallback.
+/// Fundo alinhado ao shell Memo (cor do scaffold).
 class _FantasyBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/background_stars.png',
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (ctx, __, ___) => Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: FantasyTheme.missionHomeBackgroundDecoration(ctx),
-      ),
-    );
+    return ColoredBox(color: Theme.of(context).scaffoldBackgroundColor);
   }
 }

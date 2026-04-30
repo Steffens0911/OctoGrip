@@ -23,16 +23,15 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/student_home_snapshot_store.dart';
 import 'package:viewer/utils/error_message.dart';
-import 'package:viewer/screens/student/global_supporters_section.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 import 'package:viewer/widgets/gamification/points_rules_sheet.dart';
 import 'package:viewer/widgets/gamification/streak_widget.dart';
 import 'package:viewer/widgets/gamification/weekly_mission_path.dart';
 import 'package:viewer/widgets/header_widget.dart';
-import 'package:viewer/widgets/app_navigation_tile.dart';
-import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/academy_login_notice_dialog.dart';
-import 'package:viewer/widgets/trophies_home_section.dart';
+import 'package:viewer/widgets/app_feedback.dart';
+import 'package:viewer/design/app_tokens.dart';
+import 'package:viewer/widgets/layout/memo_section_label.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
 import 'package:viewer/widgets/student/student_rules_sheet.dart';
@@ -71,6 +70,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   int? _nextLevelThreshold;
   Map<String, dynamic>? _collectiveGoal;
   int _pendingConfirmationsCount = 0;
+  /// Solicitações enviadas por mim com `pending_confirmation` ([ApiService.getMyExecutions]).
+  int _myOutgoingPendingCount = 0;
   /// Esconde o banner até o contador mudar de valor (nova carga da API).
   bool _pendingBannerDismissed = false;
   /// Bottom sheet de lembrete só uma vez por vida do State (sessão na aba Campo de treinamento).
@@ -83,7 +84,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   String? _academyLogoUrl;
   bool _showTrophies = true;
   bool _showPartners = true;
-  bool _showGlobalSupporters = true;
   /// Aviso ao logar (dados da academia; modal uma vez por sessão).
   String? _loginNoticeTitle;
   String? _loginNoticeBody;
@@ -219,6 +219,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _syncingHomeData = false;
         _trainingPartnersFuture = null;
         _pendingConfirmationsCount = 0;
+        _myOutgoingPendingCount = 0;
       });
       widget.onPendingConfirmationsCountChanged?.call(0);
       return;
@@ -425,7 +426,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _academyLogoUrl = academy.logoUrl;
         _showTrophies = academy.showTrophies;
         _showPartners = academy.showPartners;
-        _showGlobalSupporters = academy.showGlobalSupporters;
         _loginNoticeTitle = academy.loginNoticeTitle;
         _loginNoticeBody = academy.loginNoticeBody;
         _loginNoticeUrl = academy.loginNoticeUrl;
@@ -438,7 +438,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           _academyLogoUrl = null;
           _showTrophies = true;
           _showPartners = true;
-          _showGlobalSupporters = true;
           _loginNoticeTitle = null;
           _loginNoticeBody = null;
           _loginNoticeUrl = null;
@@ -478,8 +477,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _academyLogoUrl = logoUrl;
       _showTrophies = academy?['show_trophies'] as bool? ?? true;
       _showPartners = academy?['show_partners'] as bool? ?? true;
-      _showGlobalSupporters =
-          academy?['show_global_supporters'] as bool? ?? true;
       _loginNoticeTitle = academy?['login_notice_title'] as String?;
       _loginNoticeBody = academy?['login_notice_body'] as String?;
       _loginNoticeUrl = academy?['login_notice_url'] as String?;
@@ -565,17 +562,24 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadPendingConfirmationsWith() async {
     try {
-      final count = await _api.getPendingConfirmationsCount();
+      final pendingIn = await _api.getPendingConfirmationsCount();
+      final myExec = await _api.getMyExecutions();
       if (!mounted) return;
+      final outgoing =
+          myExec.where((e) => e['status'] == 'pending_confirmation').length;
       final prev = _pendingConfirmationsCount;
       setState(() {
-        if (count != prev) _pendingBannerDismissed = false;
-        _pendingConfirmationsCount = count;
+        if (pendingIn != prev) _pendingBannerDismissed = false;
+        _pendingConfirmationsCount = pendingIn;
+        _myOutgoingPendingCount = outgoing;
       });
-      widget.onPendingConfirmationsCountChanged?.call(count);
+      widget.onPendingConfirmationsCountChanged?.call(pendingIn);
     } catch (_) {
       if (!mounted) return;
-      setState(() => _pendingConfirmationsCount = 0);
+      setState(() {
+        _pendingConfirmationsCount = 0;
+        _myOutgoingPendingCount = 0;
+      });
       widget.onPendingConfirmationsCountChanged?.call(0);
     }
   }
@@ -924,9 +928,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                       const SizedBox(height: 16),
                       _buildTrophiesHomeSection(),
                     ],
-                  ],
-                  if (_showGlobalSupporters) const GlobalSupportersSection(),
-                  if (u != null) ...[
                     _buildConfirmationsAndRequestsSection(),
                   ],
                 ],
@@ -1310,7 +1311,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   }
 
   /// Acordeom **Centro de treinamento** só quando há mensagem de missões ausentes.
-  /// Com `missionWeek` carregado não há filhos aqui; troféus em [TrophiesHomeSection].
+  /// Com `missionWeek` carregado não há filhos aqui; troféus em grelha tipo Central / Presença.
   Widget _buildMainAccordion() {
     final missionHint = _missionWeek == null &&
             !_loading &&
@@ -1364,107 +1365,103 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     );
   }
 
-  Widget _buildHomeAccordion({
-    required IconData icon,
-    required String title,
-    bool showAlert = false,
-    required List<Widget> children,
-  }) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surfaceOf(context),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderOf(context)),
-          ),
-          child: ExpansionTile(
-            initiallyExpanded: false,
-            tilePadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            leading: Icon(icon, color: AppTheme.primary, size: 26),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.textPrimaryOf(context),
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-                if (showAlert) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.amber,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Icon(
-                      Icons.warning_amber_rounded,
-                      size: 16,
-                      color: Colors.amber.shade900,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            children: children,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildConfirmationsAndRequestsSection() {
     final u = _selectedUser;
     if (u == null) return const SizedBox.shrink();
     final userId = u.id;
-    final hasConfirmationsAlert = _pendingConfirmationsCount > 0;
-    return _buildHomeAccordion(
-      icon: Icons.notifications_active_outlined,
-      title: 'Confirmações e solicitações',
-      showAlert: hasConfirmationsAlert,
+    final pending = _pendingConfirmationsCount;
+    final outgoing = _myOutgoingPendingCount;
+
+    /// Rodapés discretos (surface + borda tema), texto como subtítulo do header ("Construa consistência…").
+    Widget neutralFooterChip(String label) {
+      final cs = Theme.of(context).colorScheme;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppTheme.borderOf(context)),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+                color: FantasyTheme.textSecondaryOf(context),
+              ),
+        ),
+      );
+    }
+
+    Widget footerPointsLogBadge() => neutralFooterChip('Ver histórico');
+
+    Widget footerPendingBadge() =>
+        neutralFooterChip(pending > 0 ? '$pending pendentes' : 'Em dia');
+
+    Widget footerRequestsBadge() => neutralFooterChip(
+          outgoing > 0 ? '$outgoing enviadas' : 'Nenhuma pendente',
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppNavigationTile(
-          icon: Icons.list_alt,
-          title: 'Log de pontuação',
-          subtitle: 'Histórico de pontos ganhos',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PointsLogScreen(
-                userId: userId,
-                userName: _selectedUser?.name ?? _selectedUser?.email,
+        const MemoSectionLabel('CONFIRMAÇÕES E SOLICITAÇÕES'),
+        const SizedBox(height: AppSpacing.s),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _MemoPresenceStyleTrophyCard(
+                enabled: true,
+                icon: Icons.list_alt_rounded,
+                title: 'Log de pontuação',
+                subtitle: 'Histórico de pontos ganhos',
+                footer: footerPointsLogBadge(),
+                onTap: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (context) => PointsLogScreen(
+                      userId: userId,
+                      userName: _selectedUser?.name ?? _selectedUser?.email,
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        AppNavigationTile(
-          icon: Icons.how_to_reg,
-          title: 'Confirmações pendentes',
-          subtitle: 'Confirmar execuções em você',
-          showAlertBadge: hasConfirmationsAlert,
-          onTap: _openPendingConfirmationsScreen,
-        ),
-        const SizedBox(height: 8),
-        AppNavigationTile(
-          icon: Icons.send_outlined,
-          title: 'Minhas solicitações',
-          subtitle: 'Status das confirmações que você pediu',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MyExecutionsScreen(userId: userId),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: _MemoPresenceStyleTrophyCard(
+                enabled: true,
+                icon: Icons.how_to_reg_rounded,
+                title: 'Confirmações pendentes',
+                subtitle: 'Confirmar execuções em você',
+                footer: footerPendingBadge(),
+                onTap: _openPendingConfirmationsScreen,
+              ),
             ),
-          ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: _MemoPresenceStyleTrophyCard(
+                enabled: true,
+                icon: Icons.send_rounded,
+                title: 'Minhas solicitações',
+                subtitle: 'Status das confirmações que você pediu',
+                footer: footerRequestsBadge(),
+                onTap: () => Navigator.push<void>(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (context) =>
+                        MyExecutionsScreen(userId: userId),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -1475,8 +1472,9 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (u == null) return const SizedBox.shrink();
     final userId = u.id;
     final hasAcademy = u.academyId != null && u.academyId!.isNotEmpty;
-    return TrophiesHomeSection(
-      onOpenGallery: () => Navigator.push(
+
+    void openGallery() {
+      Navigator.push<void>(
         context,
         MaterialPageRoute<void>(
           builder: (context) => TrophyGalleryScreen(
@@ -1484,22 +1482,155 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
             userName: _selectedUser?.name ?? _selectedUser?.email,
           ),
         ),
-      ),
-      onOpenClassmates: hasAcademy
-          ? () => Navigator.push(
-                context,
-                MaterialPageRoute<void>(
-                  builder: (context) => ClassmatesGalleryScreen(
-                    academyId: u.academyId!,
-                    currentUserId: userId,
-                  ),
-                ),
-              )
-          : null,
-      showClassmatesRow: hasAcademy,
+      );
+    }
+
+    void openClassmates() {
+      if (!hasAcademy) return;
+      Navigator.push<void>(
+        context,
+        MaterialPageRoute<void>(
+          builder: (context) => ClassmatesGalleryScreen(
+            academyId: u.academyId!,
+            currentUserId: userId,
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const MemoSectionLabel('TROFÉUS'),
+        const SizedBox(height: AppSpacing.s),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _MemoPresenceStyleTrophyCard(
+                enabled: true,
+                icon: Icons.emoji_events_outlined,
+                title: 'Galeria de troféus',
+                subtitle: 'Conquistas ouro, prata e bronze',
+                onTap: openGallery,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.s),
+            Expanded(
+              child: _MemoPresenceStyleTrophyCard(
+                enabled: hasAcademy,
+                icon: Icons.groups_outlined,
+                title: 'Galeria dos colegas',
+                subtitle: 'Troféus e medalhas da academia',
+                onTap: openClassmates,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
+}
+
+/// Cartão compacto com ícone Material em círculo (primary suave), igual ao [MemoCompactTileCard] da Central.
+class _MemoPresenceStyleTrophyCard extends StatelessWidget {
+  const _MemoPresenceStyleTrophyCard({
+    required this.enabled,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.footer,
+    required this.onTap,
+  });
+
+  final bool enabled;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? footer;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final iconBg = scheme.primary.withValues(alpha: 0.1);
+
+    // Cor e hierarquia alinhadas ao cumprimento «Olá, …!» no [HeaderWidget].
+    final titleStyleBase = Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: FantasyTheme.textPrimaryOf(context),
+        );
+    final subtitleStyleBase = Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: 11,
+          height: 1.25,
+        );
+
+    final inner = Material(
+      color: AppTheme.surfaceOf(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.cardRadius,
+        side: BorderSide(color: AppTheme.borderOf(context), width: 0.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: AppRadius.cardRadius,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: iconBg,
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 20, color: scheme.primary),
+              ),
+              AppSpacing.verticalS,
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: titleStyleBase?.copyWith(fontSize: 13.5),
+              ),
+              AppSpacing.verticalXs,
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: subtitleStyleBase?.copyWith(
+                  color: AppTheme.textMutedOf(context),
+                ),
+              ),
+              if (footer != null) ...[
+                AppSpacing.verticalS,
+                footer!,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final decorated = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: AppRadius.cardRadius,
+        boxShadow: AppShadow.card(context),
+      ),
+      child: inner,
+    );
+
+    if (enabled) return decorated;
+    return Opacity(
+      opacity: 0.45,
+      child: IgnorePointer(child: decorated),
+    );
+  }
 }
 
 /// Fundo da home Campo de treinamento: gradiente espacial no escuro; claro alinhado ao scaffold.

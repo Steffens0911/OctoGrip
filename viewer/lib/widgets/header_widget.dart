@@ -111,7 +111,7 @@ class HeaderWidget extends StatelessWidget {
                             color: dailyVideoCompleted
                                 ? FantasyTheme.textMutedOf(context)
                                     .withValues(alpha: 0.5)
-                                : FantasyTheme.xpGreen
+                                : FantasyTheme.xpGreenOf(context)
                                     .withValues(alpha: 0.5),
                           ),
                         ),
@@ -124,7 +124,7 @@ class HeaderWidget extends StatelessWidget {
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: dailyVideoCompleted
                                         ? FantasyTheme.textSecondaryOf(context)
-                                        : FantasyTheme.xpGreen,
+                                        : FantasyTheme.xpGreenOf(context),
                                     fontWeight: FontWeight.w600,
                                     height: 1.25,
                                   ),
@@ -142,7 +142,7 @@ class HeaderWidget extends StatelessWidget {
             child: Center(
               child: CircleAvatar(
               radius: 44,
-              backgroundColor: FantasyTheme.gold,
+              backgroundColor: FantasyTheme.accentOf(context),
               child: CircleAvatar(
                 radius: 41,
                 backgroundColor: FantasyTheme.insetSurfaceOf(context),
@@ -197,8 +197,8 @@ class HeaderWidget extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress,
                         backgroundColor: Colors.transparent,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          FantasyTheme.xpGreen,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          FantasyTheme.xpGreenOf(context),
                         ),
                         minHeight: 28,
                       ),
@@ -217,12 +217,12 @@ class HeaderWidget extends StatelessWidget {
                         ),
                   ),
                 ),
-                const Positioned(
+                Positioned(
                   right: 8,
                   child: Icon(
                     Icons.workspace_premium,
                     size: 20,
-                    color: FantasyTheme.gold,
+                    color: FantasyTheme.accentOf(context),
                   ),
                 ),
               ],

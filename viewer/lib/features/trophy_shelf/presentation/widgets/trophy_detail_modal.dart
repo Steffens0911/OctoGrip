@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/trophy_shelf/domain/shelf_trophy.dart';
+import 'package:viewer/features/trophy_shelf/presentation/widgets/trophy_tier_color.dart';
 import 'package:viewer/models/trophy.dart';
 
 /// Modal/bottom sheet ao tocar no troféu: nome, técnica, tier, datas, progresso.
@@ -40,19 +41,6 @@ class TrophyDetailModal extends StatelessWidget {
           '${end.day.toString().padLeft(2, '0')}/${end.month.toString().padLeft(2, '0')}/${end.year}';
     } catch (_) {
       return '$startIso – $endIso';
-    }
-  }
-
-  static Color _tierColor(BuildContext context, String? tier) {
-    switch (tier) {
-      case 'gold':
-        return const Color(0xFFD97706);
-      case 'silver':
-        return const Color(0xFF9CA3AF);
-      case 'bronze':
-        return const Color(0xFF92400E);
-      default:
-        return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 
@@ -95,12 +83,12 @@ class TrophyDetailModal extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: _tierColor(context, t.earnedTier).withValues(alpha: 0.2),
+                  color: trophyTierColor(context, t.earnedTier).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   t.earnedTier != null ? Icons.emoji_events : Icons.workspace_premium_outlined,
-                  color: _tierColor(context, t.earnedTier),
+                  color: trophyTierColor(context, t.earnedTier),
                   size: 32,
                 ),
               ),
@@ -126,7 +114,7 @@ class TrophyDetailModal extends StatelessWidget {
                     Text(
                       t.unlocked ? t.tierLabel : 'Trancado',
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: t.unlocked ? _tierColor(context, t.earnedTier) : theme.colorScheme.onSurfaceVariant,
+                        color: t.unlocked ? trophyTierColor(context, t.earnedTier) : theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -224,7 +212,7 @@ class TrophyDetailModal extends StatelessWidget {
         goldText,
         style: style.copyWith(
           fontWeight: FontWeight.w600,
-          color: _tierColor(context, 'gold'),
+          color: trophyTierColor(context, 'gold'),
         ),
       ));
     } else {

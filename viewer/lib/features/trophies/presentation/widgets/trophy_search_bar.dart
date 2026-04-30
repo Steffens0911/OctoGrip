@@ -45,26 +45,25 @@ class _TrophySearchBarState extends State<TrophySearchBar> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Material(
-      color: isDark ? const Color(0xFF2B2D42) : scheme.surfaceContainerHighest,
+      color: scheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
       child: TextField(
         controller: widget.controller,
         onChanged: widget.onChanged,
         style: TextStyle(
-          color: isDark ? Colors.white : AppTheme.textPrimary,
+          color: AppTheme.textPrimaryOf(context),
         ),
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: 'Buscar por nome do troféu',
           hintStyle: TextStyle(
-            color: isDark ? Colors.white54 : AppTheme.textSecondary,
+            color: AppTheme.textMutedOf(context),
           ),
           prefixIcon: Icon(
             Icons.search,
-            color: isDark ? Colors.white70 : AppTheme.textSecondary,
+            color: AppTheme.textSecondaryOf(context),
           ),
           suffixIcon: widget.controller.text.isEmpty
               ? null

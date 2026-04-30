@@ -20,10 +20,8 @@ class TechniqueListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark
-        ? const Color(0xFF2B2D42)
-        : Theme.of(context).colorScheme.surfaceContainerHighest;
+    final cs = Theme.of(context).colorScheme;
+    final cardColor = cs.surfaceContainerHighest;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -44,7 +42,7 @@ class TechniqueListCard extends StatelessWidget {
                     Text(
                       entity.name,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: isDark ? Colors.white : AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -54,7 +52,7 @@ class TechniqueListCard extends StatelessWidget {
                         child: Text(
                           'Salvando…',
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppTheme.primary,
+                                color: cs.primary,
                               ),
                         ),
                       ),
@@ -67,7 +65,7 @@ class TechniqueListCard extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isDark ? Colors.white70 : AppTheme.textSecondary,
+                                color: AppTheme.textSecondaryOf(context),
                               ),
                         ),
                       ),
@@ -77,7 +75,7 @@ class TechniqueListCard extends StatelessWidget {
               if (canEdit) ...[
                 IconButton(
                   tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_rounded, color: AppTheme.primary),
+                  icon: Icon(Icons.edit_rounded, color: cs.primary),
                   onPressed: onEdit,
                 ),
                 IconButton(

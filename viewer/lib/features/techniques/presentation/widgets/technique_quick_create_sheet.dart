@@ -82,10 +82,14 @@ class _TechniqueQuickCreateSheetState
       },
       (_) {
         Navigator.of(context).pop();
+        final cs = Theme.of(context).colorScheme;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Técnica criada'),
-            backgroundColor: AppTheme.primary,
+          SnackBar(
+            content: Text(
+              'Técnica criada',
+              style: TextStyle(color: cs.onPrimary),
+            ),
+            backgroundColor: cs.primary,
           ),
         );
       },
@@ -119,7 +123,7 @@ class _TechniqueQuickCreateSheetState
               Text(
                 'Criação rápida — após salvar, a lista é atualizada a partir do servidor.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: AppTheme.textSecondaryOf(context),
                     ),
               ),
               const SizedBox(height: 20),

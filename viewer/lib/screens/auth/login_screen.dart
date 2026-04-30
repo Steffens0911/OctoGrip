@@ -10,7 +10,7 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
 import 'package:viewer/widgets/app_error_message.dart';
 
-/// Tela de login com e-mail e senha (layout landing escuro + logo OctoGrip).
+/// Tela de login com e-mail e senha (Memo / Central: superfície, borda fina, acento primário).
 /// A senha pode ser mostrada ou ocultada com o ícone ao lado do campo (sem segunda confirmação).
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,14 +20,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static const Color _pageBg = Color(0xFF1E1D2B);
-  static const Color _cardBg = Color(0xFF262433);
-  static const Color _cardBorder = Color(0xFF3A384E);
-  static const Color _fieldFill = Color(0xFF323046);
-  static const Color _textMuted = Color(0xFFB4B0C8);
-  static const Color _textOnField = Color(0xFFEAE8F2);
-  static const Color _ctaGold = Color(0xFFF5CA3A);
-
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -44,38 +36,41 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  InputDecoration _fieldDecoration({
+  InputDecoration _fieldDecoration(
+    BuildContext context, {
     required String label,
     String? hint,
     required IconData icon,
     Widget? suffixIcon,
   }) {
+    final cs = Theme.of(context).colorScheme;
+    final muted = AppTheme.textMutedOf(context);
     final r = BorderRadius.circular(12);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       filled: true,
-      fillColor: _fieldFill,
-      prefixIcon: Icon(icon, color: _textMuted, size: 22),
+      fillColor: cs.surfaceContainerHighest,
+      prefixIcon: Icon(icon, color: muted, size: 22),
       suffixIcon: suffixIcon,
-      labelStyle: const TextStyle(color: _textMuted),
-      hintStyle: TextStyle(color: _textMuted.withValues(alpha: 0.55)),
+      labelStyle: TextStyle(color: muted),
+      hintStyle: TextStyle(color: muted.withValues(alpha: 0.55)),
       border: OutlineInputBorder(borderRadius: r),
       enabledBorder: OutlineInputBorder(
         borderRadius: r,
-        borderSide: BorderSide(color: _cardBorder.withValues(alpha: 0.85)),
+        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.9)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: r,
-        borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
+        borderSide: BorderSide(color: cs.primary, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: r,
-        borderSide: BorderSide(color: Colors.red.shade300),
+        borderSide: BorderSide(color: cs.error),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: r,
-        borderSide: BorderSide(color: Colors.red.shade400, width: 1.5),
+        borderSide: BorderSide(color: cs.error, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
     );
@@ -117,8 +112,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final cardBg = theme.cardTheme.color ?? cs.surfaceContainerHighest;
+    final cardBorder = AppTheme.borderOf(context);
+
     return Scaffold(
-      backgroundColor: _pageBg,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -128,9 +128,20 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Container(
                 padding: const EdgeInsets.fromLTRB(22, 28, 22, 26),
                 decoration: BoxDecoration(
-                  color: _cardBg,
+                  color: cardBg,
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: _cardBorder.withValues(alpha: 0.9)),
+                  border: Border.all(
+                    color: cardBorder.withValues(alpha: 0.95),
+                  ),
+                  boxShadow: theme.brightness == Brightness.light
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Form(
                   key: _formKey,
@@ -150,10 +161,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 22),
                       Text(
                         'Entre com sua conta',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: _textMuted,
-                              fontSize: 14,
-                            ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textMutedOf(context),
+                          fontSize: 14,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       if (kApiBaseUrl.isEmpty) ...[
@@ -166,8 +177,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller: _apiTunnelController,
                           keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.done,
-                          style: const TextStyle(color: _textOnField),
+                          style: TextStyle(color: AppTheme.textPrimaryOf(context)),
                           decoration: _fieldDecoration(
+                            context,
                             label: 'URL do túnel da API',
                             hint: 'https://….trycloudflare.com',
                             icon: Icons.link,
@@ -196,8 +208,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             persistApiBaseAndReload(u);
                           },
                           style: FilledButton.styleFrom(
-                            foregroundColor: _textOnField,
-                            backgroundColor: _fieldFill,
+                            foregroundColor: AppTheme.textPrimaryOf(context),
+                            backgroundColor: cs.surfaceContainerHighest,
                           ),
                           child: const Text('Salvar URL da API e recarregar'),
                         ),
@@ -207,8 +219,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        style: const TextStyle(color: _textOnField),
+                        style: TextStyle(color: AppTheme.textPrimaryOf(context)),
                         decoration: _fieldDecoration(
+                          context,
                           label: 'E-mail',
                           hint: 'seu@email.com',
                           icon: Icons.email_outlined,
@@ -225,8 +238,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _login(),
-                        style: const TextStyle(color: _textOnField),
+                        style: TextStyle(color: AppTheme.textPrimaryOf(context)),
                         decoration: _fieldDecoration(
+                          context,
                           label: 'Senha',
                           icon: Icons.lock_outline,
                           suffixIcon: IconButton(
@@ -239,7 +253,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               _obscurePassword
                                   ? Icons.visibility_outlined
                                   : Icons.visibility_off_outlined,
-                              color: _textMuted,
+                              color: AppTheme.textMutedOf(context),
                               size: 22,
                             ),
                           ),
@@ -264,10 +278,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                 }
                               },
                         style: FilledButton.styleFrom(
-                          backgroundColor: _ctaGold,
-                          foregroundColor: const Color(0xFF1A1A1A),
-                          disabledBackgroundColor: _ctaGold.withValues(alpha: 0.45),
-                          disabledForegroundColor: const Color(0xFF1A1A1A).withValues(alpha: 0.5),
+                          backgroundColor: cs.primary,
+                          foregroundColor: cs.onPrimary,
+                          disabledBackgroundColor:
+                              cs.primary.withValues(alpha: 0.45),
+                          disabledForegroundColor:
+                              cs.onPrimary.withValues(alpha: 0.55),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -279,12 +295,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         child: _loading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 22,
                                 width: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2.5,
-                                  color: Color(0xFF1A1A1A),
+                                  color: cs.onPrimary,
                                 ),
                               )
                             : const Text('Entrar'),
