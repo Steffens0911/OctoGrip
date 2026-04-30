@@ -111,6 +111,36 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
     }
   }
 
+  Color _statusBackgroundColor(BuildContext context, String? status) {
+    final cs = Theme.of(context).colorScheme;
+    switch (status) {
+      case 'pending_confirmation':
+        return cs.primary.withValues(alpha: 0.18);
+      case 'confirmed':
+        return Colors.green.withValues(alpha: 0.20);
+      case 'rejected':
+      case 'rejected_dont_remember':
+        return cs.error.withValues(alpha: 0.16);
+      default:
+        return cs.surfaceContainerHighest;
+    }
+  }
+
+  Color _statusTextColor(BuildContext context, String? status) {
+    final cs = Theme.of(context).colorScheme;
+    switch (status) {
+      case 'pending_confirmation':
+        return cs.primary;
+      case 'confirmed':
+        return Colors.green.shade700;
+      case 'rejected':
+      case 'rejected_dont_remember':
+        return cs.error;
+      default:
+        return AppTheme.textSecondaryOf(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -231,9 +261,11 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                       Expanded(
                                         child: Text(
                                           'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.textSecondary),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondaryOf(
+                                                context),
+                                          ),
                                         ),
                                       ),
                                       TextButton(
@@ -300,7 +332,8 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                                     .titleSmall
                                                     ?.copyWith(
                                                       color:
-                                                          AppTheme.textPrimary,
+                                                          AppTheme.textPrimaryOf(
+                                                              context),
                                                       fontWeight:
                                                           FontWeight.w600,
                                                     ),
@@ -309,9 +342,12 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                               Text(
                                                 'Em $opponentWithFaixa',
                                                 style: const TextStyle(
-                                                    color:
-                                                        AppTheme.textSecondary,
-                                                    fontSize: 13),
+                                                  color: AppTheme.textSecondary,
+                                                  fontSize: 13,
+                                                ).copyWith(
+                                                  color: AppTheme
+                                                      .textSecondaryOf(context),
+                                                ),
                                               ),
                                               const SizedBox(height: 8),
                                               Row(
@@ -323,21 +359,10 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                                         vertical: 4),
                                                     decoration: BoxDecoration(
                                                       color:
-                                                          isRejectedDontRemember
-                                                              ? Colors.orange
-                                                                  .shade100
-                                                              : status ==
-                                                                      'confirmed'
-                                                                  ? Colors.green
-                                                                      .shade100
-                                                                  : status ==
-                                                                          'pending_confirmation'
-                                                                      ? Colors
-                                                                          .blue
-                                                                          .shade100
-                                                                      : Colors
-                                                                          .grey
-                                                                          .shade200,
+                                                          _statusBackgroundColor(
+                                                        context,
+                                                        status,
+                                                      ),
                                                       borderRadius:
                                                           BorderRadius.circular(
                                                               8),
@@ -348,16 +373,10 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                                         fontSize: 12,
                                                         fontWeight:
                                                             FontWeight.w600,
-                                                        color:
-                                                            isRejectedDontRemember
-                                                                ? Colors.orange
-                                                                    .shade900
-                                                                : status ==
-                                                                        'confirmed'
-                                                                    ? Colors
-                                                                        .green
-                                                                        .shade900
-                                                                    : null,
+                                                        color: _statusTextColor(
+                                                          context,
+                                                          status,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
@@ -369,8 +388,9 @@ class _MyExecutionsScreenState extends State<MyExecutionsScreen> {
                                                   '$opponentWithFaixa não aceitou a posição atribuída a você.',
                                                   style: TextStyle(
                                                     fontSize: 13,
-                                                    color:
-                                                        Colors.orange.shade800,
+                                                    color: Theme.of(context)
+                                                        .colorScheme
+                                                        .error,
                                                     fontStyle: FontStyle.italic,
                                                   ),
                                                 ),

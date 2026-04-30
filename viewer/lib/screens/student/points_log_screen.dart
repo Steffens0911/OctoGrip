@@ -75,6 +75,18 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
     return 'Impacto baixo';
   }
 
+  Color _sourceChipBackground(BuildContext context) =>
+      Theme.of(context).colorScheme.primary.withValues(alpha: 0.14);
+
+  Color _sourceChipText(BuildContext context) =>
+      Theme.of(context).colorScheme.primary;
+
+  Color _impactChipBackground(BuildContext context) =>
+      Theme.of(context).colorScheme.surfaceContainerHighest;
+
+  Color _impactChipText(BuildContext context) =>
+      AppTheme.textSecondaryOf(context);
+
   @override
   void initState() {
     super.initState();
@@ -183,17 +195,16 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: AppTheme.primary
-                                              .withValues(alpha: 0.10),
+                                          color: _sourceChipBackground(context),
                                           borderRadius:
                                               BorderRadius.circular(999),
                                         ),
                                         child: Text(
                                           _sourceLabel(source),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: AppTheme.primary,
+                                            color: _sourceChipText(context),
                                           ),
                                         ),
                                       ),
@@ -201,7 +212,7 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                                         padding: const EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 3),
                                         decoration: BoxDecoration(
-                                          color: Colors.green.withValues(alpha: 0.10),
+                                          color: _impactChipBackground(context),
                                           borderRadius:
                                               BorderRadius.circular(999),
                                         ),
@@ -210,7 +221,7 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: Colors.green.shade700,
+                                            color: _impactChipText(context),
                                           ),
                                         ),
                                       ),
@@ -220,7 +231,8 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                                             .textTheme
                                             .bodySmall
                                             ?.copyWith(
-                                              color: AppTheme.textSecondary,
+                                              color: AppTheme.textSecondaryOf(
+                                                  context),
                                             ),
                                       ),
                                     ],
@@ -232,7 +244,8 @@ class _PointsLogScreenState extends State<PointsLogScreen> {
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: AppTheme.textSecondary,
+                                          color:
+                                              AppTheme.textSecondaryOf(context),
                                         ),
                                   ),
                                 ],

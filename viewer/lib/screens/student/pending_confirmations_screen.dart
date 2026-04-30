@@ -228,9 +228,11 @@ class _PendingConfirmationsScreenState
                                       Expanded(
                                         child: Text(
                                           'Mostrando ${_filteredItems.length} de ${_allItems.length}',
-                                          style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppTheme.textSecondary),
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppTheme.textSecondaryOf(
+                                                context),
+                                          ),
                                         ),
                                       ),
                                       TextButton(
@@ -325,8 +327,10 @@ class _PendingConfirmationsScreenState
                                                                   id),
                                                       child: Text('Não lembro',
                                                           style: TextStyle(
-                                                              color: Colors.grey
-                                                                  .shade700)),
+                                                            color: AppTheme
+                                                                .textSecondaryOf(
+                                                                    context),
+                                                          )),
                                                     ),
                                                   ],
                                                 )
@@ -343,8 +347,10 @@ class _PendingConfirmationsScreenState
                                                                   id),
                                                       child: Text('Não lembro',
                                                           style: TextStyle(
-                                                              color: Colors.grey
-                                                                  .shade700)),
+                                                            color: AppTheme
+                                                                .textSecondaryOf(
+                                                                    context),
+                                                          )),
                                                     ),
                                                     const SizedBox(width: 8),
                                                     TextButton(

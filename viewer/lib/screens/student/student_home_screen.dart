@@ -927,6 +927,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     if (_showTrophies) ...[
                       const SizedBox(height: 16),
                       _buildTrophiesHomeSection(),
+                      const SizedBox(height: AppSpacing.l),
                     ],
                     _buildConfirmationsAndRequestsSection(),
                   ],
@@ -1029,6 +1030,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     children: [
                       TextButton(
                         onPressed: _openPendingConfirmationsScreen,
+                        style: TextButton.styleFrom(
+                          foregroundColor: scheme.secondary,
+                          backgroundColor:
+                              scheme.secondaryContainer.withValues(alpha: 0.65),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          textStyle:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
                         child: const Text('Abrir'),
                       ),
                     ],
@@ -1412,54 +1426,66 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       children: [
         const MemoSectionLabel('CONFIRMAÇÕES E SOLICITAÇÕES'),
         const SizedBox(height: AppSpacing.s),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: _MemoPresenceStyleTrophyCard(
-                enabled: true,
-                icon: Icons.list_alt_rounded,
-                title: 'Log de pontuação',
-                subtitle: 'Histórico de pontos ganhos',
-                footer: footerPointsLogBadge(),
-                onTap: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (context) => PointsLogScreen(
-                      userId: userId,
-                      userName: _selectedUser?.name ?? _selectedUser?.email,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _MemoPresenceStyleTrophyCard(
+                    enabled: true,
+                    icon: Icons.how_to_reg_rounded,
+                    title: 'Confirmações pendentes',
+                    subtitle: 'Confirmar execuções em você',
+                    footer: footerPendingBadge(),
+                    onTap: _openPendingConfirmationsScreen,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: _MemoPresenceStyleTrophyCard(
+                    enabled: true,
+                    icon: Icons.send_rounded,
+                    title: 'Minhas solicitações',
+                    subtitle: 'Status das confirmações que você pediu',
+                    footer: footerRequestsBadge(),
+                    onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (context) =>
+                            MyExecutionsScreen(userId: userId),
+                      ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: _MemoPresenceStyleTrophyCard(
-                enabled: true,
-                icon: Icons.how_to_reg_rounded,
-                title: 'Confirmações pendentes',
-                subtitle: 'Confirmar execuções em você',
-                footer: footerPendingBadge(),
-                onTap: _openPendingConfirmationsScreen,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: _MemoPresenceStyleTrophyCard(
-                enabled: true,
-                icon: Icons.send_rounded,
-                title: 'Minhas solicitações',
-                subtitle: 'Status das confirmações que você pediu',
-                footer: footerRequestsBadge(),
-                onTap: () => Navigator.push<void>(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (context) =>
-                        MyExecutionsScreen(userId: userId),
+            const SizedBox(height: AppSpacing.s),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _MemoPresenceStyleTrophyCard(
+                    enabled: true,
+                    icon: Icons.list_alt_rounded,
+                    title: 'Log de pontuação',
+                    subtitle: 'Histórico de pontos ganhos',
+                    footer: footerPointsLogBadge(),
+                    onTap: () => Navigator.push<void>(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (context) => PointsLogScreen(
+                          userId: userId,
+                          userName:
+                              _selectedUser?.name ?? _selectedUser?.email,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const Expanded(child: SizedBox.shrink()),
+              ],
             ),
           ],
         ),
