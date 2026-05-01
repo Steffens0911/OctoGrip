@@ -144,10 +144,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     final academyId = (sessionAcademyId != null && sessionAcademyId.isNotEmpty)
         ? sessionAcademyId
         : AuthService().currentUser?.academyId;
-    if ((academyId == null || academyId.isEmpty) && !AuthService().isAdmin()) {
+    if (academyId == null || academyId.isEmpty) {
       AppFeedback.show(
         context,
-        message: 'Utilizador sem academia vinculada.',
+        message: 'Nenhuma academia vinculada a esta chamada.',
         type: AppFeedbackType.error,
       );
       return;
@@ -158,11 +158,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => AttendanceAddStudentDialog(
         api: _api,
-        academyId: academyId!,
+        academyId: academyId,
         presentUserIds: _presentUserIds,
         onConfirm: (ids) => _api.addAttendanceRecordsManualBatch(sid, ids),
       ),
     );
+    if (mounted) unawaited(_refreshSession());
   }
 
   Future<void> _confirmRemoveRecord(AttendanceRecordModel r) async {
@@ -216,9 +217,35 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _error = null;
     });
     try {
-      // Não há "sessão ativa" persistida ainda; tela começa vazia.
-      if (mounted) {
-        setState(() => _loading = false);
+      final sessions = await _api.listAttendanceSessions(status: 'active', limit: 1);
+      if (!mounted) return;
+      if (sessions.isNotEmpty) {
+        final s = sessions.first;
+        setState(() {
+          _session = s;
+          _records = const [];
+          _loading = false;
+        });
+        await _loadFaceFeatureFlag();
+        _startAutoRefresh();
+        _startQrHeartbeat();
+        _startLive(s.id);
+
+        final qrFuture = _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
+        final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
+        try {
+          final qr = await qrFuture;
+          if (!mounted) return;
+          _applyQrPayload(qr);
+        } catch (_) {}
+        try {
+          final recs = await recsFuture;
+          if (!mounted) return;
+          setState(() => _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt))));
+          unawaited(_hydrateUsersForRecords(recs));
+        } catch (_) {}
+      } else {
+        if (mounted) setState(() => _loading = false);
       }
     } catch (e) {
       if (mounted) {
@@ -476,6 +503,17 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       final s = _session;
       if (!mounted || s == null) return;
       if (s.status.toLowerCase() == 'closed') return;
+
+      final sessionExp = s.expiresAt;
+      if (sessionExp != null && sessionExp.isBefore(DateTime.now().toUtc())) {
+        if (_qr != null || _qrError == null) {
+          setState(() {
+            _qr = null;
+            _qrError = 'Sessão expirada. Encerre e inicie uma nova chamada.';
+          });
+        }
+        return;
+      }
 
       if (_isRefreshingQr) {
         final startedAt = _qrRefreshStartedAt;
@@ -924,7 +962,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                     ? 'Manual'
                     : (r.method == 'qr'
                         ? 'QR'
-                        : (r.method == 'face' || r.faceRecognition
+                        : (r.method == 'face_recognition' || r.method == 'face' || r.faceRecognition
                             ? 'Facial'
                             : r.method));
                 return ListTile(
