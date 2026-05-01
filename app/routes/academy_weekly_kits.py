@@ -104,7 +104,7 @@ async def create_weekly_kit(
     k2 = await get_kit(db, kit.id, academy_id)
     if not k2:
         raise NotFoundError("Kit não encontrado.")
-    await app_cache.invalidate_prefix("mission_week:")
+    await app_cache.bump_prefix_version("mission_week:")
     return _kit_to_read(k2)
 
 
@@ -146,7 +146,7 @@ async def patch_weekly_kit(
     k = await get_kit(db, kit_id, academy_id)
     if not k:
         raise NotFoundError("Kit não encontrado.")
-    await app_cache.invalidate_prefix("mission_week:")
+    await app_cache.bump_prefix_version("mission_week:")
     return _kit_to_read(k)
 
 
@@ -167,5 +167,5 @@ async def delete_weekly_kit(
     ok = await soft_delete_kit(db, kit_id, academy_id, audit_user_id=current_user.id)
     if not ok:
         raise NotFoundError("Kit não encontrado.")
-    await app_cache.invalidate_prefix("mission_week:")
+    await app_cache.bump_prefix_version("mission_week:")
     return None

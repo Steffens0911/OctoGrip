@@ -68,7 +68,7 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
     academy: Mapped["Academy | None"] = relationship(
         "Academy",
         back_populates="missions",
-        lazy="selectin",
+        lazy="raise",
     )
     weekly_kit: Mapped["WeeklyTechniqueKit | None"] = relationship(
         "WeeklyTechniqueKit",
@@ -87,12 +87,12 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
     mission_usages: Mapped[list["MissionUsage"]] = relationship(
         "MissionUsage",
         back_populates="mission",
-        lazy="selectin",
+        lazy="raise",
     )
     technique_executions: Mapped[list["TechniqueExecution"]] = relationship(
         "TechniqueExecution",
         back_populates="mission",
-        lazy="selectin",
+        lazy="raise",
     )
 
     @property

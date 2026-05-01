@@ -4,9 +4,10 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.app_time import combine_local_date_exclusive_end_utc, combine_local_date_start_utc, today_in_app_tz
+from app.core.list_pagination import clamp_list_limit
 from app.models import CollectiveGoal, Mission, TechniqueExecution, User
 
 
@@ -36,17 +37,26 @@ async def list_goals_for_academy(
     academy_id: UUID,
     start_date: date | None = None,
     end_date: date | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ):
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = (
         select(CollectiveGoal)
-        .options(selectinload(CollectiveGoal.technique))
+        .options(joinedload(CollectiveGoal.technique))
         .where(CollectiveGoal.academy_id == academy_id)
     )
     if start_date is not None:
         stmt = stmt.where(CollectiveGoal.end_date >= start_date)
     if end_date is not None:
         stmt = stmt.where(CollectiveGoal.start_date <= end_date)
-    return (await db.execute(stmt.order_by(CollectiveGoal.start_date.desc()))).unique().scalars().all()
+    stmt = (
+        stmt.order_by(CollectiveGoal.start_date.desc())
+        .offset(safe_offset)
+        .limit(safe_limit)
+    )
+    return (await db.execute(stmt)).unique().scalars().all()
 
 
 async def get_current_goal_for_academy(

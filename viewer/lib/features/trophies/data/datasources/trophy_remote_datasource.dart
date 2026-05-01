@@ -40,7 +40,20 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
 
   @override
   Future<List<TrophyDto>> fetchAll(String academyId) async {
-    final list = await _api.getTrophies(academyId, cacheBust: true);
+    const pageSize = 50;
+    final list = <Map<String, dynamic>>[];
+    var offset = 0;
+    while (true) {
+      final page = await _api.getTrophies(
+        academyId,
+        cacheBust: true,
+        offset: offset,
+        limit: pageSize,
+      );
+      list.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
     return list.map((e) => TrophyDto.fromJson(e, academyId: academyId)).toList();
   }
 

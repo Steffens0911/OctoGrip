@@ -1,11 +1,12 @@
 """CRUD de missões para painel do professor (T-01)."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, MissionNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_admin_or_academy_access, require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
@@ -24,7 +25,8 @@ router = APIRouter()
 @router.get("", response_model=list[MissionRead])
 async def missions_list(
     academy_id: UUID | None = None,
-    limit: int = 100,
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     include_deleted: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
@@ -40,6 +42,7 @@ async def missions_list(
         db,
         academy_id=academy_id,
         limit=limit,
+        offset=offset,
         include_deleted=include_deleted,
     )
 

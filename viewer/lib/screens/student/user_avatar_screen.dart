@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:viewer/services/api_service.dart';
@@ -122,10 +123,14 @@ class _UserAvatarScreenState extends State<UserAvatarScreen> {
                         .colorScheme
                         .surfaceContainerHighest
                         .withValues(alpha: 0.6),
-                    child: Image.network(
-                      currentUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: currentUrl,
                       fit: BoxFit.contain,
                       width: double.infinity,
+                      placeholder: (_, __) => const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                      errorWidget: (_, __, ___) => const Icon(Icons.person),
                       filterQuality: FilterQuality.high,
                     ),
                   ),

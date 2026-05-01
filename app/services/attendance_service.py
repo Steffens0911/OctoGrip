@@ -34,13 +34,28 @@ def _now_utc() -> datetime:
 
 _ATTENDANCE_RANKING_TTL_SEC = 300
 _ATTENDANCE_RANKING_PREFIX = "attendance_ranking:"
+_STATS_ME_TTL_SEC = 120
+_STATS_ME_PREFIX = "stats_me:"
+_STATS_DETAIL_TTL_SEC = 120
+_STATS_DETAIL_PREFIX = "stats_detail:"
 
 
 async def invalidate_attendance_ranking_cache(academy_id: UUID | None) -> None:
     """Invalida cache do ranking de presença para a academia."""
     if academy_id is None:
         return
-    await app_cache.invalidate_prefix(f"{_ATTENDANCE_RANKING_PREFIX}{academy_id}:")
+    await app_cache.bump_prefix_version(f"{_ATTENDANCE_RANKING_PREFIX}{academy_id}:")
+
+
+async def invalidate_attendance_stats_cache(
+    academy_id: UUID | None,
+    user_id: UUID | None = None,
+) -> None:
+    """Invalida cache de stats de presença para academia e/ou usuário."""
+    if academy_id is not None:
+        await app_cache.bump_prefix_version(f"{_STATS_DETAIL_PREFIX}{academy_id}:")
+    if user_id is not None:
+        await app_cache.bump_prefix_version(f"{_STATS_ME_PREFIX}{user_id}:")
 
 
 def _b64url(data: bytes) -> str:
@@ -217,18 +232,20 @@ async def add_record_manual(
         raise AttendanceSessionNotFoundError()
     verify_academy_access(current_user, str(s.academy_id) if s.academy_id else None, allow_none=True)
 
-    target = await db.get(User, target_user_id)
-    if not target:
+    _target_row = (await db.execute(
+        select(User.role, User.academy_id).where(User.id == target_user_id)
+    )).one_or_none()
+    if _target_row is None:
         raise UserNotFoundError()
-    if target.role != "aluno":
+    if _target_row[0] != "aluno":
         raise ForbiddenError("Apenas alunos podem receber presença nesta sessão.")
 
     if s.academy_id is not None:
-        if target.academy_id != s.academy_id:
+        if _target_row[1] != s.academy_id:
             raise ForbiddenError("O aluno não pertence à mesma academia desta sessão.")
     else:
         if current_user.role != "administrador":
-            if not current_user.academy_id or target.academy_id != current_user.academy_id:
+            if not current_user.academy_id or _target_row[1] != current_user.academy_id:
                 raise ForbiddenError("O aluno não está na sua academia.")
 
     existing = (
@@ -254,6 +271,7 @@ async def add_record_manual(
     await db.commit()
     await db.refresh(r)
     await invalidate_attendance_ranking_cache(s.academy_id)
+    await invalidate_attendance_stats_cache(s.academy_id, target_user_id)
     return r, True
 
 
@@ -282,6 +300,7 @@ async def delete_attendance_record(
     await db.delete(r)
     await db.commit()
     await invalidate_attendance_ranking_cache(s.academy_id)
+    await invalidate_attendance_stats_cache(s.academy_id, user_id)
     return session_id, user_id
 
 
@@ -369,6 +388,7 @@ async def scan_checkin(
     await db.commit()
     await db.refresh(r)
     await invalidate_attendance_ranking_cache(s.academy_id)
+    await invalidate_attendance_stats_cache(s.academy_id, current_user.id)
     return r, True
 
 
@@ -386,13 +406,15 @@ async def user_summary(
     if current_user.role not in ("aluno", "administrador", "gerente_academia", "professor", "supervisor"):
         raise ForbiddenError("Acesso negado.")
 
-    target = await db.get(User, user_id)
-    if not target:
+    _target_academy_row = (await db.execute(
+        select(User.academy_id).where(User.id == user_id)
+    )).one_or_none()
+    if _target_academy_row is None:
         raise AttendanceQrInvalidError("Usuário não encontrado.")
 
     verify_academy_access(
         current_user,
-        str(target.academy_id) if target.academy_id else None,
+        str(_target_academy_row[0]) if _target_academy_row[0] else None,
         allow_none=True,
     )
 
@@ -466,8 +488,10 @@ async def stats_sessions_by_professor(
         raise ForbiddenError("Acesso negado.")
 
     if current_user.role == "gerente_academia":
-        prof = await db.get(User, pid)
-        if not prof or prof.academy_id != current_user.academy_id:
+        _prof_row = (await db.execute(
+            select(User.academy_id).where(User.id == pid)
+        )).one_or_none()
+        if _prof_row is None or _prof_row[0] != current_user.academy_id:
             raise ForbiddenError("Professor inválido para esta academia.")
 
     df, dt = _default_stats_date_range(date_from, date_to)
@@ -627,6 +651,14 @@ async def stats_student_detail(
 
     df, dt = _default_stats_date_range(date_from, date_to)
 
+    _detail_cache_key = await app_cache.versioned_key(
+        f"{_STATS_DETAIL_PREFIX}{aid}:",
+        f"{student_id}:{df.isoformat()}:{dt.isoformat()}:{records_limit}",
+    )
+    _detail_cached = await app_cache.get(_detail_cache_key)
+    if _detail_cached is not None:
+        return _detail_cached
+
     total_n = (
         await db.execute(
             select(func.count(AttendanceSession.id)).where(
@@ -697,7 +729,7 @@ async def stats_student_detail(
         for r in rec_rows
     ]
 
-    return AttendanceStudentDetailResult(
+    result = AttendanceStudentDetailResult(
         user_id=target.id,
         email=target.email,
         name=target.name,
@@ -708,6 +740,8 @@ async def stats_student_detail(
         last_seen_at=last_seen,
         records=records,
     )
+    await app_cache.set(_detail_cache_key, result, ttl=_STATS_DETAIL_TTL_SEC)
+    return result
 
 
 def _monday_of_date(d: date) -> date:
@@ -1084,9 +1118,10 @@ async def attendance_ranking(
         date_to=date_to,
     )
     lim = min(max(limit, 1), 10)
-    cache_key = (
-        f"{_ATTENDANCE_RANKING_PREFIX}{aid}:{current_user.id}:"
-        f"{window.kind}:{window.label}:{lim}"
+    cache_prefix = f"{_ATTENDANCE_RANKING_PREFIX}{aid}:"
+    cache_key = await app_cache.versioned_key(
+        cache_prefix,
+        f"{current_user.id}:{window.kind}:{window.label}:{lim}",
     )
     cached = await app_cache.get(cache_key)
     if cached is not None:
@@ -1185,6 +1220,16 @@ async def stats_me(
     df, dt = _default_stats_date_range(date_from, date_to)
     if df > dt:
         df, dt = dt, df
+
+    lim = min(max(history_limit, 1), 100)
+    off = max(history_offset, 0)
+    _me_cache_key = await app_cache.versioned_key(
+        f"{_STATS_ME_PREFIX}{current_user.id}:",
+        f"{df.isoformat()}:{dt.isoformat()}:{lim}:{off}",
+    )
+    _me_cached = await app_cache.get(_me_cache_key)
+    if _me_cached is not None:
+        return _me_cached
 
     span_days = (dt - df).days
     bucket_pg: Literal["week", "month"] = "week" if span_days <= 60 else "month"
@@ -1293,8 +1338,6 @@ async def stats_me(
     ).scalar_one()
     history_total = int(hist_total_n or 0)
 
-    lim = min(max(history_limit, 1), 100)
-    off = max(history_offset, 0)
     rec_rows = (
         await db.execute(
             select(
@@ -1333,7 +1376,7 @@ async def stats_me(
         for r in rec_rows
     ]
 
-    return AttendanceMyStatsData(
+    result = AttendanceMyStatsData(
         from_dt=df,
         to_dt=dt,
         bucket=bucket_pg,
@@ -1350,4 +1393,6 @@ async def stats_me(
         history_limit=lim,
         history_offset=off,
     )
+    await app_cache.set(_me_cache_key, result, ttl=_STATS_ME_TTL_SEC)
+    return result
 

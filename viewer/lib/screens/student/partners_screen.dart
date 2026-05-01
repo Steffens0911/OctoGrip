@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/app_theme.dart';
@@ -20,8 +21,12 @@ class PartnersScreen extends StatefulWidget {
 
 class _PartnersScreenState extends State<PartnersScreen> {
   final ApiService _api = ApiService();
+  static const int _pageSize = 20;
   List<Partner> _partners = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -30,24 +35,45 @@ class _PartnersScreenState extends State<PartnersScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final list = await _api.getPartners(widget.academyId);
+      final list = await _api.getPartners(
+        widget.academyId,
+        offset: _offset,
+        limit: _pageSize,
+      );
       if (mounted) {
         setState(() {
-          _partners = list;
-          _loading = false;
+          if (reset) {
+            _partners = list;
+            _loading = false;
+          } else {
+            _partners = [..._partners, ...list];
+            _loadingMore = false;
+          }
+          _offset += list.length;
+          _hasMore = list.length == _pageSize;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
-          _loading = false;
+          if (reset) {
+            _loading = false;
+          } else {
+            _loadingMore = false;
+          }
         });
       }
     }
@@ -95,11 +121,25 @@ class _PartnersScreenState extends State<PartnersScreen> {
                         ),
                       )
                     : RefreshIndicator(
-                        onRefresh: _load,
+                        onRefresh: () => _load(reset: true),
                         color: AppTheme.primary,
                         child: ListView.builder(
-                          itemCount: _partners.length,
+                          itemCount: _partners.length + (_hasMore ? 1 : 0),
                           itemBuilder: (context, i) {
+                            if (i >= _partners.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Center(
+                                  child: _loadingMore
+                                      ? const CircularProgressIndicator()
+                                      : OutlinedButton.icon(
+                                          onPressed: () => _load(reset: false),
+                                          icon: const Icon(Icons.expand_more),
+                                          label: const Text('Carregar mais'),
+                                        ),
+                                ),
+                              );
+                            }
                             final p = _partners[i];
                             return Card(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -114,12 +154,19 @@ class _PartnersScreenState extends State<PartnersScreen> {
                                         if (p.logoUrl != null && p.logoUrl!.isNotEmpty)
                                           ClipRRect(
                                             borderRadius: BorderRadius.circular(8),
-                                            child: Image.network(
-                                              p.logoUrl!.startsWith('/') ? '${_api.baseUrl}${p.logoUrl}' : p.logoUrl!,
+                                            child: CachedNetworkImage(
+                                              imageUrl: p.logoUrl!.startsWith('/') ? '${_api.baseUrl}${p.logoUrl}' : p.logoUrl!,
                                               width: 48,
                                               height: 48,
                                               fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => const SizedBox(width: 48, height: 48),
+                                              placeholder: (_, __) => const SizedBox(
+                                                width: 48,
+                                                height: 48,
+                                                child: Center(
+                                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                                ),
+                                              ),
+                                              errorWidget: (_, __, ___) => const SizedBox(width: 48, height: 48),
                                             ),
                                           ),
                                         if (p.logoUrl != null && p.logoUrl!.isNotEmpty) const SizedBox(width: 12),

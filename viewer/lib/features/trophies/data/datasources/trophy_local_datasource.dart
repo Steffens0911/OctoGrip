@@ -1,10 +1,17 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logging/logging.dart';
 
 import 'package:viewer/features/trophies/data/models/trophy_dto.dart';
 import 'package:viewer/features/trophies/domain/failures/trophy_failure.dart';
+
+List<dynamic> _decodeTrophyListInIsolate(String raw) =>
+    jsonDecode(raw) as List<dynamic>;
+
+String _encodeTrophyListInIsolate(List<Map<String, dynamic>> payload) =>
+    jsonEncode(payload);
 
 abstract class TrophyLocalDataSource {
   Future<List<TrophyDto>?> read(String academyId);
@@ -35,7 +42,8 @@ class TrophyLocalDataSourceImpl implements TrophyLocalDataSource {
       final box = await _box;
       final raw = box.get(_key(academyId));
       if (raw == null || raw.isEmpty) return null;
-      final decoded = jsonDecode(raw) as List<dynamic>;
+      final decoded =
+          raw.length < 8000 ? jsonDecode(raw) as List<dynamic> : await compute(_decodeTrophyListInIsolate, raw);
       return decoded
           .map((e) => TrophyDto.fromHiveMap(e as Map<dynamic, dynamic>))
           .toList();
@@ -49,7 +57,10 @@ class TrophyLocalDataSourceImpl implements TrophyLocalDataSource {
   Future<void> write(String academyId, List<TrophyDto> items) async {
     try {
       final box = await _box;
-      final encoded = jsonEncode(items.map((e) => e.toHiveMap()).toList());
+      final payload = items.map((e) => e.toHiveMap()).toList();
+      final encoded = payload.length < 80
+          ? jsonEncode(payload)
+          : await compute(_encodeTrophyListInIsolate, payload);
       await box.put(_key(academyId), encoded);
     } catch (e, st) {
       _log.warning('write cache failed', e, st);

@@ -386,7 +386,7 @@ async def academy_reset_weekly_turmas_week_route(
         raise AcademyNotFoundError()
     verify_academy_access(current_user, str(academy_id))
     result = await reset_academy_weekly_turmas_week(db, academy_id)
-    await app_cache.invalidate_prefix("mission_week:")
+    await app_cache.bump_prefix_version("mission_week:")
     return result
 
 
@@ -933,12 +933,14 @@ async def academy_send_push_notification(
 @router.get("/{academy_id}/collective_goals", response_model=list[CollectiveGoalRead])
 async def collective_goals_list(
     academy_id: UUID,
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
     """Lista metas coletivas da academia."""
     verify_academy_access(current_user, str(academy_id))
-    goals = await list_goals_for_academy(db, academy_id)
+    goals = await list_goals_for_academy(db, academy_id, limit=limit, offset=offset)
     return [_goal_to_read(g) for g in goals]
 
 

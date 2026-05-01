@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.database import get_db
 from app.models import User
 from app.schemas.me_header import MeHeaderStatsRead
@@ -32,11 +33,18 @@ async def my_header_stats(
 
 @router.get("/training_videos/today", response_model=list[TrainingVideoStudentRead])
 async def my_training_videos_today(
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite por página"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Lista vídeos de treinamento disponíveis hoje para o usuário logado."""
-    raw = await get_training_videos_for_user_today(db, user=current_user)
+    raw = await get_training_videos_for_user_today(
+        db,
+        user=current_user,
+        limit=limit,
+        offset=offset,
+    )
     return [TrainingVideoStudentRead(**item) for item in raw]
 
 

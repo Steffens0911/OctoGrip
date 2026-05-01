@@ -13,5 +13,9 @@ if [ "$(id -u)" = "0" ]; then
   exec gosu "$APP_UID:$APP_GID" "$@"
 fi
 
+if [ "${BOOTSTRAP_ON_STARTUP:-true}" = "true" ] && [ "${1:-}" = "uvicorn" ]; then
+  python -m app.bootstrap
+fi
+
 exec "$@"
 

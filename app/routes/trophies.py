@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
 from app.core.exceptions import ForbiddenError, TrophyNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
@@ -71,12 +72,22 @@ async def trophy_create(
 @router.get("", response_model=list[TrophyRead])
 async def trophy_list(
     academy_id: UUID = Query(..., description="ID da academia"),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Lista troféus da academia."""
     verify_academy_access(current_user, str(academy_id))
-    return [_trophy_to_read(t) for t in await list_trophies_by_academy(db, academy_id)]
+    return [
+        _trophy_to_read(t)
+        for t in await list_trophies_by_academy(
+            db,
+            academy_id,
+            limit=limit,
+            offset=offset,
+        )
+    ]
 
 
 @router.patch("/{trophy_id}", response_model=TrophyRead)

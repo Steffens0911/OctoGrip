@@ -16,8 +16,12 @@ class ProfessorsScreen extends StatefulWidget {
 
 class _ProfessorsScreenState extends State<ProfessorsScreen> {
   final ApiService _api = ApiService();
+  static const int _pageSize = 50;
   List<Professor> _list = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -26,25 +30,42 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final list = await _api.getProfessors();
+      final list = await _api.getProfessors(offset: _offset, limit: _pageSize);
       if (mounted) {
         setState(() {
-        _list = list;
-        _loading = false;
-      });
+          if (reset) {
+            _list = list;
+            _loading = false;
+          } else {
+            _list = [..._list, ...list];
+            _loadingMore = false;
+          }
+          _offset += list.length;
+          _hasMore = list.length == _pageSize;
+        });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-        _error = userFacingMessage(e);
-        _loading = false;
-      });
+          _error = userFacingMessage(e);
+          if (reset) {
+            _loading = false;
+          } else {
+            _loadingMore = false;
+          }
+        });
       }
     }
   }
@@ -231,17 +252,31 @@ class _ProfessorsScreenState extends State<ProfessorsScreen> {
     }
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(reset: true),
         child: ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: _list.length,
+          itemCount: _list.length + (_hasMore ? 1 : 0),
           itemBuilder: (context, index) {
+            if (index >= _list.length) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Center(
+                  child: _loadingMore
+                      ? const CircularProgressIndicator()
+                      : OutlinedButton.icon(
+                          onPressed: () => _load(reset: false),
+                          icon: const Icon(Icons.expand_more),
+                          label: const Text('Carregar mais'),
+                        ),
+                ),
+              );
+            }
             final p = _list[index];
             return Card(
               margin: const EdgeInsets.only(bottom: 12),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: AppTheme.primary.withOpacity(0.2),
+                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
                   child: const Icon(Icons.person, color: AppTheme.primary),
                 ),
                 title: Text(p.name),

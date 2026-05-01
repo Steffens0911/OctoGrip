@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
@@ -24,7 +25,6 @@ import 'package:viewer/models/marketplace_item.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
-import 'dart:typed_data';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/attendance_ranking.dart';
 import 'package:viewer/models/user.dart';
@@ -33,6 +33,10 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/backup_multipart_io.dart'
     if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart'
     as backup_multipart;
+
+dynamic _decodeJsonInIsolate(String body) => jsonDecode(body);
+
+String _encodeJsonInIsolate(Object payload) => jsonEncode(payload);
 
 class ApiException implements Exception {
   final int statusCode;
@@ -60,6 +64,7 @@ class ApiService {
   /// Lida sempre com [kApiBaseUrl] para `?api_base=` / sessionStorage surtirem efeito sem reload rígido.
   String get baseUrl => kApiBaseUrl.replaceFirst(RegExp(r'/$'), '');
   static const _timeout = Duration(seconds: 30);
+  static const _getTimeout = Duration(seconds: 15);
 
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort =
@@ -111,8 +116,12 @@ class ApiService {
     invalidateCache('GET:$baseUrl/attendance');
   }
 
-  Future<http.Response> _req(Future<http.Response> f) => f.timeout(
-        _timeout,
+  Future<http.Response> _req(
+    Future<http.Response> f, {
+    Duration? timeout,
+  }) =>
+      f.timeout(
+        timeout ?? _timeout,
         onTimeout: () {
           throw TimeoutException(
             'Tempo esgotado ao chamar a API. Verifique conectividade da API e tente novamente.',
@@ -130,7 +139,10 @@ class ApiService {
             headers: {'content-type': 'application/json'});
       }
     }
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
     if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
       _setCache(key, r.body, r.statusCode, ttlSeconds);
     }
@@ -303,11 +315,30 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
+  Future<dynamic> _decodeJsonPayload(String body) async {
+    if (body.length < 12000) {
+      return jsonDecode(body);
+    }
+    try {
+      return await compute(_decodeJsonInIsolate, body);
+    } catch (_) {
+      return jsonDecode(body);
+    }
+  }
+
+  Future<String> _encodeJsonPayload(Object payload) async {
+    try {
+      return await compute(_encodeJsonInIsolate, payload);
+    } catch (_) {
+      return jsonEncode(payload);
+    }
+  }
+
   Future<dynamic> _decodeResponse(http.Response r) async {
     final body = r.body;
     if (body.isEmpty) return null;
     try {
-      return jsonDecode(body);
+      return await _decodeJsonPayload(body);
     } catch (_) {
       // Resposta não-JSON (proxy, HTML); _throwIfNotOk usa statusCode + reasonPhrase
       return null;
@@ -894,21 +925,38 @@ class ApiService {
     return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  /// Lista compacta de alunos da academia (`GET /students/academy/{id}/list`).
-  Future<List<AcademyStudentListItem>> getAcademyStudentsList(String academyId,
-      {bool asRealUser = false}) async {
-    final uri = Uri.parse('$baseUrl/students/academy/$academyId/list');
+  /// Lista paginada de alunos da academia (`GET /students/academy/{id}/list`).
+  Future<List<AcademyStudentListItem>> getAcademyStudentsList(
+    String academyId, {
+    bool asRealUser = false,
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/students/academy/$academyId/list')
+        .replace(queryParameters: {
+      'limit': '$limit',
+      'offset': '$offset',
+    });
     http.Response r;
     try {
       r = asRealUser
-          ? await _req(http.get(uri,
-              headers: await _headers(auth: true, realUserOnly: true)))
-          : await _req(http.get(uri, headers: await _headers(auth: true)));
+          ? await _req(
+              http.get(uri,
+                  headers: await _headers(auth: true, realUserOnly: true)),
+              timeout: _getTimeout,
+            )
+          : await _req(
+              http.get(uri, headers: await _headers(auth: true)),
+              timeout: _getTimeout,
+            );
     } on ApiException catch (e) {
-      if (e.statusCode == 403 &&
-          !asRealUser &&
-          AuthService().isRealUserAdmin) {
-        return getAcademyStudentsList(academyId, asRealUser: true);
+      if (e.statusCode == 403 && !asRealUser && AuthService().isRealUserAdmin) {
+        return getAcademyStudentsList(
+          academyId,
+          asRealUser: true,
+          offset: offset,
+          limit: limit,
+        );
       }
       rethrow;
     }
@@ -916,9 +964,29 @@ class ApiService {
     _throwIfNotOk(r, data);
     final list = data as List<dynamic>? ?? const [];
     return list
-        .map((e) =>
-            AcademyStudentListItem.fromJson(e as Map<String, dynamic>))
+        .map((e) => AcademyStudentListItem.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<AcademyStudentListItem>> getAcademyStudentsListAll(
+    String academyId, {
+    bool asRealUser = false,
+  }) async {
+    const pageSize = 50;
+    final all = <AcademyStudentListItem>[];
+    var offset = 0;
+    while (true) {
+      final page = await getAcademyStudentsList(
+        academyId,
+        asRealUser: asRealUser,
+        offset: offset,
+        limit: pageSize,
+      );
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
   }
 
   /// Várias presenças manuais (`POST .../records` com `student_ids`).
@@ -926,10 +994,11 @@ class ApiService {
       String sessionId, List<String> studentIds) async {
     if (studentIds.isEmpty) return [];
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
+    final payload = await _encodeJsonPayload({'student_ids': studentIds});
     final r = await _req(http.post(
       uri,
       headers: await _jsonHeaders(auth: true),
-      body: jsonEncode({'student_ids': studentIds}),
+      body: payload,
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1309,13 +1378,22 @@ class ApiService {
   Future<List<Map<String, dynamic>>> getTrophies(
     String academyId, {
     bool cacheBust = false,
+    int offset = 0,
+    int limit = 50,
   }) async {
-    final params = <String, String>{'academy_id': academyId};
+    final params = <String, String>{
+      'academy_id': academyId,
+      'limit': '$limit',
+      'offset': '$offset',
+    };
     if (cacheBust) {
       params['_t'] = DateTime.now().microsecondsSinceEpoch.toString();
     }
     final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: params);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -1424,13 +1502,24 @@ class ApiService {
   }
 
   /// Lista parceiros da academia (alunos: sem academy_id usa a do usuário; gestor/admin: academy_id obrigatório para admin).
-  Future<List<Partner>> getPartners([String? academyId]) async {
-    final queryParams = academyId != null && academyId.isNotEmpty
-        ? {'academy_id': academyId}
-        : null;
+  Future<List<Partner>> getPartners(
+    String? academyId, {
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final queryParams = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+    };
+    if (academyId != null && academyId.isNotEmpty) {
+      queryParams['academy_id'] = academyId;
+    }
     final uri =
         Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -1868,17 +1957,25 @@ class ApiService {
   Future<List<Technique>> getTechniques({
     required String academyId,
     bool cacheBust = false,
+    int offset = 0,
+    int limit = 50,
   }) async {
-    final params = <String, String>{'academy_id': academyId};
+    final params = <String, String>{
+      'academy_id': academyId,
+      'limit': '$limit',
+      'offset': '$offset',
+    };
     if (cacheBust) {
       params['_t'] = DateTime.now().microsecondsSinceEpoch.toString();
     }
-    final uri =
-        Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
-    final r = await _getWithCache(uri, 0);
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+    final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw
         .map((e) => Technique.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -1957,12 +2054,18 @@ class ApiService {
   }
 
   // ---------- Missions ----------
-  Future<List<Mission>> getMissions() async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions'),
-        headers: await _headers(auth: true)));
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+  Future<List<Mission>> getMissions({int offset = 0, int limit = 50}) async {
+    final uri = Uri.parse('$baseUrl/missions').replace(queryParameters: {
+      'limit': '$limit',
+      'offset': '$offset',
+    });
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw.map((e) => Mission.fromJson(e as Map<String, dynamic>)).toList();
   }
 
@@ -2587,18 +2690,27 @@ class ApiService {
 
   // ---------- Professors ----------
 
-  Future<List<Professor>> getProfessors({String? academyId}) async {
-    var uri = Uri.parse('$baseUrl/professors');
+  Future<List<Professor>> getProfessors({
+    String? academyId,
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+    };
     if (academyId != null && academyId.isNotEmpty) {
-      uri = uri.replace(queryParameters: {'academy_id': academyId});
+      params['academy_id'] = academyId;
     }
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
-    return raw
-        .map((e) => Professor.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final uri = Uri.parse('$baseUrl/professors').replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
+    return raw.map((e) => Professor.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Professor> getProfessor(String id) async {
@@ -2665,11 +2777,17 @@ class ApiService {
   // ---------- Training videos (vídeo da tarefa diária / campo de treinamento) ----------
   /// Lista vídeos da tarefa diária disponíveis hoje para o aluno logado.
   /// Endpoint esperado: GET /me/training_videos/today
-  Future<List<TrainingVideo>> getTrainingVideosToday() async {
+  Future<List<TrainingVideo>> getTrainingVideosToday({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    if (offset != 0 || limit != 50) {
+      return _fetchTrainingVideosTodayBody(offset: offset, limit: limit);
+    }
     final existing = _inFlightTrainingVideosToday;
     if (existing != null) return await existing;
 
-    final future = _fetchTrainingVideosTodayBody();
+    final future = _fetchTrainingVideosTodayBody(offset: offset, limit: limit);
     _inFlightTrainingVideosToday = future;
     try {
       return await future;
@@ -2680,14 +2798,19 @@ class ApiService {
     }
   }
 
-  Future<List<TrainingVideo>> _fetchTrainingVideosTodayBody() async {
-    final uri = Uri.parse('$baseUrl/me/training_videos/today');
+  Future<List<TrainingVideo>> _fetchTrainingVideosTodayBody({
+    required int offset,
+    required int limit,
+  }) async {
+    final uri = Uri.parse('$baseUrl/me/training_videos/today').replace(
+      queryParameters: {'offset': '$offset', 'limit': '$limit'},
+    );
     final r = await _req(
       http.get(uri, headers: await _headers(auth: true)),
     );
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw
         .map((e) => TrainingVideo.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -2713,12 +2836,21 @@ class ApiService {
 
   /// Lista todos os vídeos da tarefa diária (admin/professor).
   /// Endpoint esperado: GET /training_videos
-  Future<List<TrainingVideo>> getTrainingVideosAdmin() async {
-    final uri = Uri.parse('$baseUrl/training_videos');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+  Future<List<TrainingVideo>> getTrainingVideosAdmin({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/training_videos').replace(queryParameters: {
+      'limit': '$limit',
+      'offset': '$offset',
+    });
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw
         .map((e) => TrainingVideo.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -2797,12 +2929,17 @@ class ApiService {
 
   /// Anúncios ativos da academia do usuário.
   /// Endpoint: GET /me/marketplace_items
-  Future<List<MarketplaceItem>> getMeMarketplaceItems() async {
-    final uri = Uri.parse('$baseUrl/me/marketplace_items');
+  Future<List<MarketplaceItem>> getMeMarketplaceItems({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/me/marketplace_items').replace(
+      queryParameters: {'offset': '$offset', 'limit': '$limit'},
+    );
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw
         .map((e) => MarketplaceItem.fromStudentJson(e as Map<String, dynamic>))
         .toList();
@@ -2810,12 +2947,21 @@ class ApiService {
 
   /// Lista anúncios (admin: todos; gerente/professor: só da academia).
   /// Endpoint: GET /marketplace_items
-  Future<List<MarketplaceItem>> getMarketplaceItemsAdmin() async {
-    final uri = Uri.parse('$baseUrl/marketplace_items');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
-    final decoded = jsonDecode(r.body);
-    _throwIfNotOk(r, decoded is Map ? decoded : null);
-    final raw = decoded is List ? decoded : <dynamic>[];
+  Future<List<MarketplaceItem>> getMarketplaceItemsAdmin({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final uri = Uri.parse('$baseUrl/marketplace_items').replace(queryParameters: {
+      'limit': '$limit',
+      'offset': '$offset',
+    });
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final raw = data is List ? data : <dynamic>[];
     return raw
         .map((e) => MarketplaceItem.fromAdminJson(e as Map<String, dynamic>))
         .toList();

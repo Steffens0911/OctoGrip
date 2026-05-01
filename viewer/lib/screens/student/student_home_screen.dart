@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/app_theme.dart';
@@ -287,7 +288,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           );
         }
         unawaited(_loadDailyVideo());
-        await _runPostLoadNudges();
+        unawaited(_runPostLoadNudges());
       }
     } catch (e) {
       if (mounted) {
@@ -562,8 +563,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   Future<void> _loadPendingConfirmationsWith() async {
     try {
-      final pendingIn = await _api.getPendingConfirmationsCount();
-      final myExec = await _api.getMyExecutions();
+      final results = await Future.wait([
+        _api.getPendingConfirmationsCount(),
+        _api.getMyExecutions(),
+      ]);
+      final pendingIn = results[0] as int;
+      final myExec = results[1] as List<Map<String, dynamic>>;
       if (!mounted) return;
       final outgoing =
           myExec.where((e) => e['status'] == 'pending_confirmation').length;
@@ -1722,13 +1727,17 @@ class _RandomPartnerDialog extends StatelessWidget {
             Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  partner.logoUrl!.startsWith('/')
+                child: CachedNetworkImage(
+                  imageUrl: partner.logoUrl!.startsWith('/')
                       ? '${api.baseUrl}${partner.logoUrl}'
                       : partner.logoUrl!,
                   height: 72,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                  placeholder: (_, __) => const SizedBox(
+                    height: 72,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
             ),

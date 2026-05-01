@@ -40,7 +40,7 @@ class AttendanceSession(Base, UUIDMixin):
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    academy: Mapped["Academy | None"] = relationship("Academy", lazy="selectin")
+    academy: Mapped["Academy | None"] = relationship("Academy", lazy="raise")
     created_by: Mapped["User"] = relationship("User", lazy="selectin")
     records: Mapped[list["AttendanceRecord"]] = relationship(
         "AttendanceRecord",

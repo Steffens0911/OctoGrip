@@ -22,9 +22,13 @@ class TrainingVideoListScreen extends StatefulWidget {
 class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
   final _api = ApiService();
   final _searchCtrl = TextEditingController();
+  static const int _pageSize = 50;
   List<TrainingVideo> _all = [];
   List<TrainingVideo> _filtered = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -55,42 +59,65 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     });
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final videos = await _api.getTrainingVideosAdmin();
+      final videos =
+          await _api.getTrainingVideosAdmin(offset: _offset, limit: _pageSize);
       if (!mounted) return;
+      List<TrainingVideo> chunk;
       if (widget.localOnly) {
         final currentUser = AuthService().currentUser;
         final academyId = currentUser?.academyId;
         if (academyId != null && academyId.isNotEmpty) {
-          _all = videos.where((v) => v.academyId == academyId).toList();
+          chunk = videos.where((v) => v.academyId == academyId).toList();
         } else {
-          _all = [];
+          chunk = [];
         }
       } else {
         // Admin global: nesta tela mostrar apenas vídeos globais (apoiadores do app).
         final isAdmin = AuthService().isAdmin();
         if (isAdmin) {
-          _all = videos
+          chunk = videos
               .where(
                   (v) => v.academyId == null || (v.academyId?.isEmpty ?? true))
               .toList();
         } else {
-          _all = videos;
+          chunk = videos;
         }
       }
+      if (reset) {
+        _all = chunk;
+      } else {
+        _all = [..._all, ...chunk];
+      }
+      _offset += videos.length;
+      _hasMore = videos.length == _pageSize;
       _applyFilters();
       setState(() {
-        _loading = false;
+        if (reset) {
+          _loading = false;
+        } else {
+          _loadingMore = false;
+        }
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loading = false;
+        if (reset) {
+          _loading = false;
+        } else {
+          _loadingMore = false;
+        }
         _error = userFacingMessage(e);
       });
     }
@@ -237,13 +264,28 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                         ),
                         Expanded(
                           child: RefreshIndicator(
-                            onRefresh: _load,
+                            onRefresh: () => _load(reset: true),
                             color: AppTheme.primary,
                             child: ListView.builder(
                               padding: EdgeInsets.all(
                                   AppTheme.screenPadding(context)),
-                              itemCount: _filtered.length,
+                              itemCount: _filtered.length + (_hasMore ? 1 : 0),
                               itemBuilder: (context, i) {
+                                if (i >= _filtered.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Center(
+                                      child: _loadingMore
+                                          ? const CircularProgressIndicator()
+                                          : OutlinedButton.icon(
+                                              onPressed: () => _load(reset: false),
+                                              icon: const Icon(Icons.expand_more),
+                                              label:
+                                                  const Text('Carregar mais'),
+                                            ),
+                                    ),
+                                  );
+                                }
                                 final v = _filtered[i];
                                 final scopeLabel = v.academyId == null
                                     ? 'Global'

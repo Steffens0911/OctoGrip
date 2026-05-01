@@ -4,11 +4,12 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, Request, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.list_pagination import MAX_LIST_LIMIT
+from app.core.rate_limit import limiter
 from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
@@ -559,7 +560,9 @@ async def attendance_session_ws(
 
 
 @router.post("/scan", response_model=AttendanceRecordRead, status_code=201)
+@limiter.limit("30/minute")
 async def attendance_scan(
+    request: Request,
     body: AttendanceScanRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),

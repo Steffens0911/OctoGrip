@@ -24,6 +24,10 @@ _PANEL_ROLES = ("administrador", "gerente_academia", "professor", "supervisor")
 _WEEKLY_LOGIN_REPORT_ROLES = (*_PANEL_ROLES, "aluno")
 
 
+async def _metrics_cache_key(suffix: str) -> str:
+    return await app_cache.versioned_key(_METRICS_PREFIX, suffix)
+
+
 def _build_usage_metrics_result(
     *,
     total_completions: int,
@@ -51,7 +55,7 @@ async def get_usage_metrics(db: AsyncSession) -> dict:
     """
     Retorna métricas de uso globais (LessonProgress) e retenção (MissionUsage, PB-02).
     """
-    cache_key = f"{_METRICS_PREFIX}usage:global"
+    cache_key = await _metrics_cache_key("usage:global")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -87,7 +91,7 @@ async def get_usage_metrics_for_academy(db: AsyncSession, academy_id: uuid.UUID)
     """
     Retorna métricas de uso filtradas por academy_id (para gestor local/global).
     """
-    cache_key = f"{_METRICS_PREFIX}usage:academy:{academy_id}"
+    cache_key = await _metrics_cache_key(f"usage:academy:{academy_id}")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -209,7 +213,7 @@ async def get_engagement_report(
     - Semana: últimos 7 dias em relação à reference_date (janela móvel).
     - Mês: do primeiro dia do mês até a reference_date.
     """
-    cache_key = f"{_METRICS_PREFIX}engagement:{reference_date}:{academy_id}"
+    cache_key = await _metrics_cache_key(f"engagement:{reference_date}:{academy_id}")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -263,7 +267,7 @@ async def get_active_students_report(
 
     - Usa a mesma definição de período semanal do relatório de engajamento.
     """
-    cache_key = f"{_METRICS_PREFIX}active_students:{reference_date}:{academy_id}"
+    cache_key = await _metrics_cache_key(f"active_students:{reference_date}:{academy_id}")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -364,8 +368,8 @@ async def get_weekly_panel_logins_report(
         week_start = monday
         week_end = monday + timedelta(days=6)
 
-    cache_key = (
-        f"{_METRICS_PREFIX}weekly_logins:{week_start}:{week_end}:{academy_id}:{reference_date}"
+    cache_key = await _metrics_cache_key(
+        f"weekly_logins:{week_start}:{week_end}:{academy_id}:{reference_date}"
     )
     cached = await app_cache.get(cache_key)
     if cached is not None:
@@ -459,5 +463,5 @@ async def invalidate_metrics_cache() -> None:
     Usado após alterações que afetam relatórios; também é chamado a partir de
     ``invalidate_academy_analytics_cache`` quando dados da academia mudam.
     """
-    removed = await app_cache.invalidate_prefix(_METRICS_PREFIX)
-    logger.debug("invalidate_metrics_cache", extra={"keys_removed": removed})
+    new_version = await app_cache.bump_prefix_version(_METRICS_PREFIX)
+    logger.debug("invalidate_metrics_cache", extra={"cache_version": new_version})

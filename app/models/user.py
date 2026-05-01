@@ -83,49 +83,49 @@ class User(Base, UUIDMixin):
     academy: Mapped["Academy | None"] = relationship(
         "Academy",
         back_populates="users",
-        lazy="selectin",
+        lazy="raise",
     )
     lesson_progresses: Mapped[list["LessonProgress"]] = relationship(
         "LessonProgress",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )
     training_feedbacks: Mapped[list["TrainingFeedback"]] = relationship(
         "TrainingFeedback",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )
     mission_usages: Mapped[list["MissionUsage"]] = relationship(
         "MissionUsage",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )
     technique_executions_as_executor: Mapped[list["TechniqueExecution"]] = relationship(
         "TechniqueExecution",
         foreign_keys="TechniqueExecution.user_id",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )
     technique_executions_as_opponent: Mapped[list["TechniqueExecution"]] = relationship(
         "TechniqueExecution",
         foreign_keys="TechniqueExecution.opponent_id",
         back_populates="opponent",
-        lazy="selectin",
+        lazy="raise",
     )
     training_videos: Mapped[list["TrainingVideo"]] = relationship(
         "TrainingVideo",
         back_populates="created_by",
-        lazy="selectin",
+        lazy="raise",
     )
     marketplace_items_created: Mapped[list["AcademyMarketplaceItem"]] = relationship(
         "AcademyMarketplaceItem",
         back_populates="created_by",
-        lazy="selectin",
+        lazy="raise",
     )
     training_video_daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
         "TrainingVideoDailyView",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )
     device_tokens: Mapped[list["UserDeviceToken"]] = relationship(
         "UserDeviceToken",
@@ -136,5 +136,5 @@ class User(Base, UUIDMixin):
     weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
         "UserWeeklyKitChoice",
         back_populates="user",
-        lazy="selectin",
+        lazy="raise",
     )

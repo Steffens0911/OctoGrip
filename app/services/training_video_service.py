@@ -8,6 +8,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.app_time import today_in_app_tz, utc_now
+from app.core.list_pagination import clamp_list_limit
 from app.models import TrainingVideo, TrainingVideoDailyView, User
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -34,10 +35,19 @@ def _optional_text(value: str | None) -> str | None:
     return stripped or None
 
 
-async def list_training_videos(db: AsyncSession) -> list[TrainingVideo]:
+async def list_training_videos(
+    db: AsyncSession,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[TrainingVideo]:
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = (
         select(TrainingVideo)
         .order_by(TrainingVideo.order_index.nulls_last(), TrainingVideo.created_at.desc())
+        .offset(safe_offset)
+        .limit(safe_limit)
     )
     return (await db.execute(stmt)).scalars().all()
 
@@ -167,10 +177,15 @@ async def get_training_videos_for_user_today(
     *,
     user: User,
     today: date | None = None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[dict]:
     """Retorna vídeos ativos com status de conclusão diária para o usuário."""
     if today is None:
         today = today_in_app_tz()
+
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
 
     # Vídeos globais (academy_id IS NULL) + vídeos locais da academia do usuário (se houver).
     base_query = select(TrainingVideo).where(TrainingVideo.is_active.is_(True))
@@ -189,6 +204,8 @@ async def get_training_videos_for_user_today(
             TrainingVideo.order_index.nulls_last(),
             TrainingVideo.created_at.desc(),
         )
+        .offset(safe_offset)
+        .limit(safe_limit)
     )).scalars().all()
     if not videos:
         return []

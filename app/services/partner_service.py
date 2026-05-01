@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.list_pagination import clamp_list_limit
 from app.models import Partner
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -19,12 +20,22 @@ logger = logging.getLogger(__name__)
 _ENTITY_PARTNER = "Partner"
 
 
-async def list_partners(db: AsyncSession, academy_id: UUID) -> list[Partner]:
+async def list_partners(
+    db: AsyncSession,
+    academy_id: UUID,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Partner]:
     """Lista parceiros da academia ordenados por nome."""
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = (
         select(Partner)
         .where(Partner.academy_id == academy_id)
         .order_by(Partner.name)
+        .offset(safe_offset)
+        .limit(safe_limit)
     )
     return (await db.execute(stmt)).scalars().all()
 

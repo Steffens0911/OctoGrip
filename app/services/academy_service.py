@@ -45,17 +45,18 @@ _ENTITY_ACADEMY = "Academy"
 # Cache read-heavy (ranking / relatório semanal). Invalidar com `invalidate_academy_analytics_cache`.
 ACADEMY_ANALYTICS_PREFIX = "academy_analytics:"
 _ACADEMY_RANKING_TTL_SEC = 300
-_ACADEMY_WEEKLY_REPORT_TTL_SEC = 300
+_ACADEMY_WEEKLY_REPORT_TTL_SEC = 900
 
 
 async def invalidate_academy_analytics_cache(academy_id: UUID | None) -> None:
     """Remove entradas de cache de ranking e relatório semanal para uma academia."""
     if academy_id is None:
         return
-    removed = await app_cache.invalidate_prefix(f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:")
+    prefix = f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:"
+    new_version = await app_cache.bump_prefix_version(prefix)
     logger.debug(
         "invalidate_academy_analytics_cache",
-        extra={"academy_id": str(academy_id), "keys_removed": removed},
+        extra={"academy_id": str(academy_id), "cache_version": new_version},
     )
     # Métricas globais/por academia (painel) dependem das mesmas fontes de dados.
     await invalidate_metrics_cache()
@@ -606,11 +607,15 @@ async def get_academy_ranking(
       [início do dia local range_start, fim exclusivo do dia seguinte a range_end).
     - Caso contrário: últimos `period_days` dias a partir do instante atual (UTC).
     """
-    cache_key = (
-        f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:ranking:"
-        f"{period_days}:{limit}:"
-        f"{range_start.isoformat() if range_start else '_'}:"
-        f"{range_end.isoformat() if range_end else '_'}"
+    cache_prefix = f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:"
+    cache_key = await app_cache.versioned_key(
+        cache_prefix,
+        (
+            "ranking:"
+            f"{period_days}:{limit}:"
+            f"{range_start.isoformat() if range_start else '_'}:"
+            f"{range_end.isoformat() if range_end else '_'}"
+        ),
     )
     cached = await app_cache.get(cache_key)
     if cached is not None:
@@ -672,9 +677,10 @@ async def get_academy_weekly_report(
     - Senão: semana ISO atual.
     Retorna week_start, week_end (datas do período), completions_count, active_users_count, entries.
     """
-    cache_key = (
-        f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:weekly:"
-        f"{start_date}:{end_date}:{year}:{week}"
+    cache_prefix = f"{ACADEMY_ANALYTICS_PREFIX}{academy_id}:"
+    cache_key = await app_cache.versioned_key(
+        cache_prefix,
+        f"weekly:{start_date}:{end_date}:{year}:{week}",
     )
     cached = await app_cache.get(cache_key)
     if cached is not None:

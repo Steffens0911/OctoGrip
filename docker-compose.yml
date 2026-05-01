@@ -7,6 +7,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-jjb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jjb_secret}
       POSTGRES_DB: ${POSTGRES_DB:-jjb_db}
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 768MB
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_WORK_MEM: 4MB
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c max_connections=100
+      -c work_mem=4MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c synchronous_commit=off
     ports:
       - "5432:5432"
     volumes:
@@ -21,6 +34,9 @@ services:
     image: redis:7-alpine
     container_name: jjb_redis
     restart: unless-stopped
+    command: >
+      redis-server --save "" --appendonly no --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     healthcheck:
@@ -33,6 +49,7 @@ services:
     build: .
     container_name: jjb_api
     restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
     ports:
       # Host 8001 evita conflito com uvicorn local na 8000; dentro do contentor continua 8000.
       - "8001:8000"
@@ -44,13 +61,13 @@ services:
       JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
       # JSON. Padrão [] — localhost com porta dinâmica: regex em app/main.py. ["*"] é ignorado (Flutter Web + JWT).
       CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
-      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENABLE_METRICS: ${ENABLE_METRICS:-true}
       ACCOUNT_LOCKOUT_ATTEMPTS: ${ACCOUNT_LOCKOUT_ATTEMPTS:-5}
       ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
-      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-8}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-4}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -71,6 +88,8 @@ services:
       - face_jobs:/tmp/face_jobs
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
+    mem_limit: 512m
+    mem_reservation: 256m
 
   celery-worker:
     build: .
@@ -96,6 +115,8 @@ services:
       - api_media:/app/app_media
       - face_jobs:/tmp/face_jobs
       - ./secrets:/app/secrets:ro
+    mem_limit: 1g
+    mem_reservation: 512m
 
   celery-beat:
     build: .

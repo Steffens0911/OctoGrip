@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.cache import techniques_cache
 from app.core.exceptions import ConflictError
+from app.core.list_pagination import clamp_list_limit
 from app.core.slug import ensure_unique_slug, make_slug
 from app.models import Lesson, Mission, Technique
 from app.services.audit_service import (
@@ -23,12 +24,23 @@ logger = logging.getLogger(__name__)
 _ENTITY_TECHNIQUE = "Technique"
 
 
-async def list_techniques(db: AsyncSession, academy_id: UUID | None = None, limit: int = 200) -> list[Technique]:
+async def list_techniques(
+    db: AsyncSession,
+    academy_id: UUID | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Technique]:
     """Lista técnicas ordenadas por nome. Se academy_id informado, filtra por academia."""
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = select(Technique).where(Technique.deleted_at.is_(None))
     if academy_id is not None:
         stmt = stmt.where(Technique.academy_id == academy_id)
-    return (await db.execute(stmt.order_by(Technique.name).limit(limit))).scalars().all()
+    return (
+        await db.execute(
+            stmt.order_by(Technique.name).offset(safe_offset).limit(safe_limit)
+        )
+    ).scalars().all()
 
 
 async def get_technique(db: AsyncSession, technique_id: UUID) -> Technique | None:

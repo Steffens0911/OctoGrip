@@ -18,10 +18,14 @@ class MissionListScreen extends StatefulWidget {
 class _MissionListScreenState extends State<MissionListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  static const int _pageSize = 50;
   List<Mission> _allItems = [];
   List<Mission> _filteredItems = [];
   String? _filterLevel;
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   static const List<MapEntry<String, String>> _levels = [
@@ -51,19 +55,44 @@ class _MissionListScreenState extends State<MissionListScreen> {
     setState(() => _filteredItems = filtered);
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load({bool reset = true}) async {
+    setState(() {
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
+    });
     try {
-      final list = await _api.getMissions();
+      final list = await _api.getMissions(offset: _offset, limit: _pageSize);
       if (mounted) {
         setState(() {
-        _allItems = list;
-        _loading = false;
-      });
+          if (reset) {
+            _allItems = list;
+            _loading = false;
+          } else {
+            _allItems = [..._allItems, ...list];
+            _loadingMore = false;
+          }
+          _offset += list.length;
+          _hasMore = list.length == _pageSize;
+        });
       }
       _applyFilters();
     } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
+      if (mounted) {
+        setState(() {
+          _error = userFacingMessage(e);
+          if (reset) {
+            _loading = false;
+          } else {
+            _loadingMore = false;
+          }
+        });
+      }
     }
   }
 
@@ -181,7 +210,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
                         ),
                         Expanded(
                           child: RefreshIndicator(
-                            onRefresh: _load,
+                            onRefresh: () => _load(reset: true),
                             child: _filteredItems.isEmpty
                                 ? const Center(
                                     child: Text(
@@ -191,8 +220,26 @@ class _MissionListScreenState extends State<MissionListScreen> {
                                   )
                                 : ListView.builder(
                                     padding: const EdgeInsets.all(16),
-                                    itemCount: _filteredItems.length,
+                                    itemCount:
+                                        _filteredItems.length + (_hasMore ? 1 : 0),
                                     itemBuilder: (context, i) {
+                                      if (i >= _filteredItems.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 12),
+                                          child: Center(
+                                            child: _loadingMore
+                                                ? const CircularProgressIndicator()
+                                                : OutlinedButton.icon(
+                                                    onPressed: () =>
+                                                        _load(reset: false),
+                                                    icon:
+                                                        const Icon(Icons.expand_more),
+                                                    label:
+                                                        const Text('Carregar mais'),
+                                                  ),
+                                          ),
+                                        );
+                                      }
                                       final m = _filteredItems[i];
                                       return Card(
                                         margin: const EdgeInsets.only(bottom: 8),

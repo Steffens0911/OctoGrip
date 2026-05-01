@@ -438,3 +438,28 @@ def cleanup_face_recognition_temp_data(self) -> None:
             )
         )
         db.commit()
+
+
+@celery_app.task(bind=True, max_retries=1, time_limit=120)
+def cleanup_expired_sessions(self) -> None:
+    """Fecha sessões de presença expiradas para reduzir varreduras em endpoints de listagem."""
+    now = datetime.now(UTC)
+    with SyncSessionLocal() as db:
+        sessions = (
+            db.execute(
+                select(AttendanceSession).where(
+                    AttendanceSession.status == "active",
+                    AttendanceSession.expires_at.is_not(None),
+                    AttendanceSession.expires_at < now,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        changed = 0
+        for session in sessions:
+            session.status = "closed"
+            session.ends_at = session.ends_at or now
+            changed += 1
+        if changed:
+            db.commit()

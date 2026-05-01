@@ -21,9 +21,13 @@ class MarketplaceListScreen extends StatefulWidget {
 class _MarketplaceListScreenState extends State<MarketplaceListScreen> {
   final _api = ApiService();
   final _searchCtrl = TextEditingController();
+  static const int _pageSize = 50;
   List<MarketplaceItem> _all = [];
   List<MarketplaceItem> _filtered = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -51,30 +55,57 @@ class _MarketplaceListScreenState extends State<MarketplaceListScreen> {
     setState(() => _filtered = list);
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final items = await _api.getMarketplaceItemsAdmin();
+      final items = await _api.getMarketplaceItemsAdmin(
+        offset: _offset,
+        limit: _pageSize,
+      );
       if (!mounted) return;
+      List<MarketplaceItem> chunk;
       if (widget.localOnly) {
         final academyId = AuthService().currentUser?.academyId;
         if (academyId != null && academyId.isNotEmpty) {
-          _all = items.where((v) => v.academyId == academyId).toList();
+          chunk = items.where((v) => v.academyId == academyId).toList();
         } else {
-          _all = [];
+          chunk = [];
         }
       } else {
-        _all = items;
+        chunk = items;
       }
+      if (reset) {
+        _all = chunk;
+      } else {
+        _all = [..._all, ...chunk];
+      }
+      _offset += items.length;
+      _hasMore = items.length == _pageSize;
       _applyFilters();
-      setState(() => _loading = false);
+      setState(() {
+        if (reset) {
+          _loading = false;
+        } else {
+          _loadingMore = false;
+        }
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loading = false;
+        if (reset) {
+          _loading = false;
+        } else {
+          _loadingMore = false;
+        }
         _error = userFacingMessage(e);
       });
     }
@@ -194,13 +225,28 @@ class _MarketplaceListScreenState extends State<MarketplaceListScreen> {
                         ),
                         Expanded(
                           child: RefreshIndicator(
-                            onRefresh: _load,
+                            onRefresh: () => _load(reset: true),
                             color: AppTheme.primary,
                             child: ListView.builder(
                               padding: EdgeInsets.all(
                                   AppTheme.screenPadding(context)),
-                              itemCount: _filtered.length,
+                              itemCount: _filtered.length + (_hasMore ? 1 : 0),
                               itemBuilder: (context, i) {
+                                if (i >= _filtered.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Center(
+                                      child: _loadingMore
+                                          ? const CircularProgressIndicator()
+                                          : OutlinedButton.icon(
+                                              onPressed: () => _load(reset: false),
+                                              icon: const Icon(Icons.expand_more),
+                                              label:
+                                                  const Text('Carregar mais'),
+                                            ),
+                                    ),
+                                  );
+                                }
                                 final it = _filtered[i];
                                 final scope = it.academyName?.isNotEmpty == true
                                     ? it.academyName!

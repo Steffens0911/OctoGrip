@@ -34,14 +34,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = []
 
     # Banco - pool
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_SIZE: int = 8
+    DB_MAX_OVERFLOW: int = 4
 
     # Seed automático no startup
-    SEED_ON_STARTUP: bool = True
+    SEED_ON_STARTUP: bool = False
 
     # Rate limiting (login)
-    LOGIN_RATE_LIMIT: str = "5/minute"
+    LOGIN_RATE_LIMIT: str = "10/minute"
 
     # Fuso para "hoje", sequência de login, semana ISO de turmas, relatórios por dia, etc.
     APP_TIMEZONE: str = "America/Sao_Paulo"

@@ -113,7 +113,7 @@ async def me_weekly_kit_choice(
         body.kit_id,
         reference_date=ref,
     )
-    await app_cache.invalidate_prefix(f"mission_week:{current_user.id}:")
+    await app_cache.bump_prefix_version("mission_week:")
     return WeeklyKitChoiceResponse(
         kit_id=row.kit_id,
         iso_week_year=row.iso_week_year,

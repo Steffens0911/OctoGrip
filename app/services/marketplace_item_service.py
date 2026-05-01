@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.list_pagination import clamp_list_limit
 from app.models import AcademyMarketplaceItem, User
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -24,7 +25,11 @@ async def list_marketplace_items_for_admin(
     db: AsyncSession,
     *,
     academy_id: UUID | None,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[AcademyMarketplaceItem]:
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = select(AcademyMarketplaceItem)
     if academy_id is not None:
         stmt = stmt.where(AcademyMarketplaceItem.academy_id == academy_id)
@@ -32,14 +37,18 @@ async def list_marketplace_items_for_admin(
         AcademyMarketplaceItem.sort_order.nulls_last(),
         AcademyMarketplaceItem.created_at.desc(),
     )
-    return (await db.execute(stmt)).scalars().all()
+    return (await db.execute(stmt.offset(safe_offset).limit(safe_limit))).scalars().all()
 
 
 async def list_active_marketplace_items_for_academy(
     db: AsyncSession,
     *,
     academy_id: UUID,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[AcademyMarketplaceItem]:
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = (
         select(AcademyMarketplaceItem)
         .where(
@@ -50,6 +59,8 @@ async def list_active_marketplace_items_for_academy(
             AcademyMarketplaceItem.sort_order.nulls_last(),
             AcademyMarketplaceItem.created_at.desc(),
         )
+        .offset(safe_offset)
+        .limit(safe_limit)
     )
     return (await db.execute(stmt)).scalars().all()
 
@@ -177,8 +188,19 @@ async def delete_marketplace_item(
     return True
 
 
-async def list_marketplace_items_for_user(db: AsyncSession, *, user: User) -> list[AcademyMarketplaceItem]:
+async def list_marketplace_items_for_user(
+    db: AsyncSession,
+    *,
+    user: User,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[AcademyMarketplaceItem]:
     """Itens ativos da academia do aluno (ou lista vazia se sem academia)."""
     if user.academy_id is None:
         return []
-    return await list_active_marketplace_items_for_academy(db, academy_id=user.academy_id)
+    return await list_active_marketplace_items_for_academy(
+        db,
+        academy_id=user.academy_id,
+        limit=limit,
+        offset=offset,
+    )

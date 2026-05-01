@@ -1,10 +1,17 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:logging/logging.dart';
 
 import 'package:viewer/features/techniques/data/models/technique_dto.dart';
 import 'package:viewer/features/techniques/domain/failures/technique_failure.dart';
+
+List<dynamic> _decodeTechniqueListInIsolate(String raw) =>
+    jsonDecode(raw) as List<dynamic>;
+
+String _encodeTechniqueListInIsolate(List<Map<String, dynamic>> payload) =>
+    jsonEncode(payload);
 
 /// Persistência local com Hive (funciona em mobile e web).
 /// Uma única box com chave por [academyId] para listas serializadas em JSON.
@@ -38,7 +45,8 @@ class TechniqueLocalDataSourceImpl implements TechniqueLocalDataSource {
       final box = await _box;
       final raw = box.get(_key(academyId));
       if (raw == null || raw.isEmpty) return null;
-      final decoded = jsonDecode(raw) as List<dynamic>;
+      final decoded =
+          raw.length < 8000 ? jsonDecode(raw) as List<dynamic> : await compute(_decodeTechniqueListInIsolate, raw);
       return decoded
           .map((e) => TechniqueDto.fromHiveMap(e as Map<dynamic, dynamic>))
           .toList();
@@ -52,7 +60,10 @@ class TechniqueLocalDataSourceImpl implements TechniqueLocalDataSource {
   Future<void> write(String academyId, List<TechniqueDto> items) async {
     try {
       final box = await _box;
-      final encoded = jsonEncode(items.map((e) => e.toHiveMap()).toList());
+      final payload = items.map((e) => e.toHiveMap()).toList();
+      final encoded = payload.length < 80
+          ? jsonEncode(payload)
+          : await compute(_encodeTechniqueListInIsolate, payload);
       await box.put(_key(academyId), encoded);
     } catch (e, st) {
       _log.warning('write cache failed', e, st);

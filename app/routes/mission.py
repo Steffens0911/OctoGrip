@@ -13,15 +13,21 @@ from app.schemas.mission import MissionTodayResponse, MissionWeekResponse
 from app.services.mission_service import get_mission_today_response, get_mission_week_response
 
 router = APIRouter()
-_CACHE_TTL = 30  # segundos: reduz carga nas trocas de tela
+_CACHE_TTL = 300  # segundos: reduz carga nas trocas de tela
 
 
-def _week_cache_key(user_id: UUID, level: str, academy_id: UUID | None) -> str:
-    return f"mission_week:{user_id}:{level}:{academy_id}"
+async def _week_cache_key(user_id: UUID, level: str, academy_id: UUID | None) -> str:
+    return await app_cache.versioned_key(
+        "mission_week:",
+        f"{user_id}:{level}:{academy_id}",
+    )
 
 
-def _today_cache_key(user_id: UUID, level: str, academy_id: UUID | None, review_after_days: int) -> str:
-    return f"mission_today:{user_id}:{level}:{academy_id}:{review_after_days}"
+async def _today_cache_key(user_id: UUID, level: str, academy_id: UUID | None, review_after_days: int) -> str:
+    return await app_cache.versioned_key(
+        "mission_today:",
+        f"{user_id}:{level}:{academy_id}:{review_after_days}",
+    )
 
 
 @router.get("/week", response_model=MissionWeekResponse)
@@ -34,7 +40,7 @@ async def mission_week(
     Retorna as 3 missões da semana (Missão 1, 2, 3) para a academia do usuário autenticado.
     Requer autenticação obrigatória.
     """
-    key = _week_cache_key(current_user.id, level, current_user.academy_id)
+    key = await _week_cache_key(current_user.id, level, current_user.academy_id)
     cached = await app_cache.get(key)
     if cached is not None:
         return JSONResponse(
@@ -62,7 +68,7 @@ async def mission_today(
     Retorna a missão do dia por nível para a academia do usuário autenticado.
     Requer autenticação obrigatória.
     """
-    key = _today_cache_key(
+    key = await _today_cache_key(
         current_user.id, level, current_user.academy_id, review_after_days
     )
     cached = await app_cache.get(key)

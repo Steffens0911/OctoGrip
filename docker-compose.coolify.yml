@@ -20,6 +20,19 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-jjb}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jjb_secret}
       POSTGRES_DB: ${POSTGRES_DB:-jjb_db}
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 768MB
+      POSTGRES_MAX_CONNECTIONS: 100
+      POSTGRES_WORK_MEM: 4MB
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c max_connections=100
+      -c work_mem=4MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c synchronous_commit=off
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,6 +45,9 @@ services:
     image: redis:7-alpine
     container_name: jjb_redis
     restart: unless-stopped
+    command: >
+      redis-server --save "" --appendonly no --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,19 +58,20 @@ services:
     build: .
     container_name: jjb_api
     restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
       CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
-      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-true}
+      SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ENABLE_METRICS: ${ENABLE_METRICS:-true}
       ACCOUNT_LOCKOUT_ATTEMPTS: ${ACCOUNT_LOCKOUT_ATTEMPTS:-5}
       ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
-      DB_POOL_SIZE: ${DB_POOL_SIZE:-20}
-      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-30}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-8}
+      DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-4}
       # Push FCM (opcional): na VPS cria a pasta no host e copia o JSON da service account; ver docs/DEPLOY_COOLIFY_CONTABO.md
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
@@ -75,6 +92,8 @@ services:
       - api_media:/app/app_media
       # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
+    mem_limit: 512m
+    mem_reservation: 256m
 
   celery-worker:
     build: .
@@ -99,6 +118,8 @@ services:
     volumes:
       - api_media:/app/app_media
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
+    mem_limit: 1g
+    mem_reservation: 512m
 
   celery-beat:
     build: .

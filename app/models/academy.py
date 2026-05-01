@@ -136,67 +136,67 @@ class Academy(Base, UUIDMixin):
     users: Mapped[list["User"]] = relationship(
         "User",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     professors: Mapped[list["Professor"]] = relationship(
         "Professor",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     missions: Mapped[list["Mission"]] = relationship(
         "Mission",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     weekly_technique_kits: Mapped[list["WeeklyTechniqueKit"]] = relationship(
         "WeeklyTechniqueKit",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     user_weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
         "UserWeeklyKitChoice",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
         "CollectiveGoal",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     techniques: Mapped[list["Technique"]] = relationship(
         "Technique",
         back_populates="academy",
         foreign_keys="Technique.academy_id",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     trophies: Mapped[list["Trophy"]] = relationship(
         "Trophy",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     partners: Mapped[list["Partner"]] = relationship(
         "Partner",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     training_videos: Mapped[list["TrainingVideo"]] = relationship(
         "TrainingVideo",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )
     marketplace_items: Mapped[list["AcademyMarketplaceItem"]] = relationship(
         "AcademyMarketplaceItem",
         back_populates="academy",
-        lazy="selectin",
+        lazy="raise",
         passive_deletes=True,
     )

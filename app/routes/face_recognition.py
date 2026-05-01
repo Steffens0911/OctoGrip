@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +16,7 @@ from app.core.exceptions import (
     ForbiddenError,
     UserNotFoundError,
 )
+from app.core.rate_limit import limiter
 from app.core.role_deps import require_admin_or_manager, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import (
@@ -103,7 +102,9 @@ async def _present_count_for_session(db: AsyncSession, session_id: UUID) -> int:
 
 
 @router.post("/submit", response_model=FaceRecognitionSubmitResponse)
+@limiter.limit("5/minute")
 async def face_recognition_submit(
+    request: Request,
     session_id: str = Form(...),
     photo: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
@@ -183,7 +184,9 @@ async def face_recognition_job_status(
 
 
 @router.post("/confirm", response_model=FaceRecognitionConfirmResponse)
+@limiter.limit("5/minute")
 async def face_recognition_confirm(
+    request: Request,
     body: FaceRecognitionConfirmRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
@@ -279,7 +282,9 @@ async def face_recognition_confirm(
 
 
 @router.post("/generate-embedding/{student_id}")
+@limiter.limit("5/minute")
 async def face_generate_embedding(
+    request: Request,
     student_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_manager),

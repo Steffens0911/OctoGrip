@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ConflictError, ForbiddenError, ProfessorNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
 from app.models import Professor, User
@@ -24,6 +25,8 @@ router = APIRouter()
 @router.get("", response_model=list[ProfessorRead])
 async def professors_list(
     academy_id: UUID | None = Query(None, description="Filtrar por academia"),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):
@@ -32,7 +35,7 @@ async def professors_list(
         verify_academy_access(current_user, str(academy_id))
     elif current_user.role != "administrador":
         academy_id = current_user.academy_id
-    return await list_professors(db, academy_id=academy_id)
+    return await list_professors(db, academy_id=academy_id, limit=limit, offset=offset)
 
 
 @router.get("/{professor_id}", response_model=ProfessorRead)

@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.list_pagination import clamp_list_limit
 from app.models import Professor
 
 logger = logging.getLogger(__name__)
@@ -13,13 +14,16 @@ logger = logging.getLogger(__name__)
 async def list_professors(
     db: AsyncSession,
     academy_id: UUID | None = None,
-    limit: int = 200,
+    limit: int = 50,
+    offset: int = 0,
 ) -> list[Professor]:
     """Lista professores, opcionalmente filtrados por academia."""
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = select(Professor).order_by(Professor.name)
     if academy_id is not None:
         stmt = stmt.where(Professor.academy_id == academy_id)
-    return (await db.execute(stmt.limit(limit))).scalars().all()
+    return (await db.execute(stmt.offset(safe_offset).limit(safe_limit))).scalars().all()
 
 
 async def get_professor(db: AsyncSession, professor_id: UUID) -> Professor | None:

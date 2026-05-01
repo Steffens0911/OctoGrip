@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
@@ -322,11 +323,15 @@ class _AcademyCustomizationBusinessSectionsState
                   Center(
                     child: ClipRRect(
                       borderRadius: AppRadius.cardRadius,
-                      child: Image.network(
-                        _academyLogoFullUrl(),
+                      child: CachedNetworkImage(
+                        imageUrl: _academyLogoFullUrl(),
                         height: 72,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
+                        placeholder: (_, __) => const SizedBox(
+                          height: 72,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
                           height: 72,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
@@ -373,11 +378,15 @@ class _AcademyCustomizationBusinessSectionsState
                     borderRadius: BorderRadius.circular(16),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxHeight: 240),
-                      child: Image.network(
-                        _scheduleImageUrlWithCacheBuster(),
+                      child: CachedNetworkImage(
+                        imageUrl: _scheduleImageUrlWithCacheBuster(),
                         width: double.infinity,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => Container(
+                        placeholder: (_, __) => const SizedBox(
+                          height: 120,
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
                           height: 120,
                           alignment: Alignment.center,
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,

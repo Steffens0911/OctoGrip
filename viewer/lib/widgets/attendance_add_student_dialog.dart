@@ -67,7 +67,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
     });
     try {
       final list =
-          await widget.api.getAcademyStudentsList(widget.academyId.trim());
+          await widget.api.getAcademyStudentsListAll(widget.academyId.trim());
       final filtered = list
           .where((s) => !widget.presentUserIds.contains(s.id))
           .toList();

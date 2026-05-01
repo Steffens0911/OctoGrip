@@ -12,6 +12,7 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 _TRACKING_TABLE = "_migrations"
+_MIGRATIONS_ADVISORY_LOCK_ID = 907514230411
 
 _CREATE_TRACKING = f"""
 CREATE TABLE IF NOT EXISTS {_TRACKING_TABLE} (
@@ -104,36 +105,45 @@ def run_migrations(engine) -> None:
         return
 
     with engine.connect() as conn:
-        conn.execute(text(_CREATE_TRACKING))
-        conn.commit()
+        # Evita corrida entre múltiplos workers/processos no startup.
+        conn.execute(text("SELECT pg_advisory_lock(:lock_id)"), {"lock_id": _MIGRATIONS_ADVISORY_LOCK_ID})
+        try:
+            conn.execute(text(_CREATE_TRACKING))
+            conn.commit()
 
-        applied = _get_applied(conn)
-        pending = [f for f in files if f.name not in applied]
+            applied = _get_applied(conn)
+            pending = [f for f in files if f.name not in applied]
 
-        if not pending:
-            logger.info("Nenhuma migração pendente (%d já aplicadas).", len(applied))
-            return
+            if not pending:
+                logger.info("Nenhuma migração pendente (%d já aplicadas).", len(applied))
+                return
 
-        logger.info(
-            "%d migração(ões) pendente(s) de %d total.",
-            len(pending),
-            len(files),
-        )
+            logger.info(
+                "%d migração(ões) pendente(s) de %d total.",
+                len(pending),
+                len(files),
+            )
 
-        for path in pending:
-            name = path.name
-            try:
-                sql = path.read_text(encoding="utf-8")
-                statements = _split_statements(sql)
-                for st in statements:
-                    if st:
-                        conn.execute(text(st + ";"))
-                _record_applied(conn, name)
-                conn.commit()
-                logger.info("Migração aplicada: %s", name)
-            except Exception as e:
-                conn.rollback()
-                logger.exception("Erro ao aplicar %s: %s", name, e)
-                raise
+            for path in pending:
+                name = path.name
+                try:
+                    sql = path.read_text(encoding="utf-8")
+                    statements = _split_statements(sql)
+                    for st in statements:
+                        if st:
+                            conn.execute(text(st + ";"))
+                    _record_applied(conn, name)
+                    conn.commit()
+                    logger.info("Migração aplicada: %s", name)
+                except Exception as e:
+                    conn.rollback()
+                    logger.exception("Erro ao aplicar %s: %s", name, e)
+                    raise
+        finally:
+            conn.execute(
+                text("SELECT pg_advisory_unlock(:lock_id)"),
+                {"lock_id": _MIGRATIONS_ADVISORY_LOCK_ID},
+            )
+            conn.commit()
 
     logger.info("Migrações concluídas.")

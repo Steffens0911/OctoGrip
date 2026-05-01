@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -18,8 +19,12 @@ class MarketplaceScreen extends StatefulWidget {
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final _api = ApiService();
+  static const int _pageSize = 20;
   List<MarketplaceItem> _items = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -28,22 +33,42 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     _load();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final list = await _api.getMeMarketplaceItems();
+      final list = await _api.getMeMarketplaceItems(
+        offset: _offset,
+        limit: _pageSize,
+      );
       if (!mounted) return;
       setState(() {
-        _items = list;
-        _loading = false;
+        if (reset) {
+          _items = list;
+          _loading = false;
+        } else {
+          _items = [..._items, ...list];
+          _loadingMore = false;
+        }
+        _offset += list.length;
+        _hasMore = list.length == _pageSize;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _loading = false;
+        if (reset) {
+          _loading = false;
+        } else {
+          _loadingMore = false;
+        }
         _error = userFacingMessage(e);
       });
     }
@@ -71,7 +96,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     return Scaffold(
       appBar: const AppStandardAppBar(title: 'Loja da academia'),
       body: RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: () => _load(reset: true),
         color: AppTheme.primary,
         child: _loading
             ? ListView(
@@ -97,12 +122,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       ),
                     ],
                   )
-                : ListView(
+                : ListView.builder(
                     padding: EdgeInsets.all(AppTheme.screenPadding(context)),
                     physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      if (_items.isEmpty)
-                        Padding(
+                    itemCount: _items.isEmpty
+                        ? 1
+                        : _items.length + (_hasMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (_items.isEmpty) {
+                        return Padding(
                           padding: const EdgeInsets.only(top: 48),
                           child: Text(
                             'Nenhum produto anunciado no momento.',
@@ -114,19 +142,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                   color: AppTheme.textSecondaryOf(context),
                                 ),
                           ),
-                        )
-                      else
-                        ..._items.map((it) {
-                          final wa = it.whatsappUrl;
-                          return _ItemCard(
-                            item: it,
-                            priceLabel: _priceLabel(it),
-                            onWhatsApp: wa != null && wa.isNotEmpty
-                                ? () => _openWhatsApp(wa)
-                                : null,
-                          );
-                        }),
-                    ],
+                        );
+                      }
+                      if (index >= _items.length) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Center(
+                            child: _loadingMore
+                                ? const CircularProgressIndicator()
+                                : OutlinedButton.icon(
+                                    onPressed: () => _load(reset: false),
+                                    icon: const Icon(Icons.expand_more),
+                                    label: const Text('Ver mais produtos'),
+                                  ),
+                          ),
+                        );
+                      }
+                      final it = _items[index];
+                      final wa = it.whatsappUrl;
+                      return _ItemCard(
+                        item: it,
+                        priceLabel: _priceLabel(it),
+                        onWhatsApp: wa != null && wa.isNotEmpty
+                            ? () => _openWhatsApp(wa)
+                            : null,
+                      );
+                    },
                   ),
       ),
     );
@@ -161,15 +202,17 @@ class _ItemCard extends StatelessWidget {
           if (resolved != null)
             AspectRatio(
               aspectRatio: 16 / 9,
-              child: Image.network(
-                resolved,
+              child: CachedNetworkImage(
+                imageUrl: resolved,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.grey.shade300,
-                  alignment: Alignment.center,
-                  child: Icon(Icons.broken_image_outlined,
-                      color: Colors.grey.shade600),
+                placeholder: (_, __) => const Center(
+                  child: CircularProgressIndicator(),
                 ),
+                errorWidget: (_, __, ___) => Container(
+                    color: Colors.grey.shade300,
+                    alignment: Alignment.center,
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.grey.shade600)),
               ),
             ),
           Padding(

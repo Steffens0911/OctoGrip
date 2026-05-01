@@ -34,7 +34,8 @@ class AttendanceRankingScreen extends StatefulWidget {
   const AttendanceRankingScreen({super.key, required this.academyId});
 
   @override
-  State<AttendanceRankingScreen> createState() => _AttendanceRankingScreenState();
+  State<AttendanceRankingScreen> createState() =>
+      _AttendanceRankingScreenState();
 }
 
 class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
@@ -123,7 +124,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
       _invalidateQueryCache(invalidateQuery);
     }
     final query = _buildQuery();
-    if (query.periodKind == 'custom' && (query.dateFrom == null || query.dateTo == null)) {
+    if (query.periodKind == 'custom' &&
+        (query.dateFrom == null || query.dateTo == null)) {
       setState(() {
         _loading = false;
         _error = null;
@@ -176,7 +178,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
     final oldQuery = _buildQuery();
     setState(() {
       _periodKind = _RankingPeriodKind.custom;
-      _customFrom = DateTime(picked.start.year, picked.start.month, picked.start.day);
+      _customFrom =
+          DateTime(picked.start.year, picked.start.month, picked.start.day);
       _customTo = DateTime(picked.end.year, picked.end.month, picked.end.day);
     });
     await _loadRanking(invalidateQuery: oldQuery);
@@ -196,7 +199,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
   Future<void> _goMonth(int delta) async {
     final oldQuery = _buildQuery();
     setState(() {
-      _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + delta, 1);
+      _selectedMonth =
+          DateTime(_selectedMonth.year, _selectedMonth.month + delta, 1);
     });
     await _loadRanking(invalidateQuery: oldQuery);
   }
@@ -236,7 +240,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
     return List<int>.generate(_currentQuarter, (i) => i + 1);
   }
 
-  String _monthLabel(DateTime month) => DateFormat('MMMM yyyy', 'pt_BR').format(month);
+  String _monthLabel(DateTime month) =>
+      DateFormat('MMMM yyyy', 'pt_BR').format(month);
 
   String _initials(String name) {
     final parts = name
@@ -260,7 +265,9 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: borderColor != null ? Border.all(color: borderColor, width: 2) : null,
+        border: borderColor != null
+            ? Border.all(color: borderColor, width: 2)
+            : null,
       ),
       child: CircleAvatar(
         radius: radius,
@@ -293,10 +300,20 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
     );
   }
 
-  Widget _buildPodium(List<AttendanceRankingEntryModel> ranking, String? myUserId) {
-    final top1 = ranking.where((e) => e.position == 1).cast<AttendanceRankingEntryModel?>().firstOrNull;
-    final top2 = ranking.where((e) => e.position == 2).cast<AttendanceRankingEntryModel?>().firstOrNull;
-    final top3 = ranking.where((e) => e.position == 3).cast<AttendanceRankingEntryModel?>().firstOrNull;
+  Widget _buildPodium(
+      List<AttendanceRankingEntryModel> ranking, String? myUserId) {
+    final top1 = ranking
+        .where((e) => e.position == 1)
+        .cast<AttendanceRankingEntryModel?>()
+        .firstOrNull;
+    final top2 = ranking
+        .where((e) => e.position == 2)
+        .cast<AttendanceRankingEntryModel?>()
+        .firstOrNull;
+    final top3 = ranking
+        .where((e) => e.position == 3)
+        .cast<AttendanceRankingEntryModel?>()
+        .firstOrNull;
 
     if (top1 == null && top2 == null && top3 == null) {
       return const SizedBox.shrink();
@@ -305,9 +322,24 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Expanded(child: _buildPodiumColumn(top2, medalColor: _secondColor, avatarRadius: 26, barHeight: 60, myUserId: myUserId)),
-        Expanded(child: _buildPodiumColumn(top1, medalColor: _firstColor, avatarRadius: 32, barHeight: 80, myUserId: myUserId)),
-        Expanded(child: _buildPodiumColumn(top3, medalColor: _thirdColor, avatarRadius: 24, barHeight: 44, myUserId: myUserId)),
+        Expanded(
+            child: _buildPodiumColumn(top2,
+                medalColor: _secondColor,
+                avatarRadius: 26,
+                barHeight: 60,
+                myUserId: myUserId)),
+        Expanded(
+            child: _buildPodiumColumn(top1,
+                medalColor: _firstColor,
+                avatarRadius: 32,
+                barHeight: 80,
+                myUserId: myUserId)),
+        Expanded(
+            child: _buildPodiumColumn(top3,
+                medalColor: _thirdColor,
+                avatarRadius: 24,
+                barHeight: 44,
+                myUserId: myUserId)),
       ],
     );
   }
@@ -380,7 +412,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
             height: barHeight,
             decoration: BoxDecoration(
               color: medalColor.withValues(alpha: 0.22),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(10)),
             ),
             alignment: Alignment.center,
             child: Text(
@@ -405,7 +438,9 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isCurrentUser ? _highlightRowBackground : AppTheme.surfaceOf(context),
+        color: isCurrentUser
+            ? _highlightRowBackground
+            : AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -420,7 +455,8 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
               ),
             ),
           ),
-          _buildAvatar(name: entry.name, avatarUrl: entry.avatarUrl, radius: 18),
+          _buildAvatar(
+              name: entry.name, avatarUrl: entry.avatarUrl, radius: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -434,7 +470,9 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: isCurrentUser ? _highlightText : AppTheme.textPrimaryOf(context),
+                          color: isCurrentUser
+                              ? _highlightText
+                              : AppTheme.textPrimaryOf(context),
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -582,7 +620,7 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _selectedQuarter,
+                  initialValue: _selectedQuarter,
                   decoration: const InputDecoration(labelText: 'Trimestre'),
                   items: quarters
                       .map(
@@ -602,7 +640,7 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _selectedYear,
+                  initialValue: _selectedYear,
                   decoration: const InputDecoration(labelText: 'Ano'),
                   items: _availableYears()
                       .map(
@@ -623,7 +661,7 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
           ),
         if (_periodKind == _RankingPeriodKind.year)
           DropdownButtonFormField<int>(
-            value: _selectedYear,
+            initialValue: _selectedYear,
             decoration: const InputDecoration(labelText: 'Ano'),
             items: _availableYears()
                 .map(
@@ -695,10 +733,12 @@ class _AttendanceRankingScreenState extends State<AttendanceRankingScreen> {
                     .map(
                       (entry) => _buildRankingItem(
                         entry: entry,
-                        isCurrentUser: userId != null && entry.studentId == userId,
+                        isCurrentUser:
+                            userId != null && entry.studentId == userId,
                       ),
                     ),
-                if (ranking.myPosition != null && ranking.myPosition!.position > 10) ...[
+                if (ranking.myPosition != null &&
+                    ranking.myPosition!.position > 10) ...[
                   const SizedBox(height: 6),
                   Divider(color: AppTheme.borderOf(context)),
                   const SizedBox(height: 6),

@@ -194,10 +194,13 @@ async def get_mission_today_response(
     """
     from app.models import User
 
-    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none() if user_id else None
+    _user_row = (
+        (await db.execute(select(User.academy_id, User.graduation).where(User.id == user_id))).one_or_none()
+        if user_id else None
+    )
     resolved_academy_id = academy_id
-    if resolved_academy_id is None and user and user.academy_id is not None:
-        resolved_academy_id = user.academy_id
+    if resolved_academy_id is None and _user_row and _user_row[0] is not None:
+        resolved_academy_id = _user_row[0]
 
     mission = await get_today_mission(db, level=level, academy_id=resolved_academy_id)
     if mission and mission.technique:
@@ -238,7 +241,7 @@ async def get_mission_today_response(
         logger.info("get_mission_today_response", extra={"found": False})
         return None
     position_name = ""
-    grad_mult = max(1, points_for_graduation(user.graduation) if user else 1)
+    grad_mult = max(1, points_for_graduation(_user_row[1]) if _user_row else 1)
     return MissionTodayResponse(
         mission_id=None,
         technique_id=technique.id,

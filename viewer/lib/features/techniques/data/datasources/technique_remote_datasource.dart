@@ -1,4 +1,5 @@
 import 'package:viewer/features/techniques/data/models/technique_dto.dart';
+import 'package:viewer/models/technique.dart';
 import 'package:viewer/services/api_service.dart';
 
 /// Fonte remota: delega ao [ApiService] existente (sem duplicar HTTP).
@@ -29,10 +30,20 @@ class TechniqueRemoteDataSourceImpl implements TechniqueRemoteDataSource {
 
   @override
   Future<List<TechniqueDto>> fetchAll(String academyId) async {
-    final list = await _api.getTechniques(
-      academyId: academyId,
-      cacheBust: true,
-    );
+    const pageSize = 50;
+    final list = <Technique>[];
+    var offset = 0;
+    while (true) {
+      final page = await _api.getTechniques(
+        academyId: academyId,
+        cacheBust: true,
+        offset: offset,
+        limit: pageSize,
+      );
+      list.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
     return list
         .map(
           (t) => TechniqueDto(

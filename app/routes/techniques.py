@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, ConflictError, ForbiddenError, TechniqueNotFoundError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_read_access, require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
@@ -37,13 +38,15 @@ def _resolve_academy_id(current_user: User, academy_id: UUID | None) -> UUID:
 @router.get("", response_model=list[TechniqueRead])
 async def techniques_list(
     academy_id: UUID | None = Query(None, description="Filtra por academia"),
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
     """Lista técnicas por academia."""
     try:
         resolved = _resolve_academy_id(current_user, academy_id)
-        return await list_techniques(db, academy_id=resolved)
+        return await list_techniques(db, academy_id=resolved, limit=limit, offset=offset)
     except AppError:
         raise
     except Exception as e:

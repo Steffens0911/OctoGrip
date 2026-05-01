@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError, ForbiddenError
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_write_access
 from app.database import get_db
 from app.models import User
@@ -39,6 +40,8 @@ def _merge_whatsapp_into_patch(patch: dict) -> None:
 
 @router.get("", response_model=list[MarketplaceItemAdminRead])
 async def marketplace_items_list(
+    offset: int = Query(0, ge=0, description="Offset para paginação"),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
@@ -48,7 +51,12 @@ async def marketplace_items_list(
         if current_user.academy_id is None:
             return []
         academy_filter = current_user.academy_id
-    rows = await list_marketplace_items_for_admin(db, academy_id=academy_filter)
+    rows = await list_marketplace_items_for_admin(
+        db,
+        academy_id=academy_filter,
+        limit=limit,
+        offset=offset,
+    )
     return [marketplace_item_admin_read_from_orm(r) for r in rows]
 
 

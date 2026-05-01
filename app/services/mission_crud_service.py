@@ -5,9 +5,10 @@ from uuid import UUID
 
 from sqlalchemy import select, delete as sa_delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.exceptions import AcademyNotFoundError, AppError, LessonNotFoundError, TechniqueNotFoundError
+from app.core.list_pagination import clamp_list_limit
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique
 from app.services.audit_service import (
@@ -190,16 +191,20 @@ async def get_mission(
 async def list_missions(
     db: AsyncSession,
     academy_id: UUID | None = None,
-    limit: int = 100,
+    limit: int = 50,
+    offset: int = 0,
     *,
     include_deleted: bool = False,
 ) -> list[Mission]:
     """Lista missões, opcionalmente filtradas por academia (eager load technique para technique_name)."""
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     stmt = (
         select(Mission)
-        .options(selectinload(Mission.technique))
+        .options(joinedload(Mission.technique))
         .order_by(Mission.slot_index.asc().nullslast(), Mission.id.desc())
-        .limit(limit)
+        .offset(safe_offset)
+        .limit(safe_limit)
     )
     if not include_deleted:
         stmt = stmt.where(Mission.deleted_at.is_(None))

@@ -25,7 +25,8 @@ RUN groupadd --gid 1000 app && \
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH=/home/app/.local/bin:$PATH
+    PATH=/home/app/.local/bin:$PATH \
+    PYTHONPATH=/home/app/.local/lib/python3.12/site-packages
 
 # Copiar dependências do builder para o usuário app
 COPY --from=builder /root/.local /home/app/.local
@@ -66,4 +67,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()" || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--loop", "uvloop", "--http", "httptools", "--no-access-log"]

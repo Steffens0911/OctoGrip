@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import worker_process_init
 
 from app.config import settings
@@ -17,14 +18,23 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
     task_time_limit=120,
+    task_soft_time_limit=90,
     task_track_started=True,
     broker_connection_retry_on_startup=True,
+    worker_concurrency=2,
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
+    result_expires=3600,
     timezone="UTC",
     beat_schedule={
         "face-recognition-cleanup-daily": {
             "task": "app.tasks.face_recognition_tasks.cleanup_face_recognition_temp_data",
-            "schedule": 24 * 60 * 60,
-        }
+            "schedule": crontab(hour=3, minute=0),
+        },
+        "cleanup-expired-attendance-sessions": {
+            "task": "app.tasks.face_recognition_tasks.cleanup_expired_sessions",
+            "schedule": crontab(minute="*/30"),
+        },
     },
 )
 

@@ -34,7 +34,7 @@ async def list_global_partners(db: AsyncSession) -> list[GlobalPartner]:
 
 async def list_active_global_featured(db: AsyncSession, *, limit: int = 5) -> list[GlobalPartner]:
     lim = max(1, min(limit, 50))
-    cache_key = f"{_FEATURED_GLOBAL_PREFIX}active:{lim}"
+    cache_key = await app_cache.versioned_key(_FEATURED_GLOBAL_PREFIX, f"active:{lim}")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
@@ -90,7 +90,7 @@ async def create_global_partner(
     )
     await db.commit()
     await db.refresh(partner)
-    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
+    await app_cache.bump_prefix_version(_FEATURED_GLOBAL_PREFIX)
     logger.info("create_global_partner", extra={"global_partner_id": str(partner.id)})
     return partner
 
@@ -144,7 +144,7 @@ async def update_global_partner(
         )
     await db.commit()
     await db.refresh(partner)
-    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
+    await app_cache.bump_prefix_version(_FEATURED_GLOBAL_PREFIX)
     logger.info("update_global_partner", extra={"global_partner_id": str(partner.id)})
     return partner
 
@@ -170,6 +170,6 @@ async def delete_global_partner(
     )
     await db.delete(partner)
     await db.commit()
-    await app_cache.invalidate_prefix(_FEATURED_GLOBAL_PREFIX)
+    await app_cache.bump_prefix_version(_FEATURED_GLOBAL_PREFIX)
     logger.info("delete_global_partner", extra={"global_partner_id": str(partner.id)})
     return True

@@ -5,11 +5,12 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.app_time import today_in_app_tz
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
+from app.core.list_pagination import clamp_list_limit
 from app.models import Academy, MissionUsage, Technique, TechniqueExecution, Trophy, User
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
@@ -168,14 +169,24 @@ async def create_trophy(
     return trophy
 
 
-async def list_trophies_by_academy(db: AsyncSession, academy_id: UUID) -> list[Trophy]:
+async def list_trophies_by_academy(
+    db: AsyncSession,
+    academy_id: UUID,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[Trophy]:
     """Lista troféus ativos (não soft-deletados) da academia ordenados por nome."""
+    safe_limit = clamp_list_limit(limit)
+    safe_offset = max(0, int(offset))
     return (
         await db.execute(
             select(Trophy)
-            .options(selectinload(Trophy.technique))
+            .options(joinedload(Trophy.technique))
             .where(Trophy.academy_id == academy_id, Trophy.deleted_at.is_(None))
             .order_by(Trophy.name)
+            .offset(safe_offset)
+            .limit(safe_limit)
         )
     ).unique().scalars().all()
 

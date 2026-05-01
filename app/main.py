@@ -7,8 +7,8 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.staticfiles import StaticFiles
 from pathlib import Path
@@ -29,34 +29,11 @@ from app.core.middleware import (
 )
 from app.core.metrics import http_errors_total
 from app.core.rate_limit import limiter
-from app.database import engine
-from app.models import Base  # noqa: F401 — registra models para migrações
 from app.routes.router import api_router
-from app.run_migrations import run_migrations
-from app.scripts.seed import run_seed
 
 logger = logging.getLogger(__name__)
 
 _IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
-
-
-def _ensure_public_schema_sync() -> None:
-    """
-    Evita loop de startup se um restore interrompido remover o schema public.
-    """
-    with engine.begin() as conn:
-        conn.execute(text("CREATE SCHEMA IF NOT EXISTS public"))
-        conn.execute(text("ALTER SCHEMA public OWNER TO CURRENT_USER"))
-        conn.execute(text("GRANT ALL ON SCHEMA public TO CURRENT_USER"))
-        conn.execute(text("GRANT USAGE ON SCHEMA public TO PUBLIC"))
-        conn.execute(
-            text(
-                "DO $$ BEGIN "
-                "EXECUTE format('ALTER DATABASE %I SET search_path TO public', current_database()); "
-                "END $$;"
-            )
-        )
-
 
 def register_exception_handlers(application: FastAPI) -> None:
     """Mapeia exceções de domínio e erros não tratados para respostas HTTP (com CORS)."""
@@ -286,30 +263,11 @@ def register_exception_handlers(application: FastAPI) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Cria tabelas a partir dos models (se não existirem), aplica migrações e (opcionalmente) roda seed ao subir a API."""
+    """Inicialização leve dos workers HTTP."""
     setup_logging(level=settings.LOG_LEVEL, format_type=settings.LOG_FORMAT)
 
     # Inicializar Sentry se configurado
     init_sentry(settings.SENTRY_DSN)
-
-    # Pré-carrega modelo do DeepFace para reduzir cold start após startup.
-    # (Se o DeepFace estiver indisponível, não bloqueia o servidor subir; a feature falhará quando chamada.)
-    try:
-        from app.face_model import get_model
-
-        get_model()
-    except Exception:
-        logger.exception("Falha ao pré-carregar modelo DeepFace (Facenet512) no startup.")
-
-    # Garante schema público/saneamento antes de criar tabelas e migrar.
-    _ensure_public_schema_sync()
-    # Garante que tabelas base (users, lessons, techniques, etc.) existam antes das migrações
-    Base.metadata.create_all(bind=engine)
-    run_migrations(engine)
-    if settings.SEED_ON_STARTUP:
-        run_seed()
-    else:
-        logger.info("Seed desabilitado (SEED_ON_STARTUP=false).")
     yield
 
 
@@ -333,6 +291,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # Middleware de logging de requisições
 app.add_middleware(RequestLoggingMiddleware, log_successful=False)
+
+# Compressão para respostas JSON maiores.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS: allow_headers=["*"] com allow_credentials=False é suportado pelo Starlette e espelha no preflight
 # os headers pedidos pelo browser (Authorization, X-Impersonate-User, extensões, etc.). Evita 400

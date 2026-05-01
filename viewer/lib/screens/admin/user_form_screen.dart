@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
@@ -433,10 +434,15 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 if (_absoluteMediaUrl(_currentAvatarUrl) case final avatarUrl?)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      avatarUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: avatarUrl,
                       height: 120,
                       fit: BoxFit.cover,
+                      placeholder: (_, __) => const SizedBox(
+                        height: 120,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (_, __, ___) => const Icon(Icons.person),
                     ),
                   )
                 else
