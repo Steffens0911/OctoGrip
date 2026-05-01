@@ -8,9 +8,6 @@ import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/attendance_live_service.dart';
 import 'package:viewer/services/auth_service.dart';
-import 'package:viewer/models/face_recognition.dart';
-import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
-import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
@@ -39,10 +36,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _busy = false;
   bool _startingSession = false;
   String? _error;
-  bool _faceRecognitionEnabled = false;
-  String? _faceJobId;
-  DateTime? _faceJobSubmittedAt;
-  bool _checkingFaceJob = false;
   Timer? _refreshTimer;
   Timer? _qrRetryTimer;
   Timer? _qrHeartbeatTimer;
@@ -158,7 +151,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => AttendanceAddStudentDialog(
         api: _api,
-        academyId: academyId!,
+        academyId: academyId,
         presentUserIds: _presentUserIds,
         onConfirm: (ids) => _api.addAttendanceRecordsManualBatch(sid, ids),
       ),
@@ -226,7 +219,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           _records = const [];
           _loading = false;
         });
-        await _loadFaceFeatureFlag();
         _startAutoRefresh();
         _startQrHeartbeat();
         _startLive(s.id);
@@ -288,91 +280,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         _records = (recs.toList()
           ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
       });
-      await _loadFaceFeatureFlag();
       await _hydrateUsersForRecords(recs);
     } catch (_) {
       // Silencioso no auto refresh
     } finally {
       _isRefreshingSession = false;
-    }
-  }
-
-  Future<void> _loadFaceFeatureFlag() async {
-    final sid = _session?.academyId;
-    if (sid == null || sid.isEmpty) {
-      if (!mounted) return;
-      setState(() => _faceRecognitionEnabled = false);
-      return;
-    }
-    try {
-      final academy = await _api.getAcademy(sid);
-      if (!mounted) return;
-      setState(() => _faceRecognitionEnabled = academy.faceRecognitionEnabled);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _faceRecognitionEnabled = false);
-    }
-  }
-
-  Future<void> _openFaceRecognitionFlow() async {
-    final session = _session;
-    if (session == null || _busy) return;
-    final result =
-        await Navigator.of(context).push<FaceRecognitionSubmitResponse>(
-      MaterialPageRoute(
-        builder: (_) => FaceRecognitionCheckinScreen(sessionId: session.id),
-      ),
-    );
-    if (result == null || !mounted) return;
-    setState(() {
-      _faceJobId = result.jobId;
-      _faceJobSubmittedAt = DateTime.now();
-    });
-  }
-
-  Future<void> _checkFaceRecognitionJob() async {
-    final session = _session;
-    final jobId = _faceJobId;
-    if (session == null || jobId == null || _checkingFaceJob) return;
-    setState(() => _checkingFaceJob = true);
-    try {
-      final job = await _api.getFaceRecognitionJob(jobId);
-      if (!mounted) return;
-      if (job.status == 'completed') {
-        final saved = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => ReviewFaceResultsScreen(
-              sessionId: session.id,
-              jobId: jobId,
-              academyId: session.academyId,
-            ),
-          ),
-        );
-        if (saved == true) {
-          await _refreshSession();
-          if (!mounted) return;
-          setState(() {
-            _faceJobId = null;
-            _faceJobSubmittedAt = null;
-          });
-        }
-      } else {
-        AppFeedback.show(
-          context,
-          message:
-              'Processamento ainda em andamento. Tente novamente em instantes.',
-          type: AppFeedbackType.warning,
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: userFacingMessage(e),
-        type: AppFeedbackType.error,
-      );
-    } finally {
-      if (mounted) setState(() => _checkingFaceJob = false);
     }
   }
 
@@ -639,7 +551,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         _session = s;
         _records = const [];
       });
-      await _loadFaceFeatureFlag();
       _startAutoRefresh();
       _startQrHeartbeat();
       _startLive(s.id);
@@ -781,9 +692,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
     final qr = _qr;
     final isClosed = (s.status.toLowerCase() == 'closed');
-    final showFaceBanner = _faceJobId != null &&
-        _faceJobSubmittedAt != null &&
-        DateTime.now().difference(_faceJobSubmittedAt!).inMinutes >= 3;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -820,47 +728,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                 icon: const Icon(Icons.person_add_rounded, size: 18),
                 label: const Text('Adicionar aluno'),
               ),
-              if (_faceRecognitionEnabled)
-                OutlinedButton.icon(
-                  onPressed:
-                      _busy || isClosed ? null : _openFaceRecognitionFlow,
-                  icon: const Icon(Icons.photo_library_outlined, size: 18),
-                  label: const Text('Chamada por foto'),
-                ),
             ],
           ),
-          if (showFaceBanner) ...[
-            const SizedBox(height: 8),
-            Material(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(8),
-                onTap: _checkFaceRecognitionJob,
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.hourglass_top_rounded),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Processamento em andamento... Toque para verificar.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                      if (_checkingFaceJob)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
           const SizedBox(height: 8),
           Text(
             'Presentes: ${s.presentCount}',
