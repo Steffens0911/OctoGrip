@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/network_diagnostics_service.dart';
+import 'package:viewer/screens/debug/network_diagnostics_screen.dart';
 import 'package:viewer/utils/api_base_persist.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_error_message.dart';
@@ -44,7 +46,12 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
         type: AppFeedbackType.success,
       );
       Navigator.pop(context);
-    } catch (e) {
+    } catch (e, st) {
+      NetworkDiagnosticsService.recordError(
+        e,
+        stackTrace: st,
+        context: 'Escanear QR da chamada',
+      );
       if (!mounted) return;
       AppFeedback.show(
         context,
@@ -136,6 +143,17 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
       appBar: AppStandardAppBar(
         title: 'Escanear QR da chamada',
         actions: [
+          IconButton(
+            tooltip: 'Diagnóstico',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const NetworkDiagnosticsScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.health_and_safety_rounded),
+          ),
           IconButton(
             tooltip: 'Inserir código',
             onPressed: _busy ? null : _openManualEntry,

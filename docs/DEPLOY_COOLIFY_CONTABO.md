@@ -59,7 +59,7 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `CORS_ORIGINS` | JSON com a origem do viewer, ex. `["https://app.seudominio.com"]` |
 | `SEED_ON_STARTUP` | `false` em produção (recomendado) |
 | `PGSSLMODE` | `disable` (Postgres interno na rede Docker sem TLS) |
-| `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify: o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
+| `API_BASE_URL` | URL **pública HTTPS** da API, ex. `https://api.seudominio.com` — **obrigatória** no Coolify e deve estar **Available at Buildtime** no serviço Compose (não apenas runtime), porque o viewer compila com `dart-define=API_BASE_URL` (`viewer/lib/config_web.dart`). Sem isto, o browser tenta `localhost:8001` ou `app.seudominio.com:8001` e o login falha. |
 | `FIREBASE_WEB_APP_ID` | (Opcional) `appId` da app **Web** no Firebase (`1:...:web:...`). *Build arg* do `viewer`. |
 | `FIREBASE_WEB_API_KEY` | **Recomendado com FCM Web:** `apiKey` da **mesma** app Web na consola (costuma ser diferente da chave Android). Sem o par certo `apiKey`+`appId`, o Firebase Installations responde **400 INVALID_ARGUMENT**. |
 | `FIREBASE_MESSAGING_SENDER_ID` | (Opcional) `messagingSenderId` do snippet da app Web, se diferente do default do repositório. |

@@ -5,6 +5,8 @@ import 'package:viewer/branding/app_brand.dart';
 import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/network_diagnostics_service.dart';
+import 'package:viewer/screens/debug/network_diagnostics_screen.dart';
 import 'package:viewer/utils/api_base_persist.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/utils/form_utils.dart';
@@ -99,7 +101,12 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      NetworkDiagnosticsService.recordError(
+        e,
+        stackTrace: st,
+        context: 'Login',
+      );
       if (mounted) {
         setState(() => _error = userFacingMessage(e));
       }
@@ -267,6 +274,21 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (_error != null) ...[
                         const SizedBox(height: 16),
                         AppErrorMessage(message: _error!),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const NetworkDiagnosticsScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.health_and_safety_rounded),
+                            label: const Text('Abrir diagnóstico técnico'),
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 22),
                       FilledButton(
