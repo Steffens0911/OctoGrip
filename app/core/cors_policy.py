@@ -1,15 +1,20 @@
 """
-Política CORS (regex de origens) e eco explícito de headers nas respostas JSON.
+Política CORS (lista explícita + regex de dev) e eco explícito de headers nas respostas JSON.
 
 O CORSMiddleware e o CorsFallbackMiddleware cobrem o fluxo ASGI normal; estes headers
 reforçam respostas geradas pelos exception handlers e por rotas críticas (ex.: restore),
 onde o browser às vezes não vê Access-Control-Allow-Origin (500 multipart, pipeline atípico).
+
+Em produção, ``Settings.CORS_ORIGINS`` (``app.config``) deve incluir as origens HTTPS do viewer;
+sem isso, ``is_allowed_cors_origin`` ficava só com regex de localhost e o fallback não ecoava ACAO.
 """
 from __future__ import annotations
 
 import os
 import re
 from starlette.requests import Request
+
+from app.config import settings
 
 _IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
 
@@ -34,11 +39,15 @@ CORS_ORIGIN_REGEX_COMPILED = re.compile(CORS_ORIGIN_REGEX)
 
 
 def is_allowed_cors_origin(origin: str) -> bool:
+    if not origin:
+        return False
+    if origin in settings.CORS_ORIGINS:
+        return True
     return bool(CORS_ORIGIN_REGEX_COMPILED.fullmatch(origin))
 
 
 def cors_echo_headers_for_request(request: Request) -> dict[str, str]:
-    """Headers a acrescentar quando o Origin do pedido é permitido pelo regex."""
+    """Headers a acrescentar quando o Origin é permitido (CORS_ORIGINS ou regex de dev)."""
     origin = request.headers.get("origin")
     if not origin or not is_allowed_cors_origin(origin):
         return {}
