@@ -1,7 +1,7 @@
 """Rotas de execuções de técnica (gamificação): criar, pendentes, confirmar. Requerem autenticação."""
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
@@ -63,7 +63,7 @@ def _execution_to_read(execution) -> ExecutionRead:
 @limiter.limit("30/minute")
 async def execution_create(
     request: Request,
-    body: ExecutionCreate,
+    body: ExecutionCreate = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),
 ):

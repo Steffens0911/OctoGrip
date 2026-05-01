@@ -3,7 +3,7 @@ import logging
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -60,7 +60,7 @@ def _clear_failed_attempts(email: str) -> None:
 @limiter.limit(settings.LOGIN_RATE_LIMIT)
 async def login(
     request: Request,
-    body: LoginRequest,
+    body: LoginRequest = Body(...),
     db: AsyncSession = Depends(get_db),
 ):
     """Login com e-mail e senha. Retorna JWT."""

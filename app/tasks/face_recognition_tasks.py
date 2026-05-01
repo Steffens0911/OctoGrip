@@ -108,15 +108,15 @@ def _crop_face_base64(image_path: str, facial_area: dict | None) -> str:
 
 
 def _classify_match(similarity: float) -> str:
-    if similarity >= 0.75:
+    if similarity >= 0.55:
         return "auto_identified"
-    if similarity >= 0.50:
+    if similarity >= 0.40:
         return "suggestion"
     return "unknown"
 
 
 def _read_avatar_bytes(avatar_url: str) -> bytes:
-    if avatar_url.startswith("http://") or avatar_url.startswith("https://"):
+    if avatar_url.startswith("https://"):
         content = requests.get(avatar_url, timeout=20)
         content.raise_for_status()
         return content.content
@@ -128,7 +128,7 @@ def _read_avatar_bytes(avatar_url: str) -> bytes:
             raise FileNotFoundError("Caminho de mídia inválido para avatar.")
         return media_path.read_bytes()
 
-    raise ValueError("avatar_url inválido para geração de embedding.")
+    raise ValueError("avatar_url inválido: apenas https:// ou /media/ são permitidos.")
 
 
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
@@ -142,6 +142,7 @@ def process_face_recognition(self, job_id: str) -> None:
         if not job:
             return
 
+        photo_path = job.photo_path
         try:
             total_started = time.perf_counter()
             job.status = "processing"
@@ -334,6 +335,15 @@ def process_face_recognition(self, job_id: str) -> None:
                     os.remove(resized_tmp_path)
             except OSError:
                 pass
+            try:
+                if photo_path:
+                    os.remove(photo_path)
+                    job2 = db.get(FaceRecognitionJob, uid)
+                    if job2:
+                        job2.photo_path = ""
+                        db.commit()
+            except OSError:
+                pass
 
 
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
@@ -354,20 +364,37 @@ def generate_student_embedding(self, student_id: str) -> None:
         resized_tmp_path: str | None = None
         try:
             face_img_path, _, _, resized_tmp_path = _prepare_face_input_image(tmp_path)
-            # Garante que o modelo esteja aquecido no processo antes de representar.
             get_model()
-            represented = DeepFace.represent(
-                img_path=face_img_path,
-                model_name="Facenet512",
-                detector_backend="opencv",
-                enforce_detection=False,
-            )
+            try:
+                represented = DeepFace.represent(
+                    img_path=face_img_path,
+                    model_name="Facenet512",
+                    detector_backend="opencv",
+                    enforce_detection=True,
+                )
+            except ValueError:
+                logger.warning("Nenhuma face detectada no avatar do aluno %s — embedding ignorado.", student_id)
+                return
             faces = represented if isinstance(represented, list) else [represented]
             if not faces:
+                logger.warning("Nenhuma face detectada no avatar do aluno %s.", student_id)
                 return
-            embedding = faces[0].get("embedding")
-            if not embedding:
+            if len(faces) > 1:
+                logger.warning(
+                    "Avatar do aluno %s contém %d faces; embedding não gerado para evitar erro de identidade.",
+                    student_id,
+                    len(faces),
+                )
                 return
+            embedding_raw = faces[0].get("embedding")
+            if not embedding_raw:
+                return
+            # Normaliza L2 antes de armazenar; process_face_recognition não precisa renormalizar.
+            emb_arr = np.asarray(embedding_raw, dtype=np.float32)
+            norm = float(np.linalg.norm(emb_arr))
+            if norm > 1e-8:
+                emb_arr = emb_arr / norm
+            embedding = emb_arr.tolist()
             stmt = (
                 pg_insert(StudentFaceEmbedding)
                 .values(student_id=user.id, academy_id=user.academy_id, embedding=embedding)

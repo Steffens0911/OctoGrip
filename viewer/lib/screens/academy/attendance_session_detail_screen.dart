@@ -329,6 +329,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
             builder: (_) => ReviewFaceResultsScreen(
               sessionId: session.id,
               jobId: jobId,
+              academyId: session.academyId,
             ),
           ),
         );

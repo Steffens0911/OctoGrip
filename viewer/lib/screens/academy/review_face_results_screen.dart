@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/academy_student_list_item.dart';
 import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -13,11 +14,13 @@ import 'package:viewer/widgets/app_standard_app_bar.dart';
 class ReviewFaceResultsScreen extends StatefulWidget {
   final String sessionId;
   final String jobId;
+  final String? academyId;
 
   const ReviewFaceResultsScreen({
     super.key,
     required this.sessionId,
     required this.jobId,
+    this.academyId,
   });
 
   @override
@@ -29,9 +32,12 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
   final _api = ApiService();
   bool _loading = true;
   bool _saving = false;
+  bool _loadingStudents = false;
   String? _error;
   FaceRecognitionJobStatusModel? _job;
   final Set<String> _confirmedStudentIds = <String>{};
+  List<AcademyStudentListItem> _students = [];
+  final Map<int, String> _unknownAssignments = {};
 
   @override
   void initState() {
@@ -65,6 +71,22 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         _loading = false;
         _error = userFacingMessage(e);
       });
+      return;
+    }
+
+    final aid = widget.academyId;
+    if (aid != null && aid.isNotEmpty) {
+      setState(() => _loadingStudents = true);
+      _api.getAcademyStudentsListAll(aid).then((list) {
+        if (!mounted) return;
+        setState(() {
+          _students = list;
+          _loadingStudents = false;
+        });
+      }).catchError((_) {
+        if (!mounted) return;
+        setState(() => _loadingStudents = false);
+      });
     }
   }
 
@@ -93,6 +115,19 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         type: AppFeedbackType.error,
       );
     }
+  }
+
+  void _onUnknownAssigned(int faceIndex, String? studentId) {
+    setState(() {
+      final prev = _unknownAssignments[faceIndex];
+      if (prev != null) _confirmedStudentIds.remove(prev);
+      if (studentId != null) {
+        _unknownAssignments[faceIndex] = studentId;
+        _confirmedStudentIds.add(studentId);
+      } else {
+        _unknownAssignments.remove(faceIndex);
+      }
+    });
   }
 
   Uint8List? _decodeBase64(String base64Input) {
@@ -234,12 +269,36 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           const SizedBox(height: 16),
           Text('Não identificados',
               style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            '${unknown.length} rostos não foram identificados. Verifique se todos os alunos têm foto cadastrada.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondaryOf(context),
-                ),
+          const SizedBox(height: 4),
+          if (unknown.isNotEmpty)
+            Text(
+              '${unknown.length} rosto${unknown.length > 1 ? 's' : ''} não ${unknown.length > 1 ? 'foram' : 'foi'} identificado${unknown.length > 1 ? 's' : ''} automaticamente. '
+              'Selecione o aluno correspondente ou deixe em branco.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            )
+          else
+            Text(
+              'Nenhum rosto desconhecido.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+          if (_loadingStudents)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: LinearProgressIndicator(),
+            ),
+          if (unknown.isNotEmpty) const SizedBox(height: 8),
+          ...unknown.map(
+            (r) => _UnknownFaceItem(
+              result: r,
+              students: _students,
+              assignedStudentId: _unknownAssignments[r.faceIndex],
+              onAssigned: (sid) => _onUnknownAssigned(r.faceIndex, sid),
+              decodeBase64: _decodeBase64,
+            ),
           ),
         ],
       ),
@@ -255,6 +314,139 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
                 )
               : Text(
                   'Salvar presenças (${_confirmedStudentIds.length} alunos)'),
+        ),
+      ),
+    );
+  }
+}
+
+class _UnknownFaceItem extends StatefulWidget {
+  final FaceRecognitionResultModel result;
+  final List<AcademyStudentListItem> students;
+  final String? assignedStudentId;
+  final ValueChanged<String?> onAssigned;
+  final Uint8List? Function(String) decodeBase64;
+
+  const _UnknownFaceItem({
+    required this.result,
+    required this.students,
+    required this.assignedStudentId,
+    required this.onAssigned,
+    required this.decodeBase64,
+  });
+
+  @override
+  State<_UnknownFaceItem> createState() => _UnknownFaceItemState();
+}
+
+class _UnknownFaceItemState extends State<_UnknownFaceItem> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: _labelForId(widget.assignedStudentId));
+  }
+
+  @override
+  void didUpdateWidget(_UnknownFaceItem old) {
+    super.didUpdateWidget(old);
+    // Sincronizar se o pai limpou a atribuição externamente
+    if (old.assignedStudentId != widget.assignedStudentId &&
+        widget.assignedStudentId == null &&
+        _ctrl.text.isNotEmpty) {
+      _ctrl.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _labelForId(String? id) {
+    if (id == null) return '';
+    final s = widget.students.where((s) => s.id == id).firstOrNull;
+    return s != null ? _studentLabel(s) : '';
+  }
+
+  String _studentLabel(AcademyStudentListItem s) {
+    final belt = (s.belt != null && s.belt!.isNotEmpty) ? ' · Faixa ${s.belt}' : '';
+    return '${s.name ?? ''}$belt';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final crop = widget.decodeBase64(widget.result.faceCropBase64);
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            crop == null
+                ? const CircleAvatar(child: Icon(Icons.person_outline))
+                : CircleAvatar(backgroundImage: MemoryImage(crop)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Não identificado',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Autocomplete<AcademyStudentListItem>(
+                    textEditingController: _ctrl,
+                    optionsBuilder: (value) {
+                      final q = value.text.trim().toLowerCase();
+                      if (q.isEmpty) return widget.students.take(8);
+                      return widget.students
+                          .where((s) =>
+                              s.name?.toLowerCase().contains(q) ?? false)
+                          .take(8);
+                    },
+                    displayStringForOption: _studentLabel,
+                    onSelected: (student) {
+                      widget.onAssigned(student.id);
+                    },
+                    fieldViewBuilder: (context, ctrl, focusNode, onSubmit) {
+                      return TextField(
+                        controller: ctrl,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          hintText: widget.students.isEmpty
+                              ? 'Carregando alunos...'
+                              : 'Buscar aluno...',
+                          prefixIcon:
+                              const Icon(Icons.search_rounded, size: 18),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          suffixIcon: ctrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () {
+                                    ctrl.clear();
+                                    widget.onAssigned(null);
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (v) {
+                          if (v.isEmpty) widget.onAssigned(null);
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

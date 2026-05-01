@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,7 +187,7 @@ async def face_recognition_job_status(
 @limiter.limit("5/minute")
 async def face_recognition_confirm(
     request: Request,
-    body: FaceRecognitionConfirmRequest,
+    body: FaceRecognitionConfirmRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):

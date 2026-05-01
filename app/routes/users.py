@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Final
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Query, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
@@ -226,7 +226,7 @@ async def user_points_log(
 @limiter.limit("20/minute")
 async def user_create(
     request: Request,
-    body: UserCreate,
+    body: UserCreate = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
 ):

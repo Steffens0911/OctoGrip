@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Body, Depends, Query, Request, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
@@ -563,7 +563,7 @@ async def attendance_session_ws(
 @limiter.limit("30/minute")
 async def attendance_scan(
     request: Request,
-    body: AttendanceScanRequest,
+    body: AttendanceScanRequest = Body(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),
 ):
