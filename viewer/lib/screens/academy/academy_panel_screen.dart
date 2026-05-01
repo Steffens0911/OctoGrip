@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/config/feature_flags.dart';
+import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
@@ -11,6 +12,9 @@ import 'package:viewer/screens/academy/academy_attendance_hub_screen.dart';
 import 'package:viewer/screens/academy/academy_customization_business_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/widgets/app_navigation_tile.dart';
+import 'package:viewer/widgets/layout/memo_compact_tile_card.dart';
+import 'package:viewer/widgets/layout/memo_section_label.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
@@ -82,15 +86,6 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     _load();
   }
 
-  int _getItemCount() {
-    int count = _academies.length;
-    if (AuthService().isManager() || AuthService().isProfessor()) {
-      // Cards fixos: push
-      count += kPushNotificationsEnabled ? 1 : 0;
-    }
-    return count;
-  }
-
   Academy? get _resolvedAcademy {
     if (_academies.length == 1) return _academies.first;
     final currentAcademyId = AuthService().currentUser?.academyId;
@@ -102,75 +97,44 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     return null;
   }
 
-  Widget _buildListItem(BuildContext context, int index) {
-    final isManagerOrProfessor =
-        AuthService().isManager() || AuthService().isProfessor();
+  bool get _showPushItem =>
+      (AuthService().isManager() || AuthService().isProfessor()) &&
+      kPushNotificationsEnabled;
 
-    if (isManagerOrProfessor &&
-        kPushNotificationsEnabled &&
-        index == 0) {
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-            child: const Icon(Icons.notifications_active_rounded,
-                color: AppTheme.primary),
-          ),
-          title: const Text(
-            'Aviso à academia (push)',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text(
-            'Enviar notificação para quem tem o app e está na sua academia',
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            final academyId = AuthService().currentUser?.academyId;
-            if (academyId == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Seu usuário não está vinculado a uma academia.',
-                  ),
-                ),
-              );
-              return;
-            }
-            Navigator.push<void>(
-              context,
-              MaterialPageRoute<void>(
-                builder: (context) => const AcademyPushNotificationScreen(),
-              ),
-            );
-          },
+  Widget _academyNavigationTile({
+    required bool enabled,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    final tile = AppNavigationTile(
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      onTap: onTap,
+    );
+    if (enabled) return tile;
+    return Opacity(
+      opacity: 0.45,
+      child: IgnorePointer(child: tile),
+    );
+  }
+
+  void _openPushScreen() {
+    final academyId = AuthService().currentUser?.academyId;
+    if (academyId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Seu usuário não está vinculado a uma academia.'),
         ),
       );
+      return;
     }
-
-    // Cards fixos no topo; academias após Usuários + chamada + histórico + frequência + técnicas + vídeos + Loja (+ push).
-    final managerOffset =
-        isManagerOrProfessor ? (kPushNotificationsEnabled ? 1 : 0) : 0;
-    final academyIndex = isManagerOrProfessor ? index - managerOffset : index;
-    if (academyIndex < 0 || academyIndex >= _academies.length) {
-      return const SizedBox.shrink();
-    }
-    final academy = _academies[academyIndex];
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-          child: const Icon(Icons.school, color: AppTheme.primary),
-        ),
-        title: const Text(
-          'Relatórios',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        // Subtitle "Missão do dia" removido conforme solicitado.
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => _openAcademy(academy),
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => const AcademyPushNotificationScreen(),
       ),
     );
   }
@@ -229,125 +193,132 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: ListView(
-                          padding: const EdgeInsets.all(16),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(AppSpacing.m),
                           children: [
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.emoji_events_rounded, color: AppTheme.primary),
-                                ),
-                                title: const Text(
-                                  'Campo de treinamento',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  resolvedAcademy != null
-                                      ? 'Posições e técnicas + troféus e missões semanais'
-                                      : 'Seu usuário não está vinculado a uma academia',
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                enabled: resolvedAcademy != null,
-                                onTap: resolvedAcademy == null
-                                    ? null
-                                    : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => AcademyTrainingFieldScreen(
-                                              academy: resolvedAcademy,
+                            const MemoSectionLabel('CONTEÚDO'),
+                            const SizedBox(height: AppSpacing.s),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: MemoCompactTileCard(
+                                    featured: true,
+                                    enabled: resolvedAcademy != null,
+                                    icon: Icons.fitness_center_rounded,
+                                    title: 'Campo de treinamento',
+                                    subtitle:
+                                        'Técnicas, missões e troféus semanais',
+                                    onTap: resolvedAcademy == null
+                                        ? null
+                                        : () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    AcademyTrainingFieldScreen(
+                                                  academy: resolvedAcademy,
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                              ),
-                            ),
-
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.palette_rounded, color: AppTheme.primary),
-                                ),
-                                title: const Text(
-                                  'Personalização e Negócios',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  resolvedAcademy != null
-                                      ? 'Logo, quadro de horários, parceiros, avisos e visibilidade'
-                                      : 'Seu usuário não está vinculado a uma academia',
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                enabled: resolvedAcademy != null,
-                                onTap: resolvedAcademy == null
-                                    ? null
-                                    : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                AcademyCustomizationBusinessScreen(academy: resolvedAcademy),
-                                          ),
-                                        ),
-                              ),
-                            ),
-
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.qr_code_rounded, color: AppTheme.primary),
-                                ),
-                                title: const Text(
-                                  'Chamada e frequência',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: const Text(
-                                  'Chamada (QR), histórico e frequência',
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const AcademyAttendanceHubScreen(),
                                   ),
                                 ),
+                                const SizedBox(width: AppSpacing.s),
+                                Expanded(
+                                  child: MemoCompactTileCard(
+                                    featured: false,
+                                    enabled: resolvedAcademy != null,
+                                    icon: Icons.palette_rounded,
+                                    title: 'Personalização e Negócios',
+                                    subtitle:
+                                        'Logo, horários, parceiros e avisos',
+                                    onTap: resolvedAcademy == null
+                                        ? null
+                                        : () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    AcademyCustomizationBusinessScreen(
+                                                  academy: resolvedAcademy,
+                                                ),
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.m),
+                            const MemoSectionLabel('ALUNOS'),
+                            const SizedBox(height: AppSpacing.s),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: MemoCompactTileCard(
+                                    featured: false,
+                                    enabled: resolvedAcademy != null,
+                                    icon: Icons.school_rounded,
+                                    title: 'Alunos',
+                                    subtitle: 'Usuários, pontos e alunos ativos',
+                                    onTap: resolvedAcademy == null
+                                        ? null
+                                        : () => Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    AcademyStudentsScreen(
+                                                  academy: resolvedAcademy,
+                                                ),
+                                              ),
+                                            ),
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.s),
+                                Expanded(
+                                  child: MemoCompactTileCard(
+                                    featured: false,
+                                    enabled: true,
+                                    icon: Icons.assignment_rounded,
+                                    title: 'Chamada e frequência',
+                                    subtitle:
+                                        'Chamada (QR), histórico e frequência',
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const AcademyAttendanceHubScreen(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.m),
+                            const MemoSectionLabel('DADOS'),
+                            const SizedBox(height: AppSpacing.s),
+                            ..._academies.map(
+                              (academy) => Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: AppSpacing.s),
+                                child: _academyNavigationTile(
+                                  enabled: true,
+                                  icon: Icons.bar_chart_rounded,
+                                  title: 'Relatórios',
+                                  subtitle:
+                                      'Exportar dados e métricas da academia',
+                                  onTap: () => _openAcademy(academy),
+                                ),
                               ),
                             ),
-
-                            Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
-                                  child: const Icon(Icons.school_rounded, color: AppTheme.primary),
-                                ),
-                                title: const Text(
-                                  'Alunos',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                subtitle: Text(
-                                  resolvedAcademy != null
-                                      ? 'Usuários, pontos e alunos ativos'
-                                      : 'Seu usuário não está vinculado a uma academia',
-                                ),
-                                trailing: const Icon(Icons.chevron_right),
-                                enabled: resolvedAcademy != null,
-                                onTap: resolvedAcademy == null
-                                    ? null
-                                    : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                AcademyStudentsScreen(academy: resolvedAcademy),
-                                          ),
-                                        ),
+                            if (_showPushItem) ...[
+                              _academyNavigationTile(
+                                enabled: true,
+                                icon: Icons.notifications_active_rounded,
+                                title: 'Aviso à academia (push)',
+                                subtitle:
+                                    'Enviar notificação para quem tem o app e está na sua academia',
+                                onTap: _openPushScreen,
                               ),
-                            ),
-
-                            // Lista existente (cards fixos + academias).
-                            ...List.generate(_getItemCount(), (index) => _buildListItem(context, index)),
+                            ],
                           ],
                         ),
                       ),
