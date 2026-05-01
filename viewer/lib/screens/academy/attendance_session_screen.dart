@@ -158,7 +158,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.6),
       builder: (ctx) => AttendanceAddStudentDialog(
         api: _api,
-        academyId: academyId,
+        academyId: academyId!,
         presentUserIds: _presentUserIds,
         onConfirm: (ids) => _api.addAttendanceRecordsManualBatch(sid, ids),
       ),

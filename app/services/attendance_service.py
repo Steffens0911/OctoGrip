@@ -388,7 +388,6 @@ async def scan_checkin(
     db.add(r)
     try:
         await db.commit()
-        await db.refresh(r)
     except IntegrityError:
         # Índice único (session_id, user_id): duplo scan simultâneo pode passar na leitura
         # “existing” e falhar aqui — tratar como idempotente em vez de 500.
