@@ -52,7 +52,9 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
     ports:
       # Host 8001 evita conflito com uvicorn local na 8000; dentro do contentor continua 8000.
-      - "8001:8000"
+      # Bind em IPv4 e IPv6 para que tanto 127.0.0.1 quanto localhost (::1) funcionem no Windows.
+      - "127.0.0.1:8001:8000"
+      - "[::1]:8001:8000"
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       # Cliente libpq (pg_dump/psql): em Postgres interno sem TLS, preferível a falhas de negociação SSL
@@ -153,7 +155,8 @@ services:
     container_name: jjb_viewer
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
+      - "[::1]:8080:80"
     depends_on:
       - api
 

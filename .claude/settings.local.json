@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(Start-Process \"msedge\" \"http://localhost:8080\")",
+      "PowerShell(Start-Process \"msedge\" \"http://localhost:8080\")",
+      "Bash(Start-Sleep 15)",
+      "Bash(docker exec *)",
+      "PowerShell(docker exec jjb_api /home/app/.local/bin/alembic current 2>&1)",
+      "PowerShell(docker exec jjb_api find / -name \"alembic\" -type f 2>$null)",
+      "PowerShell(docker exec jjb_api sh -c \"which alembic || find /usr /home -name 'alembic' 2>/dev/null | head -5\")",
+      "PowerShell(docker exec jjb_api sh -c \"ls /app && echo '---' && cat /app/app/run_migrations.py 2>/dev/null | head -20\")",
+      "PowerShell(docker exec jjb_api sh -c \"ls /app/migrations/ | sort\")",
+      "PowerShell(docker exec jjb_api sh -c \"cat /app/migrations/066_face_recognition.sql\")",
+      "PowerShell(docker exec jjb_api sh -c \"cd /app && /usr/local/bin/python3.12 -m app.bootstrap 2>&1 | tail -30\")",
+      "PowerShell(docker exec jjb_api sh -c \"cd /app && PYTHONPATH=/home/app/.local/lib/python3.12/site-packages /usr/local/bin/python3.12 -m app.bootstrap 2>&1 | tail -30\")"
+    ]
+  }
+}
