@@ -35,6 +35,9 @@ htmlcov/
 .tox/
 .nox/
 
+# Claude Code — worktrees locais (espelho completo do repo; não versionar)
+.claude/worktrees/
+
 # IDE (opcional)
 .idea/
 .vscode/
