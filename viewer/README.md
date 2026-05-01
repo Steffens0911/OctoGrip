@@ -39,7 +39,7 @@ python scripts/generate_pwa_icons_from_wordmark.py
 
 ## Como rodar
 
-1. Tenha a API rodando (ex.: `http://localhost:8000`).
+1. Tenha a API rodando. **Docker Compose** do repo expõe a API em **`http://localhost:8001`** no host (uvicorn ouve `:8000` dentro do contentor). **Uvicorn local** sem Docker costuma ser `http://localhost:8000`.
 2. Instale dependências e rode o app:
 
 ```bash
@@ -60,14 +60,16 @@ C:\flutter\bin\flutter.bat run
 
 ## URL da API
 
-Por padrão o app usa `http://localhost:8000`. Para alterar (ex.: emulador Android usa `10.0.2.2` para localhost do host):
+**Web (`flutter run -d chrome`):** `lib/config_web.dart` e `web/index.html` usam **`localhost:8001`** quando o viewer está em `localhost`/`127.0.0.1`, alinhado ao `docker-compose.yml`. Em produção configure **`API_BASE_URL`** no build ou `?api_base=`.
 
-- **Web:** altere `kApiBaseUrl` em `lib/config.dart` ou use:
+Para alterar manualmente:
+
+- **Web:**
   ```bash
-  flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000
+  flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8001
   ```
-- **Android emulador:** use `http://10.0.2.2:8000` como base.
-- **Dispositivo físico:** use o IP da máquina onde a API está (ex.: `http://192.168.1.10:8000`).
+- **Android emulador:** use `http://10.0.2.2:<porta>` (ex.: **8001** se a API Docker estiver no host).
+- **Dispositivo físico:** IP da máquina + porta da API (ex.: `http://192.168.1.10:8001`).
 
 ## Notificações push (FCM)
 

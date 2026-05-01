@@ -3,8 +3,8 @@ FROM ghcr.io/cirruslabs/flutter:stable AS builder
 
 WORKDIR /app
 
-# URL da API (o browser acede pelo host; em Docker no mesmo host = localhost:8000)
-ARG API_BASE_URL=http://localhost:8000
+# URL da API no browser (Docker Compose expõe o host em 8001 → uvicorn :8000 no contentor).
+ARG API_BASE_URL=http://localhost:8001
 # FCM Web: copiar do snippet "firebaseConfig" da app Web na consola (todos do MESMO objecto).
 ARG FIREBASE_WEB_APP_ID=
 ARG FIREBASE_WEB_API_KEY=

@@ -47,7 +47,7 @@ def main() -> None:
     text = text.replace("__FIREBASE_STORAGE_BUCKET__", bucket)
     sw_path.write_text(text, encoding="utf-8")
 
-    api_base = os.environ.get("API_BASE_URL", "http://localhost:8000")
+    api_base = os.environ.get("API_BASE_URL", "http://localhost:8001")
     if isinstance(api_base, str):
         api_base = api_base.strip()
 

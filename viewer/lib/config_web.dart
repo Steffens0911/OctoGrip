@@ -78,6 +78,10 @@ String getApiBaseUrl() {
   if (host.endsWith('.trycloudflare.com')) {
     return '';
   }
+  // Viewer Docker expõe a UI frequentemente em :8080 no host; API no mesmo IP costuma estar em :8001.
+  if (Uri.base.hasPort && Uri.base.port == 8080) {
+    return '${Uri.base.scheme}://$host:$localApiPort';
+  }
   // Em produção preferimos mesma origem (sem :8001) para evitar connection refused
   // quando a API está atrás de proxy (ex.: Caddy/Nginx/Cloudflare).
   return '${Uri.base.scheme}://$host';

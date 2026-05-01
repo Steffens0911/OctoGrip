@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/utils/api_base_persist.dart';
 import 'package:viewer/utils/error_message.dart';
+import 'package:viewer/widgets/app_error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
@@ -15,12 +19,14 @@ class AttendanceScanScreen extends StatefulWidget {
 class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   final _api = ApiService();
   final _controller = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+  final _apiTunnelController = TextEditingController();
 
   bool _busy = false;
   bool _torchOn = false;
 
   @override
   void dispose() {
+    _apiTunnelController.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -78,6 +84,54 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Web em túnel público sem api_base: evita erro opaco ao chamar API (kApiBaseUrl vazio).
+    if (kIsWeb && kApiBaseUrl.isEmpty) {
+      return Scaffold(
+        appBar: const AppStandardAppBar(title: 'Escanear QR da chamada'),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              const AppErrorMessage(message: kWebTrycloudflareMissingApiBaseMessage),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _apiTunnelController,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                decoration: const InputDecoration(
+                  labelText: 'URL do túnel da API',
+                  hintText: 'https://….trycloudflare.com',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                onPressed: () {
+                  final u = _apiTunnelController.text.trim();
+                  if (u.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cole a URL do túnel da API.')),
+                    );
+                    return;
+                  }
+                  if (!u.startsWith('https://') && !u.startsWith('http://')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('A URL deve começar com https:// ou http://'),
+                      ),
+                    );
+                    return;
+                  }
+                  persistApiBaseAndReload(u);
+                },
+                child: const Text('Salvar URL da API e recarregar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppStandardAppBar(
         title: 'Escanear QR da chamada',

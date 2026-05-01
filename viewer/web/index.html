@@ -39,10 +39,9 @@
 </head>
 <body>
   <!--
-    API: por defeito mesmo host + porta 8000 (LAN / Docker local).
-    trycloudflare.com: o Chrome bloqueia chamadas de páginas HTTPS públicas para 127.0.0.1. É obrigatório
-    um segundo túnel na API (uvicorn :8000) e abrir o viewer com ?api_base=URL_HTTPS_DO_TUNEL_DA_API (fica em sessionStorage).
-    Ex.: cloudflared tunnel --url http://127.0.0.1:8000 → use a URL trycloudflare na query api_base.
+    API em Docker local (compose): host usa porta 8001 → mapa para uvicorn :8000 no contentor.
+    trycloudflare.com: o Chrome bloqueia HTTPS público → 127.0.0.1; use segundo túnel na API e ?api_base=...
+    Em hosts públicos não forçamos porta aqui: config_web.dart usa mesma origem (proxy) ou --dart-define.
   -->
   <script>
     (function () {
@@ -74,8 +73,9 @@
       }
       if (stored && h.endsWith('.trycloudflare.com')) {
         if (/\.trycloudflare\.com:8000\b/.test(stored) ||
-            /^https?:\/\/127\.0\.0\.1:8000/.test(stored) ||
-            /^https?:\/\/localhost:8000/.test(stored)) {
+            /\.trycloudflare\.com:8001\b/.test(stored) ||
+            /^https?:\/\/127\.0\.0\.1:800[01]\b/.test(stored) ||
+            /^https?:\/\/localhost:800[01]\b/.test(stored)) {
           try {
             sessionStorage.removeItem('jjb_api_base_url');
           } catch (e) {}
@@ -85,14 +85,14 @@
       if (stored) {
         window.__API_BASE_URL__ = stored;
       } else {
-        if (h === 'localhost' || h === '127.0.0.1') {
+        if (viewerIsLocal) {
           window.__API_BASE_URL__ =
-            window.location.protocol + '//' + h + ':8000';
+            window.location.protocol + '//' + h + ':8001';
         } else if (h.endsWith('.trycloudflare.com')) {
           window.__API_BASE_URL__ = '';
         } else {
-          window.__API_BASE_URL__ =
-            window.location.protocol + '//' + h + ':8000';
+          // Deixa vazio para config_web.dart decidir (mesma origem em produção ou :8080→:8001 na LAN).
+          window.__API_BASE_URL__ = '';
         }
       }
     })();
