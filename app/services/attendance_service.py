@@ -9,6 +9,7 @@ from typing import Literal, NamedTuple
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -385,8 +386,25 @@ async def scan_checkin(
         added_manually=False,
     )
     db.add(r)
-    await db.commit()
-    await db.refresh(r)
+    try:
+        await db.commit()
+        await db.refresh(r)
+    except IntegrityError:
+        # Índice único (session_id, user_id): duplo scan simultâneo pode passar na leitura
+        # “existing” e falhar aqui — tratar como idempotente em vez de 500.
+        await db.rollback()
+        raced = (
+            await db.execute(
+                select(AttendanceRecord).where(
+                    AttendanceRecord.session_id == session_id,
+                    AttendanceRecord.user_id == current_user.id,
+                )
+            )
+        ).scalar_one_or_none()
+        if raced:
+            return raced, False
+        raise
+
     await invalidate_attendance_ranking_cache(s.academy_id)
     await invalidate_attendance_stats_cache(s.academy_id, current_user.id)
     return r, True
