@@ -210,34 +210,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _error = null;
     });
     try {
-      final sessions = await _api.listAttendanceSessions(status: 'active', limit: 1);
-      if (!mounted) return;
-      if (sessions.isNotEmpty) {
-        final s = sessions.first;
-        setState(() {
-          _session = s;
-          _records = const [];
-          _loading = false;
-        });
-        _startAutoRefresh();
-        _startQrHeartbeat();
-        _startLive(s.id);
-
-        final qrFuture = _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
-        final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
-        try {
-          final qr = await qrFuture;
-          if (!mounted) return;
-          _applyQrPayload(qr);
-        } catch (_) {}
-        try {
-          final recs = await recsFuture;
-          if (!mounted) return;
-          setState(() => _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt))));
-          unawaited(_hydrateUsersForRecords(recs));
-        } catch (_) {}
-      } else {
-        if (mounted) setState(() => _loading = false);
+      // Comportamento alinhado ao fluxo estável de QR: não restaurar sessão ativa
+      // via listagem no arranque (evita erro de rede/CORS nesse endpoint derrubar
+      // a tela; o professor inicia a chamada e aí carrega QR/WS como antes).
+      if (mounted) {
+        setState(() => _loading = false);
       }
     } catch (e) {
       if (mounted) {
@@ -415,17 +392,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       final s = _session;
       if (!mounted || s == null) return;
       if (s.status.toLowerCase() == 'closed') return;
-
-      final sessionExp = s.expiresAt;
-      if (sessionExp != null && sessionExp.isBefore(DateTime.now().toUtc())) {
-        if (_qr != null || _qrError == null) {
-          setState(() {
-            _qr = null;
-            _qrError = 'Sessão expirada. Encerre e inicie uma nova chamada.';
-          });
-        }
-        return;
-      }
 
       if (_isRefreshingQr) {
         final startedAt = _qrRefreshStartedAt;
