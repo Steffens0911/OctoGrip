@@ -26,6 +26,7 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:viewer/models/attendance.dart';
+import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/attendance_ranking.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/weekly_kit.dart';
@@ -1273,14 +1274,27 @@ class ApiService {
     invalidateCache('GET:${uri.toString()}');
   }
 
-  Future<AttendanceQrPayloadModel> getAttendanceQrPayload(String sessionId,
+  Future<QrTokenModel> getAttendanceQrToken(String sessionId,
       {int ttlSeconds = 60}) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/qr')
         .replace(queryParameters: {'ttl_seconds': '$ttlSeconds'});
     final r = await _req(http.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
-    return AttendanceQrPayloadModel.fromJson(data! as Map<String, dynamic>);
+    return QrTokenModel.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AttendanceRecordModel> scanAttendance(String token) async {
+    final uri = Uri.parse('$baseUrl/attendance/scan');
+    final r = await _req(http.post(
+      uri,
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'token': token}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    _invalidateAttendanceCache();
+    return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<AttendanceSessionModel> closeAttendanceSession(
@@ -1291,19 +1305,6 @@ class ApiService {
     _throwIfNotOk(r, data);
     _invalidateAttendanceCache();
     return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
-  }
-
-  Future<AttendanceRecordModel> scanAttendance(String payload) async {
-    final uri = Uri.parse('$baseUrl/attendance/scan');
-    final r = await _req(http.post(
-      uri,
-      headers: await _jsonHeaders(auth: true),
-      body: jsonEncode({'payload': payload}),
-    ));
-    final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
-    _invalidateAttendanceCache();
-    return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<AttendanceUserSummaryModel> getAttendanceMeSummary(

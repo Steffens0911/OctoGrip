@@ -127,3 +127,5 @@ class AttendanceSessionClosedError(AppError):
 class AttendanceQrInvalidError(AppError):
     def __init__(self, message: str = "QR inválido ou expirado."):
         super().__init__(message, status_code=400)
+
+

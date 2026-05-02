@@ -20,7 +20,9 @@ class AttendanceScanScreen extends StatefulWidget {
 
 class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   final _api = ApiService();
-  final _controller = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
+  final _scanner = MobileScannerController(
+    detectionSpeed: DetectionSpeed.noDuplicates,
+  );
   final _apiTunnelController = TextEditingController();
 
   bool _busy = false;
@@ -29,35 +31,26 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
   @override
   void dispose() {
     _apiTunnelController.dispose();
-    _controller.dispose();
+    _scanner.dispose();
     super.dispose();
   }
 
-  Future<void> _submitPayload(String payload) async {
-    final p = payload.trim();
-    if (p.isEmpty || _busy) return;
+  Future<void> _submit(String token) async {
+    final t = token.trim();
+    if (t.isEmpty || _busy) return;
     setState(() => _busy = true);
     try {
-      await _api.scanAttendance(p);
+      await _api.scanAttendance(t);
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: 'Presença confirmada',
-        type: AppFeedbackType.success,
-      );
+      AppFeedback.show(context,
+          message: 'Presença confirmada', type: AppFeedbackType.success);
       Navigator.pop(context);
     } catch (e, st) {
-      NetworkDiagnosticsService.recordError(
-        e,
-        stackTrace: st,
-        context: 'Escanear QR da chamada',
-      );
+      NetworkDiagnosticsService.recordError(e,
+          stackTrace: st, context: 'Scan QR chamada');
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: userFacingMessage(e),
-        type: AppFeedbackType.error,
-      );
+      AppFeedback.show(context,
+          message: userFacingMessage(e), type: AppFeedbackType.error);
       setState(() => _busy = false);
     }
   }
@@ -67,34 +60,35 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Inserir código'),
+        title: const Text('Inserir token'),
         content: TextField(
           controller: c,
           maxLines: 3,
           decoration: const InputDecoration(
-            labelText: 'Código do QR',
-            hintText: 'Cole o payload (sid=...&iat=...&exp=...&nonce=...&sig=...)',
+            labelText: 'Token do QR',
+            hintText: 'Cole o conteúdo lido do QR code',
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmar')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirmar')),
         ],
       ),
     );
-    final payload = c.text;
+    final token = c.text;
     c.dispose();
-    if (ok == true) {
-      await _submitPayload(payload);
-    }
+    if (ok == true) await _submit(token);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Web em túnel público sem api_base: evita erro opaco ao chamar API (kApiBaseUrl vazio).
     if (kIsWeb && kApiBaseUrl.isEmpty) {
       return Scaffold(
-        appBar: const AppStandardAppBar(title: 'Escanear QR da chamada'),
+        appBar: const AppStandardAppBar(title: 'Escanear QR'),
         body: SafeArea(
           child: ListView(
             padding: const EdgeInsets.all(24),
@@ -124,14 +118,13 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
                   if (!u.startsWith('https://') && !u.startsWith('http://')) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('A URL deve começar com https:// ou http://'),
-                      ),
+                          content: Text('A URL deve começar com https:// ou http://')),
                     );
                     return;
                   }
                   persistApiBaseAndReload(u);
                 },
-                child: const Text('Salvar URL da API e recarregar'),
+                child: const Text('Salvar e recarregar'),
               ),
             ],
           ),
@@ -141,44 +134,38 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
 
     return Scaffold(
       appBar: AppStandardAppBar(
-        title: 'Escanear QR da chamada',
+        title: 'Escanear QR',
         actions: [
           IconButton(
-            tooltip: 'Diagnóstico',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const NetworkDiagnosticsScreen(),
-                ),
-              );
-            },
+            tooltip: 'Diagnóstico de rede',
             icon: const Icon(Icons.health_and_safety_rounded),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const NetworkDiagnosticsScreen()),
+            ),
           ),
           IconButton(
-            tooltip: 'Inserir código',
-            onPressed: _busy ? null : _openManualEntry,
+            tooltip: 'Inserir token manualmente',
             icon: const Icon(Icons.keyboard_rounded),
+            onPressed: _busy ? null : _openManualEntry,
           ),
           IconButton(
             tooltip: _torchOn ? 'Desligar lanterna' : 'Ligar lanterna',
+            icon: Icon(_torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded),
             onPressed: () async {
-              await _controller.toggleTorch();
+              await _scanner.toggleTorch();
               setState(() => _torchOn = !_torchOn);
             },
-            icon: Icon(_torchOn ? Icons.flash_on_rounded : Icons.flash_off_rounded),
           ),
         ],
       ),
       body: Stack(
         children: [
           MobileScanner(
-            controller: _controller,
+            controller: _scanner,
             onDetect: (capture) {
-              final barcodes = capture.barcodes;
-              if (barcodes.isEmpty) return;
-              final raw = barcodes.first.rawValue;
+              final raw = capture.barcodes.firstOrNull?.rawValue;
               if (raw == null || raw.trim().isEmpty) return;
-              _submitPayload(raw);
+              _submit(raw);
             },
           ),
           Positioned(
@@ -190,7 +177,10 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.92),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surface
+                      .withValues(alpha: 0.92),
                   border: Border(
                     top: BorderSide(
                       color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
@@ -219,4 +209,3 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
     );
   }
 }
-

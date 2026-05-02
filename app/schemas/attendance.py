@@ -29,13 +29,13 @@ class AttendanceSessionRead(BaseModel):
     present_count: int = 0
 
 
-class AttendanceQrPayloadResponse(BaseModel):
-    payload: str
+class QrTokenOut(BaseModel):
+    token: str
     expires_at: datetime
 
 
-class AttendanceScanRequest(BaseModel):
-    payload: str = Field(..., min_length=10, description="Payload lido do QR (sid/iat/exp/nonce/sig).")
+class QrScanIn(BaseModel):
+    token: str = Field(..., min_length=10)
 
 
 class AttendanceManualCheckinRequest(BaseModel):

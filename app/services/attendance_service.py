@@ -1,9 +1,5 @@
 from __future__ import annotations
 
-import base64
-import hashlib
-import hmac
-import secrets
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal, NamedTuple
 from uuid import UUID
@@ -17,7 +13,6 @@ from app.core.cache import app_cache
 from app.core.list_pagination import clamp_list_limit
 from app.core.exceptions import (
     AppError,
-    AttendanceQrInvalidError,
     AttendanceRecordNotFoundError,
     AttendanceSessionClosedError,
     AttendanceSessionNotFoundError,
@@ -57,27 +52,6 @@ async def invalidate_attendance_stats_cache(
         await app_cache.bump_prefix_version(f"{_STATS_DETAIL_PREFIX}{academy_id}:")
     if user_id is not None:
         await app_cache.bump_prefix_version(f"{_STATS_ME_PREFIX}{user_id}:")
-
-
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
-
-
-def _hmac_sig(secret: str, msg: str) -> str:
-    mac = hmac.new(secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).digest()
-    return _b64url(mac)
-
-
-def _parse_payload(payload: str) -> dict[str, str]:
-    # Formato: sid=...&iat=...&exp=...&nonce=...&sig=...
-    parts = [p for p in (payload or "").split("&") if p]
-    out: dict[str, str] = {}
-    for p in parts:
-        if "=" not in p:
-            continue
-        k, v = p.split("=", 1)
-        out[k.strip()] = v.strip()
-    return out
 
 
 async def create_attendance_session(
@@ -305,58 +279,23 @@ async def delete_attendance_record(
     return session_id, user_id
 
 
-def issue_qr_payload(*, session_id: UUID, ttl_seconds: int = 60) -> tuple[str, datetime]:
-    now = _now_utc()
-    exp = now + timedelta(seconds=int(ttl_seconds))
-    nonce = secrets.token_urlsafe(10)
-
-    msg = f"{session_id}|{int(now.timestamp())}|{int(exp.timestamp())}|{nonce}"
-    sig = _hmac_sig(settings.ATTENDANCE_QR_SECRET, msg)
-    payload = (
-        f"sid={session_id}&iat={int(now.timestamp())}&exp={int(exp.timestamp())}"
-        f"&nonce={nonce}&sig={sig}"
-    )
-    return payload, exp
-
-
 async def scan_checkin(
     db: AsyncSession,
     *,
     current_user: User,
-    payload: str,
+    token: str,
 ) -> tuple[AttendanceRecord, bool]:
+    """Registra presença via token QR. Idempotente por (session_id, user_id)."""
+    from app.services.qr_service import verify as qr_verify
+
     if current_user.role != "aluno":
         raise ForbiddenError("Apenas alunos podem registrar presença via QR.")
     if not current_user.academy_id:
         raise ForbiddenError("Aluno não está vinculado a uma academia.")
 
-    data = _parse_payload(payload)
-    sid = data.get("sid")
-    iat = data.get("iat")
-    exp = data.get("exp")
-    nonce = data.get("nonce")
-    sig = data.get("sig")
-    if not (sid and iat and exp and nonce and sig):
-        raise AttendanceQrInvalidError()
-    try:
-        session_id = UUID(sid)
-        iat_i = int(iat)
-        exp_i = int(exp)
-    except Exception:
-        raise AttendanceQrInvalidError()
+    session_id = qr_verify(token)
 
     now = _now_utc()
-    if exp_i < int(now.timestamp()):
-        raise AttendanceQrInvalidError()
-    if exp_i - iat_i > 600:
-        # Evita payloads com expiração longa.
-        raise AttendanceQrInvalidError()
-
-    msg = f"{session_id}|{iat_i}|{exp_i}|{nonce}"
-    expected = _hmac_sig(settings.ATTENDANCE_QR_SECRET, msg)
-    if not hmac.compare_digest(expected, sig):
-        raise AttendanceQrInvalidError()
-
     s = await db.get(AttendanceSession, session_id)
     if not s:
         raise AttendanceSessionNotFoundError()
@@ -389,8 +328,6 @@ async def scan_checkin(
     try:
         await db.commit()
     except IntegrityError:
-        # Índice único (session_id, user_id): duplo scan simultâneo pode passar na leitura
-        # “existing” e falhar aqui — tratar como idempotente em vez de 500.
         await db.rollback()
         raced = (
             await db.execute(
@@ -427,7 +364,7 @@ async def user_summary(
         select(User.academy_id).where(User.id == user_id)
     )).one_or_none()
     if _target_academy_row is None:
-        raise AttendanceQrInvalidError("Usuário não encontrado.")
+        raise UserNotFoundError()
 
     verify_academy_access(
         current_user,

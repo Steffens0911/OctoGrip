@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
+import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/attendance_live_service.dart';
@@ -28,7 +29,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   StreamSubscription<AttendanceLiveEvent>? _liveSub;
 
   AttendanceSessionModel? _session;
-  AttendanceQrPayloadModel? _qr;
+  QrTokenModel? _qr;
+  String? _qrError;
+  bool _refreshingQr = false;
   List<AttendanceRecordModel> _records = [];
   Map<String, UserModel> _userById = {};
 
@@ -36,19 +39,15 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _busy = false;
   bool _startingSession = false;
   String? _error;
-  Timer? _refreshTimer;
-  Timer? _qrRetryTimer;
-  Timer? _qrHeartbeatTimer;
-  /// Último evento WebSocket útil (check-in/remoção); usado para não duplicar polling HTTP.
-  DateTime? _lastWsActivityAt;
-  bool _isRefreshingQr = false;
-  bool _isRefreshingSession = false;
-  String? _qrError;
-  DateTime? _qrRefreshStartedAt;
 
-  static const Duration _qrRequestTimeout = Duration(seconds: 25);
-  static const String _qrTimeoutMessage =
-      'Tempo esgotado ao gerar QR. Tentando novamente...';
+  Timer? _refreshTimer;
+  Timer? _qrHeartbeatTimer;
+  DateTime? _lastWsActivityAt;
+  bool _isRefreshingSession = false;
+
+  static const Duration _pollInterval = Duration(seconds: 15);
+  static const Duration _skipPollAfterWs = Duration(seconds: 12);
+  static const Duration _qrTimeout = Duration(seconds: 20);
 
   @override
   void initState() {
@@ -60,10 +59,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   void dispose() {
     _stopLive();
     _refreshTimer?.cancel();
-    _qrRetryTimer?.cancel();
     _qrHeartbeatTimer?.cancel();
     super.dispose();
   }
+
+  // ── WebSocket ──────────────────────────────────────────────
 
   void _stopLive() {
     _liveSub?.cancel();
@@ -85,45 +85,175 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (!mounted || s == null) return;
     _lastWsActivityAt = DateTime.now();
     if (event is AttendanceCheckinLiveEvent) {
-      final e = event;
-      if (s.id != e.record.sessionId) return;
+      if (s.id != event.record.sessionId) return;
       setState(() {
-        _session = AttendanceSessionModel(
-          id: s.id,
-          academyId: s.academyId,
-          createdByUserId: s.createdByUserId,
-          status: s.status,
-          title: s.title,
-          startsAt: s.startsAt,
-          endsAt: s.endsAt,
-          expiresAt: s.expiresAt,
-          presentCount: e.presentCount,
-        );
+        _session = _copySession(s, presentCount: event.presentCount);
         final others = _records
-            .where((r) => r.userId != e.record.userId)
+            .where((r) => r.userId != event.record.userId)
             .toList()
-          ..add(e.record);
-        // Mais recente primeiro.
+          ..add(event.record);
         others.sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt));
         _records = others;
       });
-      unawaited(_hydrateMissingUsers([e.record]));
+      unawaited(_hydrateMissingUsers([event.record]));
     } else if (event is AttendanceRecordRemovedLiveEvent) {
       if (s.id != event.sessionId) return;
       setState(() {
-        _session = AttendanceSessionModel(
-          id: s.id,
-          academyId: s.academyId,
-          createdByUserId: s.createdByUserId,
-          status: s.status,
-          title: s.title,
-          startsAt: s.startsAt,
-          endsAt: s.endsAt,
-          expiresAt: s.expiresAt,
-          presentCount: event.presentCount,
-        );
+        _session = _copySession(s, presentCount: event.presentCount);
         _records = _records.where((r) => r.id != event.recordId).toList();
       });
+    }
+  }
+
+  AttendanceSessionModel _copySession(AttendanceSessionModel s,
+      {int? presentCount}) {
+    return AttendanceSessionModel(
+      id: s.id,
+      academyId: s.academyId,
+      createdByUserId: s.createdByUserId,
+      status: s.status,
+      title: s.title,
+      startsAt: s.startsAt,
+      endsAt: s.endsAt,
+      expiresAt: s.expiresAt,
+      presentCount: presentCount ?? s.presentCount,
+    );
+  }
+
+  // ── QR heartbeat ───────────────────────────────────────────
+
+  void _startQrHeartbeat() {
+    _qrHeartbeatTimer?.cancel();
+    _qrHeartbeatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted) return;
+      final s = _session;
+      if (s == null || s.status.toLowerCase() == 'closed') return;
+      if (_refreshingQr) return;
+      final q = _qr;
+      if (q == null || _secondsLeft(q.expiresAt) <= 5) {
+        unawaited(_fetchQr());
+      }
+    });
+  }
+
+  Future<void> _fetchQr() async {
+    final s = _session;
+    if (s == null || s.status.toLowerCase() == 'closed') return;
+    if (_refreshingQr) return;
+    setState(() {
+      _refreshingQr = true;
+      _qrError = null;
+    });
+    try {
+      final qr = await _api
+          .getAttendanceQrToken(s.id, ttlSeconds: 60)
+          .timeout(_qrTimeout, onTimeout: () => throw TimeoutException(null));
+      if (!mounted) return;
+      setState(() {
+        _qr = qr;
+        _qrError = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _qr = null;
+        _qrError = userFacingMessage(e);
+      });
+    } finally {
+      if (mounted) setState(() => _refreshingQr = false);
+    }
+  }
+
+  // ── Session polling ────────────────────────────────────────
+
+  void _startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(_pollInterval, (_) {
+      if (_session?.id == null) return;
+      final last = _lastWsActivityAt;
+      if (last != null &&
+          DateTime.now().difference(last) < _skipPollAfterWs) return;
+      unawaited(_refreshSession());
+    });
+  }
+
+  Future<void> _refreshSession() async {
+    final s = _session;
+    if (s == null || _isRefreshingSession) return;
+    _isRefreshingSession = true;
+    try {
+      final updated = await _api.getAttendanceSession(s.id);
+      final recs = await _api.getAttendanceSessionRecordsAll(s.id);
+      if (!mounted) return;
+      setState(() {
+        _session = updated;
+        _records = (recs.toList()
+          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+      });
+      await _hydrateUsersForRecords(recs);
+    } catch (_) {
+      // silencioso
+    } finally {
+      _isRefreshingSession = false;
+    }
+  }
+
+  // ── Usuários ───────────────────────────────────────────────
+
+  Future<void> _hydrateMissingUsers(
+      Iterable<AttendanceRecordModel> recs) async {
+    final missing = recs
+        .map((r) => r.userId)
+        .where((id) => !_userById.containsKey(id))
+        .toSet()
+        .toList();
+    if (missing.isEmpty) return;
+    final results = await Future.wait(missing.map((id) async {
+      try {
+        return await _api.getUser(id);
+      } catch (_) {
+        return null;
+      }
+    }));
+    if (!mounted) return;
+    final add = <String, UserModel>{};
+    for (final u in results) {
+      if (u != null) add[u.id] = u;
+    }
+    if (add.isEmpty) return;
+    setState(() => _userById = {..._userById, ...add});
+  }
+
+  Future<void> _hydrateUsersForRecords(List<AttendanceRecordModel> recs) async {
+    if (_userById.isEmpty) {
+      try {
+        final isAdmin = AuthService().isAdmin();
+        final academyId = AuthService().currentUser?.academyId;
+        final users =
+            await _api.getUsersAll(academyId: isAdmin ? null : academyId);
+        if (!mounted) return;
+        setState(() => _userById = {for (final u in users) u.id: u});
+      } catch (_) {}
+    }
+    await _hydrateMissingUsers(recs);
+  }
+
+  // ── Ações ──────────────────────────────────────────────────
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -138,11 +268,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         ? sessionAcademyId
         : AuthService().currentUser?.academyId;
     if (academyId == null || academyId.isEmpty) {
-      AppFeedback.show(
-        context,
-        message: 'Nenhuma academia vinculada a esta chamada.',
-        type: AppFeedbackType.error,
-      );
+      AppFeedback.show(context,
+          message: 'Nenhuma academia vinculada a esta chamada.',
+          type: AppFeedbackType.error);
       return;
     }
     await showDialog<void>(
@@ -204,288 +332,15 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
   }
 
-  Future<void> _loadInitial() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      // Comportamento alinhado ao fluxo estável de QR: não restaurar sessão ativa
-      // via listagem no arranque (evita erro de rede/CORS nesse endpoint derrubar
-      // a tela; o professor inicia a chamada e aí carrega QR/WS como antes).
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = userFacingMessage(e);
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  static const Duration _refreshPollInterval = Duration(seconds: 15);
-  /// Evita polling HTTP redundante quando o WS acabou de entregar atualização.
-  static const Duration _skipPollAfterWsActivity = Duration(seconds: 12);
-
-  void _startAutoRefresh() {
-    _refreshTimer?.cancel();
-    // Fallback lento se o WebSocket falhar (reconexão cobre a maioria dos casos).
-    _refreshTimer = Timer.periodic(_refreshPollInterval, (_) {
-      if (_session?.id == null) return;
-      final last = _lastWsActivityAt;
-      if (last != null &&
-          DateTime.now().difference(last) < _skipPollAfterWsActivity) {
-        return;
-      }
-      unawaited(_refreshSession());
-    });
-  }
-
-  Future<void> _refreshSession() async {
-    final s = _session;
-    if (s == null || _isRefreshingSession) return;
-    _isRefreshingSession = true;
-    try {
-      final updated = await _api.getAttendanceSession(s.id);
-      final recs = await _api.getAttendanceSessionRecordsAll(s.id);
-      if (!mounted) return;
-      setState(() {
-        _session = updated;
-        _records = (recs.toList()
-          ..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
-      });
-      await _hydrateUsersForRecords(recs);
-    } catch (_) {
-      // Silencioso no auto refresh
-    } finally {
-      _isRefreshingSession = false;
-    }
-  }
-
-  Future<void> _refreshQr({bool showErrors = false}) async {
-    final s = _session;
-    if (s == null || _isRefreshingQr) return;
-    if ((s.status.toLowerCase() == 'closed')) return;
-    _qrRetryTimer?.cancel();
-    setState(() {
-      _isRefreshingQr = true;
-      _qrError = null;
-      _qrRefreshStartedAt = DateTime.now();
-    });
-    try {
-      final qr =
-          await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60).timeout(
-                _qrRequestTimeout,
-                onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
-              );
-      if (!mounted) return;
-      _applyQrPayload(qr);
-      return;
-    } catch (_) {
-      // Retry curto para rede/proxy intermitente.
-    }
-    try {
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-      final qr =
-          await _api.getAttendanceQrPayload(s.id, ttlSeconds: 60).timeout(
-                _qrRequestTimeout,
-                onTimeout: () => throw TimeoutException(_qrTimeoutMessage),
-              );
-      if (!mounted) return;
-      _applyQrPayload(qr);
-    } catch (e) {
-      if (!mounted) return;
-      final msg = userFacingMessage(e);
-      setState(() {
-        _qr = null;
-        _qrError = msg;
-      });
-      if (showErrors) {
-        AppFeedback.show(
-          context,
-          message: msg,
-          type: AppFeedbackType.error,
-        );
-      }
-      _scheduleQrRetry();
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshingQr = false;
-          _qrRefreshStartedAt = null;
-        });
-      }
-      // Garantia extra: se sair sem QR, tenta novamente em breve.
-      if (_qr == null) {
-        _scheduleQrRetry();
-      }
-    }
-  }
-
-  Future<void> _safeRefreshQr({bool showErrors = false}) async {
-    try {
-      await _refreshQr(showErrors: showErrors);
-    } catch (e) {
-      if (!mounted) return;
-      final msg = userFacingMessage(e);
-      setState(() {
-        _isRefreshingQr = false;
-        _qrRefreshStartedAt = null;
-        _qrError = msg;
-      });
-      if (showErrors) {
-        AppFeedback.show(context, message: msg, type: AppFeedbackType.error);
-      }
-      _scheduleQrRetry();
-    }
-  }
-
-  void _scheduleQrRetry({Duration delay = const Duration(seconds: 3)}) {
-    final s = _session;
-    if (!mounted || s == null) return;
-    if (s.status.toLowerCase() == 'closed') return;
-    _qrRetryTimer?.cancel();
-    _qrRetryTimer = Timer(delay, () {
-      if (!mounted) return;
-      final current = _session;
-      if (current == null || current.status.toLowerCase() == 'closed') return;
-      if (_isRefreshingQr) return;
-      unawaited(_safeRefreshQr());
-    });
-  }
-
-  void _invalidateCurrentQrForRefresh() {
-    setState(() {
-      _qr = null;
-      _qrError = null;
-    });
-  }
-
-  Future<void> _forceRefreshQr() async {
-    if (_busy) return;
-    // Se travar em "Gerando...", o botão manual destrava o estado local.
-    if (_isRefreshingQr && mounted) {
-      setState(() {
-        _isRefreshingQr = false;
-        _qrRefreshStartedAt = null;
-      });
-    }
-    _invalidateCurrentQrForRefresh();
-    await _safeRefreshQr(showErrors: true);
-  }
-
-  void _applyQrPayload(AttendanceQrPayloadModel qr) {
-    _qrRetryTimer?.cancel();
-    setState(() {
-      _qr = qr;
-      _qrError = null;
-    });
-  }
-
-  void _startQrHeartbeat() {
-    _qrHeartbeatTimer?.cancel();
-    _qrHeartbeatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      final s = _session;
-      if (!mounted || s == null) return;
-      if (s.status.toLowerCase() == 'closed') return;
-
-      if (_isRefreshingQr) {
-        final startedAt = _qrRefreshStartedAt;
-        if (startedAt != null &&
-            DateTime.now().difference(startedAt) >
-                (_qrRequestTimeout + const Duration(seconds: 2))) {
-          setState(() {
-            _isRefreshingQr = false;
-            _qrRefreshStartedAt = null;
-          });
-          _scheduleQrRetry(delay: const Duration(seconds: 1));
-        }
-        return;
-      }
-
-      final q = _qr;
-      if (q == null || _secondsUntilQrExpiry(q.expiresAt) <= 0) {
-        unawaited(_safeRefreshQr());
-      }
-    });
-  }
-
-  Future<void> _handleQrExpired() async {
-    final s = _session;
-    if (s == null || s.status.toLowerCase() == 'closed') return;
-    // Evita corrida entre expiração e refresh já em andamento.
-    if (_isRefreshingQr) {
-      _scheduleQrRetry(delay: const Duration(seconds: 1));
-      return;
-    }
-    _invalidateCurrentQrForRefresh();
-    await _safeRefreshQr();
-  }
-
-  Future<void> _hydrateMissingUsers(
-      Iterable<AttendanceRecordModel> recs) async {
-    final missingIds = recs
-        .map((r) => r.userId)
-        .where((id) => !_userById.containsKey(id))
-        .toSet()
-        .toList();
-    if (missingIds.isEmpty) return;
-
-    Future<UserModel?> fetchOne(String id) async {
-      try {
-        return await _api.getUser(id);
-      } catch (_) {
-        return null;
-      }
-    }
-
-    final results = await Future.wait(missingIds.map(fetchOne));
-    if (!mounted) return;
-
-    final additions = <String, UserModel>{};
-    for (final u in results) {
-      if (u != null) additions[u.id] = u;
-    }
-    if (additions.isEmpty) return;
-
-    setState(() {
-      _userById = {..._userById, ...additions};
-    });
-  }
-
-  /// Pré-carrega o mapa de utilizadores (batch) e completa nomes em falta.
-  Future<void> _hydrateUsersForRecords(List<AttendanceRecordModel> recs) async {
-    if (_userById.isEmpty) {
-      try {
-        final isAdmin = AuthService().isAdmin();
-        final academyId = AuthService().currentUser?.academyId;
-        final users = await _api.getUsersAll(
-          academyId: isAdmin ? null : academyId,
-        );
-        if (!mounted) return;
-        setState(() {
-          _userById = {for (final u in users) u.id: u};
-        });
-      } catch (_) {
-        // ok
-      }
-    }
-    await _hydrateMissingUsers(recs);
-  }
-
   Future<void> _startSession() async {
     if (_busy) return;
-    final titleController = TextEditingController();
+    final titleCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Iniciar chamada'),
         content: TextField(
-          controller: titleController,
+          controller: titleCtrl,
           decoration: const InputDecoration(
             labelText: 'Título (opcional)',
             hintText: 'Ex.: Treino 19h',
@@ -501,8 +356,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         ],
       ),
     );
-    final title = titleController.text.trim();
-    titleController.dispose();
+    final title = titleCtrl.text.trim();
+    titleCtrl.dispose();
     if (ok != true) return;
 
     setState(() {
@@ -521,22 +376,20 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _startQrHeartbeat();
       _startLive(s.id);
 
-      // Busca QR e presenças em paralelo; prioriza o QR para reduzir espera.
-      final qrFuture = _api.getAttendanceQrPayload(s.id, ttlSeconds: 60);
+      // Busca QR e lista em paralelo
+      final qrFuture = _api.getAttendanceQrToken(s.id, ttlSeconds: 60);
       final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
 
       final qr = await qrFuture;
       if (!mounted) return;
-      _applyQrPayload(qr);
+      setState(() => _qr = qr);
 
       try {
         final recs = await recsFuture;
         if (!mounted) return;
         setState(() => _records = recs);
         await _hydrateUsersForRecords(recs);
-      } catch (_) {
-        // ok: lista pode falhar por rede; WS + refresh continuam atualizando.
-      }
+      } catch (_) {}
 
       if (!mounted) return;
       AppFeedback.show(context,
@@ -551,12 +404,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           message: userFacingMessage(e), type: AppFeedbackType.error);
       return;
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _startingSession = false;
-        });
-      }
+      if (mounted) setState(() {
+        _busy = false;
+        _startingSession = false;
+      });
     }
   }
 
@@ -582,7 +433,6 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     if (ok != true) return;
 
     _stopLive();
-    _qrRetryTimer?.cancel();
     _qrHeartbeatTimer?.cancel();
     setState(() => _busy = true);
     try {
@@ -607,10 +457,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
   }
 
+  // ── Build ──────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Chamada (QR)'),
+      appBar: const AppStandardAppBar(title: 'Chamada'),
       body: _loading
           ? const AppScreenState.loading()
           : _error != null
@@ -641,12 +493,11 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.qr_code_rounded),
-              label:
-                  Text(_startingSession ? 'Iniciando...' : 'Iniciar chamada'),
+              label: Text(_startingSession ? 'Iniciando...' : 'Iniciar chamada'),
             ),
             const SizedBox(height: 12),
             Text(
-              'O QR muda automaticamente. Os alunos escaneiam para registrar presença.',
+              'O QR é renovado automaticamente. Os alunos escaneiam com o app para registrar presença.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
@@ -656,17 +507,17 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       );
     }
 
-    final qr = _qr;
-    final isClosed = (s.status.toLowerCase() == 'closed');
+    final isClosed = s.status.toLowerCase() == 'closed';
 
     return RefreshIndicator(
       onRefresh: () async {
         await _refreshSession();
-        await _safeRefreshQr(showErrors: true);
+        if (!isClosed) await _fetchQr();
       },
       child: ListView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
         children: [
+          // ── Header ──
           Row(
             children: [
               Expanded(
@@ -685,17 +536,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _addStudentDialog,
-                icon: const Icon(Icons.person_add_rounded, size: 18),
-                label: const Text('Adicionar aluno'),
-              ),
-            ],
-          ),
+          if (!isClosed)
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _addStudentDialog,
+              icon: const Icon(Icons.person_add_rounded, size: 18),
+              label: const Text('Adicionar aluno'),
+            ),
           const SizedBox(height: 8),
           Text(
             'Presentes: ${s.presentCount}',
@@ -704,73 +550,67 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                 ),
           ),
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  if (qr != null && !isClosed)
-                    RepaintBoundary(
-                      child: QrImageView(
-                        key: ValueKey<String>(qr.payload),
-                        data: qr.payload,
-                        size: 240,
-                        backgroundColor: Colors.white,
-                        errorCorrectionLevel: QrErrorCorrectLevel.M,
-                      ),
-                    )
-                  else
-                    Container(
-                      height: 240,
-                      alignment: Alignment.center,
-                      child: Text(
-                        isClosed
-                            ? 'Sessão encerrada'
-                            : (_isRefreshingQr
-                                ? 'Gerando novo QR...'
-                                : 'QR expirado'),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  if (qr != null && !isClosed)
-                    _QrExpiryCountdownLabel(
-                      key: ValueKey<String>('${qr.payload}_${qr.expiresAt.toIso8601String()}'),
-                      expiresAt: qr.expiresAt,
-                      textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondaryOf(context),
-                          ),
-                      onExpired: () => unawaited(_handleQrExpired()),
-                    ),
-                  if (qr == null && !isClosed) ...[
-                    if (_qrError != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          _qrError!,
-                          textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.red.shade400,
-                                  ),
+
+          // ── QR Card ──
+          if (!isClosed)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    if (_qr != null)
+                      RepaintBoundary(
+                        child: QrImageView(
+                          key: ValueKey<String>(_qr!.token),
+                          data: _qr!.token,
+                          size: 240,
+                          backgroundColor: Colors.white,
+                          errorCorrectionLevel: QrErrorCorrectLevel.M,
+                        ),
+                      )
+                    else
+                      SizedBox(
+                        height: 240,
+                        child: Center(
+                          child: _refreshingQr
+                              ? const CircularProgressIndicator()
+                              : Text(
+                                  _qrError ?? 'Gerando QR...',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: _qrError != null
+                                            ? Colors.red.shade400
+                                            : null,
+                                      ),
+                                ),
                         ),
                       ),
-                  ],
-                  if (!isClosed)
+                    const SizedBox(height: 8),
+                    if (_qr != null)
+                      _QrCountdown(
+                        key: ValueKey(_qr!.token),
+                        expiresAt: _qr!.expiresAt,
+                        textStyle:
+                            Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondaryOf(context),
+                                ),
+                      ),
+                    const SizedBox(height: 8),
                     OutlinedButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () {
-                              unawaited(_forceRefreshQr());
-                            },
+                      onPressed: (_busy || _refreshingQr) ? null : _fetchQr,
                       icon: const Icon(Icons.refresh_rounded),
                       label: const Text('Gerar novo QR'),
                     ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 16),
+
+          // ── Lista de presenças ──
           Text('Presenças', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (_records.isEmpty)
@@ -793,13 +633,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                         ? u.name!.trim()
                         : u.email)
                     : r.userId;
-                final methodLabel = r.method == 'manual'
-                    ? 'Manual'
-                    : (r.method == 'qr'
-                        ? 'QR'
-                        : (r.method == 'face_recognition' || r.method == 'face' || r.faceRecognition
-                            ? 'Facial'
-                            : r.method));
+                final methodLabel = switch (r.method) {
+                  'manual' => 'Manual',
+                  'qr' => 'QR',
+                  'face_recognition' || 'face' => 'Facial',
+                  _ => r.method,
+                };
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.check_circle_rounded,
@@ -807,7 +646,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                   title: Text(label,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text(
-                    '${_formatDateTime(r.checkedInAt)} · $methodLabel',
+                    '${_fmt(r.checkedInAt)} · $methodLabel',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppTheme.textSecondaryOf(context),
                         ),
@@ -826,40 +665,38 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     );
   }
 
-  String _formatDateTime(DateTime dt) {
-    final local = dt.toLocal();
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${two(local.day)}/${two(local.month)} ${two(local.hour)}:${two(local.minute)}';
+  String _fmt(DateTime dt) {
+    final l = dt.toLocal();
+    String p(int v) => v.toString().padLeft(2, '0');
+    return '${p(l.day)}/${p(l.month)} ${p(l.hour)}:${p(l.minute)}';
   }
-
 }
 
-/// Atualiza apenas este texto ~1×/s; evita `setState` na raiz da [AttendanceSessionScreen].
-class _QrExpiryCountdownLabel extends StatefulWidget {
-  const _QrExpiryCountdownLabel({
+// ── Countdown widget ───────────────────────────────────────────────────────────
+
+class _QrCountdown extends StatefulWidget {
+  const _QrCountdown({
     super.key,
     required this.expiresAt,
-    required this.onExpired,
-    required this.textStyle,
+    this.textStyle,
   });
 
   final DateTime expiresAt;
-  final VoidCallback onExpired;
   final TextStyle? textStyle;
 
   @override
-  State<_QrExpiryCountdownLabel> createState() =>
-      _QrExpiryCountdownLabelState();
+  State<_QrCountdown> createState() => _QrCountdownState();
 }
 
-class _QrExpiryCountdownLabelState extends State<_QrExpiryCountdownLabel> {
+class _QrCountdownState extends State<_QrCountdown> {
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _tick();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   @override
@@ -868,40 +705,24 @@ class _QrExpiryCountdownLabelState extends State<_QrExpiryCountdownLabel> {
     super.dispose();
   }
 
-  void _tick() {
-    if (!mounted) return;
-    final left = _secondsUntilQrExpiry(widget.expiresAt);
-    if (left <= 0) {
-      _timer?.cancel();
-      widget.onExpired();
-      return;
-    }
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
-    final left = _secondsUntilQrExpiry(widget.expiresAt);
-    final suffix =
-        left <= 0 ? '0s' : _formatQrCountdown(left);
+    final left = _secondsLeft(widget.expiresAt);
     return Text(
-      'QR expira em $suffix',
+      left > 0 ? 'QR expira em ${_fmtCountdown(left)}' : 'QR expirado',
       style: widget.textStyle,
     );
   }
 }
 
-int _secondsUntilQrExpiry(DateTime exp) {
-  final now = DateTime.now().toUtc();
-  final left = exp.toUtc().difference(now).inSeconds;
+int _secondsLeft(DateTime exp) {
+  final left = exp.toUtc().difference(DateTime.now().toUtc()).inSeconds;
   return left < 0 ? 0 : left;
 }
 
-String _formatQrCountdown(int seconds) {
-  if (seconds < 60) return '${seconds}s';
-  final mins = seconds ~/ 60;
-  final secs = seconds % 60;
-  final mm = mins.toString().padLeft(2, '0');
-  final ss = secs.toString().padLeft(2, '0');
-  return '$mm:$ss';
+String _fmtCountdown(int s) {
+  if (s < 60) return '${s}s';
+  final m = s ~/ 60;
+  final r = s % 60;
+  return '${m.toString().padLeft(2, '0')}:${r.toString().padLeft(2, '0')}';
 }

@@ -65,9 +65,8 @@ class Settings(BaseSettings):
     ACCOUNT_LOCKOUT_ATTEMPTS: int = 5
     ACCOUNT_LOCKOUT_MINUTES: int = 15
 
-    # Chamada por QR (presença)
-    # Assina o payload do QR (HMAC). Em produção, defina um valor forte via env.
-    ATTENDANCE_QR_SECRET: str = _DEFAULT_JWT_SECRET
+    # Chamada QR — assina tokens de presença (HMAC-SHA256). Em produção, use valor forte via env.
+    QR_SECRET: str = _DEFAULT_JWT_SECRET
 
     # Ambiente (development/production)
     ENVIRONMENT: str = "development"

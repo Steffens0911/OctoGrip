@@ -8,8 +8,8 @@ from fastapi import APIRouter, Body, Depends, Query, Request, Response, WebSocke
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
-from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
+from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
@@ -20,18 +20,18 @@ from app.schemas.attendance import (
     AttendanceMyPositionRead,
     AttendanceMyStatsRead,
     AttendancePeriodBucketRead,
-    AttendanceQrPayloadResponse,
     AttendanceRankingEntryRead,
     AttendanceRankingRead,
     AttendanceRecordRead,
     AttendanceRecordWithSessionRead,
-    AttendanceScanRequest,
     AttendanceSessionCreate,
     AttendanceSessionRead,
     AttendanceSessionStatRead,
     AttendanceStudentDetailRead,
     AttendanceStudentStatRead,
     AttendanceUserSummaryResponse,
+    QrScanIn,
+    QrTokenOut,
 )
 from app.services.attendance_realtime import attendance_manager
 from app.services.attendance_service import (
@@ -42,7 +42,6 @@ from app.services.attendance_service import (
     delete_attendance_record,
     get_attendance_session,
     get_attendance_session_basic,
-    issue_qr_payload,
     list_attendance_sessions,
     scan_checkin,
     stats_me,
@@ -51,6 +50,7 @@ from app.services.attendance_service import (
     stats_students,
     user_summary,
 )
+from app.services import qr_service
 from app.services.user_service import get_user
 
 router = APIRouter()
@@ -500,7 +500,7 @@ async def attendance_session_records(
     return [_record_read(r) for r in rows]
 
 
-@router.get("/sessions/{session_id}/qr", response_model=AttendanceQrPayloadResponse)
+@router.get("/sessions/{session_id}/qr", response_model=QrTokenOut)
 async def attendance_session_qr(
     session_id: UUID,
     db: AsyncSession = Depends(get_db),
@@ -508,8 +508,32 @@ async def attendance_session_qr(
     ttl_seconds: int = Query(60, ge=15, le=180),
 ):
     await get_attendance_session_basic(db, session_id, current_user=current_user)
-    payload, exp = issue_qr_payload(session_id=session_id, ttl_seconds=ttl_seconds)
-    return AttendanceQrPayloadResponse(payload=payload, expires_at=exp)
+    token, expires_at = qr_service.issue(session_id, ttl_seconds=ttl_seconds)
+    return QrTokenOut(token=token, expires_at=expires_at)
+
+
+@router.post("/scan", response_model=AttendanceRecordRead, status_code=201)
+@limiter.limit("30/minute")
+async def attendance_scan(
+    request: Request,
+    body: QrScanIn = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_aluno_not_frozen),
+):
+    r, created = await scan_checkin(db, current_user=current_user, token=body.token)
+    if created:
+        present_count = await _present_count_for_session(db, r.session_id)
+        rec_read = _record_read(r)
+        await attendance_manager.broadcast(
+            r.session_id,
+            {
+                "type": "checkin",
+                "session_id": str(r.session_id),
+                "record": rec_read.model_dump(mode="json"),
+                "present_count": present_count,
+            },
+        )
+    return _record_read(r)
 
 
 @router.websocket("/sessions/{session_id}/ws")
@@ -557,30 +581,6 @@ async def attendance_session_ws(
         pass
     finally:
         await attendance_manager.disconnect(session_id, websocket)
-
-
-@router.post("/scan", response_model=AttendanceRecordRead, status_code=201)
-@limiter.limit("30/minute")
-async def attendance_scan(
-    request: Request,
-    body: AttendanceScanRequest = Body(...),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_aluno_not_frozen),
-):
-    r, created = await scan_checkin(db, current_user=current_user, payload=body.payload)
-    if created:
-        present_count = await _present_count_for_session(db, r.session_id)
-        rec_read = _record_read(r)
-        await attendance_manager.broadcast(
-            r.session_id,
-            {
-                "type": "checkin",
-                "session_id": str(r.session_id),
-                "record": rec_read.model_dump(mode="json"),
-                "present_count": present_count,
-            },
-        )
-    return _record_read(r)
 
 
 @router.get("/me/summary", response_model=AttendanceUserSummaryResponse)

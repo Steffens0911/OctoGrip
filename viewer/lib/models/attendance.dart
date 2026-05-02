@@ -72,20 +72,6 @@ class AttendanceRecordModel {
   }
 }
 
-class AttendanceQrPayloadModel {
-  final String payload;
-  final DateTime expiresAt;
-
-  AttendanceQrPayloadModel({required this.payload, required this.expiresAt});
-
-  factory AttendanceQrPayloadModel.fromJson(Map<String, dynamic> json) {
-    return AttendanceQrPayloadModel(
-      payload: json['payload'] as String,
-      expiresAt: DateTime.parse(json['expires_at'] as String),
-    );
-  }
-}
-
 class AttendanceUserSummaryModel {
   final String userId;
   final DateTime fromDt;
