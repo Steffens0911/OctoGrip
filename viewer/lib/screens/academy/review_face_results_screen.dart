@@ -49,6 +49,11 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
   List<AcademyStudentListItem> _students = [];
   final Map<int, String> _unknownAssignments = {};
 
+  /// Sugestões (baixa confiança): confirmar checkbox e/ou escolher outro aluno na busca.
+  final Map<int, String> _suggestionManualPick = {};
+  final Map<int, bool> _suggestionUseSuggested = {};
+  final Map<int, String?> _prevSuggestionEff = {};
+
   @override
   void initState() {
     super.initState();
@@ -124,6 +129,9 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         _job = job;
         _loading = false;
         _hasReceivedJobOnce = true;
+        _suggestionManualPick.clear();
+        _suggestionUseSuggested.clear();
+        _prevSuggestionEff.clear();
         _confirmedStudentIds
           ..clear()
           ..addAll(
@@ -196,6 +204,40 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
       } else {
         _unknownAssignments.remove(faceIndex);
       }
+    });
+  }
+
+  void _syncSuggestionFace(int faceIndex, FaceRecognitionResultModel r) {
+    final sug = r.student?.id;
+    if (sug == null) return;
+    final manual = _suggestionManualPick[faceIndex];
+    final use = _suggestionUseSuggested[faceIndex] ?? false;
+    final next = manual ?? (use ? sug : null);
+    final prev = _prevSuggestionEff[faceIndex];
+    if (prev == next) return;
+    if (prev != null) _confirmedStudentIds.remove(prev);
+    if (next != null) _confirmedStudentIds.add(next);
+    _prevSuggestionEff[faceIndex] = next;
+  }
+
+  void _onSuggestionToggleSuggested(
+      int faceIndex, FaceRecognitionResultModel r, bool value) {
+    setState(() {
+      _suggestionUseSuggested[faceIndex] = value;
+      _syncSuggestionFace(faceIndex, r);
+    });
+  }
+
+  void _onSuggestionManualPick(
+      int faceIndex, FaceRecognitionResultModel r, String? studentId) {
+    setState(() {
+      if (studentId == null || studentId.isEmpty) {
+        _suggestionManualPick.remove(faceIndex);
+      } else {
+        _suggestionManualPick[faceIndex] = studentId;
+        _suggestionUseSuggested[faceIndex] = false;
+      }
+      _syncSuggestionFace(faceIndex, r);
     });
   }
 
@@ -367,12 +409,38 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           else
             ...auto.map((r) => _buildItem(r, initiallyChecked: true)),
           const SizedBox(height: 16),
+          if (_loadingStudents &&
+              (suggestions.isNotEmpty || unknown.isNotEmpty))
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: LinearProgressIndicator(),
+            ),
           Text('Confirmar', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (suggestions.isEmpty)
             const Text('Nenhuma sugestão para conferência.')
-          else
-            ...suggestions.map((r) => _buildItem(r, initiallyChecked: false)),
+          else ...[
+            Text(
+              'Confira a sugestão ou busque outro aluno para este rosto.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+            const SizedBox(height: 8),
+            ...suggestions.map(
+              (r) => _SuggestionFaceItem(
+                result: r,
+                students: _students,
+                useSuggested: _suggestionUseSuggested[r.faceIndex] ?? false,
+                manualStudentId: _suggestionManualPick[r.faceIndex],
+                decodeBase64: _decodeBase64,
+                onToggleSuggested: (v) =>
+                    _onSuggestionToggleSuggested(r.faceIndex, r, v),
+                onManualPick: (sid) =>
+                    _onSuggestionManualPick(r.faceIndex, r, sid),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Text('Não identificados',
               style: Theme.of(context).textTheme.titleMedium),
@@ -391,11 +459,6 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
-            ),
-          if (_loadingStudents)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: LinearProgressIndicator(),
             ),
           if (unknown.isNotEmpty) const SizedBox(height: 8),
           ...unknown.map(
@@ -421,6 +484,173 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
                 )
               : Text(
                   'Salvar presenças (${_confirmedStudentIds.length} alunos)'),
+        ),
+      ),
+    );
+  }
+}
+
+class _SuggestionFaceItem extends StatefulWidget {
+  const _SuggestionFaceItem({
+    required this.result,
+    required this.students,
+    required this.useSuggested,
+    required this.manualStudentId,
+    required this.decodeBase64,
+    required this.onToggleSuggested,
+    required this.onManualPick,
+  });
+
+  final FaceRecognitionResultModel result;
+  final List<AcademyStudentListItem> students;
+  final bool useSuggested;
+  final String? manualStudentId;
+  final Uint8List? Function(String) decodeBase64;
+  final ValueChanged<bool> onToggleSuggested;
+  final ValueChanged<String?> onManualPick;
+
+  @override
+  State<_SuggestionFaceItem> createState() => _SuggestionFaceItemState();
+}
+
+class _SuggestionFaceItemState extends State<_SuggestionFaceItem> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: _labelForId(widget.manualStudentId));
+  }
+
+  @override
+  void didUpdateWidget(_SuggestionFaceItem old) {
+    super.didUpdateWidget(old);
+    if (old.manualStudentId != widget.manualStudentId) {
+      final next = _labelForId(widget.manualStudentId);
+      if (_ctrl.text != next) {
+        _ctrl.text = next;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  String _labelForId(String? id) {
+    if (id == null) return '';
+    final s = widget.students.where((s) => s.id == id).firstOrNull;
+    return s != null ? _studentLabel(s) : '';
+  }
+
+  String _studentLabel(AcademyStudentListItem s) {
+    final belt =
+        (s.belt != null && s.belt!.isNotEmpty) ? ' · Faixa ${s.belt}' : '';
+    return '${s.name ?? ''}$belt';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.result;
+    final student = r.student;
+    final crop = widget.decodeBase64(r.faceCropBase64);
+    final confidenceLabel = '${(r.confidence * 100).toStringAsFixed(0)}%';
+    final blockedByManual = widget.manualStudentId != null;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            crop == null
+                ? const CircleAvatar(child: Icon(Icons.person_outline))
+                : CircleAvatar(backgroundImage: MemoryImage(crop)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    [
+                      if (student?.name != null &&
+                          student!.name!.trim().isNotEmpty)
+                        student.name!.trim(),
+                      if (student?.belt != null &&
+                          student!.belt!.trim().isNotEmpty)
+                        'Faixa ${student.belt}',
+                      'Confiança $confidenceLabel',
+                    ].join(' · '),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(
+                      blockedByManual
+                          ? 'Sugestão (substituída pela busca)'
+                          : 'Confirmar esta sugestão',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    value: blockedByManual ? false : widget.useSuggested,
+                    onChanged: blockedByManual
+                        ? null
+                        : (v) =>
+                            widget.onToggleSuggested(v ?? false),
+                  ),
+                  const SizedBox(height: 8),
+                  Autocomplete<AcademyStudentListItem>(
+                    textEditingController: _ctrl,
+                    optionsBuilder: (value) {
+                      final q = value.text.trim().toLowerCase();
+                      if (q.isEmpty) return widget.students.take(8);
+                      return widget.students
+                          .where((s) =>
+                              (s.name?.toLowerCase().contains(q) ?? false))
+                          .take(8);
+                    },
+                    displayStringForOption: _studentLabel,
+                    onSelected: (picked) {
+                      widget.onManualPick(picked.id);
+                    },
+                    fieldViewBuilder: (context, ctrl, focusNode, onSubmit) {
+                      return TextField(
+                        controller: ctrl,
+                        focusNode: focusNode,
+                        decoration: InputDecoration(
+                          hintText: widget.students.isEmpty
+                              ? 'Carregando alunos...'
+                              : 'Buscar aluno…',
+                          prefixIcon:
+                              const Icon(Icons.search_rounded, size: 18),
+                          isDense: true,
+                          border: const OutlineInputBorder(),
+                          suffixIcon: ctrl.text.isNotEmpty
+                              ? IconButton(
+                                  icon:
+                                      const Icon(Icons.clear_rounded, size: 18),
+                                  onPressed: () {
+                                    ctrl.clear();
+                                    widget.onManualPick(null);
+                                  },
+                                )
+                              : null,
+                        ),
+                        onChanged: (v) {
+                          if (v.isEmpty) widget.onManualPick(null);
+                        },
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -514,7 +744,7 @@ class _UnknownFaceItemState extends State<_UnknownFaceItem> {
                       if (q.isEmpty) return widget.students.take(8);
                       return widget.students
                           .where((s) =>
-                              s.name?.toLowerCase().contains(q) ?? false)
+                              (s.name?.toLowerCase().contains(q) ?? false))
                           .take(8);
                     },
                     displayStringForOption: _studentLabel,
