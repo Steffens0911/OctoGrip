@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Query, Request, Response, WebSocket, WebSocketDisconnect
@@ -529,7 +529,7 @@ async def attendance_session_qr(
 @limiter.limit("30/minute")
 async def attendance_scan(
     request: Request,
-    body: QrScanIn = Body(...),
+    body: Annotated[QrScanIn, Body(...)],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_aluno_not_frozen),
 ):
