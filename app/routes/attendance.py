@@ -512,8 +512,12 @@ async def attendance_session_qr(
         db, session_id, current_user=current_user
     )
     if session.academy_id is not None:
-        academy = await db.get(Academy, session.academy_id)
-        if academy is not None and not academy.qr_attendance_enabled:
+        qr_enabled = (
+            await db.execute(
+                select(Academy.qr_attendance_enabled).where(Academy.id == session.academy_id)
+            )
+        ).scalar_one_or_none()
+        if qr_enabled is False:
             raise ForbiddenError(
                 "A chamada por QR está desativada para esta academia. Faça presença manual."
             )
