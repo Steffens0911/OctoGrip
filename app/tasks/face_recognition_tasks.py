@@ -107,6 +107,31 @@ def _crop_face_base64(image_path: str, facial_area: dict | None) -> str:
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
+def _reference_photo_preview_base64(image_path: str, *, max_side: int = 960) -> str | None:
+    """JPEG reduzido exclusivamente para conferência na UI após conclusão do job."""
+    try:
+        with Image.open(image_path) as image:
+            image = image.convert("RGB")
+            w, h = image.size
+            longest = max(w, h)
+            if longest > max_side:
+                scale = max_side / float(longest)
+                image = image.resize(
+                    (max(1, int(round(w * scale))), max(1, int(round(h * scale)))),
+                    Image.Resampling.LANCZOS,
+                )
+            buffer = io.BytesIO()
+            image.save(buffer, format="JPEG", quality=82, optimize=True)
+            return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    except Exception:
+        logger.warning(
+            "Não foi possível gerar pré-visualização da foto de treino.",
+            extra={"path": image_path},
+            exc_info=True,
+        )
+        return None
+
+
 def _classify_match(similarity: float) -> str:
     if similarity >= 0.55:
         return "auto_identified"
@@ -260,6 +285,9 @@ def process_face_recognition(self, job_id: str) -> None:
                 "total_faces_detected": len(results),
                 "results": results,
             }
+            ref_preview = _reference_photo_preview_base64(job.photo_path)
+            if ref_preview:
+                payload["reference_photo_base64"] = ref_preview
             job.status = "completed"
             job.result_json = payload
             job.completed_at = datetime.now(UTC)

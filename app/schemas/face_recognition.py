@@ -35,6 +35,10 @@ class FaceRecognitionJobStatusRead(BaseModel):
     total_faces_detected: int | None = None
     results: list[FaceRecognitionResultRead] | None = None
     error_message: str | None = None
+    reference_photo_base64: str | None = Field(
+        default=None,
+        description="JPEG base64 reduzido para conferência na revisão (removido após confirm).",
+    )
 
 
 class FaceRecognitionConfirmRequest(BaseModel):

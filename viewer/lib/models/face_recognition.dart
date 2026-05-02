@@ -77,6 +77,8 @@ class FaceRecognitionJobStatusModel {
   final int totalFacesDetected;
   final List<FaceRecognitionResultModel> results;
   final String? errorMessage;
+  /// JPEG base64 reduzido só para conferência (opcional).
+  final String? referencePhotoBase64;
 
   FaceRecognitionJobStatusModel({
     required this.jobId,
@@ -85,6 +87,7 @@ class FaceRecognitionJobStatusModel {
     required this.totalFacesDetected,
     required this.results,
     required this.errorMessage,
+    required this.referencePhotoBase64,
   });
 
   factory FaceRecognitionJobStatusModel.fromJson(Map<String, dynamic> json) {
@@ -99,6 +102,7 @@ class FaceRecognitionJobStatusModel {
           .map(FaceRecognitionResultModel.fromJson)
           .toList(),
       errorMessage: json['error_message'] as String?,
+      referencePhotoBase64: json['reference_photo_base64'] as String?,
     );
   }
 }

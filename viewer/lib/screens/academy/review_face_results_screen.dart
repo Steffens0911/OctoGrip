@@ -54,6 +54,9 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
   final Map<int, bool> _suggestionUseSuggested = {};
   final Map<int, String?> _prevSuggestionEff = {};
 
+  /// Pré-visualização da foto enviada (só conferência; vem da API como JPEG base64).
+  Uint8List? _trainingPhotoBytes;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +93,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           _loading = false;
           _hasReceivedJobOnce = true;
           _job = job;
+          _trainingPhotoBytes = null;
           _error = job.errorMessage?.trim().isNotEmpty == true
               ? job.errorMessage
               : 'O processamento da foto falhou. Tente enviar outra imagem.';
@@ -104,6 +108,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
             _loading = false;
             _hasReceivedJobOnce = true;
             _job = job;
+            _trainingPhotoBytes = null;
             _error =
                 'O processamento ultrapassou o tempo esperado (vários minutos). '
                 'O trabalho em segundo plano (Celery) pode não estar a correr ou não consegue falar com o Redis. '
@@ -117,6 +122,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           _loading = false;
           _hasReceivedJobOnce = true;
           _job = job;
+          _trainingPhotoBytes = null;
         });
         _pollTimer = Timer(_pollInterval, () {
           if (mounted) _load();
@@ -129,6 +135,8 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         _job = job;
         _loading = false;
         _hasReceivedJobOnce = true;
+        _trainingPhotoBytes =
+            _decodeTrainingPhotoPreview(job.referencePhotoBase64);
         _suggestionManualPick.clear();
         _suggestionUseSuggested.clear();
         _prevSuggestionEff.clear();
@@ -146,6 +154,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
       setState(() {
         _loading = false;
         _hasReceivedJobOnce = true;
+        _trainingPhotoBytes = null;
         _error = userFacingMessage(e);
       });
       return;
@@ -248,6 +257,54 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  Uint8List? _decodeTrainingPhotoPreview(String? b64) {
+    if (b64 == null || b64.isEmpty) return null;
+    return _decodeBase64(b64);
+  }
+
+  Widget _buildTrainingPhotoSection(BuildContext context) {
+    final bytes = _trainingPhotoBytes;
+    if (bytes == null || bytes.isEmpty) return const SizedBox.shrink();
+
+    final maxH = MediaQuery.sizeOf(context).height * 0.38;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Foto do treino',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Apenas para conferência neste ecrã.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondaryOf(context),
+                ),
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxH),
+                child: Image.memory(
+                  bytes,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  gaplessPlayback: true,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildItem(FaceRecognitionResultModel result,
@@ -402,6 +459,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           96,
         ),
         children: [
+          _buildTrainingPhotoSection(context),
           Text('Identificados', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (auto.isEmpty)

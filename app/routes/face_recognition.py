@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Body, Depends, File, Form, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
 from app.core.auth_deps import get_current_user
@@ -180,6 +181,7 @@ async def face_recognition_job_status(
         total_faces_detected=payload.get("total_faces_detected"),
         results=payload.get("results"),
         error_message=job.error_message,
+        reference_photo_base64=payload.get("reference_photo_base64"),
     )
 
 
@@ -256,6 +258,14 @@ async def face_recognition_confirm(
                 "present_count": present_count,
             },
         )
+
+    job_updated = await db.get(FaceRecognitionJob, body.job_id)
+    if job_updated and isinstance(job_updated.result_json, dict):
+        cleaned = dict(job_updated.result_json)
+        cleaned.pop("reference_photo_base64", None)
+        job_updated.result_json = cleaned
+        flag_modified(job_updated, "result_json")
+        await db.commit()
 
     if job.photo_path:
         try:
