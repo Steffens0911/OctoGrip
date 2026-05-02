@@ -296,24 +296,41 @@ async def scan_checkin(
     session_id = qr_verify(token)
 
     now = _now_utc()
-    s = await db.get(AttendanceSession, session_id)
-    if not s:
+
+    # Busca apenas as colunas necessárias — evita carregar relacionamentos selectin
+    # (created_by, records, etc.) que disparam cascatas de queries e podem falhar.
+    _s_row = (
+        await db.execute(
+            select(
+                AttendanceSession.id,
+                AttendanceSession.academy_id,
+                AttendanceSession.status,
+                AttendanceSession.expires_at,
+            ).where(AttendanceSession.id == session_id)
+        )
+    ).one_or_none()
+    if _s_row is None:
         raise AttendanceSessionNotFoundError()
-    if s.academy_id is not None:
+
+    s_academy_id = _s_row[1]
+    s_status = _s_row[2]
+    s_expires_at = _s_row[3]
+
+    if s_academy_id is not None:
         qr_enabled = (
             await db.execute(
-                select(Academy.qr_attendance_enabled).where(Academy.id == s.academy_id)
+                select(Academy.qr_attendance_enabled).where(Academy.id == s_academy_id)
             )
         ).scalar_one_or_none()
         if qr_enabled is False:
             raise ForbiddenError(
                 "A chamada por QR está desativada para esta academia. Faça presença manual."
             )
-    if s.status != "active":
+    if s_status != "active":
         raise AttendanceSessionClosedError()
-    if s.expires_at and s.expires_at < now:
+    if s_expires_at and s_expires_at < now:
         raise AttendanceSessionClosedError("Sessão expirada.")
-    if s.academy_id and s.academy_id != current_user.academy_id:
+    if s_academy_id and s_academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Sessão pertence a outra academia.")
 
     existing = (
@@ -324,7 +341,7 @@ async def scan_checkin(
             )
         )
     ).scalar_one_or_none()
-    if existing:
+    if existing is not None:
         return existing, False
 
     r = AttendanceRecord(
@@ -347,12 +364,12 @@ async def scan_checkin(
                 )
             )
         ).scalar_one_or_none()
-        if raced:
+        if raced is not None:
             return raced, False
         raise
 
-    await invalidate_attendance_ranking_cache(s.academy_id)
-    await invalidate_attendance_stats_cache(s.academy_id, current_user.id)
+    await invalidate_attendance_ranking_cache(s_academy_id)
+    await invalidate_attendance_stats_cache(s_academy_id, current_user.id)
     return r, True
 
 
