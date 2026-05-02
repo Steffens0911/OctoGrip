@@ -321,46 +321,20 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
     if (session == null || jobId == null || _checkingFaceJob) return;
     setState(() => _checkingFaceJob = true);
     try {
-      final job = await _api.getFaceRecognitionJob(jobId);
-      if (!mounted) return;
-      if (job.status == 'completed') {
-        final saved = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => ReviewFaceResultsScreen(
-              sessionId: session.id,
-              jobId: jobId,
-              academyId: session.academyId,
-            ),
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReviewFaceResultsScreen(
+            sessionId: session.id,
+            jobId: jobId,
+            academyId: session.academyId,
           ),
-        );
-        if (!mounted) return;
-        if (saved == true) {
-          setState(() => _faceJobId = null);
-          await _load();
-        }
-        return;
-      }
-      if (job.status == 'failed') {
-        AppFeedback.show(
-          context,
-          message: job.errorMessage ?? 'Processamento falhou. Envie outra foto.',
-          type: AppFeedbackType.error,
-        );
-        setState(() => _faceJobId = null);
-        return;
-      }
-      AppFeedback.show(
-        context,
-        message: 'Processamento ainda em andamento. Tente novamente em instantes.',
-        type: AppFeedbackType.warning,
+        ),
       );
-    } catch (e) {
       if (!mounted) return;
-      AppFeedback.show(
-        context,
-        message: userFacingMessage(e),
-        type: AppFeedbackType.error,
-      );
+      if (saved == true) {
+        setState(() => _faceJobId = null);
+        await _load();
+      }
     } finally {
       if (mounted) setState(() => _checkingFaceJob = false);
     }

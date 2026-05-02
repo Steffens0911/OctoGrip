@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -30,6 +31,15 @@ class ReviewFaceResultsScreen extends StatefulWidget {
 
 class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
   final _api = ApiService();
+
+  /// Reconsulta o estado do job enquanto estiver pending/processing (fila Celery).
+  static const Duration _pollInterval = Duration(seconds: 2);
+  static const int _maxPollAttempts = 90;
+
+  Timer? _pollTimer;
+  int _pollAttempts = 0;
+  bool _hasReceivedJobOnce = false;
+
   bool _loading = true;
   bool _saving = false;
   bool _loadingStudents = false;
@@ -45,17 +55,75 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool manualRetry = false}) async {
+    if (manualRetry) {
+      _pollAttempts = 0;
+      _pollTimer?.cancel();
+    }
+
+    if (!_hasReceivedJobOnce || manualRetry) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
     try {
       final job = await _api.getFaceRecognitionJob(widget.jobId);
+      if (!mounted) return;
+
+      _pollTimer?.cancel();
+
+      if (job.status == 'failed') {
+        setState(() {
+          _loading = false;
+          _hasReceivedJobOnce = true;
+          _job = job;
+          _error = job.errorMessage?.trim().isNotEmpty == true
+              ? job.errorMessage
+              : 'O processamento da foto falhou. Tente enviar outra imagem.';
+        });
+        return;
+      }
+
+      if (job.status == 'pending' || job.status == 'processing') {
+        _pollAttempts++;
+        if (_pollAttempts > _maxPollAttempts) {
+          setState(() {
+            _loading = false;
+            _hasReceivedJobOnce = true;
+            _job = job;
+            _error =
+                'O processamento ultrapassou o tempo esperado (vários minutos). '
+                'O trabalho em segundo plano (Celery) pode não estar a correr ou não consegue falar com o Redis. '
+                'Confirme que o contentor celery-worker está ativo, que REDIS_URL é igual na API e no worker e '
+                'que FACE_JOBS_DIR está no mesmo volume partilhado (ver README / docs/DEPLOY_COOLIFY_CONTABO.md).';
+          });
+          return;
+        }
+
+        setState(() {
+          _loading = false;
+          _hasReceivedJobOnce = true;
+          _job = job;
+        });
+        _pollTimer = Timer(_pollInterval, () {
+          if (mounted) _load();
+        });
+        return;
+      }
+
       if (!mounted) return;
       setState(() {
         _job = job;
         _loading = false;
+        _hasReceivedJobOnce = true;
         _confirmedStudentIds
           ..clear()
           ..addAll(
@@ -69,6 +137,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
+        _hasReceivedJobOnce = true;
         _error = userFacingMessage(e);
       });
       return;
@@ -213,7 +282,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         appBar: const AppStandardAppBar(title: 'Revisar reconhecimento'),
         body: AppScreenState.error(
           message: _error!,
-          onRetry: _load,
+          onRetry: () => _load(manualRetry: true),
         ),
       );
     }
@@ -223,16 +292,54 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
         appBar: const AppStandardAppBar(title: 'Revisar reconhecimento'),
         body: AppScreenState.empty(
           message: 'Nenhum resultado disponível para este job.',
-          onRetry: _load,
+          onRetry: () => _load(manualRetry: true),
         ),
       );
     }
+
+    if (job.status == 'pending' || job.status == 'processing') {
+      return Scaffold(
+        appBar: const AppStandardAppBar(title: 'Revisar reconhecimento'),
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(AppTheme.screenPadding(context) * 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 24),
+                Text(
+                  'A processar a foto…',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Estado: ${job.status}. Isto costuma levar poucos segundos.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondaryOf(context),
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                TextButton.icon(
+                  onPressed: () => _load(manualRetry: true),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Recarregar agora'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (job.status != 'completed') {
       return Scaffold(
         appBar: const AppStandardAppBar(title: 'Revisar reconhecimento'),
         body: AppScreenState.empty(
-          message: 'Processamento em andamento (status: ${job.status}).',
-          onRetry: _load,
+          message: 'Estado inesperado: ${job.status}.',
+          onRetry: () => _load(manualRetry: true),
         ),
       );
     }

@@ -60,6 +60,17 @@ Foto de referência de aluno para reconhecimento facial:
 - URL persistida em `users.avatar_url` no formato `/media/user_avatars/...`.
 - O worker de embedding aceita tanto URL HTTP/HTTPS quanto URL relativa `/media/...`.
 
+### Chamada por foto “sempre em processamento”
+
+O fluxo grava o job na base de dados e enfileira a tarefa **Celery** (`process_face_recognition`). Enquanto o status do job for `pending` ou `processing`, o viewer está à espera do worker.
+
+Se ficar preso indefinidamente:
+
+1. Confirme que **redis**, **celery-worker** e **celery-beat** estão no ar (`docker compose ps` ou equivalente no Coolify).
+2. **REDIS_URL** deve ser **igual** na API e no worker (mesmo host/porta Redis na rede Docker).
+3. **FACE_JOBS_DIR** deve estar no **mesmo volume partilhado** entre API e worker (no compose local: volume `face_jobs`; no Coolify: subpasta de `api_media` — ver `docs/DEPLOY_COOLIFY_CONTABO.md`).
+4. Veja os logs do worker (`docker compose logs celery-worker`) por erros ao importar DeepFace ou ler o ficheiro da foto.
+
 ### HTTPS na VPS (Caddy)
 
 Com domínios apontando para a máquina, use o override que adiciona **Caddy** (TLS automático com Let’s Encrypt) na frente do viewer e da API:
