@@ -8,12 +8,13 @@ from fastapi import APIRouter, Body, Depends, Query, Request, Response, WebSocke
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.exceptions import ForbiddenError
 from app.core.rate_limit import limiter
 from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
-from app.models import AttendanceRecord, AttendanceSession, User
+from app.models import Academy, AttendanceRecord, AttendanceSession, User
 from app.schemas.attendance import (
     AttendanceManualBatchResponse,
     AttendanceManualCheckinRequest,
@@ -507,7 +508,15 @@ async def attendance_session_qr(
     current_user: User = Depends(require_write_access),
     ttl_seconds: int = Query(60, ge=15, le=180),
 ):
-    await get_attendance_session_basic(db, session_id, current_user=current_user)
+    session = await get_attendance_session_basic(
+        db, session_id, current_user=current_user
+    )
+    if session.academy_id is not None:
+        academy = await db.get(Academy, session.academy_id)
+        if academy is not None and not academy.qr_attendance_enabled:
+            raise ForbiddenError(
+                "A chamada por QR está desativada para esta academia. Faça presença manual."
+            )
     token, expires_at = qr_service.issue(session_id, ttl_seconds=ttl_seconds)
     return QrTokenOut(token=token, expires_at=expires_at)
 

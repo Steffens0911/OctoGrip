@@ -71,6 +71,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _loadingWeeklyKits = false;
   bool _showGlobalSupporters = true;
   bool _faceRecognitionEnabled = false;
+  bool _qrAttendanceEnabled = true;
   bool _savingAdminPersonalization = false;
 
   @override
@@ -85,6 +86,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _weeklyMultiplier3 = clampRewardPoints(_academy.weeklyMultiplier3);
     _showGlobalSupporters = _academy.showGlobalSupporters;
     _faceRecognitionEnabled = _academy.faceRecognitionEnabled;
+    _qrAttendanceEnabled = _academy.qrAttendanceEnabled;
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
@@ -111,6 +113,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _academy = fresh;
         _showGlobalSupporters = fresh.showGlobalSupporters;
         _faceRecognitionEnabled = fresh.faceRecognitionEnabled;
+        _qrAttendanceEnabled = fresh.qrAttendanceEnabled;
       });
     } catch (_) {
       // Mantém os dados já carregados no detalhe caso o refresh falhe.
@@ -287,10 +290,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   Future<void> _updateAdminPersonalization({
     bool? showGlobalSupporters,
     bool? faceRecognitionEnabled,
+    bool? qrAttendanceEnabled,
   }) async {
     if (_savingAdminPersonalization) return;
     final previousShowGlobalSupporters = _showGlobalSupporters;
     final previousFaceRecognitionEnabled = _faceRecognitionEnabled;
+    final previousQrAttendanceEnabled = _qrAttendanceEnabled;
     setState(() {
       _savingAdminPersonalization = true;
       if (showGlobalSupporters != null) {
@@ -299,18 +304,23 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (faceRecognitionEnabled != null) {
         _faceRecognitionEnabled = faceRecognitionEnabled;
       }
+      if (qrAttendanceEnabled != null) {
+        _qrAttendanceEnabled = qrAttendanceEnabled;
+      }
     });
     try {
       final updated = await _api.updateAcademy(
         _academy.id,
         showGlobalSupporters: showGlobalSupporters,
         faceRecognitionEnabled: faceRecognitionEnabled,
+        qrAttendanceEnabled: qrAttendanceEnabled,
       );
       if (!mounted) return;
       setState(() {
         _academy = updated;
         _showGlobalSupporters = updated.showGlobalSupporters;
         _faceRecognitionEnabled = updated.faceRecognitionEnabled;
+        _qrAttendanceEnabled = updated.qrAttendanceEnabled;
         _savingAdminPersonalization = false;
       });
       widget.onUpdated();
@@ -324,6 +334,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       setState(() {
         _showGlobalSupporters = previousShowGlobalSupporters;
         _faceRecognitionEnabled = previousFaceRecognitionEnabled;
+        _qrAttendanceEnabled = previousQrAttendanceEnabled;
         _savingAdminPersonalization = false;
       });
       AppFeedback.show(
@@ -648,7 +659,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                         child: Text(
-                          'Controle por academia o bloco de parceiros globais da Central e a chamada por foto.',
+                          'Controle por academia o bloco de parceiros globais da Central, a chamada por foto e a chamada por QR.',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: AppTheme.textSecondaryOf(context),
                               ),
@@ -666,6 +677,21 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                             : (value) {
                                 _updateAdminPersonalization(
                                   showGlobalSupporters: value,
+                                );
+                              },
+                      ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text('Ativar chamada por QR Code'),
+                        subtitle: const Text(
+                          'Quando desativado, a presença é registrada somente de forma manual.',
+                        ),
+                        value: _qrAttendanceEnabled,
+                        onChanged: _savingAdminPersonalization
+                            ? null
+                            : (value) {
+                                _updateAdminPersonalization(
+                                  qrAttendanceEnabled: value,
                                 );
                               },
                       ),

@@ -45,6 +45,7 @@ class AcademyRead(BaseModel):
     login_notice_url: str | None = None
     login_notice_active: bool = False
     face_recognition_enabled: bool = False
+    qr_attendance_enabled: bool = True
     updated_at: datetime | None = None
 
     class Config:
@@ -85,6 +86,7 @@ class AcademyUpdate(BaseModel):
     login_notice_url: str | None = Field(None, max_length=512)
     login_notice_active: bool | None = None
     face_recognition_enabled: bool | None = None
+    qr_attendance_enabled: bool | None = None
 
 
 class RankingEntry(BaseModel):

@@ -182,6 +182,8 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
 
     final showPartners = _flagFromHeaderStats('show_partners', fallback: true);
     final showSchedule = _flagFromHeaderStats('show_schedule', fallback: true);
+    final qrAttendanceEnabled =
+        _flagFromHeaderStats('qr_attendance_enabled', fallback: true);
     final scheduleUrl = _scheduleUrlFromHeaderStats();
 
     final scheduleEnabled =
@@ -243,11 +245,13 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                     Expanded(
                       child: MemoCompactTileCard(
                         featured: true,
-                        enabled: true,
+                        enabled: qrAttendanceEnabled,
                         icon: Icons.qr_code_scanner_rounded,
                         title: 'Chamada por QR',
-                        subtitle: 'Escanear QR para registrar presença no treino',
-                        onTap: _pushAttendanceQr,
+                        subtitle: qrAttendanceEnabled
+                            ? 'Escanear QR para registrar presença no treino'
+                            : 'A chamada por QR está desativada nesta academia',
+                        onTap: qrAttendanceEnabled ? _pushAttendanceQr : null,
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s),

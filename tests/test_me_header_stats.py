@@ -19,6 +19,7 @@ async def test_me_header_stats_returns_level_and_academy(
     academy.show_partners = True
     academy.show_schedule = False
     academy.show_global_supporters = True
+    academy.qr_attendance_enabled = False
     aluno_user.reward_level = 3
     aluno_user.reward_level_points = 17
     await db.commit()
@@ -37,6 +38,7 @@ async def test_me_header_stats_returns_level_and_academy(
     assert data["academy"]["show_partners"] is True
     assert data["academy"]["show_schedule"] is False
     assert data["academy"]["show_global_supporters"] is True
+    assert data["academy"]["qr_attendance_enabled"] is False
 
 
 async def test_me_header_stats_returns_null_academy(client, db, admin_headers, admin_user):

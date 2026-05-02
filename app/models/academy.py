@@ -110,6 +110,12 @@ class Academy(Base, UUIDMixin):
         nullable=False,
         comment="Feature premium: habilita chamada por reconhecimento facial na academia.",
     )
+    qr_attendance_enabled: Mapped[bool] = mapped_column(
+        default=True,
+        server_default=text("true"),
+        nullable=False,
+        comment="Controle da academia: habilita chamada por QR; quando false, só presença manual.",
+    )
 
     weekly_technique: Mapped["Technique | None"] = relationship(
         "Technique",

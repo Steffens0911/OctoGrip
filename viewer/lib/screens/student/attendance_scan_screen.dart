@@ -27,12 +27,42 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
 
   bool _busy = false;
   bool _torchOn = false;
+  bool _loadingQrFlag = true;
+  bool _qrAttendanceEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQrAttendanceFlag();
+  }
 
   @override
   void dispose() {
     _apiTunnelController.dispose();
     _scanner.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadQrAttendanceFlag() async {
+    try {
+      final data = await _api.getMeHeaderStats();
+      final academy = data['academy'];
+      if (academy is Map<String, dynamic>) {
+        final enabled = academy['qr_attendance_enabled'];
+        if (enabled is bool && mounted) {
+          setState(() {
+            _qrAttendanceEnabled = enabled;
+            _loadingQrFlag = false;
+          });
+          return;
+        }
+      }
+    } catch (_) {
+      // fallback habilitado
+    }
+    if (mounted) {
+      setState(() => _loadingQrFlag = false);
+    }
   }
 
   Future<void> _submit(String token) async {
@@ -86,6 +116,28 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadingQrFlag) {
+      return const Scaffold(
+        appBar: AppStandardAppBar(title: 'Escanear QR'),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_qrAttendanceEnabled) {
+      return const Scaffold(
+        appBar: AppStandardAppBar(title: 'Escanear QR'),
+        body: SafeArea(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: AppErrorMessage(
+              message:
+                  'A chamada por QR está desativada nesta academia. A presença deve ser registrada manualmente pelo professor.',
+            ),
+          ),
+        ),
+      );
+    }
+
     if (kIsWeb && kApiBaseUrl.isEmpty) {
       return Scaffold(
         appBar: const AppStandardAppBar(title: 'Escanear QR'),

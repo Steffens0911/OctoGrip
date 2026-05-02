@@ -38,6 +38,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _loading = true;
   bool _busy = false;
   bool _startingSession = false;
+  bool _qrAttendanceEnabled = true;
   String? _error;
 
   Timer? _refreshTimer;
@@ -123,6 +124,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   // ── QR heartbeat ───────────────────────────────────────────
 
   void _startQrHeartbeat() {
+    if (!_qrAttendanceEnabled) return;
     _qrHeartbeatTimer?.cancel();
     _qrHeartbeatTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!mounted) return;
@@ -138,6 +140,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   Future<void> _fetchQr() async {
     final s = _session;
+    if (!_qrAttendanceEnabled) return;
     if (s == null || s.status.toLowerCase() == 'closed') return;
     if (_refreshingQr) return;
     setState(() {
@@ -172,7 +175,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       if (_session?.id == null) return;
       final last = _lastWsActivityAt;
       if (last != null &&
-          DateTime.now().difference(last) < _skipPollAfterWs) return;
+          DateTime.now().difference(last) < _skipPollAfterWs) {
+        return;
+      }
       unawaited(_refreshSession());
     });
   }
@@ -246,6 +251,17 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _error = null;
     });
     try {
+      final academyId = AuthService().currentUser?.academyId;
+      if (academyId != null && academyId.isNotEmpty) {
+        try {
+          final academy = await _api.getAcademy(academyId);
+          if (mounted) {
+            setState(() => _qrAttendanceEnabled = academy.qrAttendanceEnabled);
+          }
+        } catch (_) {
+          // Mantém fallback true se não conseguir carregar a configuração.
+        }
+      }
       if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) {
@@ -371,18 +387,32 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       setState(() {
         _session = s;
         _records = const [];
+        _qr = null;
+        _qrError = null;
       });
       _startAutoRefresh();
-      _startQrHeartbeat();
       _startLive(s.id);
-
-      // Busca QR e lista em paralelo
-      final qrFuture = _api.getAttendanceQrToken(s.id, ttlSeconds: 60);
       final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
-
-      final qr = await qrFuture;
-      if (!mounted) return;
-      setState(() => _qr = qr);
+      if (_qrAttendanceEnabled) {
+        _startQrHeartbeat();
+        try {
+          final qr = await _api.getAttendanceQrToken(s.id, ttlSeconds: 60);
+          if (!mounted) return;
+          setState(() => _qr = qr);
+        } catch (e) {
+          if (!mounted) return;
+          setState(() => _qrError = userFacingMessage(e));
+        }
+      } else {
+        _qrHeartbeatTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _qr = null;
+            _qrError =
+                'QR desativado nesta academia. Registre presença manualmente.';
+          });
+        }
+      }
 
       try {
         final recs = await recsFuture;
@@ -404,10 +434,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           message: userFacingMessage(e), type: AppFeedbackType.error);
       return;
     } finally {
-      if (mounted) setState(() {
-        _busy = false;
-        _startingSession = false;
-      });
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _startingSession = false;
+        });
+      }
     }
   }
 
@@ -480,7 +512,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Inicie uma chamada para exibir o QR na sala.',
+              _qrAttendanceEnabled
+                  ? 'Inicie uma chamada para exibir o QR na sala.'
+                  : 'Inicie uma chamada para registrar presença manualmente.',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
@@ -497,7 +531,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'O QR é renovado automaticamente. Os alunos escaneiam com o app para registrar presença.',
+              _qrAttendanceEnabled
+                  ? 'O QR é renovado automaticamente. Os alunos escaneiam com o app para registrar presença.'
+                  : 'Nesta academia, o QR está desativado. Use "Adicionar aluno" para registrar presença manual.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
@@ -512,7 +548,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     return RefreshIndicator(
       onRefresh: () async {
         await _refreshSession();
-        if (!isClosed) await _fetchQr();
+        if (!isClosed && _qrAttendanceEnabled) await _fetchQr();
       },
       child: ListView(
         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
@@ -558,7 +594,18 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    if (_qr != null)
+                    if (!_qrAttendanceEnabled)
+                      SizedBox(
+                        height: 240,
+                        child: Center(
+                          child: Text(
+                            'QR desativado nesta academia.\nUse "Adicionar aluno" para presença manual.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      )
+                    else if (_qr != null)
                       RepaintBoundary(
                         child: QrImageView(
                           key: ValueKey<String>(_qr!.token),
@@ -589,7 +636,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                         ),
                       ),
                     const SizedBox(height: 8),
-                    if (_qr != null)
+                    if (_qrAttendanceEnabled && _qr != null)
                       _QrCountdown(
                         key: ValueKey(_qr!.token),
                         expiresAt: _qr!.expiresAt,
@@ -599,11 +646,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                                 ),
                       ),
                     const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: (_busy || _refreshingQr) ? null : _fetchQr,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: const Text('Gerar novo QR'),
-                    ),
+                    if (_qrAttendanceEnabled)
+                      OutlinedButton.icon(
+                        onPressed: (_busy || _refreshingQr) ? null : _fetchQr,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Gerar novo QR'),
+                      ),
                   ],
                 ),
               ),

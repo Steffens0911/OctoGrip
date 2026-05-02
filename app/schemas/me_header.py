@@ -17,6 +17,7 @@ class MeHeaderAcademyRead(BaseModel):
     show_partners: bool = True
     show_schedule: bool = True
     show_global_supporters: bool = True
+    qr_attendance_enabled: bool = True
     login_notice_title: str | None = None
     login_notice_body: str | None = None
     login_notice_url: str | None = None

@@ -21,7 +21,7 @@ from app.core.exceptions import (
     UserNotFoundError,
 )
 from app.core.role_deps import verify_academy_access
-from app.models import AttendanceRecord, AttendanceSession, User
+from app.models import Academy, AttendanceRecord, AttendanceSession, User
 
 
 def _now_utc() -> datetime:
@@ -299,6 +299,12 @@ async def scan_checkin(
     s = await db.get(AttendanceSession, session_id)
     if not s:
         raise AttendanceSessionNotFoundError()
+    if s.academy_id is not None:
+        academy = await db.get(Academy, s.academy_id)
+        if academy is not None and not academy.qr_attendance_enabled:
+            raise ForbiddenError(
+                "A chamada por QR está desativada para esta academia. Faça presença manual."
+            )
     if s.status != "active":
         raise AttendanceSessionClosedError()
     if s.expires_at and s.expires_at < now:

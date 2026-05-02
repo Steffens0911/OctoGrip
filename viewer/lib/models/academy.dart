@@ -27,6 +27,7 @@ class Academy {
   final String? loginNoticeUrl;
   final bool loginNoticeActive;
   final bool faceRecognitionEnabled;
+  final bool qrAttendanceEnabled;
   final String? updatedAt;
 
   Academy({
@@ -56,6 +57,7 @@ class Academy {
     this.loginNoticeUrl,
     this.loginNoticeActive = false,
     this.faceRecognitionEnabled = false,
+    this.qrAttendanceEnabled = true,
     this.updatedAt,
   });
 
@@ -88,6 +90,7 @@ class Academy {
       loginNoticeActive: json['login_notice_active'] as bool? ?? false,
       faceRecognitionEnabled:
           json['face_recognition_enabled'] as bool? ?? false,
+      qrAttendanceEnabled: json['qr_attendance_enabled'] as bool? ?? true,
       updatedAt: json['updated_at'] as String?,
     );
   }
@@ -111,6 +114,7 @@ class Academy {
         'login_notice_url': loginNoticeUrl,
         'login_notice_active': loginNoticeActive,
         'face_recognition_enabled': faceRecognitionEnabled,
+        'qr_attendance_enabled': qrAttendanceEnabled,
         'updated_at': updatedAt,
       };
 }

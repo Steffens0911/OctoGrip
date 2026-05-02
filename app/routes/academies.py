@@ -176,6 +176,7 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         login_notice_url=a.login_notice_url,
         login_notice_active=a.login_notice_active,
         face_recognition_enabled=a.face_recognition_enabled,
+        qr_attendance_enabled=a.qr_attendance_enabled,
         updated_at=getattr(a, "updated_at", None),
     )
 
@@ -336,6 +337,7 @@ async def academy_update(
     if current_user.role != "administrador":
         updates.pop("face_recognition_enabled", None)
         updates.pop("show_global_supporters", None)
+        updates.pop("qr_attendance_enabled", None)
     academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()
