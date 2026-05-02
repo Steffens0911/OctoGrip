@@ -44,6 +44,34 @@
     Em hosts públicos não forçamos porta aqui: config_web.dart usa mesma origem (proxy) ou --dart-define.
   -->
   <script>
+    // PWA install prompt — captura o evento para uso pelo Flutter.
+    window.__pwaInstallPrompt = null;
+    window.__pwaInstalled = false;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__pwaInstallPrompt = e;
+    });
+    window.addEventListener('appinstalled', function () {
+      window.__pwaInstalled = true;
+      window.__pwaInstallPrompt = null;
+    });
+    window.triggerPwaInstall = function () {
+      var p = window.__pwaInstallPrompt;
+      if (!p) return false;
+      p.prompt();
+      p.userChoice.then(function () {
+        window.__pwaInstallPrompt = null;
+      });
+      return true;
+    };
+    window.isPwaInstalled = function () {
+      if (window.__pwaInstalled) return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.navigator && window.navigator.standalone === true) return true;
+      return false;
+    };
+  </script>
+  <script>
     (function () {
       var params = new URLSearchParams(window.location.search);
       var q = params.get('api_base');

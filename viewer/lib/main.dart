@@ -21,6 +21,7 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
+import 'package:viewer/widgets/pwa_install_banner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -145,7 +146,7 @@ class _OctoGripAppState extends State<OctoGripApp> {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: TextScaler.linear(_textScale)),
-          child: child ?? const SizedBox.shrink(),
+          child: PwaInstallBanner(child: child ?? const SizedBox.shrink()),
         );
       },
       home: AuthGate(
