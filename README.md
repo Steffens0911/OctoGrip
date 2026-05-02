@@ -39,10 +39,12 @@ Para subir o processamento assíncrono de reconhecimento facial (Redis + worker 
 docker compose up -d --build redis celery-worker celery-beat
 ```
 
+O worker usa **`--pool=solo --concurrency=1`** para não criar vários processos que carregam TensorFlow ao mesmo tempo (evita **OOM / SIGKILL** em VPS com pouca RAM). O limite por defeito no compose para **celery-worker** é **2 GiB**.
+
 Comandos diretos (ambiente local, fora do Docker):
 
 ```bash
-celery -A celery_app worker --loglevel=info --concurrency=2
+celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1
 celery -A celery_app beat --loglevel=info
 ```
 
@@ -70,6 +72,7 @@ Se ficar preso indefinidamente:
 2. **REDIS_URL** deve ser **igual** na API e no worker (mesmo host/porta Redis na rede Docker).
 3. **FACE_JOBS_DIR** deve estar no **mesmo volume partilhado** entre API e worker (no compose local: volume `face_jobs`; no Coolify: subpasta de `api_media` — ver `docs/DEPLOY_COOLIFY_CONTABO.md`).
 4. Veja os logs do worker (`docker compose logs celery-worker`) por erros ao importar DeepFace ou ler o ficheiro da foto.
+5. **SIGKILL** / **Timed out waiting for UP message** em `ForkPoolWorker`: falta RAM para várias cópias do TensorFlow — usa **`--pool=solo`** e aumenta **mem_limit** do contentor **celery-worker** (definições actuais em `docker-compose.yml` / `docker-compose.coolify.yml`; ver também `docs/DEPLOY_COOLIFY_CONTABO.md`).
 
 ### HTTPS na VPS (Caddy)
 

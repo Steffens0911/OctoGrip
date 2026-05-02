@@ -97,7 +97,8 @@ services:
     build: .
     container_name: jjb_celery_worker
     restart: unless-stopped
-    command: celery -A celery_app worker --loglevel=info --concurrency=2
+    # Pool solo: uma cópia do modelo na RAM; prefork+TensorFlow estoura mem_limit típico (SIGKILL nos ForkPoolWorker).
+    command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
@@ -117,8 +118,8 @@ services:
       - api_media:/app/app_media
       - face_jobs:/tmp/face_jobs
       - ./secrets:/app/secrets:ro
-    mem_limit: 1g
-    mem_reservation: 512m
+    mem_limit: 2g
+    mem_reservation: 768m
 
   celery-beat:
     build: .

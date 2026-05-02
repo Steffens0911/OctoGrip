@@ -21,7 +21,9 @@ celery_app.conf.update(
     task_soft_time_limit=90,
     task_track_started=True,
     broker_connection_retry_on_startup=True,
-    worker_concurrency=2,
+    # Prefork com concurrency>1 duplica TensorFlow/DeepFace por processo → OOM (SIGKILL) em VPS ~1 GiB.
+    # O compose usa --pool=solo (um processo); mantemos 1 aqui para ambientes sem esse flag.
+    worker_concurrency=1,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     result_expires=3600,

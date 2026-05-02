@@ -75,6 +75,12 @@ O Coolify deteta variáveis no formato `${NOME}` do compose. Configura no UI (va
 | `REDIS_URL` | (Opcional) URL do broker Celery / Redis. Por defeito no compose: `redis://redis:6379/0` (serviço interno `redis`). Só precisas de definir se usares Redis externo. |
 | `FACE_JOBS_DIR` | (Opcional) Diretório **dentro do contentor** para ficheiros temporários dos jobs de face. Por defeito no compose Coolify: `/app/app_media/face_jobs` (subpasta do volume `api_media`). |
 
+### Celery worker, RAM e logs `ForkPoolWorker` / SIGKILL
+
+O reconhecimento facial carrega **TensorFlow** (DeepFace). Com pool **prefork** e `concurrency` elevado, cada processo filho duplica esse footprint na RAM — num limite baixo (ex.: **1 GiB** no contentor), o kernel ou o Docker mata o processo com **SIGKILL** e aparece nos logs **Timed out waiting for UP message** nos `ForkPoolWorker`.
+
+O `docker-compose.coolify.yml` usa **`celery … --pool=solo --concurrency=1`** (uma só cópia do modelo na RAM, uma tarefa de cada vez) e **`mem_limit: 2g`** no serviço **celery-worker**. No Coolify confirma também o limite de memória desse contentor na UI (deve ser consistente). VPS muito pequenas podem precisar de mais RAM ou swap.
+
 O `DATABASE_URL` no compose já aponta para `postgres:5432` na rede interna — não é necessário alterar para o proxy público.
 
 ### Onde colar a config Firebase **Web** (FCM) no Coolify
