@@ -381,30 +381,28 @@ def _compute_counts_from_executions(
     in_period: list[TechniqueExecution],
     max_count_per_opponent: int | None,
 ) -> dict:
-    """Retorna gold_count, silver_count, bronze_count a partir de execuções no período do troféu.
+    “””Retorna gold_count, silver_count, bronze_count a partir de execuções no período do troféu.
 
-    Sem limite (``max_count_per_opponent`` null): ouro e prata contam todas as execuções válidas;
-    bronze conta **faixas brancas distintas** (comportamento legado).
+    Sem limite (``max_count_per_opponent`` null): cada execução incrementa ouro, prata ou bronze
+    conforme a faixa do adversário (a regra global de 1 execução/adversário/dia já previne farm).
 
-    Com limite N: cada ``opponent_id`` contribui no máximo N execuções no total; cada uma incrementa
-    ouro, prata ou bronze conforme a faixa do adversário (bronze deixa de ser só “distintos”).
-    """
+    Com limite N: cada ``opponent_id`` contribui no máximo N execuções no total.
+    “””
     if max_count_per_opponent is None:
         gold_count = 0
         silver_count = 0
-        white_opponent_ids = set()
+        bronze_count = 0
         for e in in_period:
             if not e.opponent:
                 continue
             tier = _graduation_to_tier(e.opponent.graduation)
-            if tier == "gold":
+            if tier == “gold”:
                 gold_count += 1
-            elif tier == "silver":
+            elif tier == “silver”:
                 silver_count += 1
-            elif tier == "bronze":
-                white_opponent_ids.add(e.opponent_id)
-        bronze_count = len(white_opponent_ids)
-        return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}
+            else:
+                bronze_count += 1
+        return {“gold_count”: gold_count, “silver_count”: silver_count, “bronze_count”: bronze_count}
 
     gold_count = 0
     silver_count = 0
@@ -448,8 +446,7 @@ async def compute_trophy_counts(
     Retorna gold_count, silver_count, bronze_count para o usuário no troféu.
     Ouro: execuções em adversários roxa/marrom/preta.
     Prata: execuções em adversários azuis.
-    Bronze: adversários brancos distintos (sem limite por adversário) ou contagem limitada por
-    adversário quando ``max_count_per_opponent`` está definido.
+    Bronze: execuções em adversários brancos (todas, limitadas por ``max_count_per_opponent`` se definido).
     """
     logger.debug(
         "compute_trophy_counts",
@@ -474,8 +471,7 @@ async def compute_user_trophy_tier(
     Calcula o tier conquistado (gold, silver, bronze) para o usuário no troféu.
     Ouro: N execuções confirmadas em adversários roxa/marrom/preta.
     Prata: N execuções em adversários azuis.
-    Bronze: N execuções em adversários brancos (distintos se sem ``max_count_per_opponent``;
-    com limite, até N execuções por adversário contam em qualquer tier).
+    Bronze: N execuções em adversários brancos (limitadas por ``max_count_per_opponent`` se definido).
     Retorna o maior tier conquistado ou None.
     """
     logger.debug(

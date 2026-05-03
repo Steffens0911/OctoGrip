@@ -19,11 +19,15 @@ class LessonListScreen extends StatefulWidget {
 class _LessonListScreenState extends State<LessonListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  static const int _pageSize = 50;
   List<Lesson> _allItems = [];
   List<Lesson> _filteredItems = [];
   List<Technique> _techniques = [];
   String? _filterTechniqueId;
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   @override
@@ -44,23 +48,62 @@ class _LessonListScreenState extends State<LessonListScreen> {
     setState(() => _filteredItems = filtered);
   }
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+  Future<void> _load({bool reset = true}) async {
+    setState(() {
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
+    });
     try {
-      final results = await Future.wait([
-        _api.getLessons(),
-        _api.getTechniques(academyId: AuthService().currentUser?.academyId ?? ''),
-      ]);
+      final academyId = AuthService().currentUser?.academyId ?? '';
+      if (reset) {
+        final results = await Future.wait([
+          _api.getLessons(academyId: academyId.isNotEmpty ? academyId : null, offset: 0, limit: _pageSize),
+          _api.getTechniques(academyId: academyId),
+        ]);
+        if (mounted) {
+          final list = results[0] as List<Lesson>;
+          setState(() {
+            _allItems = list;
+            _techniques = results[1] as List<Technique>;
+            _offset = list.length;
+            _hasMore = list.length == _pageSize;
+            _loading = false;
+          });
+          _applyFilters();
+        }
+      } else {
+        final list = await _api.getLessons(
+          academyId: academyId.isNotEmpty ? academyId : null,
+          offset: _offset,
+          limit: _pageSize,
+        );
+        if (mounted) {
+          setState(() {
+            _allItems = [..._allItems, ...list];
+            _offset += list.length;
+            _hasMore = list.length == _pageSize;
+            _loadingMore = false;
+          });
+          _applyFilters();
+        }
+      }
+    } catch (e) {
       if (mounted) {
         setState(() {
-        _allItems = results[0] as List<Lesson>;
-        _techniques = results[1] as List<Technique>;
-        _loading = false;
-      });
+          _error = userFacingMessage(e);
+          if (reset) {
+            _loading = false;
+          } else {
+            _loadingMore = false;
+          }
+        });
       }
-      _applyFilters();
-    } catch (e) {
-      if (mounted) setState(() { _error = userFacingMessage(e); _loading = false; });
     }
   }
 
@@ -166,13 +209,27 @@ class _LessonListScreenState extends State<LessonListScreen> {
                         ),
                         Expanded(
                           child: RefreshIndicator(
-                            onRefresh: _load,
+                            onRefresh: () => _load(reset: true),
                             child: _filteredItems.isEmpty
                                 ? const Center(child: Text('Nenhuma lição encontrada.', style: TextStyle(color: AppTheme.textSecondary)))
                                 : ListView.builder(
                                     padding: const EdgeInsets.all(16),
-                                    itemCount: _filteredItems.length,
+                                    itemCount: _filteredItems.length + (_hasMore ? 1 : 0),
                                     itemBuilder: (context, i) {
+                                      if (i >= _filteredItems.length) {
+                                        return Padding(
+                                          padding: const EdgeInsets.only(bottom: 12),
+                                          child: Center(
+                                            child: _loadingMore
+                                                ? const CircularProgressIndicator()
+                                                : OutlinedButton.icon(
+                                                    onPressed: () => _load(reset: false),
+                                                    icon: const Icon(Icons.expand_more),
+                                                    label: const Text('Carregar mais'),
+                                                  ),
+                                          ),
+                                        );
+                                      }
                                       final l = _filteredItems[i];
                                       return Card(
                                         margin: const EdgeInsets.only(bottom: 8),

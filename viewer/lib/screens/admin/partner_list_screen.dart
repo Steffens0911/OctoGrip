@@ -22,8 +22,12 @@ class PartnerListScreen extends StatefulWidget {
 
 class _PartnerListScreenState extends State<PartnerListScreen> {
   final ApiService _api = ApiService();
+  static const int _pageSize = 50;
   List<Partner> _list = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
   String? _error;
 
   Future<void> _toggleHighlight(Partner partner) async {
@@ -62,24 +66,41 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
     }
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool reset = true}) async {
     setState(() {
-      _loading = true;
-      _error = null;
+      if (reset) {
+        _loading = true;
+        _error = null;
+        _offset = 0;
+        _hasMore = true;
+      } else {
+        _loadingMore = true;
+      }
     });
     try {
-      final list = await _api.getPartners(widget.academy.id);
+      final list = await _api.getPartners(widget.academy.id, offset: _offset, limit: _pageSize);
       if (mounted) {
         setState(() {
-          _list = list;
-          _loading = false;
+          if (reset) {
+            _list = list;
+            _loading = false;
+          } else {
+            _list = [..._list, ...list];
+            _loadingMore = false;
+          }
+          _offset += list.length;
+          _hasMore = list.length == _pageSize;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _error = userFacingMessage(e);
-          _loading = false;
+          if (reset) {
+            _loading = false;
+          } else {
+            _loadingMore = false;
+          }
         });
       }
     }
@@ -168,12 +189,26 @@ class _PartnerListScreenState extends State<PartnerListScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _load,
+                      onRefresh: () => _load(reset: true),
                       color: AppTheme.primary,
                       child: ListView.builder(
                         padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-                        itemCount: _list.length,
+                        itemCount: _list.length + (_hasMore ? 1 : 0),
                         itemBuilder: (context, i) {
+                          if (i >= _list.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Center(
+                                child: _loadingMore
+                                    ? const CircularProgressIndicator()
+                                    : OutlinedButton.icon(
+                                        onPressed: () => _load(reset: false),
+                                        icon: const Icon(Icons.expand_more),
+                                        label: const Text('Carregar mais'),
+                                      ),
+                              ),
+                            );
+                          }
                           final p = _list[i];
                           final subtitleParts = <String>[
                             if (p.highlightOnLogin) 'Pop-up inicial',
