@@ -20,3 +20,16 @@ class TokenResponse(BaseModel):
         0,
         description="Pontos extra por sequência de login (múltiplos de 7 dias no calendário APP_TIMEZONE); 0 se não aplicou.",
     )
+
+
+class DailyCheckinResponse(BaseModel):
+    """Resposta do check-in diário silencioso (POST /auth/daily-checkin)."""
+
+    streak_bonus_points: int = Field(
+        0,
+        description="Pontos concedidos por sequência (0 se ainda não era dia de bónus).",
+    )
+    already_checked_in: bool = Field(
+        False,
+        description="True se o usuário já tinha registado presença hoje (chamada duplicada no mesmo dia).",
+    )

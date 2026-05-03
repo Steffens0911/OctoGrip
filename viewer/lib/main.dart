@@ -19,6 +19,7 @@ import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
+import 'package:viewer/services/daily_checkin_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
 import 'package:viewer/widgets/pwa_install_banner.dart';
@@ -40,6 +41,8 @@ void main() async {
       PushNotificationService.schedulePostLoginPushTokenRetries();
     }
   }
+  // Check-in diário silencioso ao abrir o app (avança streak sem novo login).
+  unawaited(DailyCheckinService.instance.maybeCheckin());
   runApp(
     ProviderScope(
       child: ChangeNotifierProvider<AuthService>.value(
@@ -59,7 +62,7 @@ class OctoGripApp extends StatefulWidget {
   State<OctoGripApp> createState() => _OctoGripAppState();
 }
 
-class _OctoGripAppState extends State<OctoGripApp> {
+class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
   /// Padrão escuro até carregar preferência (login e primeiro frame).
   ThemeMode _themeMode = ThemeMode.dark;
   bool _useGameFont = true;
@@ -68,6 +71,7 @@ class _OctoGripAppState extends State<OctoGripApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     PushNotificationService.setNotificationOpenHandler((data) {
       if (data['type'] != 'face_recognition_complete') return;
       final jobId = data['job_id'];
@@ -121,6 +125,20 @@ class _OctoGripAppState extends State<OctoGripApp> {
     if (next == _textScale) return;
     setState(() => _textScale = next);
     await ThemeService.saveTextScale(_textScale);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Detecta retorno ao primeiro plano e dispara check-in diário silencioso.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(DailyCheckinService.instance.maybeCheckin());
+    }
   }
 
   @override

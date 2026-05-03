@@ -196,6 +196,19 @@ class ApiService {
     return (token: token, user: user, streakBonusPoints: streakBonusPoints);
   }
 
+  /// Check-in diário silencioso. Retorna pontos de streak concedidos (0 se nenhum).
+  /// Idempotente — pode ser chamado várias vezes no mesmo dia sem efeito colateral.
+  Future<int> postDailyCheckin() async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/auth/daily-checkin'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    return map['streak_bonus_points'] as int? ?? 0;
+  }
+
   /// Retorna o usuário logado (requer token).
   Future<UserModel> getAuthMe([String? token]) async {
     final h = token != null

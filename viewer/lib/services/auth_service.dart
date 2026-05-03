@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/daily_checkin_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/student_home_snapshot_store.dart';
 
@@ -117,6 +118,7 @@ class AuthService extends ChangeNotifier {
     _loginNoticeShown = false;
     await _clearStorage();
     await StudentHomeSnapshotStore.clearAll();
+    await DailyCheckinService.instance.clear();
     ApiService().invalidateCache();
     notifyListeners();
   }

@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -14,10 +15,15 @@ from app.core.rate_limit import limiter
 from app.core.security import verify_password, create_access_token
 from app.database import get_db
 from app.models import User
-from app.schemas.auth import LoginRequest, TokenResponse
+from app.models.user_login_day import UserLoginDay
+from app.schemas.auth import DailyCheckinResponse, LoginRequest, TokenResponse
 from app.schemas.user import MeUpdate, UserRead
 from app.services.leveling_service import refresh_user_level
-from app.services.login_streak_service import apply_login_streak_bonus, user_read_with_login_streak
+from app.core.app_time import today_in_app_tz
+from app.services.login_streak_service import (
+    apply_login_streak_bonus,
+    user_read_with_login_streak,
+)
 from app.services.user_service import get_user_by_email, update_user
 
 logger = logging.getLogger(__name__)
@@ -137,3 +143,47 @@ async def patch_me(
         audit_user_id=current_user.id,
     )
     return await user_read_with_login_streak(db, updated if updated else current_user)
+
+
+@router.post("/daily-checkin", response_model=DailyCheckinResponse)
+async def daily_checkin(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Check-in diário silencioso.
+
+    Registra o dia de uso no calendário do app (idempotente — pode ser chamado
+    várias vezes no mesmo dia sem efeito colateral).  Avança a sequência de
+    presença e concede pontos bônus nos marcos configurados (padrão: cada 7
+    dias).  Usado pelo app Flutter para manter o streak mesmo sem novo login.
+    """
+    today = today_in_app_tz()
+
+    # Verifica se já registrou hoje antes de qualquer write.
+    existing = (
+        await db.execute(
+            select(UserLoginDay.login_day).where(
+                UserLoginDay.user_id == current_user.id,
+                UserLoginDay.login_day == today,
+            )
+        )
+    ).one_or_none()
+    already_checked_in = existing is not None
+
+    streak_bonus_points = await apply_login_streak_bonus(db, current_user, now=None)
+    await db.commit()
+    if streak_bonus_points > 0:
+        await refresh_user_level(db, current_user.id)
+
+    logger.info(
+        "daily_checkin",
+        extra={
+            "user_id": str(current_user.id),
+            "already_checked_in": already_checked_in,
+            "streak_bonus_points": streak_bonus_points,
+        },
+    )
+    return DailyCheckinResponse(
+        streak_bonus_points=streak_bonus_points,
+        already_checked_in=already_checked_in,
+    )
