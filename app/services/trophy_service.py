@@ -381,13 +381,13 @@ def _compute_counts_from_executions(
     in_period: list[TechniqueExecution],
     max_count_per_opponent: int | None,
 ) -> dict:
-    “””Retorna gold_count, silver_count, bronze_count a partir de execuções no período do troféu.
+    """Retorna gold_count, silver_count, bronze_count a partir de execuções no período do troféu.
 
     Sem limite (``max_count_per_opponent`` null): cada execução incrementa ouro, prata ou bronze
     conforme a faixa do adversário (a regra global de 1 execução/adversário/dia já previne farm).
 
     Com limite N: cada ``opponent_id`` contribui no máximo N execuções no total.
-    “””
+    """
     if max_count_per_opponent is None:
         gold_count = 0
         silver_count = 0
@@ -396,13 +396,13 @@ def _compute_counts_from_executions(
             if not e.opponent:
                 continue
             tier = _graduation_to_tier(e.opponent.graduation)
-            if tier == “gold”:
+            if tier == "gold":
                 gold_count += 1
-            elif tier == “silver”:
+            elif tier == "silver":
                 silver_count += 1
             else:
                 bronze_count += 1
-        return {“gold_count”: gold_count, “silver_count”: silver_count, “bronze_count”: bronze_count}
+        return {"gold_count": gold_count, "silver_count": silver_count, "bronze_count": bronze_count}
 
     gold_count = 0
     silver_count = 0

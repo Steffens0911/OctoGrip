@@ -63,8 +63,10 @@ String getApiBaseUrl() {
   } catch (_) {}
 
   // 4) Build release (`--dart-define=API_BASE_URL`).
+  // Ignora URL de loopback em domínio público (Coolify sem API_BASE_URL configurado bakes localhost:8001).
   final fromBuild = _kApiBaseFromBuild.trim();
-  if (fromBuild.isNotEmpty) {
+  if (fromBuild.isNotEmpty &&
+      !_storedApiBaseIncompatibleWithHost(fromBuild, hostEarly)) {
     return _trimTrailingSlashes(fromBuild);
   }
 
