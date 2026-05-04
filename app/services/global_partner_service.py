@@ -32,12 +32,16 @@ async def list_global_partners(db: AsyncSession) -> list[GlobalPartner]:
     return (await db.execute(stmt)).scalars().all()
 
 
-async def list_active_global_featured(db: AsyncSession, *, limit: int = 5) -> list[GlobalPartner]:
+async def list_active_global_featured(db: AsyncSession, *, limit: int = 5) -> list:
     lim = max(1, min(limit, 50))
     cache_key = await app_cache.versioned_key(_FEATURED_GLOBAL_PREFIX, f"active:{lim}")
     cached = await app_cache.get(cache_key)
-    if cached is not None:
-        return cached
+    if cached is not None and isinstance(cached, list):
+        if not cached or isinstance(cached[0], dict):
+            return cached  # lista de dicts (Redis/in-memory formato novo)
+        if isinstance(cached[0], GlobalPartner):
+            return cached  # ORM objects (in-memory formato antigo)
+        # Garbage do Redis (str) — re-consulta o banco
     stmt = (
         select(GlobalPartner)
         .where(GlobalPartner.is_active.is_(True))
@@ -45,8 +49,22 @@ async def list_active_global_featured(db: AsyncSession, *, limit: int = 5) -> li
         .limit(lim)
     )
     rows = (await db.execute(stmt)).scalars().all()
-    await app_cache.set(cache_key, rows, ttl=_FEATURED_GLOBAL_TTL_SEC)
-    return rows
+    data = [
+        {
+            "id": str(p.id),
+            "name": p.name,
+            "description": p.description,
+            "logo_url": p.logo_url,
+            "offer_text": p.offer_text,
+            "external_url": p.external_url,
+            "button_label": p.button_label,
+            "featured_order": p.featured_order,
+            "is_active": p.is_active,
+        }
+        for p in rows
+    ]
+    await app_cache.set(cache_key, data, ttl=_FEATURED_GLOBAL_TTL_SEC)
+    return data
 
 
 async def get_global_partner(db: AsyncSession, partner_id: UUID) -> GlobalPartner | None:

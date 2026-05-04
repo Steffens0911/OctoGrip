@@ -1065,6 +1065,35 @@ async def _ranking_rows_for_range(
     ]
 
 
+def _decode_ranking_result(d: dict) -> "AttendanceRankingResult":
+    return AttendanceRankingResult(
+        month=d["month"],
+        period_kind=d["period_kind"],
+        period_label=d["period_label"],
+        period_start=date.fromisoformat(d["period_start"]),
+        period_end=date.fromisoformat(d["period_end"]),
+        ranking=[
+            AttendanceRankingRow(
+                position=r["position"],
+                student_id=UUID(r["student_id"]),
+                name=r["name"],
+                avatar_url=r["avatar_url"],
+                belt=r["belt"],
+                total_checkins=r["total_checkins"],
+                attendance_percentage=r["attendance_percentage"],
+                position_change=r["position_change"],
+            )
+            for r in d["ranking"]
+        ],
+        my_position=AttendanceMyPositionRow(
+            position=d["my_position"]["position"],
+            total_checkins=d["my_position"]["total_checkins"],
+            attendance_percentage=d["my_position"]["attendance_percentage"],
+            position_change=d["my_position"]["position_change"],
+        ) if d.get("my_position") is not None else None,
+    )
+
+
 async def attendance_ranking(
     db: AsyncSession,
     *,
@@ -1106,7 +1135,13 @@ async def attendance_ranking(
     )
     cached = await app_cache.get(cache_key)
     if cached is not None:
-        return cached
+        if isinstance(cached, AttendanceRankingResult):
+            return cached
+        if isinstance(cached, dict) and cached.get("_type") == "AttendanceRankingResult":
+            try:
+                return _decode_ranking_result(cached)
+            except Exception:
+                pass  # dados corrompidos no cache — re-consulta o banco
 
     total_sessions_raw = (
         await db.execute(
@@ -1178,7 +1213,34 @@ async def attendance_ranking(
         ranking=ranking,
         my_position=my_position,
     )
-    await app_cache.set(cache_key, result, ttl=_ATTENDANCE_RANKING_TTL_SEC)
+    cache_payload = {
+        "_type": "AttendanceRankingResult",
+        "month": result.month,
+        "period_kind": result.period_kind,
+        "period_label": result.period_label,
+        "period_start": result.period_start.isoformat(),
+        "period_end": result.period_end.isoformat(),
+        "ranking": [
+            {
+                "position": r.position,
+                "student_id": str(r.student_id),
+                "name": r.name,
+                "avatar_url": r.avatar_url,
+                "belt": r.belt,
+                "total_checkins": r.total_checkins,
+                "attendance_percentage": r.attendance_percentage,
+                "position_change": r.position_change,
+            }
+            for r in result.ranking
+        ],
+        "my_position": {
+            "position": result.my_position.position,
+            "total_checkins": result.my_position.total_checkins,
+            "attendance_percentage": result.my_position.attendance_percentage,
+            "position_change": result.my_position.position_change,
+        } if result.my_position is not None else None,
+    }
+    await app_cache.set(cache_key, cache_payload, ttl=_ATTENDANCE_RANKING_TTL_SEC)
     return result
 
 
