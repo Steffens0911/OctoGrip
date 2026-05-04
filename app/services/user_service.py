@@ -42,11 +42,18 @@ async def list_users(
     limit: int = 50,
     offset: int = 0,
     academy_id: UUID | None = None,
+    search: str | None = None,
+    graduation: str | None = None,
 ) -> list[User]:
     """Lista usuários com paginação adequada."""
     stmt = select(User).order_by(User.email)
     if academy_id is not None:
         stmt = stmt.where(User.academy_id == academy_id)
+    if search:
+        s = f"%{search.strip()}%"
+        stmt = stmt.where(or_(User.email.ilike(s), User.name.ilike(s)))
+    if graduation:
+        stmt = stmt.where(User.graduation == graduation)
     return (await db.execute(stmt.offset(offset).limit(limit))).scalars().all()
 
 

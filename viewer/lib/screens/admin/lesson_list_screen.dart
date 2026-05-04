@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/lesson.dart';
@@ -19,11 +21,13 @@ class LessonListScreen extends StatefulWidget {
 class _LessonListScreenState extends State<LessonListScreen> {
   final _api = ApiService();
   final _searchController = TextEditingController();
+  Timer? _debounceTimer;
   static const int _pageSize = 50;
   List<Lesson> _allItems = [];
   List<Lesson> _filteredItems = [];
   List<Technique> _techniques = [];
   String? _filterTechniqueId;
+  String _searchQuery = '';
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -32,20 +36,17 @@ class _LessonListScreenState extends State<LessonListScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _applyFilters() {
-    var filtered = _allItems;
-    final query = _searchController.text.trim().toLowerCase();
-    if (query.isNotEmpty) {
-      filtered = filtered.where((l) => l.title.toLowerCase().contains(query)).toList();
+  void _applyTechniqueFilter() {
+    if (_filterTechniqueId == null) {
+      setState(() => _filteredItems = _allItems);
+    } else {
+      setState(() => _filteredItems = _allItems.where((l) => l.techniqueId == _filterTechniqueId).toList());
     }
-    if (_filterTechniqueId != null) {
-      filtered = filtered.where((l) => l.techniqueId == _filterTechniqueId).toList();
-    }
-    setState(() => _filteredItems = filtered);
   }
 
   Future<void> _load({bool reset = true}) async {
@@ -63,7 +64,12 @@ class _LessonListScreenState extends State<LessonListScreen> {
       final academyId = AuthService().currentUser?.academyId ?? '';
       if (reset) {
         final results = await Future.wait([
-          _api.getLessons(academyId: academyId.isNotEmpty ? academyId : null, offset: 0, limit: _pageSize),
+          _api.getLessons(
+            academyId: academyId.isNotEmpty ? academyId : null,
+            offset: 0,
+            limit: _pageSize,
+            search: _searchQuery.isNotEmpty ? _searchQuery : null,
+          ),
           _api.getTechniques(academyId: academyId),
         ]);
         if (mounted) {
@@ -75,13 +81,14 @@ class _LessonListScreenState extends State<LessonListScreen> {
             _hasMore = list.length == _pageSize;
             _loading = false;
           });
-          _applyFilters();
+          _applyTechniqueFilter();
         }
       } else {
         final list = await _api.getLessons(
           academyId: academyId.isNotEmpty ? academyId : null,
           offset: _offset,
           limit: _pageSize,
+          search: _searchQuery.isNotEmpty ? _searchQuery : null,
         );
         if (mounted) {
           setState(() {
@@ -90,7 +97,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
             _hasMore = list.length == _pageSize;
             _loadingMore = false;
           });
-          _applyFilters();
+          _applyTechniqueFilter();
         }
       }
     } catch (e) {
@@ -141,19 +148,11 @@ class _LessonListScreenState extends State<LessonListScreen> {
       await _api.deleteLesson(l.id);
       if (mounted) _load();
       if (mounted) {
-        AppFeedback.show(
-          context,
-          message: 'Lição excluída',
-          type: AppFeedbackType.success,
-        );
+        AppFeedback.show(context, message: 'Lição excluída', type: AppFeedbackType.success);
       }
     } catch (e) {
       if (mounted) {
-        AppFeedback.show(
-          context,
-          message: userFacingMessage(e),
-          type: AppFeedbackType.error,
-        );
+        AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
       }
     }
   }
@@ -166,7 +165,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
           : _error != null
               ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Text(_error!), const SizedBox(height: 16), ElevatedButton(onPressed: _load, child: const Text('Tentar novamente'))]))
-              : _allItems.isEmpty
+              : _allItems.isEmpty && _searchQuery.isEmpty
                   ? const Center(child: Text('Nenhuma lição. Toque em + para criar.'))
                   : Column(
                       children: [
@@ -179,21 +178,28 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                 decoration: InputDecoration(
                                   hintText: 'Buscar por título da lição',
                                   prefixIcon: const Icon(Icons.search),
-                                  suffixIcon: _searchController.text.isNotEmpty
+                                  suffixIcon: _searchQuery.isNotEmpty
                                       ? IconButton(
                                           icon: const Icon(Icons.clear),
                                           onPressed: () {
                                             _searchController.clear();
-                                            _applyFilters();
+                                            setState(() => _searchQuery = '');
+                                            _load(reset: true);
                                           },
                                         )
                                       : null,
                                 ),
-                                onChanged: (_) => _applyFilters(),
+                                onChanged: (v) {
+                                  _debounceTimer?.cancel();
+                                  _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+                                    setState(() => _searchQuery = v.trim());
+                                    _load(reset: true);
+                                  });
+                                },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
-                                initialValue: _filterTechniqueId,
+                                value: _filterTechniqueId,
                                 decoration: const InputDecoration(labelText: 'Técnica', hintText: 'Todas', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16), isDense: true),
                                 items: [
                                   const DropdownMenuItem(value: null, child: Text('Todas')),
@@ -201,7 +207,7 @@ class _LessonListScreenState extends State<LessonListScreen> {
                                 ],
                                 onChanged: (v) {
                                   setState(() => _filterTechniqueId = v);
-                                  _applyFilters();
+                                  _applyTechniqueFilter();
                                 },
                               ),
                             ],

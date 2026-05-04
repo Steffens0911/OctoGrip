@@ -29,15 +29,16 @@ async def list_lessons(
     academy_id: UUID | None = None,
     offset: int = 0,
     limit: int = 100,
+    search: str | None = None,
 ):
     """
     Lista aulas ordenadas por order_index com paginação.
-    Se academy_id for informado e a academia tiver visible_lesson_id, retorna apenas essa lição.
-    Senão retorna todas com paginação (default: 100 por página).
+    Se academy_id for informado, a academia tiver visible_lesson_id e não houver busca,
+    retorna apenas essa lição. Senão retorna todas com paginação (default: 100 por página).
     """
     from app.models import Academy
 
-    if academy_id:
+    if academy_id and not search:
         academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
         if academy and academy.visible_lesson_id:
             lesson = (
@@ -55,23 +56,21 @@ async def list_lessons(
             if lesson:
                 logger.debug("list_lessons", extra={"academy_id": str(academy_id), "count": 1})
                 return [lesson]
-    
+
     # Aplicar paginação (teto alinhado à API: MAX_LIST_LIMIT)
     limit = clamp_list_limit(limit)
     offset = max(0, offset)
-    
-    lessons = (
-        await db.execute(
-            select(Lesson)
-            .options(
-                selectinload(Lesson.technique),
-            )
-            .where(Lesson.deleted_at.is_(None))
-            .order_by(Lesson.order_index.asc())
-            .offset(offset)
-            .limit(limit)
-        )
-    ).unique().scalars().all()
+
+    stmt = (
+        select(Lesson)
+        .options(selectinload(Lesson.technique))
+        .where(Lesson.deleted_at.is_(None))
+    )
+    if search:
+        stmt = stmt.where(Lesson.title.ilike(f"%{search.strip()}%"))
+    stmt = stmt.order_by(Lesson.order_index.asc()).offset(offset).limit(limit)
+
+    lessons = (await db.execute(stmt)).unique().scalars().all()
     logger.debug("list_lessons", extra={"count": len(lessons), "offset": offset, "limit": limit})
     return lessons
 

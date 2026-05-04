@@ -26,6 +26,7 @@ async def list_partners(
     *,
     limit: int = 50,
     offset: int = 0,
+    search: str | None = None,
 ) -> list[Partner]:
     """Lista parceiros da academia ordenados por nome."""
     safe_limit = clamp_list_limit(limit)
@@ -33,10 +34,10 @@ async def list_partners(
     stmt = (
         select(Partner)
         .where(Partner.academy_id == academy_id)
-        .order_by(Partner.name)
-        .offset(safe_offset)
-        .limit(safe_limit)
     )
+    if search:
+        stmt = stmt.where(Partner.name.ilike(f"%{search.strip()}%"))
+    stmt = stmt.order_by(Partner.name).offset(safe_offset).limit(safe_limit)
     return (await db.execute(stmt)).scalars().all()
 
 async def get_partner(db: AsyncSession, partner_id: UUID) -> Partner | None:

@@ -25,11 +25,12 @@ async def get_lessons(
     academy_id: UUID | None = Query(None, description="Se informado e academia tiver lição visível, retorna só ela."),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
     limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
+    search: str | None = Query(None, description="Busca por título da lição"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
     """Lista aulas ordenadas por order_index com paginação."""
-    return await list_lessons(db, academy_id=academy_id, offset=offset, limit=limit)
+    return await list_lessons(db, academy_id=academy_id, offset=offset, limit=limit, search=search)
 
 
 @router.get("/{lesson_id}", response_model=LessonRead)

@@ -153,20 +153,22 @@ async def users_list(
     academy_id: UUID | None = Query(None, description="Filtrar por academia (colegas da academia)"),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
     limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
+    search: str | None = Query(None, description="Busca por nome ou e-mail"),
+    graduation: str | None = Query(None, description="Filtrar por graduação"),
     current_user: User = Depends(get_current_user),
 ):
     """Lista usuários com paginação."""
     if current_user.role == "administrador":
-        return await list_users(db, academy_id=academy_id, offset=offset, limit=limit)
+        return await list_users(db, academy_id=academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
     if current_user.role in ("gerente_academia", "professor"):
         if current_user.academy_id is None:
             return []
-        return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit)
+        return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
     if current_user.academy_id is None:
         raise ForbiddenError("Acesso negado. Você não está vinculado a uma academia.")
     if academy_id is None or academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Você só pode listar usuários da sua academia.")
-    return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit)
+    return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
 
 
 @router.get("/{user_id}", response_model=UserRead)

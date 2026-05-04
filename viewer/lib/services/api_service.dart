@@ -795,24 +795,24 @@ class ApiService {
       {String? academyId,
       bool asRealUser = false,
       int offset = 0,
-      int limit = 50}) async {
+      int limit = 50,
+      String? search,
+      String? graduation}) async {
     var queryParams = <String, String>{};
     if (academyId != null && academyId.isNotEmpty) {
       queryParams['academy_id'] = academyId;
     }
-    if (offset > 0) {
-      queryParams['offset'] = offset.toString();
-    }
-    if (limit != 50) {
-      queryParams['limit'] = limit.toString();
-    }
+    if (offset > 0) queryParams['offset'] = offset.toString();
+    if (limit != 50) queryParams['limit'] = limit.toString();
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    if (graduation != null && graduation.isNotEmpty) queryParams['graduation'] = graduation;
     var uri = Uri.parse('$baseUrl/users');
     if (queryParams.isNotEmpty) {
       uri = uri.replace(queryParameters: queryParams);
     }
-    final r = asRealUser
+    final r = (asRealUser || search != null || graduation != null)
         ? await _req(http.get(uri,
-            headers: await _headers(auth: true, realUserOnly: true)))
+            headers: await _headers(auth: true, realUserOnly: asRealUser)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
@@ -1524,6 +1524,7 @@ class ApiService {
     String? academyId, {
     int offset = 0,
     int limit = 50,
+    String? search,
   }) async {
     final queryParams = <String, String>{
       'limit': '$limit',
@@ -1532,6 +1533,7 @@ class ApiService {
     if (academyId != null && academyId.isNotEmpty) {
       queryParams['academy_id'] = academyId;
     }
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
     final uri =
         Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
     final r = await _req(
@@ -1880,21 +1882,18 @@ class ApiService {
   // ---------- Lessons ----------
   /// Lista lições. Se [academyId] for informado e a academia tiver lição visível, retorna só ela.
   Future<List<Lesson>> getLessons(
-      {String? academyId, int offset = 0, int limit = 50}) async {
+      {String? academyId, int offset = 0, int limit = 50, String? search}) async {
     var queryParams = <String, String>{};
-    if (academyId != null) {
-      queryParams['academy_id'] = academyId;
-    }
-    if (offset > 0) {
-      queryParams['offset'] = offset.toString();
-    }
-    if (limit != 50) {
-      queryParams['limit'] = limit.toString();
-    }
+    if (academyId != null) queryParams['academy_id'] = academyId;
+    if (offset > 0) queryParams['offset'] = offset.toString();
+    if (limit != 50) queryParams['limit'] = limit.toString();
+    if (search != null && search.isNotEmpty) queryParams['search'] = search;
     final uri = queryParams.isNotEmpty
         ? Uri.parse('$baseUrl/lessons').replace(queryParameters: queryParams)
         : Uri.parse('$baseUrl/lessons');
-    final r = await _getWithCache(uri, _cacheTtlMedium);
+    final r = search != null && search.isNotEmpty
+        ? await _req(http.get(uri, headers: await _headers(auth: true)))
+        : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
     final raw = decoded is List ? decoded : <dynamic>[];

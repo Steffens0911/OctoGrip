@@ -40,6 +40,7 @@ async def partners_list(
     academy_id: UUID | None = Query(None, description="Filtra por academia"),
     offset: int = Query(0, ge=0, description="Offset para paginação"),
     limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT, description="Limite de resultados (máximo 50)"),
+    search: str | None = Query(None, description="Busca por nome do parceiro"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_read_access),
 ):
@@ -50,6 +51,7 @@ async def partners_list(
         academy_id=resolved,
         limit=limit,
         offset=offset,
+        search=search,
     )
 
 
