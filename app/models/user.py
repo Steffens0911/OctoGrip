@@ -138,3 +138,9 @@ class User(Base, UUIDMixin):
         back_populates="user",
         lazy="raise",
     )
+    trophy_earned: Mapped[list["UserTrophyEarned"]] = relationship(
+        "UserTrophyEarned",
+        back_populates="user",
+        lazy="raise",
+        cascade="all, delete-orphan",
+    )

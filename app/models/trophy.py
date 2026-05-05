@@ -59,3 +59,9 @@ class Trophy(Base, UUIDMixin, SoftDeleteMixin):
         back_populates="trophies",
         lazy="joined",
     )
+    earned_by: Mapped[list["UserTrophyEarned"]] = relationship(
+        "UserTrophyEarned",
+        back_populates="trophy",
+        lazy="raise",
+        cascade="all, delete-orphan",
+    )

@@ -493,6 +493,19 @@ async def confirm_execution(
     executor_user = await db.get(User, execution.user_id)
     await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
 
+    # Verifica conquista de troféu/medalha e envia push (fire-and-forget; erros não afetam a resposta).
+    try:
+        from app.services.trophy_notification_service import check_and_notify_trophy_earned
+        from app.services.trophy_service import _execution_technique_id
+
+        await check_and_notify_trophy_earned(
+            db,
+            user_id=execution.user_id,
+            technique_id=_execution_technique_id(execution),
+        )
+    except Exception:
+        logger.exception("confirm_execution: erro ao verificar troféu conquistado")
+
     logger.info(
         "confirm_execution",
         extra={"execution_id": str(execution_id), "outcome": outcome, "points": points},
