@@ -1,4 +1,5 @@
 // ignore: avoid_web_libraries_in_flutter
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 
@@ -6,13 +7,11 @@ import 'package:flutter/material.dart';
 
 final _registered = <String>{};
 final _iframesByVideoId = <String, html.IFrameElement>{};
-final _interactingByVideoId = <String, ValueNotifier<bool>>{};
-
-ValueNotifier<bool> _interactingNotifier(String videoId) =>
-    _interactingByVideoId.putIfAbsent(videoId, () => ValueNotifier(false));
 
 /// Web: embed do YouTube via iframe.
-/// Começa em modo scroll (pointer-events: none); toque ativa os controles.
+/// O overlay transparente captura gestos: arrastar rola a página, tocar
+/// envia play/pause via YouTube IFrame API (postMessage). O iframe nunca
+/// recebe eventos de ponteiro diretamente (pointer-events: none).
 Widget buildYoutubeEmbed({
   required String videoId,
   required String videoUrl,
@@ -24,7 +23,9 @@ Widget buildYoutubeEmbed({
   final viewType = 'youtube_embed_$videoId';
   if (!_registered.contains(videoId)) {
     _registered.add(videoId);
-    final embedUrl = 'https://www.youtube.com/embed/$videoId?rel=0';
+    // enablejsapi=1 permite controle via postMessage
+    final embedUrl =
+        'https://www.youtube.com/embed/$videoId?rel=0&enablejsapi=1';
     ui_web.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
       final iframe = html.IFrameElement()
         ..src = embedUrl
@@ -44,29 +45,26 @@ Widget buildYoutubeEmbed({
     viewType: viewType,
     width: width,
     height: height,
+    onEnded: onEnded,
   );
 }
 
-/// Controla se o iframe pode receber eventos de mouse/scroll (sincroniza widget + iframe).
-void setYoutubePointerEvents({required String videoId, required bool enabled}) {
-  final iframe = _iframesByVideoId[videoId];
-  if (iframe != null) {
-    iframe.style.pointerEvents = enabled ? 'auto' : 'none';
-  }
-  _interactingNotifier(videoId).value = enabled;
-}
+/// No-op: com o overlay sempre ativo, o iframe nunca precisa de pointer-events.
+void setYoutubePointerEvents({required String videoId, required bool enabled}) {}
 
 class _YoutubeScrollableEmbed extends StatefulWidget {
   final String videoId;
   final String viewType;
   final double width;
   final double height;
+  final VoidCallback? onEnded;
 
   const _YoutubeScrollableEmbed({
     required this.videoId,
     required this.viewType,
     required this.width,
     required this.height,
+    this.onEnded,
   });
 
   @override
@@ -75,20 +73,57 @@ class _YoutubeScrollableEmbed extends StatefulWidget {
 }
 
 class _YoutubeScrollableEmbedState extends State<_YoutubeScrollableEmbed> {
-  late final ValueNotifier<bool> _interacting;
+  // playerState do YouTube: -1=uninit, 0=ended, 1=playing, 2=paused,
+  // 3=buffering, 5=cued
+  int _playerState = -1;
+  html.EventListener? _msgListener;
+
+  bool get _isPlaying => _playerState == 1 || _playerState == 3;
 
   @override
   void initState() {
     super.initState();
-    _interacting = _interactingNotifier(widget.videoId);
+    _msgListener = _onWindowMessage;
+    html.window.addEventListener('message', _msgListener!);
   }
 
-  void _setInteracting(bool value) {
-    final iframe = _iframesByVideoId[widget.videoId];
-    if (iframe != null) {
-      iframe.style.pointerEvents = value ? 'auto' : 'none';
+  @override
+  void dispose() {
+    html.window.removeEventListener('message', _msgListener!);
+    super.dispose();
+  }
+
+  void _onWindowMessage(html.Event event) {
+    if (event is! html.MessageEvent) return;
+    final raw = event.data;
+    if (raw is! String) return;
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final ytEvent = map['event'] as String?;
+      if (ytEvent == 'onStateChange') {
+        final state = map['info'];
+        if (state is int && mounted) {
+          setState(() => _playerState = state);
+          if (state == 0) widget.onEnded?.call();
+        }
+      }
+    } catch (_) {}
+  }
+
+  void _sendCommand(String func) {
+    _iframesByVideoId[widget.videoId]
+        ?.contentWindow
+        ?.postMessage('{"event":"command","func":"$func","args":""}', '*');
+  }
+
+  void _togglePlayPause() {
+    if (_isPlaying) {
+      _sendCommand('pauseVideo');
+      if (mounted) setState(() => _playerState = 2);
+    } else {
+      _sendCommand('playVideo');
+      if (mounted) setState(() => _playerState = 1);
     }
-    _interacting.value = value;
   }
 
   @override
@@ -96,82 +131,41 @@ class _YoutubeScrollableEmbedState extends State<_YoutubeScrollableEmbed> {
     return SizedBox(
       width: widget.width,
       height: widget.height,
-      child: ValueListenableBuilder<bool>(
-        valueListenable: _interacting,
-        builder: (context, interacting, _) {
-          return Stack(
-            children: [
-              HtmlElementView(viewType: widget.viewType),
-
-              // Modo scroll: overlay transparente captura gestos verticais e
-              // repassa para o SingleChildScrollView pai.
-              if (!interacting)
-                Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onVerticalDragUpdate: (details) {
-                      final scrollable = Scrollable.maybeOf(context);
-                      if (scrollable == null) return;
-                      final pos = scrollable.position;
-                      pos.jumpTo(
-                        (pos.pixels - details.delta.dy)
-                            .clamp(pos.minScrollExtent, pos.maxScrollExtent),
-                      );
-                    },
-                    onTap: () => _setInteracting(true),
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: _Badge(
-                          icon: Icons.touch_app,
-                          label: 'Toque p/ controlar',
-                        ),
-                      ),
+      child: Stack(
+        children: [
+          HtmlElementView(viewType: widget.viewType),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: (details) {
+                final scrollable = Scrollable.maybeOf(context);
+                if (scrollable == null) return;
+                final pos = scrollable.position;
+                pos.jumpTo(
+                  (pos.pixels - details.delta.dy)
+                      .clamp(pos.minScrollExtent, pos.maxScrollExtent),
+                );
+              },
+              onTap: _togglePlayPause,
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _isPlaying ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 52,
                     ),
                   ),
                 ),
-
-              // Modo interação: badge para voltar ao modo scroll.
-              if (interacting)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => _setInteracting(false),
-                    child: _Badge(icon: Icons.swap_vert, label: 'Rolar'),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _Badge({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 14),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white, fontSize: 11),
+              ),
+            ),
           ),
         ],
       ),

@@ -135,8 +135,7 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
         allowSkip: allowSkip,
       );
     } finally {
-      // Mantém modo scroll após o sheet; usuário toca no vídeo para reativar controles.
-      setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: false);
+      setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: true);
     }
   }
 
