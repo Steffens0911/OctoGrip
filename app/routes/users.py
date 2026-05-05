@@ -33,7 +33,7 @@ from app.tasks.face_recognition_tasks import generate_student_embedding
 
 router = APIRouter()
 
-_ALLOWED_NON_ADMIN_CREATE_ROLE = "aluno"
+_ALLOWED_NON_ADMIN_CREATE_ROLES = {"aluno", "professor"}
 _MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
@@ -245,7 +245,11 @@ async def user_create(
         if current_user.academy_id is None:
             raise ForbiddenError("Você precisa estar vinculado a uma academia para cadastrar usuários.")
         academy_id = current_user.academy_id
-        role = _ALLOWED_NON_ADMIN_CREATE_ROLE
+        if body.role not in _ALLOWED_NON_ADMIN_CREATE_ROLES:
+            raise ForbiddenError(
+                f"Papel inválido. Gerentes podem criar apenas: {', '.join(sorted(_ALLOWED_NON_ADMIN_CREATE_ROLES))}."
+            )
+        role = body.role
     return await create_user(
         db,
         email=body.email.strip().lower(),
@@ -273,22 +277,29 @@ async def user_update(
     payload = body.model_dump(exclude_unset=True)
     if current_user.role != "administrador":
         # Endurecimento RBAC: não-admin não pode elevar privilégios nem alterar campos sensíveis.
-        payload.pop("role", None)
         payload.pop("academy_id", None)
         payload.pop("points_adjustment", None)
         payload.pop("password", None)
+    if current_user.role == "gerente_academia":
+        new_role = payload.get("role")
+        if new_role is not None and new_role not in _ALLOWED_NON_ADMIN_CREATE_ROLES:
+            raise ForbiddenError(
+                f"Papel inválido. Gerentes podem atribuir apenas: {', '.join(sorted(_ALLOWED_NON_ADMIN_CREATE_ROLES))}."
+            )
+    elif current_user.role != "administrador":
+        payload.pop("role", None)
     if current_user.role not in ("administrador", "gerente_academia"):
         payload.pop("account_frozen", None)
         payload.pop("account_freeze_reason", None)
     if current_user.role == "gerente_academia":
         if "account_frozen" in payload or "account_freeze_reason" in payload:
-            if target.role != "aluno":
+            if target.role not in _ALLOWED_NON_ADMIN_CREATE_ROLES:
                 raise ForbiddenError(
-                    "Apenas contas de aluno podem ter o congelamento alterado pelo gestor da academia."
+                    "Apenas contas de aluno ou professor podem ter o congelamento alterado pelo gestor da academia."
                 )
             if target.academy_id is None or target.academy_id != current_user.academy_id:
                 raise ForbiddenError(
-                    "Acesso negado. Só pode congelar alunos vinculados à sua academia."
+                    "Acesso negado. Só pode congelar usuários vinculados à sua academia."
                 )
     updated = await update_user(
         db,
