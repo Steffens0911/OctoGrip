@@ -73,6 +73,15 @@ class TrophyWithEarned {
   bool get isMedal => awardKind == 'medal';
   String get awardKindLabel => isTrophy ? 'Troféu' : 'Medalha';
 
+  static String tierEmoji(String? tier) {
+    switch (tier) {
+      case 'gold': return '🥇';
+      case 'silver': return '🥈';
+      case 'bronze': return '🥉';
+      default: return '🏆';
+    }
+  }
+
   String get tierLabel {
     if (earnedTier == null) return 'A conquistar';
     switch (earnedTier!) {
@@ -83,7 +92,6 @@ class TrophyWithEarned {
     }
   }
 
-  /// Label em português da faixa mínima para desbloquear; null se não houver restrição.
   static String? graduationLabel(String? graduation) {
     if (graduation == null || graduation.isEmpty) return null;
     switch (graduation.toLowerCase()) {
@@ -95,4 +103,84 @@ class TrophyWithEarned {
       default: return graduation;
     }
   }
+}
+
+class TrophyHomeSummaryItem {
+  final String trophyId;
+  final String name;
+  final String awardKind;
+  final String tier;
+
+  TrophyHomeSummaryItem({
+    required this.trophyId,
+    required this.name,
+    required this.awardKind,
+    required this.tier,
+  });
+
+  factory TrophyHomeSummaryItem.fromJson(Map<String, dynamic> json) =>
+      TrophyHomeSummaryItem(
+        trophyId: json['trophy_id'] as String,
+        name: json['name'] as String,
+        awardKind: json['award_kind'] as String? ?? 'trophy',
+        tier: json['tier'] as String,
+      );
+
+  String get emoji => TrophyWithEarned.tierEmoji(tier);
+}
+
+class AcademyRecentItem {
+  final String userId;
+  final String userName;
+  final String tier;
+  final String trophyName;
+  final String awardKind;
+
+  AcademyRecentItem({
+    required this.userId,
+    required this.userName,
+    required this.tier,
+    required this.trophyName,
+    required this.awardKind,
+  });
+
+  factory AcademyRecentItem.fromJson(Map<String, dynamic> json) =>
+      AcademyRecentItem(
+        userId: json['user_id'] as String,
+        userName: json['user_name'] as String,
+        tier: json['tier'] as String,
+        trophyName: json['trophy_name'] as String,
+        awardKind: json['award_kind'] as String? ?? 'trophy',
+      );
+
+  String get tierEmoji => TrophyWithEarned.tierEmoji(tier);
+  String get firstName => userName.split(' ').first;
+  String get initials {
+    final parts = userName.trim().split(' ');
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    return userName.substring(0, userName.length >= 2 ? 2 : 1).toUpperCase();
+  }
+}
+
+class TrophyHomeSummary {
+  final int myEarnedCount;
+  final List<TrophyHomeSummaryItem> myRecent;
+  final List<AcademyRecentItem> academyRecent;
+
+  TrophyHomeSummary({
+    required this.myEarnedCount,
+    required this.myRecent,
+    required this.academyRecent,
+  });
+
+  factory TrophyHomeSummary.fromJson(Map<String, dynamic> json) =>
+      TrophyHomeSummary(
+        myEarnedCount: (json['my_earned_count'] as num?)?.toInt() ?? 0,
+        myRecent: (json['my_recent'] as List<dynamic>? ?? [])
+            .map((e) => TrophyHomeSummaryItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        academyRecent: (json['academy_recent'] as List<dynamic>? ?? [])
+            .map((e) => AcademyRecentItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
 }

@@ -3,7 +3,7 @@ import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -578,3 +578,81 @@ async def list_user_trophies_with_earned(
         extra={"user_id": str(user_id), "trophies_count": len(result)},
     )
     return result
+
+
+async def get_trophy_home_summary(
+    db: AsyncSession,
+    user_id: UUID,
+    academy_id: UUID,
+) -> dict:
+    """
+    Retorna resumo para os cards da home:
+    - my_earned_count: total de troféus/medalhas conquistados pelo usuário
+    - my_recent: últimos 3 conquistados pelo próprio usuário
+    - academy_recent: últimas 7 conquistas de colegas da academia (ordenadas por earned_at)
+    Usa a tabela user_trophy_earned (populada a partir do deploy da feature de notificação).
+    """
+    from app.models.user_trophy_earned import UserTrophyEarned
+
+    # Total e recentes do próprio usuário
+    my_earned_count: int = (
+        await db.scalar(
+            select(func.count()).where(UserTrophyEarned.user_id == user_id)
+        )
+    ) or 0
+
+    my_recent_rows = (
+        await db.execute(
+            select(UserTrophyEarned, Trophy)
+            .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
+            .where(
+                UserTrophyEarned.user_id == user_id,
+                Trophy.deleted_at.is_(None),
+            )
+            .order_by(UserTrophyEarned.earned_at.desc())
+            .limit(3)
+        )
+    ).all()
+
+    my_recent = [
+        {
+            "trophy_id": str(row.UserTrophyEarned.trophy_id),
+            "name": row.Trophy.name,
+            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
+            "tier": row.UserTrophyEarned.tier,
+        }
+        for row in my_recent_rows
+    ]
+
+    # Conquistas recentes da academia (excluindo o próprio usuário para evitar duplicata)
+    academy_recent_rows = (
+        await db.execute(
+            select(UserTrophyEarned, User, Trophy)
+            .join(User, User.id == UserTrophyEarned.user_id)
+            .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
+            .where(
+                User.academy_id == academy_id,
+                Trophy.deleted_at.is_(None),
+            )
+            .order_by(UserTrophyEarned.earned_at.desc())
+            .limit(7)
+        )
+    ).all()
+
+    academy_recent = [
+        {
+            "user_id": str(row.User.id),
+            "user_name": (row.User.name or row.User.email or "Aluno").strip(),
+            "tier": row.UserTrophyEarned.tier,
+            "trophy_name": row.Trophy.name,
+            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
+            "earned_at": row.UserTrophyEarned.earned_at.isoformat(),
+        }
+        for row in academy_recent_rows
+    ]
+
+    return {
+        "my_earned_count": my_earned_count,
+        "my_recent": my_recent,
+        "academy_recent": academy_recent,
+    }

@@ -20,6 +20,7 @@ import 'package:viewer/screens/student/classmates_gallery_screen.dart';
 import 'package:viewer/screens/student/trophy_gallery_screen.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/models/partner.dart';
+import 'package:viewer/models/trophy.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/student_home_snapshot_store.dart';
@@ -95,6 +96,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   /// Rede a sincronizar (header + missões, etc.): barra no topo e skeletons opcionais.
   bool _syncingHomeData = false;
   Future<List<Partner>>? _trainingPartnersFuture;
+  Future<TrophyHomeSummary>? _trophySummaryFuture;
 
   void _setupTrainingPartnersFuture(String? academyId) {
     if (academyId == null || academyId.isEmpty) {
@@ -102,6 +104,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       return;
     }
     _trainingPartnersFuture = _api.getPartners(academyId);
+  }
+
+  void _setupTrophySummaryFuture(String? academyId) {
+    if (academyId == null || academyId.isEmpty) {
+      _trophySummaryFuture = null;
+      return;
+    }
+    _trophySummaryFuture = _api.getTrophyHomeSummary();
   }
 
   /// Mapeia faixa do usuário para level da API (beginner/intermediate).
@@ -209,6 +219,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     setState(() {
       _selectedUser = currentUser;
       _setupTrainingPartnersFuture(currentUser?.academyId);
+      _setupTrophySummaryFuture(currentUser?.academyId);
       if (currentUser != null) {
         _syncingHomeData = true;
       }
@@ -1534,29 +1545,46 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       children: [
         const MemoSectionLabel('TROFÉUS'),
         const SizedBox(height: AppSpacing.s),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _MemoPresenceStyleTrophyCard(
-                enabled: true,
-                icon: Icons.emoji_events_outlined,
-                title: 'Galeria de troféus',
-                subtitle: 'Conquistas ouro, prata e bronze',
-                onTap: openGallery,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.s),
-            Expanded(
-              child: _MemoPresenceStyleTrophyCard(
-                enabled: hasAcademy,
-                icon: Icons.groups_outlined,
-                title: 'Galeria dos colegas',
-                subtitle: 'Troféus e medalhas da academia',
-                onTap: openClassmates,
-              ),
-            ),
-          ],
+        FutureBuilder<TrophyHomeSummary>(
+          future: _trophySummaryFuture,
+          builder: (context, snap) {
+            final summary = snap.data;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _MemoPresenceStyleTrophyCard(
+                    enabled: true,
+                    icon: Icons.emoji_events_outlined,
+                    title: 'Galeria de troféus',
+                    subtitle: 'Conquistas ouro, prata e bronze',
+                    onTap: openGallery,
+                    footer: summary != null && summary.myRecent.isNotEmpty
+                        ? _TrophyPillsRow(
+                            items: summary.myRecent
+                                .map((t) => '${t.emoji} ${t.name}')
+                                .toList(),
+                            extra: summary.myEarnedCount - summary.myRecent.length,
+                          )
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s),
+                Expanded(
+                  child: _MemoPresenceStyleTrophyCard(
+                    enabled: hasAcademy,
+                    icon: Icons.groups_outlined,
+                    title: 'Galeria dos colegas',
+                    subtitle: 'Troféus e medalhas da academia',
+                    onTap: openClassmates,
+                    footer: summary != null && summary.academyRecent.isNotEmpty
+                        ? _AcademyRecentFooter(items: summary.academyRecent)
+                        : null,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -1660,6 +1688,104 @@ class _MemoPresenceStyleTrophyCard extends StatelessWidget {
     return Opacity(
       opacity: 0.45,
       child: IgnorePointer(child: decorated),
+    );
+  }
+}
+
+/// Linha de pills "🥇 Nome do troféu" com indicador +N para conquistas extras.
+class _TrophyPillsRow extends StatelessWidget {
+  const _TrophyPillsRow({required this.items, required this.extra});
+  final List<String> items;
+  final int extra;
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = AppTheme.textMutedOf(context);
+    final style = Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5);
+    return Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      children: [
+        for (final label in items)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(label, style: style, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        if (extra > 0)
+          Text('+$extra', style: style?.copyWith(color: muted)),
+      ],
+    );
+  }
+}
+
+/// Footer do card "Galeria dos colegas": avatares de iniciais + pills com nome e tier.
+class _AcademyRecentFooter extends StatelessWidget {
+  const _AcademyRecentFooter({required this.items});
+  final List<AcademyRecentItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = AppTheme.textMutedOf(context);
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 10.5);
+
+    // Avatares únicos por userId (máx 4 + indicador)
+    final seen = <String>{};
+    final unique = items.where((i) => seen.add(i.userId)).toList();
+    final avatarCount = unique.length.clamp(0, 4);
+    final avatarExtra = unique.length - avatarCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            for (int i = 0; i < avatarCount; i++)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: CircleAvatar(
+                  radius: 11,
+                  backgroundColor: scheme.primary.withValues(alpha: 0.18),
+                  child: Text(
+                    unique[i].initials,
+                    style: TextStyle(fontSize: 9, color: scheme.primary, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ),
+            if (avatarExtra > 0)
+              Text('+$avatarExtra', style: labelStyle?.copyWith(color: muted)),
+            const SizedBox(width: 4),
+            Text('conquistas recentes', style: labelStyle?.copyWith(color: muted)),
+          ],
+        ),
+        const SizedBox(height: 5),
+        Wrap(
+          spacing: 4,
+          runSpacing: 4,
+          children: [
+            for (final item in items.take(3))
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${item.tierEmoji} ${item.firstName}',
+                  style: labelStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (items.length > 3)
+              Text('+${items.length - 3}', style: labelStyle?.copyWith(color: muted)),
+          ],
+        ),
+      ],
     );
   }
 }

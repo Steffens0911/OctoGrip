@@ -118,3 +118,28 @@ class UserTrophyEarned(BaseModel):
     gold_count: int = 0
     silver_count: int = 0
     bronze_count: int = 0
+
+
+class TrophyHomeSummaryItem(BaseModel):
+    """Troféu/medalha recentemente conquistado pelo próprio usuário."""
+    trophy_id: UUID
+    name: str
+    award_kind: str
+    tier: TrophyTier
+
+
+class AcademyRecentItem(BaseModel):
+    """Conquista recente de um colega da academia."""
+    user_id: UUID
+    user_name: str
+    tier: TrophyTier
+    trophy_name: str
+    award_kind: str
+    earned_at: datetime
+
+
+class TrophyHomeSummaryResponse(BaseModel):
+    """Resumo para os cards da home: conquistas próprias + feed da academia."""
+    my_earned_count: int
+    my_recent: list[TrophyHomeSummaryItem]
+    academy_recent: list[AcademyRecentItem]

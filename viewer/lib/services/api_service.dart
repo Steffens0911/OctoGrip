@@ -1392,6 +1392,17 @@ class ApiService {
         .toList();
   }
 
+  /// Resumo dos cards de troféus da home: conquistas recentes do usuário e feed da academia.
+  Future<TrophyHomeSummary> getTrophyHomeSummary() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/trophies/me/home-summary'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return TrophyHomeSummary.fromJson(data as Map<String, dynamic>);
+  }
+
   /// Lista troféus da academia (admin). [cacheBust] evita resposta HTTP antiga no browser.
   Future<List<Map<String, dynamic>>> getTrophies(
     String academyId, {
