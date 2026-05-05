@@ -10,11 +10,12 @@ from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
-from app.schemas.trophy import TrophyCreate, TrophyHomeSummaryResponse, TrophyRead, TrophyUpdate, UserTrophyEarned
+from app.schemas.trophy import AcademyUserEarned, TrophyCreate, TrophyHomeSummaryResponse, TrophyRead, TrophyUpdate, UserTrophyEarned
 from app.services.trophy_service import (
     create_trophy,
     get_trophy,
     get_trophy_home_summary,
+    list_academy_earned_by_user,
     list_trophies_by_academy,
     list_user_trophies_with_earned,
     soft_delete_trophy,
@@ -120,6 +121,18 @@ async def trophy_delete(
         raise TrophyNotFoundError()
     verify_academy_access(current_user, str(trophy.academy_id))
     await soft_delete_trophy(db, trophy_id, audit_user_id=current_user.id)
+
+
+@router.get("/academy-earned", response_model=list[AcademyUserEarned])
+async def trophy_academy_earned(
+    academy_id: UUID = Query(..., description="ID da academia"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Troféus/medalhas conquistados por cada usuário da academia (uma query só)."""
+    verify_academy_access(current_user, str(academy_id))
+    rows = await list_academy_earned_by_user(db, academy_id)
+    return [AcademyUserEarned(**r) for r in rows]
 
 
 @router.get("/me/home-summary", response_model=TrophyHomeSummaryResponse)

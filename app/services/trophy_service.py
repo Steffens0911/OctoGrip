@@ -656,3 +656,44 @@ async def get_trophy_home_summary(
         "my_recent": my_recent,
         "academy_recent": academy_recent,
     }
+
+
+async def list_academy_earned_by_user(
+    db: AsyncSession,
+    academy_id: UUID,
+) -> list[dict]:
+    """
+    Retorna, para cada usuário da academia com ao menos um troféu conquistado,
+    a lista de troféus/medalhas ganhos — tudo em uma única query.
+    """
+    from app.models.user_trophy_earned import UserTrophyEarned
+
+    rows = (
+        await db.execute(
+            select(UserTrophyEarned, User, Trophy)
+            .join(User, User.id == UserTrophyEarned.user_id)
+            .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
+            .where(
+                User.academy_id == academy_id,
+                Trophy.deleted_at.is_(None),
+            )
+            .order_by(User.id, UserTrophyEarned.earned_at.desc())
+        )
+    ).all()
+
+    grouped: dict[str, dict] = {}
+    for row in rows:
+        uid = str(row.User.id)
+        if uid not in grouped:
+            grouped[uid] = {
+                "user_id": uid,
+                "items": [],
+            }
+        grouped[uid]["items"].append({
+            "trophy_id": str(row.UserTrophyEarned.trophy_id),
+            "name": row.Trophy.name,
+            "tier": row.UserTrophyEarned.tier,
+            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
+        })
+
+    return list(grouped.values())

@@ -1392,6 +1392,23 @@ class ApiService {
         .toList();
   }
 
+  /// Troféus conquistados por cada usuário da academia (uma query só).
+  Future<Map<String, List<AcademyUserEarnedItem>>> getAcademyEarned(String academyId) async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/trophies/academy-earned?academy_id=$academyId'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data is List ? data : <dynamic>[];
+    final map = <String, List<AcademyUserEarnedItem>>{};
+    for (final e in list) {
+      final entry = AcademyUserEarned.fromJson(e as Map<String, dynamic>);
+      map[entry.userId] = entry.items;
+    }
+    return map;
+  }
+
   /// Resumo dos cards de troféus da home: conquistas recentes do usuário e feed da academia.
   Future<TrophyHomeSummary> getTrophyHomeSummary() async {
     final r = await _req(http.get(

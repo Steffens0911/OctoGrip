@@ -162,6 +162,45 @@ class AcademyRecentItem {
   }
 }
 
+class AcademyUserEarnedItem {
+  final String trophyId;
+  final String name;
+  final String tier;
+  final String awardKind;
+
+  AcademyUserEarnedItem({
+    required this.trophyId,
+    required this.name,
+    required this.tier,
+    required this.awardKind,
+  });
+
+  factory AcademyUserEarnedItem.fromJson(Map<String, dynamic> json) =>
+      AcademyUserEarnedItem(
+        trophyId: json['trophy_id'] as String,
+        name: json['name'] as String,
+        tier: json['tier'] as String,
+        awardKind: json['award_kind'] as String? ?? 'trophy',
+      );
+
+  String get emoji => TrophyWithEarned.tierEmoji(tier);
+}
+
+class AcademyUserEarned {
+  final String userId;
+  final List<AcademyUserEarnedItem> items;
+
+  AcademyUserEarned({required this.userId, required this.items});
+
+  factory AcademyUserEarned.fromJson(Map<String, dynamic> json) =>
+      AcademyUserEarned(
+        userId: json['user_id'] as String,
+        items: (json['items'] as List<dynamic>? ?? [])
+            .map((e) => AcademyUserEarnedItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
 class TrophyHomeSummary {
   final int myEarnedCount;
   final List<TrophyHomeSummaryItem> myRecent;

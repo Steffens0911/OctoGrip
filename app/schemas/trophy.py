@@ -138,6 +138,18 @@ class AcademyRecentItem(BaseModel):
     earned_at: datetime
 
 
+class AcademyUserEarnedItem(BaseModel):
+    trophy_id: UUID
+    name: str
+    tier: TrophyTier
+    award_kind: str = "trophy"
+
+
+class AcademyUserEarned(BaseModel):
+    user_id: UUID
+    items: list[AcademyUserEarnedItem]
+
+
 class TrophyHomeSummaryResponse(BaseModel):
     """Resumo para os cards da home: conquistas próprias + feed da academia."""
     my_earned_count: int
