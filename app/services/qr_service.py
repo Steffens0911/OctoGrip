@@ -12,11 +12,51 @@ import hashlib
 import hmac
 import json
 import secrets
+import threading
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.config import settings
 from app.core.exceptions import AttendanceQrInvalidError
+
+# Alfabeto sem caracteres ambíguos (0/O, 1/I/L)
+_ALPHA = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+_short_codes: dict[str, tuple[UUID, int]] = {}  # code -> (session_id, exp_unix)
+_short_lock = threading.Lock()
+
+
+def _cleanup_expired() -> None:
+    now = int(datetime.now(timezone.utc).timestamp())
+    expired = [k for k, (_, exp) in _short_codes.items() if exp <= now]
+    for k in expired:
+        _short_codes.pop(k, None)
+
+
+def issue_short(session_id: UUID, exp_unix: int) -> str:
+    """Gera um código de 5 caracteres mapeado para session_id com o mesmo TTL do QR."""
+    with _short_lock:
+        _cleanup_expired()
+        for _ in range(30):
+            code = "".join(secrets.choice(_ALPHA) for _ in range(5))
+            if code not in _short_codes:
+                _short_codes[code] = (session_id, exp_unix)
+                return code
+        code = "".join(secrets.choice(_ALPHA) for _ in range(5))
+        _short_codes[code] = (session_id, exp_unix)
+        return code
+
+
+def verify_short(code: str) -> UUID:
+    """Valida código curto e retorna session_id. Lança AttendanceQrInvalidError se inválido."""
+    now = int(datetime.now(timezone.utc).timestamp())
+    with _short_lock:
+        entry = _short_codes.get(code.upper())
+    if entry is None:
+        raise AttendanceQrInvalidError()
+    session_id, exp = entry
+    if exp <= now:
+        raise AttendanceQrInvalidError()
+    return session_id
 
 
 _HEADER_B64 = base64.urlsafe_b64encode(

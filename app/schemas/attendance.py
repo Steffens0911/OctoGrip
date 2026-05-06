@@ -32,10 +32,11 @@ class AttendanceSessionRead(BaseModel):
 class QrTokenOut(BaseModel):
     token: str
     expires_at: datetime
+    short_code: str
 
 
 class QrScanIn(BaseModel):
-    token: str = Field(..., min_length=10)
+    token: str = Field(..., min_length=5)
 
 
 class AttendanceManualCheckinRequest(BaseModel):

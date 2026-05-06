@@ -520,7 +520,8 @@ async def attendance_session_qr(
                 "A chamada por QR está desativada para esta academia. Faça presença manual."
             )
     token, expires_at = qr_service.issue(session_id, ttl_seconds=ttl_seconds)
-    return QrTokenOut(token=token, expires_at=expires_at)
+    short_code = qr_service.issue_short(session_id, int(expires_at.timestamp()))
+    return QrTokenOut(token=token, expires_at=expires_at, short_code=short_code)
 
 
 @router.post("/scan", response_model=AttendanceRecordRead, status_code=201)

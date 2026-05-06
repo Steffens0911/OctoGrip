@@ -657,38 +657,39 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                           color: Theme.of(context).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
                           children: [
-                            Text(
-                              'Código para digitar manualmente:',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: AppTheme.textSecondaryOf(context),
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: SelectableText(
-                                    _qr!.token,
-                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          fontFamily: 'monospace',
-                                          letterSpacing: 0.5,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Código manual (quem não consegue escanear):',
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                          color: AppTheme.textSecondaryOf(context),
                                         ),
                                   ),
-                                ),
-                                IconButton(
-                                  tooltip: 'Copiar código',
-                                  icon: const Icon(Icons.copy_rounded, size: 18),
-                                  onPressed: () {
-                                    Clipboard.setData(ClipboardData(text: _qr!.token));
-                                    AppFeedback.show(context,
-                                        message: 'Código copiado',
-                                        type: AppFeedbackType.success);
-                                  },
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    _qr!.shortCode,
+                                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                          fontFamily: 'monospace',
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 6,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Copiar código',
+                              icon: const Icon(Icons.copy_rounded, size: 18),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: _qr!.shortCode));
+                                AppFeedback.show(context,
+                                    message: 'Código copiado',
+                                    type: AppFeedbackType.success);
+                              },
                             ),
                           ],
                         ),

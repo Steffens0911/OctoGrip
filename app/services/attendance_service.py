@@ -286,14 +286,19 @@ async def scan_checkin(
     token: str,
 ) -> tuple[AttendanceRecord, bool]:
     """Registra presença via token QR. Idempotente por (session_id, user_id)."""
-    from app.services.qr_service import verify as qr_verify
+    from app.services.qr_service import verify as qr_verify, verify_short as qr_verify_short
+    from app.core.exceptions import AttendanceQrInvalidError
 
-    if current_user.role != "aluno":
-        raise ForbiddenError("Apenas alunos podem registrar presença via QR.")
+    if current_user.role not in ("aluno", "professor", "gerente_academia"):
+        raise ForbiddenError("Apenas alunos, professores e gerentes podem registrar presença via QR.")
     if not current_user.academy_id:
-        raise ForbiddenError("Aluno não está vinculado a uma academia.")
+        raise ForbiddenError("Usuário não está vinculado a uma academia.")
 
-    session_id = qr_verify(token)
+    stripped = token.strip()
+    if len(stripped) == 5:
+        session_id = qr_verify_short(stripped)
+    else:
+        session_id = qr_verify(stripped)
 
     now = _now_utc()
 
