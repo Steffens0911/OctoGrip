@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/screens/academy/attendance_session_detail_screen.dart';
+import 'package:viewer/screens/academy/attendance_session_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
@@ -247,7 +248,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                                   await Navigator.push<void>(
                                     context,
                                     MaterialPageRoute<void>(
-                                      builder: (ctx) => AttendanceSessionDetailScreen(sessionId: s.id),
+                                      builder: (ctx) => closed
+                                          ? AttendanceSessionDetailScreen(sessionId: s.id)
+                                          : AttendanceSessionScreen(sessionId: s.id),
                                     ),
                                   );
                                   if (mounted) await _load(reset: true);

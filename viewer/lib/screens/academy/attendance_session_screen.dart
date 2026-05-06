@@ -1,6 +1,7 @@
 import 'dart:async' show StreamSubscription, TimeoutException, Timer, unawaited;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
@@ -16,7 +17,10 @@ import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/attendance_add_student_dialog.dart';
 
 class AttendanceSessionScreen extends StatefulWidget {
-  const AttendanceSessionScreen({super.key});
+  const AttendanceSessionScreen({super.key, this.sessionId});
+
+  /// Quando informado, carrega a sessão existente em vez de exibir "Iniciar chamada".
+  final String? sessionId;
 
   @override
   State<AttendanceSessionScreen> createState() =>
@@ -258,11 +262,51 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           if (mounted) {
             setState(() => _qrAttendanceEnabled = academy.qrAttendanceEnabled);
           }
-        } catch (_) {
-          // Mantém fallback true se não conseguir carregar a configuração.
+        } catch (_) {}
+      }
+
+      if (widget.sessionId != null) {
+        await _loadExistingSession(widget.sessionId!);
+        return;
+      }
+
+      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = userFacingMessage(e);
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadExistingSession(String sessionId) async {
+    try {
+      final session = await _api.getAttendanceSession(sessionId);
+      final recs = await _api.getAttendanceSessionRecordsAll(sessionId);
+      if (!mounted) return;
+      final isActive = session.status.toLowerCase() != 'closed';
+      setState(() {
+        _session = session;
+        _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
+        _loading = false;
+      });
+      await _hydrateUsersForRecords(recs);
+      if (!mounted) return;
+      if (isActive) {
+        _startAutoRefresh();
+        _startLive(sessionId);
+        if (_qrAttendanceEnabled) {
+          _startQrHeartbeat();
+          try {
+            final qr = await _api.getAttendanceQrToken(sessionId, ttlSeconds: 60);
+            if (mounted) setState(() => _qr = qr);
+          } catch (e) {
+            if (mounted) setState(() => _qrError = userFacingMessage(e));
+          }
         }
       }
-      if (mounted) setState(() => _loading = false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -605,7 +649,51 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                           ),
                         ),
                       )
-                    else if (_qr != null)
+                    else if (_qr != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Código para digitar manualmente:',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppTheme.textSecondaryOf(context),
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SelectableText(
+                                    _qr!.token,
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          fontFamily: 'monospace',
+                                          letterSpacing: 0.5,
+                                        ),
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Copiar código',
+                                  icon: const Icon(Icons.copy_rounded, size: 18),
+                                  onPressed: () {
+                                    Clipboard.setData(ClipboardData(text: _qr!.token));
+                                    AppFeedback.show(context,
+                                        message: 'Código copiado',
+                                        type: AppFeedbackType.success);
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       RepaintBoundary(
                         child: QrImageView(
                           key: ValueKey<String>(_qr!.token),
@@ -614,7 +702,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                           backgroundColor: Colors.white,
                           errorCorrectionLevel: QrErrorCorrectLevel.M,
                         ),
-                      )
+                      ),
+                    ]
                     else
                       SizedBox(
                         height: 240,

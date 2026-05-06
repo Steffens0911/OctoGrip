@@ -239,18 +239,34 @@ class _AttendanceScanScreenState extends State<AttendanceScanScreen> {
                     ),
                   ),
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.info_outline_rounded),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _busy
-                            ? 'Confirmando presença...'
-                            : 'Aponte a câmera para o QR exibido pelo professor.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
+                    Row(
+                      children: [
+                        const Icon(Icons.info_outline_rounded),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _busy
+                                ? 'Confirmando presença...'
+                                : 'Aponte a câmera para o QR exibido pelo professor.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
                     ),
+                    if (!_busy) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _openManualEntry,
+                          icon: const Icon(Icons.keyboard_rounded, size: 18),
+                          label: const Text('Não consegue escanear? Digite o código manualmente'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
