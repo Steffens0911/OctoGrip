@@ -544,6 +544,7 @@ async def list_user_trophies_with_earned(
         if t.end_date < today and tier is None:
             continue
         technique_name = t.technique.name if t.technique else None
+        technique_video_url = t.technique.video_url if t.technique else None
         min_lvl = getattr(t, "min_reward_level_to_unlock", 0) or 0
         min_grad = getattr(t, "min_graduation_to_unlock", None) or None
         if min_grad and isinstance(min_grad, str) and not min_grad.strip():
@@ -558,6 +559,7 @@ async def list_user_trophies_with_earned(
                 "academy_id": str(user.academy_id) if user.academy_id else None,
                 "name": t.name,
                 "technique_name": technique_name,
+                "technique_video_url": technique_video_url,
                 "start_date": t.start_date.isoformat(),
                 "end_date": t.end_date.isoformat(),
                 "target_count": t.target_count,

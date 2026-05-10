@@ -5,6 +5,7 @@ class TrophyWithEarned {
   final String? academyId;
   final String name;
   final String? techniqueName;
+  final String? techniqueVideoUrl;
   final String startDate;
   final String endDate;
   final int targetCount;
@@ -30,6 +31,7 @@ class TrophyWithEarned {
     this.academyId,
     required this.name,
     this.techniqueName,
+    this.techniqueVideoUrl,
     required this.startDate,
     required this.endDate,
     required this.targetCount,
@@ -52,6 +54,7 @@ class TrophyWithEarned {
       academyId: json['academy_id'] as String?,
       name: json['name'] as String,
       techniqueName: json['technique_name'] as String?,
+      techniqueVideoUrl: json['technique_video_url'] as String?,
       startDate: json['start_date'] as String,
       endDate: json['end_date'] as String,
       targetCount: (json['target_count'] as num?)?.toInt() ?? 0,

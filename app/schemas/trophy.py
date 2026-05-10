@@ -105,6 +105,7 @@ class UserTrophyEarned(BaseModel):
     academy_id: UUID | None = None
     name: str
     technique_name: str | None = None
+    technique_video_url: str | None = None
     start_date: date
     end_date: date
     target_count: int

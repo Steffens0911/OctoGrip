@@ -10,6 +10,7 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
+import 'package:viewer/widgets/youtube_player_embed.dart';
 
 /// Galeria de troféus e medalhas do usuário: premiações da academia com tier conquistado (ouro/prata/bronze) ou "A conquistar".
 class TrophyGalleryScreen extends StatefulWidget {
@@ -238,6 +239,58 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
         );
       }
     }
+  }
+
+  void _showTechniqueVideo(BuildContext context, TrophyWithEarned t) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (_, scrollController) => ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              t.techniqueName ?? t.name,
+              style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              t.name,
+              style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryOf(ctx),
+                  ),
+            ),
+            const SizedBox(height: 16),
+            YoutubePlayerEmbed(
+              videoUrl: t.techniqueVideoUrl!,
+              reelsMode: false,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Linhas de progresso por tier (só para tiers ainda não conquistados).
@@ -793,6 +846,20 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                             )),
                                                   ];
                                                 }(),
+                                              if (t.techniqueVideoUrl != null &&
+                                                  t.techniqueVideoUrl!.isNotEmpty) ...[
+                                                const SizedBox(height: 12),
+                                                SizedBox(
+                                                  width: double.infinity,
+                                                  child: OutlinedButton.icon(
+                                                    icon: const Icon(
+                                                        Icons.play_circle_outline_rounded,
+                                                        size: 18),
+                                                    label: const Text('Ver vídeo da técnica'),
+                                                    onPressed: () => _showTechniqueVideo(context, t),
+                                                  ),
+                                                ),
+                                              ],
                                               if (_isOwnGallery &&
                                                   t.unlocked &&
                                                   t.academyId != null &&
