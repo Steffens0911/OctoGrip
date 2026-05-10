@@ -317,6 +317,14 @@ async def create_execution(
         "create_execution",
         extra={"execution_id": str(full.id), "user_id": str(user_id), "opponent_id": str(opponent_id)},
     )
+
+    # Notifica o adversário sobre a indicação (fire-and-forget; erro não afeta a resposta).
+    try:
+        from app.services.execution_notification_service import notify_opponent_of_indication
+        await notify_opponent_of_indication(db, full)
+    except Exception:
+        logger.exception("create_execution: erro ao enviar push de indicação")
+
     return full
 
 
@@ -492,6 +500,13 @@ async def confirm_execution(
 
     executor_user = await db.get(User, execution.user_id)
     await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
+
+    # Notifica o executor que sua indicação foi confirmada (fire-and-forget).
+    try:
+        from app.services.execution_notification_service import notify_executor_of_confirmation
+        await notify_executor_of_confirmation(db, execution)
+    except Exception:
+        logger.exception("confirm_execution: erro ao enviar push de confirmação")
 
     # Verifica conquista de troféu/medalha e envia push (fire-and-forget; erros não afetam a resposta).
     try:
