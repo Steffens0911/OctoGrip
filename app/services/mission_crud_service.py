@@ -396,7 +396,7 @@ async def _upsert_slot_missions(
                         cond_kit,
                     )
                 )
-            ).scalar_one_or_none()
+            ).scalars().first()
             
             if existing:
                 if existing.technique_id != tech_id:
@@ -465,7 +465,7 @@ async def _cleanup_kit_trailing_slots(
                             cond_kit,
                         )
                     )
-                ).scalar_one_or_none()
+                ).scalars().first()
                 if old:
                     before = entity_snapshot_row(old)
                     old.deleted_at = datetime.now(timezone.utc)
