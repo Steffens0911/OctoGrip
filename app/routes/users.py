@@ -279,7 +279,11 @@ async def user_update(
         # Endurecimento RBAC: não-admin não pode elevar privilégios nem alterar campos sensíveis.
         payload.pop("academy_id", None)
         payload.pop("points_adjustment", None)
-        payload.pop("password", None)
+        if current_user.role in ("gerente_academia", "professor"):
+            if "password" in payload and target.role != "aluno":
+                raise ForbiddenError("Gerentes e professores só podem alterar a senha de alunos.")
+        else:
+            payload.pop("password", None)
     if current_user.role == "gerente_academia":
         new_role = payload.get("role")
         if new_role is not None and new_role not in _ALLOWED_NON_ADMIN_CREATE_ROLES:
