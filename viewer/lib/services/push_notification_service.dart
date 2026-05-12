@@ -305,11 +305,14 @@ class PushNotificationService {
   }
 
   /// Chamado no logout: remove tokens no servidor e invalida FCM local.
+  /// Só chama deleteAllMyPushTokens() se o Firebase foi inicializado —
+  /// sem Firebase não há token registrado no servidor, então o DELETE é
+  /// desnecessário e causava loop infinito ao receber 401.
   static Future<void> unregister() async {
+    if (!_firebaseReady) return;
     try {
       await ApiService().deleteAllMyPushTokens();
     } catch (_) {}
-    if (!_firebaseReady) return;
     try {
       await FirebaseMessaging.instance.deleteToken();
     } catch (_) {}

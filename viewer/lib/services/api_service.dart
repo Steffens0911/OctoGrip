@@ -188,7 +188,10 @@ class ApiService {
       body: jsonEncode({'email': email, 'password': password}),
     ));
     final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
+    // noAutoLogout=true: falha no login (ex.: senha errada → 401) nunca deve
+    // disparar logout automático — o utilizador pode ter um token antigo guardado
+    // e isLoggedIn ficaria true, causando logout + loop de push_tokens DELETE.
+    _throwIfNotOk(r, data, true);
     final map = data! as Map<String, dynamic>;
     final token = map['access_token'] as String;
     final streakBonusPoints = map['streak_bonus_points'] as int? ?? 0;
@@ -204,7 +207,9 @@ class ApiService {
       headers: await _jsonHeaders(auth: true),
     ));
     final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
+    // noAutoLogout=true: o caller (DailyCheckinService) já trata erros silenciosamente;
+    // um 401 aqui não deve disparar logout — o MainShell detetará tokens expirados.
+    _throwIfNotOk(r, data, true);
     final map = data! as Map<String, dynamic>;
     return map['streak_bonus_points'] as int? ?? 0;
   }
@@ -254,13 +259,16 @@ class ApiService {
   }
 
   /// Remove todos os tokens FCM do usuário (logout).
+  /// Usa noAutoLogout=true: um 401 aqui (JWT já expirado) não deve
+  /// disparar novo logout — o chamador (PushNotificationService.unregister)
+  /// já faz parte do fluxo de logout e captura erros silenciosamente.
   Future<void> deleteAllMyPushTokens() async {
     final r = await _req(http.delete(
       Uri.parse('$baseUrl/me/push_tokens'),
       headers: await _headers(auth: true),
     ));
     final data = await _decodeResponse(r);
-    _throwIfNotOk(r, data);
+    _throwIfNotOk(r, data, true);
   }
 
   /// Envia notificação push a usuários da academia com app e tokens registrados.
@@ -386,10 +394,17 @@ class ApiService {
     return detail.toString();
   }
 
-  void _throwIfNotOk(http.Response r, [dynamic data]) {
+  void _throwIfNotOk(
+    http.Response r, [
+    dynamic data,
+    bool noAutoLogout = false,
+  ]) {
     if (r.statusCode >= 200 && r.statusCode < 300) return;
-    if (r.statusCode == 401) {
-      AuthService().logout(notifyInvalidated: true);
+    // Só faz logout automático se havia uma sessão ativa (token presente) e
+    // o chamador não optou por suprimir (ex.: deleteAllMyPushTokens, que faz
+    // parte do próprio fluxo de logout — chamar logout aqui causaria loop).
+    if (r.statusCode == 401 && !noAutoLogout && AuthService().isLoggedIn) {
+      unawaited(AuthService().logout(notifyInvalidated: true));
     }
     String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
     String? errorType;

@@ -26,6 +26,9 @@ class AuthService extends ChangeNotifier {
   UserModel? _effectiveUser;
   bool _randomPartnerShown = false;
   bool _loginNoticeShown = false;
+  /// Previne re-entrada concorrente em logout() e impede que ensureLoaded()
+  /// recarregue o token do storage enquanto o logout ainda está em progresso.
+  bool _loggingOut = false;
 
   AuthService._();
 
@@ -109,18 +112,28 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> logout({bool notifyInvalidated = false}) async {
-    await PushNotificationService.unregister();
-    _impersonatedUserId = null;
-    _effectiveUser = null;
-    _token = null;
-    _currentUser = null;
-    _randomPartnerShown = false;
-    _loginNoticeShown = false;
-    await _clearStorage();
-    await StudentHomeSnapshotStore.clearAll();
-    await DailyCheckinService.instance.clear();
-    ApiService().invalidateCache();
-    notifyListeners();
+    // Guard contra re-entrada: múltiplos 401 concorrentes podem chamar logout()
+    // simultaneamente; sem esse flag, ensureLoaded() recarrega o token do
+    // storage (não limpo ainda) entre o _token=null e o await _clearStorage(),
+    // fazendo isLoggedIn voltar a true e disparando outro logout → loop infinito.
+    if (_loggingOut) return;
+    _loggingOut = true;
+    try {
+      _impersonatedUserId = null;
+      _effectiveUser = null;
+      _token = null;
+      _currentUser = null;
+      _randomPartnerShown = false;
+      _loginNoticeShown = false;
+      await _clearStorage();
+      await PushNotificationService.unregister();
+      await StudentHomeSnapshotStore.clearAll();
+      await DailyCheckinService.instance.clear();
+      ApiService().invalidateCache();
+      notifyListeners();
+    } finally {
+      _loggingOut = false;
+    }
   }
 
   Future<void> setImpersonating(String? userId) async {
@@ -163,7 +176,10 @@ class AuthService extends ChangeNotifier {
   String? get authHeader => _token != null ? 'Bearer $_token' : null;
 
   Future<void> ensureLoaded() async {
-    if (_token == null) await _loadFromStorage();
+    // Não recarrega o token durante logout: _clearStorage() pode ainda não ter
+    // terminado, e _loadFromStorage() leria o token antigo do storage, fazendo
+    // isLoggedIn voltar a true e disparando novo logout → loop infinito.
+    if (_token == null && !_loggingOut) await _loadFromStorage();
   }
 
   Future<void> restoreImpersonation() async {
