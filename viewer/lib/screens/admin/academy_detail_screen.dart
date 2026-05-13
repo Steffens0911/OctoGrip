@@ -1587,7 +1587,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         const SizedBox(height: 8),
         Text(
           '${report.usersLoggedAtLeastOnce} logaram ao menos 1 dia · '
-          '${report.eligibleUsersCount} usuários (staff e alunos)',
+          '${report.eligibleUsersCount} usuários (staff e alunos) · '
+          '${report.totalLoginDays} logins no total',
           style: Theme.of(context).textTheme.titleSmall,
         ),
         if (report.users.isNotEmpty) ...[

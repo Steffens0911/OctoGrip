@@ -47,6 +47,7 @@ class WeeklyPanelLoginsReport {
   final DateTime weekEnd;
   final int eligibleUsersCount;
   final int usersLoggedAtLeastOnce;
+  final int totalLoginDays;
   final List<WeeklyPanelLoginUserItem> users;
 
   WeeklyPanelLoginsReport({
@@ -55,6 +56,7 @@ class WeeklyPanelLoginsReport {
     required this.weekEnd,
     required this.eligibleUsersCount,
     required this.usersLoggedAtLeastOnce,
+    required this.totalLoginDays,
     required this.users,
   });
 
@@ -73,6 +75,7 @@ class WeeklyPanelLoginsReport {
       eligibleUsersCount: (json['eligible_users_count'] as num?)?.toInt() ?? 0,
       usersLoggedAtLeastOnce:
           (json['users_logged_at_least_once'] as num?)?.toInt() ?? 0,
+      totalLoginDays: (json['total_login_days'] as num?)?.toInt() ?? 0,
       users: users,
     );
   }

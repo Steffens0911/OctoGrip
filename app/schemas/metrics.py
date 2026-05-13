@@ -93,4 +93,5 @@ class WeeklyPanelLoginsReportResponse(BaseModel):
     week_end: date
     eligible_users_count: int
     users_logged_at_least_once: int
+    total_login_days: int = 0
     users: list[WeeklyPanelLoginUserItem]

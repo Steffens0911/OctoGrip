@@ -440,6 +440,7 @@ async def get_weekly_panel_logins_report(
         "week_end": week_end,
         "eligible_users_count": len(eligible_users),
         "users_logged_at_least_once": len(users),
+        "total_login_days": len(login_rows),
         "users": users,
     }
     logger.info(
