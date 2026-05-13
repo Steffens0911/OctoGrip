@@ -427,12 +427,20 @@ def _compute_counts_from_executions(
 
 
 def _tier_from_counts(counts: dict, target: int) -> str | None:
-    """Retorna tier conquistado (gold, silver, bronze) a partir dos counts e target."""
-    if counts["gold_count"] >= target:
+    """Retorna tier conquistado (gold, silver, bronze) a partir dos counts e target.
+
+    Ouro: N execuções em roxa/marrom/preta.
+    Prata: N execuções em azul ou superior (azul + roxa + marrom + preta).
+    Bronze: N execuções em qualquer faixa.
+    """
+    gold = counts["gold_count"]
+    silver = counts["silver_count"]
+    bronze = counts["bronze_count"]
+    if gold >= target:
         return "gold"
-    if counts["silver_count"] >= target:
+    if gold + silver >= target:
         return "silver"
-    if counts["bronze_count"] >= target:
+    if gold + silver + bronze >= target:
         return "bronze"
     return None
 
@@ -444,9 +452,10 @@ async def compute_trophy_counts(
 ) -> dict:
     """
     Retorna gold_count, silver_count, bronze_count para o usuário no troféu.
-    Ouro: execuções em adversários roxa/marrom/preta.
-    Prata: execuções em adversários azuis.
-    Bronze: execuções em adversários brancos (todas, limitadas por ``max_count_per_opponent`` se definido).
+    gold_count: execuções em adversários roxa/marrom/preta.
+    silver_count: execuções em adversários azuis.
+    bronze_count: execuções em adversários brancos.
+    Para o tier conquistado, os contadores são acumulativos: bronze = gold+silver+bronze >= target.
     """
     logger.debug(
         "compute_trophy_counts",
@@ -469,9 +478,9 @@ async def compute_user_trophy_tier(
 ) -> str | None:
     """
     Calcula o tier conquistado (gold, silver, bronze) para o usuário no troféu.
-    Ouro: N execuções confirmadas em adversários roxa/marrom/preta.
-    Prata: N execuções em adversários azuis.
-    Bronze: N execuções em adversários brancos (limitadas por ``max_count_per_opponent`` se definido).
+    Ouro: N execuções em roxa/marrom/preta.
+    Prata: N execuções em azul ou superior (azul + roxa + marrom + preta).
+    Bronze: N execuções em qualquer faixa.
     Retorna o maior tier conquistado ou None.
     """
     logger.debug(
@@ -480,13 +489,7 @@ async def compute_user_trophy_tier(
     )
     counts = await compute_trophy_counts(db, user_id, trophy)
     target = trophy.target_count
-    tier = None
-    if counts["gold_count"] >= target:
-        tier = "gold"
-    elif counts["silver_count"] >= target:
-        tier = "silver"
-    elif counts["bronze_count"] >= target:
-        tier = "bronze"
+    tier = _tier_from_counts(counts, target)
     logger.debug(
         "compute_user_trophy_tier result",
         extra={"user_id": str(user_id), "trophy_id": str(trophy.id), "tier": tier},

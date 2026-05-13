@@ -315,29 +315,33 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
               fontWeight: FontWeight.w600, color: _tierColor('gold'))));
       return lines;
     }
+    // Contagens acumulativas: bronze inclui azuis e roxos+; prata inclui roxos+
+    final bronzeTotal = t.bronzeCount + t.silverCount + t.goldCount;
+    final silverTotal = t.silverCount + t.goldCount;
+    final goldTotal   = t.goldCount;
     if (!hasBronze) {
-      final missing = target - t.bronzeCount;
+      final missing = target - bronzeTotal;
       if (missing > 0) {
         final bronzeHint = cap != null
-            ? '${t.bronzeCount} no bronze (faixa branca). Faltam $missing para o troféu bronze.'
-            : '${t.bronzeCount} adversários brancos distintos. Faltam $missing para o troféu bronze.';
+            ? '$bronzeTotal no bronze (qualquer faixa). Faltam $missing para o troféu bronze.'
+            : '$bronzeTotal adversários contabilizados. Faltam $missing para o troféu bronze.';
         lines.add(Text(bronzeHint, style: style));
       }
     }
     if (!hasSilver) {
-      final missing = target - t.silverCount;
+      final missing = target - silverTotal;
       if (missing > 0) {
         lines.add(Text(
-          '${t.silverCount} azuis contabilizados. Faltam $missing para o troféu prata.',
+          '$silverTotal azuis ou superior contabilizados. Faltam $missing para o troféu prata.',
           style: style,
         ));
       }
     }
     if (!hasGold) {
-      final missing = target - t.goldCount;
+      final missing = target - goldTotal;
       if (missing > 0) {
         lines.add(Text(
-          '${t.goldCount} em roxa/marrom/preta. Faltam $missing para o troféu ouro.',
+          '$goldTotal em roxa/marrom/preta. Faltam $missing para o troféu ouro.',
           style: style,
         ));
       }
