@@ -15,11 +15,12 @@ ARG FIREBASE_STORAGE_BUCKET=
 ARG FCM_VAPID_KEY=
 
 COPY pubspec.yaml pubspec.lock* ./
-RUN flutter pub get && flutter precache --web
+RUN flutter pub get
 
 COPY . .
 
-# Passo 1: gera dart_define_web.json e substitui placeholders no SW
+# Gera dart_define_web.json, baixa Web SDK e compila — tudo no mesmo RUN
+# para que o cache do flutter precache esteja disponível para o build.
 RUN set -e; \
   export API_BASE_URL="${API_BASE_URL}"; \
   export FIREBASE_WEB_APP_ID="${FIREBASE_WEB_APP_ID}"; \
@@ -29,17 +30,12 @@ RUN set -e; \
   export FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN}"; \
   export FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET}"; \
   export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
-  python3 tool/prepare_firebase_web_build.py
-
-# Passo 2: diagnóstico + build (diagnóstico aparece no log ao falhar)
-RUN echo "=== MEMORIA ===" && \
-    grep -E "MemTotal|MemFree|MemAvailable" /proc/meminfo && \
-    echo "=== DISCO ===" && \
-    df -h / && \
-    flutter build web --release \
-      --no-pub \
-      --no-wasm-dry-run \
-      --dart-define-from-file=tool/dart_define_web.json
+  python3 tool/prepare_firebase_web_build.py && \
+  flutter precache --web && \
+  flutter build web --release \
+    --no-pub \
+    --no-wasm-dry-run \
+    --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
 FROM nginx:alpine
