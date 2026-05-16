@@ -23,7 +23,9 @@ from app.routes import (
     lessons,
     marketplace_items,
     me_marketplace,
+    me_professor_impact,
     me_push,
+    me_training_stats,
     me_training_videos,
     metrics,
     mission,
@@ -74,6 +76,8 @@ api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(training_videos.router, prefix="/training_videos", tags=["training_videos"])
 api_router.include_router(marketplace_items.router, prefix="/marketplace_items", tags=["marketplace_items"])
+api_router.include_router(me_professor_impact.router, prefix="/me", tags=["me"])
+api_router.include_router(me_training_stats.router, prefix="/me", tags=["me"])
 api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
 api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])

@@ -19,16 +19,21 @@ import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/models/professor.dart';
+import 'package:viewer/models/professor_impact.dart';
 import 'package:viewer/models/technique.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/models/marketplace_item.dart';
 import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
+import 'package:viewer/models/mission_completion_report.dart';
+import 'package:viewer/models/students_attention_report.dart';
+import 'package:viewer/models/technique_execution_summary.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/attendance_ranking.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/models/training_stats.dart';
 import 'package:viewer/models/weekly_kit.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/backup_multipart_io.dart'
@@ -323,6 +328,16 @@ class ApiService {
       sent: n(m['sent']),
       failed: n(m['failed']),
     );
+  }
+
+  Future<TrainingStats> getTrainingStats() async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/me/training_stats'),
+      _cacheTtlShort,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return TrainingStats.fromJson(data as Map<String, dynamic>);
   }
 
   /// Snapshot agregado do header/home do usuário atual.
@@ -2530,6 +2545,22 @@ class ApiService {
     return UsageMetrics.fromJson(data! as Map<String, dynamic>);
   }
 
+  Future<ProfessorImpact> getProfessorImpact({DateTime? referenceDate}) async {
+    final params = <String, String>{};
+    if (referenceDate != null) {
+      params['reference_date'] =
+          '${referenceDate.year.toString().padLeft(4, '0')}-${referenceDate.month.toString().padLeft(2, '0')}-${referenceDate.day.toString().padLeft(2, '0')}';
+    }
+    final uri = Uri.parse('$baseUrl/me/professor-impact')
+        .replace(queryParameters: params.isEmpty ? null : params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return ProfessorImpact.fromJson(data! as Map<String, dynamic>);
+  }
+
   Future<EngagementReport> getEngagementReport({
     required DateTime referenceDate,
     String? academyId,
@@ -2595,6 +2626,62 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return WeeklyPanelLoginsReport.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<TechniqueExecutionSummary> getTechniqueExecutionSummary({
+    String? academyId,
+  }) async {
+    final params = <String, String>{
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/technique_execution_summary')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return TechniqueExecutionSummary.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<StudentsAttentionReport> getStudentsAttentionReport({
+    String? academyId,
+    int limit = 20,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/students_attention')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return StudentsAttentionReport.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<MissionCompletionReport> getMissionCompletionReport({
+    required DateTime fromDate,
+    required DateTime toDate,
+    String? academyId,
+  }) async {
+    String ymd(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final params = <String, String>{
+      'from_date': ymd(fromDate),
+      'to_date': ymd(toDate),
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/mission_completion')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return MissionCompletionReport.fromJson(data! as Map<String, dynamic>);
   }
 
   // ---------- Academy extras (ranking, dificuldades, relatório, reset, missões semanais) ----------

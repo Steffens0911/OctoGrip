@@ -34,9 +34,11 @@ import 'package:viewer/widgets/academy_login_notice_dialog.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/widgets/layout/memo_section_label.dart';
+import 'package:viewer/models/training_stats.dart';
 import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
 import 'package:viewer/widgets/student/student_rules_sheet.dart';
+import 'package:viewer/widgets/student/student_stats_section.dart';
 import 'package:viewer/widgets/student/academy_partners_training_banner.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
@@ -97,6 +99,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _syncingHomeData = false;
   Future<List<Partner>>? _trainingPartnersFuture;
   Future<TrophyHomeSummary>? _trophySummaryFuture;
+  TrainingStats? _trainingStats;
 
   void _setupTrainingPartnersFuture(String? academyId) {
     if (academyId == null || academyId.isEmpty) {
@@ -299,6 +302,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
           );
         }
         unawaited(_loadDailyVideo());
+        unawaited(_loadTrainingStats());
         unawaited(_runPostLoadNudges());
       }
     } catch (e) {
@@ -757,6 +761,15 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
+  Future<void> _loadTrainingStats() async {
+    try {
+      final stats = await _api.getTrainingStats();
+      if (mounted) setState(() => _trainingStats = stats);
+    } catch (_) {
+      // Falha silenciosa: estatísticas ficam ocultas
+    }
+  }
+
   void _onDailyVideoTap() {
     if (AuthService().isEffectiveStudentFrozen) {
       _notifyAccountFrozen();
@@ -873,6 +886,12 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                         onOpenPointsRules: () => showPointsRulesSheet(context),
                       ),
                     ),
+                  if (_trainingStats != null) ...[
+                    const SizedBox(height: 14),
+                    const MemoSectionLabel('SUA JORNADA'),
+                    const SizedBox(height: 8),
+                    StudentStatsSection(stats: _trainingStats!),
+                  ],
                   if (_showPartners && _trainingPartnersFuture != null) ...[
                     const SizedBox(height: 10),
                     FutureBuilder<List<Partner>>(
