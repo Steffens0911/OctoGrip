@@ -31,11 +31,18 @@ RUN set -e; \
   export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
   python3 tool/prepare_firebase_web_build.py
 
-# Passo 2: compila o Flutter web (verbose para diagnóstico em caso de falha)
+# Diagnóstico: memória e disco disponíveis no servidor
+RUN echo "=== MEMÓRIA ===" && \
+    grep -E "MemTotal|MemFree|MemAvailable" /proc/meminfo && \
+    echo "=== DISCO ===" && \
+    df -h / && \
+    echo "=== FLUTTER VERSION ===" && \
+    flutter --version
+
+# Passo 2: compila o Flutter web
 RUN flutter build web --release \
       --no-pub \
       --no-wasm-dry-run \
-      --verbose \
       --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
