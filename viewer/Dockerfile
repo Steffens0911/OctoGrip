@@ -15,7 +15,7 @@ ARG FIREBASE_STORAGE_BUCKET=
 ARG FCM_VAPID_KEY=
 
 COPY pubspec.yaml pubspec.lock* ./
-RUN flutter pub get
+RUN flutter pub get && flutter precache --web
 
 COPY . .
 # JSON + Python evitam shell/sed a partir com aspas ou caracteres especiais nas env vars do Coolify.
