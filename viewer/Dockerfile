@@ -31,16 +31,12 @@ RUN set -e; \
   export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
   python3 tool/prepare_firebase_web_build.py
 
-# Diagnóstico: memória e disco disponíveis no servidor
-RUN echo "=== MEMÓRIA ===" && \
+# Passo 2: diagnóstico + build (diagnóstico aparece no log ao falhar)
+RUN echo "=== MEMORIA ===" && \
     grep -E "MemTotal|MemFree|MemAvailable" /proc/meminfo && \
     echo "=== DISCO ===" && \
     df -h / && \
-    echo "=== FLUTTER VERSION ===" && \
-    flutter --version
-
-# Passo 2: compila o Flutter web
-RUN flutter build web --release \
+    flutter build web --release \
       --no-pub \
       --no-wasm-dry-run \
       --dart-define-from-file=tool/dart_define_web.json
