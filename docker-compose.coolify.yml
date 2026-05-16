@@ -141,19 +141,9 @@ services:
         condition: service_healthy
 
   viewer:
-    build:
-      context: ./viewer
-      dockerfile: Dockerfile
-      args:
-        API_BASE_URL: ${API_BASE_URL:-http://localhost:8001}
-        # FCM Web: no Coolify use o objecto firebaseConfig completo da app Web (Buildtime).
-        FIREBASE_WEB_APP_ID: ${FIREBASE_WEB_APP_ID:-}
-        FIREBASE_WEB_API_KEY: ${FIREBASE_WEB_API_KEY:-}
-        FIREBASE_MESSAGING_SENDER_ID: ${FIREBASE_MESSAGING_SENDER_ID:-}
-        FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-        FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:-}
-        FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET:-}
-        FCM_VAPID_KEY: ${FCM_VAPID_KEY:-}
+    # Imagem pré-construída pelo GitHub Actions (flutter build web roda lá,
+    # onde storage.googleapis.com é acessível). Ver .github/workflows/build-viewer.yml
+    image: ghcr.io/steffens0911/octogrip-viewer:latest
     container_name: jjb_viewer
     restart: unless-stopped
     depends_on:
