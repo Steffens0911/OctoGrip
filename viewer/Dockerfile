@@ -18,7 +18,8 @@ COPY pubspec.yaml pubspec.lock* ./
 RUN flutter pub get && flutter precache --web
 
 COPY . .
-# JSON + Python evitam shell/sed a partir com aspas ou caracteres especiais nas env vars do Coolify.
+
+# Passo 1: gera dart_define_web.json e substitui placeholders no SW
 RUN set -e; \
   export API_BASE_URL="${API_BASE_URL}"; \
   export FIREBASE_WEB_APP_ID="${FIREBASE_WEB_APP_ID}"; \
@@ -28,10 +29,13 @@ RUN set -e; \
   export FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN}"; \
   export FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET}"; \
   export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
-  python3 tool/prepare_firebase_web_build.py && \
-  flutter build web --release \
-    --no-wasm-dry-run \
-    --dart-define-from-file=tool/dart_define_web.json
+  python3 tool/prepare_firebase_web_build.py
+
+# Passo 2: compila o Flutter web (verbose para diagnóstico em caso de falha)
+RUN flutter build web --release \
+      --no-wasm-dry-run \
+      --verbose \
+      --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
 FROM nginx:alpine
