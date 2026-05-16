@@ -33,8 +33,8 @@ RUN set -e; \
 
 # Passo 2: compila o Flutter web (verbose para diagnóstico em caso de falha)
 RUN flutter build web --release \
+      --no-pub \
       --no-wasm-dry-run \
-      --verbose \
       --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
