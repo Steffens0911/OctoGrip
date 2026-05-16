@@ -1,4 +1,4 @@
-build/
+# build/web é copiado pelo Dockerfile após flutter build no CI
 .dart_tool/
 .git/
 *.iml
