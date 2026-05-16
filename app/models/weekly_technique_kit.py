@@ -93,6 +93,6 @@ class UserWeeklyKitChoice(Base, UUIDMixin):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="weekly_kit_choices", lazy="selectin")
+    user: Mapped["User"] = relationship("User", back_populates="weekly_kit_choices", lazy="raise")
     academy: Mapped["Academy"] = relationship("Academy", back_populates="user_weekly_kit_choices")
     kit: Mapped["WeeklyTechniqueKit"] = relationship("WeeklyTechniqueKit", lazy="joined")

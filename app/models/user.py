@@ -111,6 +111,7 @@ class User(Base, UUIDMixin):
         foreign_keys="TechniqueExecution.opponent_id",
         back_populates="opponent",
         lazy="raise",
+        passive_deletes=True,
     )
     training_videos: Mapped[list["TrainingVideo"]] = relationship(
         "TrainingVideo",
@@ -137,6 +138,7 @@ class User(Base, UUIDMixin):
         "UserWeeklyKitChoice",
         back_populates="user",
         lazy="raise",
+        passive_deletes=True,
     )
     trophy_earned: Mapped[list["UserTrophyEarned"]] = relationship(
         "UserTrophyEarned",

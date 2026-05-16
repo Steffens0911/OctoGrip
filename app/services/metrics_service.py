@@ -12,7 +12,7 @@ from app.core.app_time import (
     today_in_app_tz,
 )
 from app.core.cache import app_cache
-from app.models import LessonProgress, MissionUsage, User, UserLoginDay
+from app.models import AttendanceRecord, AttendanceSession, LessonProgress, MissionUsage, TechniqueExecution, User, UserLoginDay
 
 logger = logging.getLogger(__name__)
 
@@ -451,6 +451,214 @@ async def get_weekly_panel_logins_report(
             "week_end": str(week_end),
             "eligible_users_count": result["eligible_users_count"],
             "users_logged_at_least_once": result["users_logged_at_least_once"],
+        },
+    )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
+    return result
+
+
+async def get_technique_execution_summary(
+    db: AsyncSession,
+    *,
+    academy_id: uuid.UUID | None,
+) -> dict:
+    """
+    Resumo de execuções de técnicas (before_training = planejadas, after_training = naturais).
+    Filtra apenas execuções confirmadas.
+    """
+    cache_key = await _metrics_cache_key(f"technique_exec_summary:{academy_id}")
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    base_where = [TechniqueExecution.status == "confirmed"]
+
+    if academy_id is not None:
+        base_where.append(
+            TechniqueExecution.user_id.in_(
+                select(User.id).where(User.academy_id == academy_id)
+            )
+        )
+
+    before = await db.scalar(
+        select(func.count(TechniqueExecution.id)).where(
+            *base_where,
+            TechniqueExecution.usage_type == "before_training",
+        )
+    ) or 0
+
+    after = await db.scalar(
+        select(func.count(TechniqueExecution.id)).where(
+            *base_where,
+            TechniqueExecution.usage_type == "after_training",
+        )
+    ) or 0
+
+    total = before + after
+    before_percent = round(before / total * 100.0, 1) if total > 0 else 0.0
+
+    result = {
+        "academy_id": str(academy_id) if academy_id is not None else None,
+        "before_training_count": before,
+        "after_training_count": after,
+        "total": total,
+        "before_training_percent": before_percent,
+    }
+    logger.info("get_technique_execution_summary", extra=result)
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
+    return result
+
+
+async def get_students_attention_report(
+    db: AsyncSession,
+    *,
+    academy_id: uuid.UUID | None,
+    limit: int = 20,
+) -> dict:
+    """
+    Alunos que há mais tempo não aparecem em nenhuma aula (última presença mais antiga).
+    Inclui alunos que nunca tiveram presença (last_seen_at = null) — aparecem primeiro.
+    """
+    cache_key = await _metrics_cache_key(f"students_attention:{academy_id}:{limit}")
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    last_seen_subq = (
+        select(
+            AttendanceRecord.user_id.label("uid"),
+            func.max(AttendanceRecord.checked_in_at).label("last_seen"),
+        )
+        .select_from(AttendanceRecord)
+        .join(AttendanceSession, AttendanceSession.id == AttendanceRecord.session_id)
+        .group_by(AttendanceRecord.user_id)
+    ).subquery()
+
+    from sqlalchemy.orm import selectinload
+
+    from sqlalchemy import case as sa_case
+
+    users_query = (
+        select(
+            User.id,
+            User.email,
+            User.name,
+            User.graduation,
+            User.academy_id,
+            last_seen_subq.c.last_seen,
+        )
+        .select_from(User)
+        .outerjoin(last_seen_subq, User.id == last_seen_subq.c.uid)
+        .where(User.role == "aluno")
+        .order_by(
+            # Quem já frequentou mas parou vem primeiro (last_seen mais antiga primeiro)
+            # Quem nunca compareceu vem por último
+            sa_case((last_seen_subq.c.last_seen.is_(None), 1), else_=0).asc(),
+            last_seen_subq.c.last_seen.asc(),
+        )
+        .limit(limit)
+    )
+    if academy_id is not None:
+        users_query = users_query.where(User.academy_id == academy_id)
+
+    total_query = select(func.count(User.id)).where(User.role == "aluno")
+    if academy_id is not None:
+        total_query = total_query.where(User.academy_id == academy_id)
+
+    rows = (await db.execute(users_query)).all()
+    total_students = await db.scalar(total_query) or 0
+
+    now = datetime.now(timezone.utc)
+    students = []
+    for uid, email, name, grad, acad_id, last_seen in rows:
+        days_absent: int | None = None
+        if last_seen is not None:
+            ls = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+            days_absent = (now - ls).days
+        students.append({
+            "user_id": str(uid),
+            "email": email,
+            "name": name,
+            "graduation": grad,
+            "academy_id": str(acad_id) if acad_id is not None else None,
+            "academy_name": None,
+            "last_seen_at": last_seen,
+            "days_absent": days_absent,
+        })
+
+    result = {
+        "academy_id": str(academy_id) if academy_id is not None else None,
+        "total_students": total_students,
+        "students": students,
+    }
+    logger.info(
+        "get_students_attention_report",
+        extra={"academy_id": result["academy_id"], "count": len(students)},
+    )
+    await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)
+    return result
+
+
+async def get_mission_completion_report(
+    db: AsyncSession,
+    *,
+    from_date: date,
+    to_date: date,
+    academy_id: uuid.UUID | None,
+) -> dict:
+    """
+    Taxa de conclusão de missões no período: % de alunos (role=aluno) que
+    concluíram ao menos 1 missão (MissionUsage.completed_at dentro do range).
+    """
+    cache_key = await _metrics_cache_key(f"mission_completion:{from_date}:{to_date}:{academy_id}")
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    start_dt = combine_local_date_start_utc(from_date)
+    end_dt = combine_local_date_end_utc(to_date)
+
+    total_query = select(func.count(User.id)).where(User.role == "aluno")
+    if academy_id is not None:
+        total_query = total_query.where(User.academy_id == academy_id)
+    total_students = await db.scalar(total_query) or 0
+
+    completed_subq = (
+        select(MissionUsage.user_id)
+        .join(User, MissionUsage.user_id == User.id)
+        .where(
+            User.role == "aluno",
+            MissionUsage.completed_at.is_not(None),
+            MissionUsage.completed_at >= start_dt,
+            MissionUsage.completed_at <= end_dt,
+        )
+    )
+    if academy_id is not None:
+        completed_subq = completed_subq.where(User.academy_id == academy_id)
+    completed_subq = completed_subq.distinct().subquery()
+
+    users_completed = await db.scalar(select(func.count()).select_from(completed_subq)) or 0
+
+    completion_rate = (
+        round(users_completed / total_students * 100.0, 1) if total_students > 0 else 0.0
+    )
+
+    result = {
+        "academy_id": str(academy_id) if academy_id is not None else None,
+        "from_date": from_date,
+        "to_date": to_date,
+        "total_students": total_students,
+        "users_completed": users_completed,
+        "completion_rate": completion_rate,
+    }
+    logger.info(
+        "get_mission_completion_report",
+        extra={
+            "academy_id": result["academy_id"],
+            "from_date": str(from_date),
+            "to_date": str(to_date),
+            "users_completed": users_completed,
+            "completion_rate": completion_rate,
         },
     )
     await app_cache.set(cache_key, result, ttl=_METRICS_TTL_SEC)

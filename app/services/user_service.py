@@ -220,14 +220,7 @@ async def delete_user(
     await db.execute(sa_delete(TrainingVideoDailyView).where(TrainingVideoDailyView.user_id == user_id))
     await db.execute(sa_delete(LessonProgress).where(LessonProgress.user_id == user_id))
     await db.execute(sa_delete(MissionUsage).where(MissionUsage.user_id == user_id))
-    await db.execute(
-        sa_delete(TechniqueExecution).where(
-            or_(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.opponent_id == user_id,
-            )
-        )
-    )
+    await db.execute(sa_delete(TechniqueExecution).where(TechniqueExecution.user_id == user_id))
     await db.execute(sa_delete(TrainingFeedback).where(TrainingFeedback.user_id == user_id))
     db.expire(user)
     await db.delete(user)

@@ -3,8 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/screens/admin/academy_list_screen.dart';
 import 'package:viewer/screens/admin/admin_broadcast_push_screen.dart';
-import 'package:viewer/screens/admin/engagement_reports_screen.dart';
-import 'package:viewer/screens/admin/execution_reports_screen.dart';
+import 'package:viewer/screens/admin/relatorios_hub_screen.dart';
 import 'package:viewer/screens/admin/audit_recovery_screen.dart';
 import 'package:viewer/screens/admin/database_backup_screen.dart';
 import 'package:viewer/screens/admin/global_partner_list_screen.dart';
@@ -118,24 +117,12 @@ class AdminSectionScreen extends StatelessWidget {
           const SizedBox(height: 16),
           AppNavigationTile(
             icon: Icons.bar_chart_rounded,
-            title: 'Relatórios de execuções',
-            subtitle: 'Premeditadas vs naturais por academia',
+            title: 'Relatórios',
+            subtitle: 'Engajamento, logins, execuções e missões por período',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const ExecutionReportsScreen(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          AppNavigationTile(
-            icon: Icons.insights_rounded,
-            title: 'Relatórios de engajamento',
-            subtitle: 'Semana e mês · % de alunos ativos',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const EngagementReportsScreen(),
+                builder: (context) => const RelatoriosHubScreen(),
               ),
             ),
           ),

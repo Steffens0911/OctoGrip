@@ -43,9 +43,9 @@ class TechniqueExecution(Base, UUIDMixin):
         nullable=True,
         index=True,
     )
-    opponent_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+    opponent_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     usage_type: Mapped[str] = mapped_column(

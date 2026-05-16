@@ -79,6 +79,46 @@ class WeeklyPanelLoginUserItem(BaseModel):
     login_days: list[date]
 
 
+class TechniqueExecutionSummaryResponse(BaseModel):
+    """Resumo de execuções de técnicas confirmadas (planejadas vs naturais)."""
+
+    academy_id: Optional[str] = None
+    before_training_count: int
+    after_training_count: int
+    total: int
+    before_training_percent: float
+
+
+class StudentAttentionItem(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: str
+    graduation: Optional[str] = None
+    academy_id: Optional[str] = None
+    academy_name: Optional[str] = None
+    last_seen_at: Optional[datetime] = None
+    days_absent: Optional[int] = None
+
+
+class StudentsAttentionReportResponse(BaseModel):
+    """Alunos que há mais tempo não aparecem em nenhuma aula."""
+
+    academy_id: Optional[str] = None
+    total_students: int
+    students: list[StudentAttentionItem]
+
+
+class MissionCompletionReportResponse(BaseModel):
+    """Taxa de conclusão de missões: % de alunos que concluíram ≥1 missão no período."""
+
+    academy_id: Optional[str] = None
+    from_date: date
+    to_date: date
+    total_students: int
+    users_completed: int
+    completion_rate: float
+
+
 class WeeklyPanelLoginsReportResponse(BaseModel):
     """
     Relatório de logins (staff e alunos), semana ISO ou intervalo customizado.

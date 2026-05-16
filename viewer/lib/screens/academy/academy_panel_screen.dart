@@ -5,6 +5,7 @@ import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/screens/academy/academy_push_notification_screen.dart';
+import 'package:viewer/screens/academy/professor_impact_screen.dart';
 import 'package:viewer/screens/admin/academy_detail_screen.dart';
 import 'package:viewer/screens/academy/academy_training_field_screen.dart';
 import 'package:viewer/screens/academy/academy_students_screen.dart';
@@ -309,6 +310,23 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                                 ),
                               ),
                             ),
+                            if (AuthService().isProfessor() || AuthService().isManager()) ...[
+                              const SizedBox(height: AppSpacing.s),
+                              _academyNavigationTile(
+                                enabled: true,
+                                icon: Icons.bolt_rounded,
+                                title: 'Meu Impacto',
+                                subtitle:
+                                    'Alunos alcançados, conclusão por técnica e alunos inativos',
+                                onTap: () => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (context) =>
+                                        const ProfessorImpactScreen(),
+                                  ),
+                                ),
+                              ),
+                            ],
                             if (_showPushItem) ...[
                               _academyNavigationTile(
                                 enabled: true,

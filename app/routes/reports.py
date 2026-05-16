@@ -13,11 +13,17 @@ from app.models import User
 from app.schemas.metrics import (
     ActiveStudentsReportResponse,
     EngagementReportResponse,
+    MissionCompletionReportResponse,
+    StudentsAttentionReportResponse,
+    TechniqueExecutionSummaryResponse,
     WeeklyPanelLoginsReportResponse,
 )
 from app.services.metrics_service import (
     get_active_students_report,
     get_engagement_report,
+    get_mission_completion_report,
+    get_students_attention_report,
+    get_technique_execution_summary,
     get_weekly_panel_logins_report,
 )
 
@@ -124,6 +130,86 @@ async def reports_weekly_panel_logins(
             academy_id=academy_id,
         )
     return result
+
+
+@router.get("/technique_execution_summary", response_model=TechniqueExecutionSummaryResponse)
+async def reports_technique_execution_summary(
+    academy_id: UUID
+    | None = Query(
+        None,
+        description="Academia para visão local. Se omitido, usa visão geral.",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
+):
+    """Resumo de execuções de técnicas confirmadas: planejadas (before_training) vs naturais (after_training)."""
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id.")
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+    return await get_technique_execution_summary(db, academy_id=academy_id)
+
+
+@router.get("/students_attention", response_model=StudentsAttentionReportResponse)
+async def reports_students_attention(
+    academy_id: UUID
+    | None = Query(
+        None,
+        description="Academia para visão local. Se omitido, usa visão geral.",
+    ),
+    limit: int = Query(
+        20,
+        ge=1,
+        le=100,
+        description="Quantidade máxima de alunos retornados (padrão 20).",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
+):
+    """
+    Alunos que há mais tempo não aparecem em nenhuma aula.
+    Ordenados por última presença (mais antiga primeiro). Alunos sem nenhuma presença aparecem primeiro.
+    """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+
+    return await get_students_attention_report(db, academy_id=academy_id, limit=limit)
+
+
+@router.get("/mission_completion", response_model=MissionCompletionReportResponse)
+async def reports_mission_completion(
+    from_date: date = Query(
+        ...,
+        description="Início do período (inclusive).",
+    ),
+    to_date: date = Query(
+        ...,
+        description="Fim do período (inclusive).",
+    ),
+    academy_id: UUID
+    | None = Query(
+        None,
+        description="Academia para visão local. Se omitido, usa visão geral.",
+    ),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_manager_or_supervisor),
+):
+    """
+    Taxa de conclusão de missões: % de alunos que concluíram ≥1 missão no período.
+    """
+    if current_user.role == "supervisor" and academy_id is None:
+        raise ForbiddenError("Supervisores devem informar academy_id (visão por academia).")
+    if academy_id is not None:
+        verify_academy_access(current_user, str(academy_id))
+    _validate_inclusive_date_range(from_date, to_date)
+    return await get_mission_completion_report(
+        db,
+        from_date=from_date,
+        to_date=to_date,
+        academy_id=academy_id,
+    )
 
 
 @router.get("/active_students", response_model=ActiveStudentsReportResponse)

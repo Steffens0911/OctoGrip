@@ -9,12 +9,12 @@ importScripts('https://www.gstatic.com/firebasejs/11.6.0/firebase-messaging-comp
 // Valores por defeito = projeto do repo; no Docker o Dockerfile substitui antes do `flutter build`
 // para coincidir com os mesmos --dart-define (obrigatório: apiKey + appId do MESMO objecto na consola).
 firebase.initializeApp({
-  apiKey: '__FIREBASE_WEB_API_KEY__',
+  apiKey: 'AIzaSyAby3LjFqiQysgqFJF3TDkFyIQbj7XeD2A',
   appId: '__FIREBASE_WEB_APP_ID__',
-  messagingSenderId: '__FIREBASE_MESSAGING_SENDER_ID__',
-  projectId: '__FIREBASE_PROJECT_ID__',
-  authDomain: '__FIREBASE_AUTH_DOMAIN__',
-  storageBucket: '__FIREBASE_STORAGE_BUCKET__',
+  messagingSenderId: '914963189561',
+  projectId: 'octogrip',
+  authDomain: 'octogrip.firebaseapp.com',
+  storageBucket: 'octogrip.firebasestorage.app',
 });
 
 const messaging = firebase.messaging();
