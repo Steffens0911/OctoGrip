@@ -12,23 +12,25 @@ ARG FIREBASE_AUTH_DOMAIN=
 ARG FIREBASE_STORAGE_BUCKET=
 ARG FCM_VAPID_KEY=
 
+ENV API_BASE_URL=${API_BASE_URL}
+ENV FIREBASE_WEB_APP_ID=${FIREBASE_WEB_APP_ID}
+ENV FIREBASE_WEB_API_KEY=${FIREBASE_WEB_API_KEY}
+ENV FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
+ENV FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+ENV FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
+ENV FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+ENV FCM_VAPID_KEY=${FCM_VAPID_KEY}
+
 COPY pubspec.yaml pubspec.lock* ./
 RUN flutter pub get
 
 COPY . .
 
-RUN set -e; \
-  export API_BASE_URL="${API_BASE_URL}"; \
-  export FIREBASE_WEB_APP_ID="${FIREBASE_WEB_APP_ID}"; \
-  export FIREBASE_WEB_API_KEY="${FIREBASE_WEB_API_KEY}"; \
-  export FIREBASE_MESSAGING_SENDER_ID="${FIREBASE_MESSAGING_SENDER_ID}"; \
-  export FIREBASE_PROJECT_ID="${FIREBASE_PROJECT_ID}"; \
-  export FIREBASE_AUTH_DOMAIN="${FIREBASE_AUTH_DOMAIN}"; \
-  export FIREBASE_STORAGE_BUCKET="${FIREBASE_STORAGE_BUCKET}"; \
-  export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
-  python3 tool/prepare_firebase_web_build.py && \
-  flutter precache --web && \
-  flutter build web --release \
+RUN python3 tool/prepare_firebase_web_build.py
+
+RUN flutter precache --web
+
+RUN flutter build web --release \
     --no-pub \
     --dart-define-from-file=tool/dart_define_web.json
 
