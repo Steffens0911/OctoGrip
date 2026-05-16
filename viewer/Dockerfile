@@ -1,5 +1,5 @@
 # Estágio 1: build do Flutter web
-FROM ghcr.io/cirruslabs/flutter:stable AS builder
+FROM ghcr.io/cirruslabs/flutter:stable@sha256:00a00f16768db672361fb5b79396b2748b75391c9d3bd9a33fc40b257ee94ef0 AS builder
 
 WORKDIR /app
 
@@ -30,6 +30,7 @@ RUN set -e; \
   export FCM_VAPID_KEY="${FCM_VAPID_KEY}"; \
   python3 tool/prepare_firebase_web_build.py && \
   flutter build web --release \
+    --no-wasm-dry-run \
     --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
