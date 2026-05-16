@@ -32,7 +32,9 @@ RUN flutter precache --web
 
 RUN flutter build web --release \
     --no-pub \
-    --dart-define-from-file=tool/dart_define_web.json
+    --no-wasm-dry-run \
+    --dart-define-from-file=tool/dart_define_web.json \
+    || (flutter build web --release --no-pub --no-wasm-dry-run --dart-define-from-file=tool/dart_define_web.json --verbose 2>&1 | tail -100 && exit 1)
 
 # Estágio 2: servir com nginx
 FROM nginx:alpine
