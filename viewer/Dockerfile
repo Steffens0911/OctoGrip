@@ -35,6 +35,7 @@ RUN set -e; \
 RUN flutter build web --release \
       --no-pub \
       --no-wasm-dry-run \
+      --verbose \
       --dart-define-from-file=tool/dart_define_web.json
 
 # Estágio 2: servir com nginx
