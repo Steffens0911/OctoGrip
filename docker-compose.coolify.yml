@@ -144,6 +144,7 @@ services:
     # Imagem pré-construída pelo GitHub Actions (flutter build web roda lá,
     # onde storage.googleapis.com é acessível). Ver .github/workflows/build-viewer.yml
     image: ghcr.io/steffens0911/octogrip-viewer:latest
+    pull_policy: always
     container_name: jjb_viewer
     restart: unless-stopped
     depends_on:
