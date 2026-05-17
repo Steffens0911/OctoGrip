@@ -490,6 +490,8 @@ async def confirm_execution(
     execution.points_awarded = points
     execution.confirmed_at = now
     execution.confirmed_by = confirmed_by_user_id
+    from app.services.trophy_service import _execution_technique_id as _get_technique_id
+    technique_id_for_trophy = _get_technique_id(execution)
     await db.commit()
     await db.refresh(execution)
 
@@ -511,12 +513,11 @@ async def confirm_execution(
     # Verifica conquista de troféu/medalha e envia push (fire-and-forget; erros não afetam a resposta).
     try:
         from app.services.trophy_notification_service import check_and_notify_trophy_earned
-        from app.services.trophy_service import _execution_technique_id
 
         await check_and_notify_trophy_earned(
             db,
             user_id=execution.user_id,
-            technique_id=_execution_technique_id(execution),
+            technique_id=technique_id_for_trophy,
         )
     except Exception:
         logger.exception("confirm_execution: erro ao verificar troféu conquistado")
@@ -629,6 +630,8 @@ async def professor_review_execution(
         execution.points_awarded = points
         execution.confirmed_at = now
         execution.confirmed_by = reviewed_by_user_id
+        from app.services.trophy_service import _execution_technique_id as _get_technique_id
+        technique_id_for_trophy = _get_technique_id(execution)
         await db.commit()
         await db.refresh(execution)
 
@@ -640,11 +643,10 @@ async def professor_review_execution(
 
         try:
             from app.services.trophy_notification_service import check_and_notify_trophy_earned
-            from app.services.trophy_service import _execution_technique_id
             await check_and_notify_trophy_earned(
                 db,
                 user_id=execution.user_id,
-                technique_id=_execution_technique_id(execution),
+                technique_id=technique_id_for_trophy,
             )
         except Exception:
             logger.exception("professor_review_execution: erro ao verificar troféu conquistado")
