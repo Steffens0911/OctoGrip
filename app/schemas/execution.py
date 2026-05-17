@@ -92,3 +92,21 @@ class ExecutionRejectResponse(BaseModel):
 
     id: UUID
     status: str
+
+
+class ProfessorReviewRequest(BaseModel):
+    """Body do POST /executions/{id}/professor_review. Quem revisa vem do token (professor/gerente)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    outcome: str = Field(..., description="attempted_correctly | executed_successfully | rejected")
+
+
+class ProfessorReviewResponse(BaseModel):
+    """Resposta do POST /executions/{id}/professor_review."""
+
+    id: UUID
+    status: str
+    outcome: str | None = None
+    points_awarded: int | None = None
+    confirmed_at: datetime | None = None

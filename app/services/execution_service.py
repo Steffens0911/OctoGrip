@@ -470,7 +470,7 @@ async def confirm_execution(
     execution = await get_execution(db, execution_id)
     if not execution:
         raise NotFoundError("Execução não encontrada.")
-    if execution.status != "pending_confirmation":
+    if execution.status not in ("pending_confirmation", "pending_professor_review"):
         raise AppError("Esta execução já foi confirmada ou recusada.", status_code=400)
     if execution.opponent_id != confirmed_by_user_id:
         raise AppError("Apenas o adversário pode confirmar esta execução.", status_code=403)
@@ -546,6 +546,124 @@ async def reject_execution(
     execution.status = "rejected_dont_remember" if reason == "dont_remember" else "rejected"
     await db.commit()
     await db.refresh(execution)
+    return execution
+
+
+async def list_professor_review_executions(
+    db: AsyncSession,
+    academy_id: UUID,
+    offset: int = 0,
+    limit: int = 100,
+):
+    """Lista execuções aguardando revisão do professor em uma academia específica."""
+    limit = clamp_list_limit(limit)
+    offset = max(0, offset)
+    return (
+        await db.execute(
+            select(TechniqueExecution)
+            .join(User, TechniqueExecution.user_id == User.id)
+            .options(
+                selectinload(TechniqueExecution.user),
+                selectinload(TechniqueExecution.mission).selectinload(Mission.technique),
+                selectinload(TechniqueExecution.lesson).selectinload(Lesson.technique),
+                selectinload(TechniqueExecution.technique),
+                selectinload(TechniqueExecution.opponent),
+            )
+            .where(
+                TechniqueExecution.status == "pending_professor_review",
+                User.academy_id == academy_id,
+            )
+            .order_by(TechniqueExecution.created_at.asc())
+            .offset(offset)
+            .limit(limit)
+        )
+    ).unique().scalars().all()
+
+
+async def professor_review_execution(
+    db: AsyncSession,
+    execution_id: UUID,
+    outcome: str,
+    reviewed_by_user_id: UUID,
+    reviewer_academy_id: UUID | None,
+) -> TechniqueExecution:
+    """
+    Professor ou gerente da academia revisa execução escalada.
+    outcome: attempted_correctly | executed_successfully → confirma e pontua.
+    outcome: rejected → rejeita sem pontuar.
+    """
+    execution = await get_execution(db, execution_id)
+    if not execution:
+        raise NotFoundError("Execução não encontrada.")
+    if execution.status != "pending_professor_review":
+        raise AppError("Esta execução não está aguardando revisão do professor.", status_code=400)
+
+    # Verificar que a execução pertence à academia do revisor (administrador global ignora)
+    if reviewer_academy_id is not None:
+        executor = await db.get(User, execution.user_id)
+        if not executor or executor.academy_id != reviewer_academy_id:
+            raise AppError("Esta execução não pertence à sua academia.", status_code=403)
+
+    if outcome not in ("attempted_correctly", "executed_successfully", "rejected"):
+        raise AppError(
+            "Outcome deve ser attempted_correctly, executed_successfully ou rejected.",
+            status_code=400,
+        )
+
+    now = utc_now()
+
+    if outcome == "rejected":
+        execution.status = "rejected"
+        await db.commit()
+        await db.refresh(execution)
+    else:
+        opponent = execution.opponent
+        base_points = await _get_base_points_for_execution(db, execution)
+        points = calculate_points_awarded(
+            opponent.graduation if opponent else None,
+            outcome,
+            base_points=base_points,
+        )
+        execution.status = "confirmed"
+        execution.outcome = outcome
+        execution.points_awarded = points
+        execution.confirmed_at = now
+        execution.confirmed_by = reviewed_by_user_id
+        await db.commit()
+        await db.refresh(execution)
+
+        from app.services.leveling_service import refresh_user_level
+        await refresh_user_level(db, execution.user_id)
+
+        executor_user = await db.get(User, execution.user_id)
+        await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
+
+        try:
+            from app.services.trophy_notification_service import check_and_notify_trophy_earned
+            from app.services.trophy_service import _execution_technique_id
+            await check_and_notify_trophy_earned(
+                db,
+                user_id=execution.user_id,
+                technique_id=_execution_technique_id(execution),
+            )
+        except Exception:
+            logger.exception("professor_review_execution: erro ao verificar troféu conquistado")
+
+    # Notifica o executor do resultado da revisão (fire-and-forget)
+    try:
+        from app.services.execution_notification_service import notify_executor_of_professor_review
+        await notify_executor_of_professor_review(db, execution, approved=(outcome != "rejected"))
+    except Exception:
+        logger.exception("professor_review_execution: erro ao enviar push ao executor")
+
+    logger.info(
+        "professor_review_execution",
+        extra={
+            "execution_id": str(execution_id),
+            "outcome": outcome,
+            "reviewed_by": str(reviewed_by_user_id),
+        },
+    )
     return execution
 
 

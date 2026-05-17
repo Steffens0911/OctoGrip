@@ -10,7 +10,7 @@ celery_app = Celery(
     "octogrip",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.face_recognition_tasks"],
+    include=["app.tasks.face_recognition_tasks", "app.tasks.execution_tasks"],
 )
 
 celery_app.conf.update(
@@ -36,6 +36,10 @@ celery_app.conf.update(
         "cleanup-expired-attendance-sessions": {
             "task": "app.tasks.face_recognition_tasks.cleanup_expired_sessions",
             "schedule": crontab(minute="*/30"),
+        },
+        "escalate-pending-executions-to-professor": {
+            "task": "app.tasks.execution_tasks.escalate_pending_executions_to_professor",
+            "schedule": crontab(hour=4, minute=0),
         },
     },
 )

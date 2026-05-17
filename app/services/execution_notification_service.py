@@ -117,3 +117,43 @@ async def notify_executor_of_confirmation(
         "execution_notification: confirmação enviada ao executor",
         extra={"execution_id": str(execution.id), "user_id": str(execution.user_id)},
     )
+
+
+async def notify_executor_of_professor_review(
+    db: AsyncSession,
+    execution: TechniqueExecution,
+    *,
+    approved: bool,
+) -> None:
+    """Push para o executor quando o professor/gerente revisa a indicação escalada."""
+    if not execution.user_id:
+        return
+    tech = _technique_name(execution)
+    if approved:
+        title = "Indicação aprovada pelo professor! ✅"
+        body = "Sua indicação foi aprovada pelo professor e os pontos foram contabilizados"
+        if tech:
+            body = f"Sua indicação de "{tech}" foi aprovada pelo professor"
+        notification_type = "execution_professor_approved"
+    else:
+        title = "Indicação não confirmada"
+        body = "O professor não confirmou sua indicação"
+        if tech:
+            body = f"O professor não confirmou sua indicação de "{tech}""
+        notification_type = "execution_professor_rejected"
+
+    await _push(
+        db,
+        to_user_id=execution.user_id,
+        title=title,
+        body=body,
+        data={"type": notification_type, "execution_id": str(execution.id)},
+    )
+    logger.info(
+        "execution_notification: revisão do professor enviada ao executor",
+        extra={
+            "execution_id": str(execution.id),
+            "user_id": str(execution.user_id),
+            "approved": approved,
+        },
+    )

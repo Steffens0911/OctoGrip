@@ -57,7 +57,7 @@ class TechniqueExecution(Base, UUIDMixin):
         nullable=False,
         default="pending_confirmation",
         index=True,
-        comment="pending_confirmation | confirmed | rejected | rejected_dont_remember",
+        comment="pending_confirmation | pending_professor_review | confirmed | rejected | rejected_dont_remember",
     )
     outcome: Mapped[str | None] = mapped_column(String(32), nullable=True)
     points_awarded: Mapped[int | None] = mapped_column(Integer, nullable=True)

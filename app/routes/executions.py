@@ -9,6 +9,7 @@ from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
 from app.database import get_db
 from app.models import User
+from app.core.role_deps import require_write_access
 from app.schemas.execution import (
     ExecutionConfirmRequest,
     ExecutionConfirmResponse,
@@ -17,6 +18,8 @@ from app.schemas.execution import (
     ExecutionRead,
     ExecutionRejectRequest,
     ExecutionRejectResponse,
+    ProfessorReviewRequest,
+    ProfessorReviewResponse,
 )
 from app.services.execution_service import (
     confirm_execution,
@@ -24,6 +27,8 @@ from app.services.execution_service import (
     create_execution,
     list_my_executions,
     list_pending_confirmations,
+    list_professor_review_executions,
+    professor_review_execution,
     reject_execution,
 )
 
@@ -147,6 +152,48 @@ async def execution_reject(
         reason=body.reason,
     )
     return ExecutionRejectResponse(id=execution.id, status=execution.status)
+
+
+@router.get("/professor_review", response_model=list[ExecutionRead])
+async def execution_professor_review_list(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=MAX_LIST_LIMIT),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Lista execuções aguardando revisão do professor na academia do usuário logado."""
+    if current_user.role != "administrador" and not current_user.academy_id:
+        return []
+    academy_id = current_user.academy_id if current_user.role != "administrador" else None
+    if academy_id is None:
+        return []
+    executions = await list_professor_review_executions(db, academy_id=academy_id, offset=offset, limit=limit)
+    return [_execution_to_read(e) for e in executions]
+
+
+@router.post("/{execution_id}/professor_review", response_model=ProfessorReviewResponse)
+async def execution_professor_review(
+    execution_id: UUID,
+    body: ProfessorReviewRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Professor ou gerente da academia aprova ou reprova uma execução escalada."""
+    reviewer_academy_id = None if current_user.role == "administrador" else current_user.academy_id
+    execution = await professor_review_execution(
+        db,
+        execution_id=execution_id,
+        outcome=body.outcome,
+        reviewed_by_user_id=current_user.id,
+        reviewer_academy_id=reviewer_academy_id,
+    )
+    return ProfessorReviewResponse(
+        id=execution.id,
+        status=execution.status,
+        outcome=execution.outcome,
+        points_awarded=execution.points_awarded,
+        confirmed_at=execution.confirmed_at,
+    )
 
 
 @router.get("/my_executions", response_model=list[ExecutionRead])

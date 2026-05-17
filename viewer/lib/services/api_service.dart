@@ -2465,6 +2465,32 @@ class ApiService {
     return data! as Map<String, dynamic>;
   }
 
+  Future<List<Map<String, dynamic>>> getProfessorReviewExecutions() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/executions/professor_review'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data is List ? data : <dynamic>[];
+    return list.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<Map<String, dynamic>> postProfessorReviewExecution({
+    required String executionId,
+    required String outcome,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/executions/$executionId/professor_review'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'outcome': outcome}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/executions');
+    return data! as Map<String, dynamic>;
+  }
+
   Future<List<Map<String, dynamic>>> getMyExecutions() async {
     final r = await _req(http.get(
       Uri.parse('$baseUrl/executions/my_executions'),
