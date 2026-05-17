@@ -1,5 +1,8 @@
 """Estatísticas de treino do aluno autenticado (últimos 30 dias + total)."""
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+_APP_TZ = ZoneInfo("America/Sao_Paulo")
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -59,7 +62,9 @@ async def my_training_stats(
     else:
         if last_at.tzinfo is None:
             last_at = last_at.replace(tzinfo=timezone.utc)
-        days_since = (now.date() - last_at.date()).days
+        today_app = now.astimezone(_APP_TZ).date()
+        last_app = last_at.astimezone(_APP_TZ).date()
+        days_since = (today_app - last_app).days
 
     # ── Posições: execuções confirmadas pelo adversário ──
     base_confirmed = select(TechniqueExecution).where(
