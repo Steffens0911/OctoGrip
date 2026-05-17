@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-jjb}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jjb_secret}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_local_only}
       POSTGRES_DB: ${POSTGRES_DB:-jjb_db}
       POSTGRES_SHARED_BUFFERS: 256MB
       POSTGRES_EFFECTIVE_CACHE_SIZE: 768MB
@@ -59,8 +59,8 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       # Cliente libpq (pg_dump/psql): em Postgres interno sem TLS, preferível a falhas de negociação SSL
       PGSSLMODE: ${PGSSLMODE:-disable}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
-      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-dev_local_only}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-dev-local-only-nao-usar-em-producao}
       # JSON. Padrão [] — localhost com porta dinâmica: regex em app/main.py. ["*"] é ignorado (Flutter Web + JWT).
       CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
@@ -102,8 +102,8 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
-      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-dev_local_only}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-dev-local-only-nao-usar-em-producao}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
@@ -129,8 +129,8 @@ services:
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-jjb_secret}@postgres:5432/${POSTGRES_DB:-jjb_db}
-      JWT_SECRET: ${JWT_SECRET:-altere-em-producao-use-um-secret-forte}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-dev_local_only}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-dev-local-only-nao-usar-em-producao}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}

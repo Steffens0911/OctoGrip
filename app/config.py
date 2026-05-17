@@ -13,7 +13,7 @@ _MIN_JWT_SECRET_LENGTH = 32
 class Settings(BaseSettings):
     """Configuração da aplicação (variáveis de ambiente)."""
 
-    DATABASE_URL: str = "postgresql://jjb:jjb_secret@localhost:5432/jjb_db"
+    DATABASE_URL: str = "postgresql://jjb:dev_local_only@localhost:5432/jjb_db"
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "text"  # text ou json
     
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     ACCOUNT_LOCKOUT_MINUTES: int = 15
 
     # Chamada QR — assina tokens de presença (HMAC-SHA256). Em produção, use valor forte via env.
-    QR_SECRET: str = _DEFAULT_JWT_SECRET
+    QR_SECRET: str = "dev-local-only-qr-secret"
 
     # Ambiente (development/production)
     ENVIRONMENT: str = "development"
@@ -79,6 +79,18 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     FACE_JOBS_DIR: str = "/tmp/face_jobs"
     FACE_MAX_IMAGE_SIDE: int = 1280
+
+    @field_validator("QR_SECRET")
+    @classmethod
+    def validate_qr_secret(cls, v: str) -> str:
+        """Valida força do QR_SECRET em produção."""
+        is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
+        if is_production and (not v or len(v) < _MIN_JWT_SECRET_LENGTH or "dev" in v.lower()):
+            raise ValueError(
+                "QR_SECRET não pode usar o valor padrão em produção. "
+                "Defina um secret forte via variável de ambiente."
+            )
+        return v
 
     @field_validator("JWT_SECRET")
     @classmethod
