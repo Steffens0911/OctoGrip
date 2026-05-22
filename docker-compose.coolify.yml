@@ -64,7 +64,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jjb_db}
-      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com valor forte (min 32 chars) - gere com: python -c "import secrets; print(secrets.token_urlsafe(64))"}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET nas variaveis de ambiente do Coolify}
       CORS_ORIGINS: "${CORS_ORIGINS:-[]}"
       SEED_ON_STARTUP: ${SEED_ON_STARTUP:-false}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -73,7 +73,6 @@ services:
       ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-8}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-4}
-      # Push FCM (opcional): na VPS cria a pasta no host e copia o JSON da service account; ver docs/DEPLOY_COOLIFY_CONTABO.md
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
