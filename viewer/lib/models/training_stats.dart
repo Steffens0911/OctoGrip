@@ -7,6 +7,9 @@ class TrainingStats {
   final double? avgTop10PositionsLast30Days;
   final int? rankingPositionsTotal;
   final int? rankingPositionsTotalOutOf;
+  final int videosLast30Days;
+  final double? avgTop10VideosLast30Days;
+  final int? rankingVideosLast30Days;
 
   const TrainingStats({
     required this.workoutsLast30Days,
@@ -17,6 +20,9 @@ class TrainingStats {
     this.avgTop10PositionsLast30Days,
     this.rankingPositionsTotal,
     this.rankingPositionsTotalOutOf,
+    required this.videosLast30Days,
+    this.avgTop10VideosLast30Days,
+    this.rankingVideosLast30Days,
   });
 
   factory TrainingStats.fromJson(Map<String, dynamic> json) => TrainingStats(
@@ -32,5 +38,10 @@ class TrainingStats {
             json['ranking_positions_total'] as int?,
         rankingPositionsTotalOutOf:
             json['ranking_positions_total_out_of'] as int?,
+        videosLast30Days: (json['videos_last_30_days'] as num? ?? 0).toInt(),
+        avgTop10VideosLast30Days:
+            (json['avg_top10_videos_last_30_days'] as num?)?.toDouble(),
+        rankingVideosLast30Days:
+            json['ranking_videos_last_30_days'] as int?,
       );
 }

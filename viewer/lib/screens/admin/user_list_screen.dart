@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart' as models;
+import 'package:viewer/models/user_academy_stats.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
@@ -27,17 +29,21 @@ class _UserListScreenState extends State<UserListScreen> {
   final _searchController = TextEditingController();
   Timer? _debounceTimer;
   bool _importing = false;
-  List<models.UserModel> _items = [];
+
+  List<models.UserModel> _allItems = [];
   List<Academy> _academies = [];
   String? _filterAcademyId;
   String? _filterGraduation;
   bool _loading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _currentPage = 0;
-  static const int _pageSize = 50;
   String? _error;
   String _searchQuery = '';
+
+  Map<String, UserAcademyStats> _statsMap = {};
+  late DateTime _fromDate;
+  late DateTime _toDate;
+
+  String? _sortBy;
+  bool _sortAscending = false;
 
   static const List<MapEntry<String, String>> _graduations = [
     MapEntry('white', 'Branca'),
@@ -48,45 +54,63 @@ class _UserListScreenState extends State<UserListScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _fromDate = now.subtract(const Duration(days: 30));
+    _toDate = now;
+    _load();
+  }
+
+  @override
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<List<models.UserModel>> _fetchUsers({required int offset}) {
-    final isAdmin = AuthService().isAdmin();
-    return isAdmin
-        ? _api.getUsers(
-            offset: offset,
-            limit: _pageSize,
-            search: _searchQuery.isNotEmpty ? _searchQuery : null,
-            academyId: _filterAcademyId,
-            graduation: _filterGraduation,
-          )
-        : _api.getUsers(
-            academyId: AuthService().currentUser?.academyId,
-            offset: offset,
-            limit: _pageSize,
-            search: _searchQuery.isNotEmpty ? _searchQuery : null,
-            graduation: _filterGraduation,
-          );
+  String? _academyIdForQuery() {
+    if (AuthService().isAdmin()) return _filterAcademyId;
+    return AuthService().currentUser?.academyId;
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; _currentPage = 0; _hasMore = true; });
+    setState(() { _loading = true; _error = null; });
     try {
-      final results = await Future.wait([
-        _fetchUsers(offset: 0),
-        _api.getAcademies(),
-      ]);
-      final list = results[0] as List<models.UserModel>;
+      final isAdmin = AuthService().isAdmin();
+      final academyId = _academyIdForQuery();
+
+      // Academias só interessam ao admin
+      final academiesFuture = isAdmin ? _api.getAcademies() : Future.value(<Academy>[]);
+
+      // Com academia definida: carrega todos os alunos de uma vez (sem paginação)
+      // para que busca, filtros e ordenação funcionem sobre o conjunto completo.
+      final Future<List<models.UserModel>> usersFuture;
+      final Future<Map<String, UserAcademyStats>> statsFuture;
+
+      if (academyId != null) {
+        usersFuture = _api.getUsersAll(academyId: academyId);
+        statsFuture = _api.getAcademyStudentStats(
+          fromDate: _fromDate,
+          toDate: _toDate,
+          academyId: academyId,
+        );
+      } else if (isAdmin) {
+        // Admin sem academia selecionada: carrega primeira página sem stats
+        usersFuture = _api.getUsers(offset: 0, limit: 50);
+        statsFuture = Future.value({});
+      } else {
+        usersFuture = Future.value([]);
+        statsFuture = Future.value({});
+      }
+
+      final results = await Future.wait([academiesFuture, usersFuture, statsFuture]);
       if (mounted) {
         setState(() {
-          _items = list;
-          _academies = results[1] as List<Academy>;
+          _academies = results[0] as List<Academy>;
+          _allItems = results[1] as List<models.UserModel>;
+          _statsMap = results[2] as Map<String, UserAcademyStats>;
           _loading = false;
-          _hasMore = list.length >= _pageSize;
         });
       }
     } catch (e) {
@@ -94,31 +118,21 @@ class _UserListScreenState extends State<UserListScreen> {
     }
   }
 
-  Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore) return;
-    setState(() => _isLoadingMore = true);
-    try {
-      final nextOffset = (_currentPage + 1) * _pageSize;
-      final list = await _fetchUsers(offset: nextOffset);
-      if (mounted) {
-        setState(() {
-          _items = [..._items, ...list];
-          _currentPage++;
-          _hasMore = list.length >= _pageSize;
-          _isLoadingMore = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _isLoadingMore = false);
-      if (mounted) {
-        AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
-      }
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
+  Future<void> _pickDateRange() async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(start: _fromDate, end: _toDate),
+      helpText: 'Selecione o período',
+      saveText: 'Confirmar',
+      cancelText: 'Cancelar',
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _fromDate = picked.start;
+      _toDate = picked.end;
+    });
     _load();
   }
 
@@ -141,7 +155,6 @@ class _UserListScreenState extends State<UserListScreen> {
       );
       return;
     }
-
     final pick = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['xlsx'],
@@ -155,7 +168,6 @@ class _UserListScreenState extends State<UserListScreen> {
       AppFeedback.show(context, message: 'Não foi possível ler o arquivo. Tente novamente.', type: AppFeedbackType.error);
       return;
     }
-
     setState(() => _importing = true);
     try {
       if (mounted) {
@@ -170,18 +182,15 @@ class _UserListScreenState extends State<UserListScreen> {
           ),
         );
       }
-
       final result = await _api.bulkImportStudentsXlsx(academyId: academyId, bytes: bytes, filename: f.name);
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-
       final summary = (result['summary'] as Map?) ?? const {};
       final created = summary['created'] ?? 0;
       final skipped = summary['skipped'] ?? 0;
       final failed = summary['failed'] ?? 0;
       final results = (result['results'] as List?) ?? const [];
       final failedLines = results.where((e) => e is Map && e['ok'] == false).take(10).toList();
-
       if (mounted) {
         await showDialog(
           context: context,
@@ -271,10 +280,69 @@ class _UserListScreenState extends State<UserListScreen> {
     }
   }
 
+  void _tapSort(String key) {
+    setState(() {
+      if (_sortBy == key) {
+        _sortAscending = !_sortAscending;
+      } else {
+        _sortBy = key;
+        _sortAscending = key == 'name';
+      }
+    });
+  }
+
+  // Filtragem client-side sobre o conjunto completo de alunos
+  List<models.UserModel> get _filteredItems {
+    var list = _allItems;
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      list = list.where((u) =>
+        u.email.toLowerCase().contains(q) ||
+        (u.name?.toLowerCase().contains(q) ?? false),
+      ).toList();
+    }
+    if (_filterGraduation != null) {
+      list = list.where((u) => u.graduation == _filterGraduation).toList();
+    }
+    return list;
+  }
+
+  List<models.UserModel> get _sortedItems {
+    if (_sortBy == null) return _filteredItems;
+    final sorted = List<models.UserModel>.from(_filteredItems);
+    sorted.sort((a, b) {
+      final sa = _statsMap[a.id];
+      final sb = _statsMap[b.id];
+      int cmp;
+      switch (_sortBy) {
+        case 'name':
+          cmp = (a.name ?? a.email).toLowerCase().compareTo((b.name ?? b.email).toLowerCase());
+        case 'videos':
+          cmp = (sa?.videosInPeriod ?? 0).compareTo(sb?.videosInPeriod ?? 0);
+        case 'positions':
+          cmp = (sa?.positionsInPeriod ?? 0).compareTo(sb?.positionsInPeriod ?? 0);
+        case 'workouts':
+          cmp = (sa?.workoutsInPeriod ?? 0).compareTo(sb?.workoutsInPeriod ?? 0);
+        case 'trophies':
+          cmp = (sa?.trophiesCount ?? 0).compareTo(sb?.trophiesCount ?? 0);
+        case 'inactive':
+          cmp = (sa?.daysSinceLastWorkout ?? 0).compareTo(sb?.daysSinceLastWorkout ?? 0);
+        default:
+          cmp = 0;
+      }
+      return _sortAscending ? cmp : -cmp;
+    });
+    return sorted;
+  }
+
   bool get _hasFilters => _searchQuery.isNotEmpty || _filterAcademyId != null || _filterGraduation != null;
+
+  String _fmtDate(DateTime d) => DateFormat('dd/MM/yyyy').format(d);
 
   @override
   Widget build(BuildContext context) {
+    final displayItems = _sortedItems;
+
     return Scaffold(
       appBar: AppStandardAppBar(
         title: 'Usuários',
@@ -291,7 +359,7 @@ class _UserListScreenState extends State<UserListScreen> {
           ? const AppScreenState.loading()
           : _error != null
               ? AppScreenState.error(message: _error!, onRetry: _load)
-              : _items.isEmpty && !_hasFilters
+              : _allItems.isEmpty && !_hasFilters
                   ? const AppScreenState.empty(message: 'Nenhum usuário. Toque em + para criar.')
                   : AppScreenState.content(
                       child: Column(
@@ -311,16 +379,14 @@ class _UserListScreenState extends State<UserListScreen> {
                                             onPressed: () {
                                               _searchController.clear();
                                               setState(() => _searchQuery = '');
-                                              _load();
                                             },
                                           )
                                         : null,
                                   ),
                                   onChanged: (v) {
                                     _debounceTimer?.cancel();
-                                    _debounceTimer = Timer(const Duration(milliseconds: 400), () {
+                                    _debounceTimer = Timer(const Duration(milliseconds: 200), () {
                                       setState(() => _searchQuery = v.trim());
-                                      _load();
                                     });
                                   },
                                 ),
@@ -330,7 +396,7 @@ class _UserListScreenState extends State<UserListScreen> {
                                     if (AuthService().isAdmin())
                                       Expanded(
                                         child: DropdownButtonFormField<String>(
-                                          value: _filterAcademyId,
+                                          initialValue: _filterAcademyId,
                                           decoration: const InputDecoration(
                                             labelText: 'Academia',
                                             hintText: 'Todas',
@@ -350,7 +416,7 @@ class _UserListScreenState extends State<UserListScreen> {
                                     if (AuthService().isAdmin()) const SizedBox(width: 12),
                                     Expanded(
                                       child: DropdownButtonFormField<String>(
-                                        value: _filterGraduation,
+                                        initialValue: _filterGraduation,
                                         decoration: const InputDecoration(
                                           labelText: 'Graduação',
                                           hintText: 'Todas',
@@ -363,23 +429,93 @@ class _UserListScreenState extends State<UserListScreen> {
                                         ],
                                         onChanged: (v) {
                                           setState(() => _filterGraduation = v);
-                                          _load();
                                         },
                                       ),
                                     ),
                                   ],
                                 ),
-                                if (_hasFilters)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
+                                const SizedBox(height: 12),
+                                // Seletor de período
+                                InkWell(
+                                  onTap: _pickDateRange,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4)),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                     child: Row(
                                       children: [
-                                        Expanded(
-                                          child: Text(
-                                            'Mostrando ${_items.length} resultado${_items.length != 1 ? 's' : ''}',
-                                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                                          ),
+                                        Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondaryOf(context)),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Período: ${_fmtDate(_fromDate)} – ${_fmtDate(_toDate)}',
+                                          style: TextStyle(fontSize: 13, color: AppTheme.textSecondaryOf(context)),
                                         ),
+                                        const Spacer(),
+                                        Icon(Icons.edit_calendar_outlined, size: 16, color: AppTheme.textSecondaryOf(context)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // Chips de ordenação
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      Text('Ordenar:', style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context))),
+                                      const SizedBox(width: 8),
+                                      ...[
+                                        ('name', 'Nome', Icons.sort_by_alpha),
+                                        ('videos', 'Vídeos', Icons.play_circle_outline),
+                                        ('positions', 'Posições', Icons.sports_martial_arts),
+                                        ('workouts', 'Presenças', Icons.fitness_center),
+                                        ('trophies', 'Troféus', Icons.emoji_events_outlined),
+                                        ('inactive', 'Inativos', Icons.warning_amber_rounded),
+                                      ].map((entry) {
+                                        final key = entry.$1;
+                                        final label = entry.$2;
+                                        final icon = entry.$3;
+                                        final active = _sortBy == key;
+                                        return Padding(
+                                          padding: const EdgeInsets.only(right: 6),
+                                          child: FilterChip(
+                                            label: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(icon, size: 13),
+                                                const SizedBox(width: 4),
+                                                Text(label, style: const TextStyle(fontSize: 12)),
+                                                if (active) ...[
+                                                  const SizedBox(width: 2),
+                                                  Icon(_sortAscending ? Icons.arrow_upward : Icons.arrow_downward, size: 11),
+                                                ],
+                                              ],
+                                            ),
+                                            selected: active,
+                                            onSelected: (_) => _tapSort(key),
+                                            visualDensity: VisualDensity.compact,
+                                            padding: EdgeInsets.zero,
+                                          ),
+                                        );
+                                      }),
+                                    ],
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          '${displayItems.length} de ${_allItems.length} aluno${_allItems.length != 1 ? 's' : ''}',
+                                          style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+                                        ),
+                                      ),
+                                      if (_hasFilters)
                                         TextButton(
                                           onPressed: () {
                                             _searchController.clear();
@@ -392,14 +528,14 @@ class _UserListScreenState extends State<UserListScreen> {
                                           },
                                           child: const Text('Limpar filtros'),
                                         ),
-                                      ],
-                                    ),
+                                    ],
                                   ),
+                                ),
                               ],
                             ),
                           ),
                           Expanded(
-                            child: _items.isEmpty
+                            child: displayItems.isEmpty
                                 ? const AppScreenState.empty(message: 'Nenhum usuário encontrado.')
                                 : AppListScaffold(
                                     onRefresh: _load,
@@ -407,51 +543,111 @@ class _UserListScreenState extends State<UserListScreen> {
                                       horizontal: AppTheme.screenPadding(context),
                                       vertical: 12,
                                     ),
-                                    children: [
-                                      ...List.generate(_items.length, (i) {
-                                        final u = _items[i];
-                                        return Card(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          child: ListTile(
-                                            title: Text(u.email),
-                                            subtitle: Text(u.name ?? '—'),
-                                            trailing: Row(
-                                              mainAxisSize: MainAxisSize.min,
+                                    children: List.generate(displayItems.length, (i) {
+                                      final u = displayItems[i];
+                                      final stats = _statsMap[u.id];
+                                      return Card(
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        child: InkWell(
+                                          onTap: () => _openForm(u),
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                IconButton(
-                                                  icon: const Icon(Icons.emoji_events_outlined),
-                                                  tooltip: 'Ver galeria de troféus',
-                                                  onPressed: () => Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (context) => TrophyShelfPage(userId: u.id, userName: u.name ?? u.email),
+                                                Row(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Expanded(
+                                                                child: Text(
+                                                                  u.email,
+                                                                  style: Theme.of(context).textTheme.bodyMedium,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                ),
+                                                              ),
+                                                              if (u.accountFrozen)
+                                                                const Tooltip(
+                                                                  message: 'Conta congelada: o aluno não consegue acessar o app',
+                                                                  child: Padding(
+                                                                    padding: EdgeInsets.only(left: 4),
+                                                                    child: Icon(Icons.lock_outline, size: 14, color: Colors.orange),
+                                                                  ),
+                                                                ),
+                                                            ],
+                                                          ),
+                                                          if (u.name != null)
+                                                            Text(
+                                                              u.name!,
+                                                              style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
+                                                            ),
+                                                        ],
+                                                      ),
                                                     ),
-                                                  ),
+                                                    Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        IconButton(
+                                                          icon: const Icon(Icons.emoji_events_outlined),
+                                                          tooltip: 'Ver galeria de troféus',
+                                                          onPressed: () => Navigator.push(
+                                                            context,
+                                                            MaterialPageRoute(
+                                                              builder: (context) => TrophyShelfPage(userId: u.id, userName: u.name ?? u.email),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        if (AuthService().canEditResources()) ...[
+                                                          IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
+                                                          IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(u)),
+                                                        ],
+                                                      ],
+                                                    ),
+                                                  ],
                                                 ),
-                                                if (AuthService().canEditResources()) ...[
-                                                  IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
-                                                  IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(u)),
+                                                if (stats != null) ...[
+                                                  const SizedBox(height: 8),
+                                                  Wrap(
+                                                    spacing: 6,
+                                                    runSpacing: 4,
+                                                    children: [
+                                                      _StatChip(
+                                                        icon: Icons.play_circle_outline,
+                                                        value: stats.videosInPeriod,
+                                                        tooltip: 'Vídeos de treinamento assistidos no período selecionado',
+                                                      ),
+                                                      _StatChip(
+                                                        icon: Icons.sports_martial_arts,
+                                                        value: stats.positionsInPeriod,
+                                                        tooltip: 'Posições aplicadas e confirmadas pelo adversário no período',
+                                                      ),
+                                                      _StatChip(
+                                                        icon: Icons.fitness_center,
+                                                        value: stats.workoutsInPeriod,
+                                                        tooltip: 'Presenças registradas em chamadas de aula no período',
+                                                      ),
+                                                      _StatChip(
+                                                        icon: Icons.emoji_events_outlined,
+                                                        value: stats.trophiesCount,
+                                                        tooltip: 'Total de troféus e medalhas conquistados pelo aluno',
+                                                      ),
+                                                      if (stats.daysSinceLastWorkout != null && stats.daysSinceLastWorkout! > 14)
+                                                        _InactivityChip(days: stats.daysSinceLastWorkout!),
+                                                    ],
+                                                  ),
                                                 ],
                                               ],
                                             ),
-                                            onTap: () => _openForm(u),
-                                          ),
-                                        );
-                                      }),
-                                      if (_isLoadingMore)
-                                        const Padding(
-                                          padding: EdgeInsets.all(16),
-                                          child: Center(child: CircularProgressIndicator()),
-                                        ),
-                                      if (_hasMore && !_isLoadingMore)
-                                        Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: FilledButton(
-                                            onPressed: _loadMore,
-                                            child: const Text('Carregar mais'),
                                           ),
                                         ),
-                                    ],
+                                      );
+                                    }),
                                   ),
                           ),
                         ],
@@ -460,6 +656,69 @@ class _UserListScreenState extends State<UserListScreen> {
       floatingActionButton: AuthService().canEditResources()
           ? FloatingActionButton(onPressed: () => _openForm(), child: const Icon(Icons.add))
           : null,
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final int value;
+  final String tooltip;
+
+  const _StatChip({required this.icon, required this.value, required this.tooltip});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = cs.onSurfaceVariant;
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: fg),
+            const SizedBox(width: 4),
+            Text(value.toString(), style: TextStyle(fontSize: 12, color: fg)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InactivityChip extends StatelessWidget {
+  final int days;
+
+  const _InactivityChip({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Sem aparecer na chamada de aula há $days dias — aluno pode precisar de atenção',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.warning_amber_rounded, size: 13, color: Colors.orange),
+            const SizedBox(width: 4),
+            Text(
+              '${days}d sem treinar',
+              style: const TextStyle(fontSize: 12, color: Colors.orange),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

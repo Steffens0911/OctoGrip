@@ -1,3 +1,5 @@
+import 'dart:math' show max;
+
 import 'package:flutter/material.dart';
 
 import 'package:viewer/models/professor_impact.dart';
@@ -131,29 +133,79 @@ class _WeekSelector extends StatelessWidget {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _ImpactBody extends StatelessWidget {
+class _ImpactBody extends StatefulWidget {
   final ProfessorImpact data;
 
   const _ImpactBody({required this.data});
 
   @override
+  State<_ImpactBody> createState() => _ImpactBodyState();
+}
+
+class _ImpactBodyState extends State<_ImpactBody> {
+  static const _pageSize = 5;
+  int _atRiskPage = 0;
+
+  @override
+  void didUpdateWidget(_ImpactBody old) {
+    super.didUpdateWidget(old);
+    if (old.data != widget.data) _atRiskPage = 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
+    final students = data.atRiskStudents;
+    final totalPages = (students.length / _pageSize).ceil();
+    final pageStudents = students.skip(_atRiskPage * _pageSize).take(_pageSize).toList();
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
       children: [
         const SizedBox(height: 12),
         _HeroCard(data: data),
         const SizedBox(height: 20),
+        _SectionLabel('VÍDEOS ASSISTIDOS NA SEMANA'),
+        const SizedBox(height: 8),
+        _VideoViewsCard(data: data),
+        const SizedBox(height: 20),
         if (data.techniques.isNotEmpty) ...[
           _SectionLabel('CONCLUSÃO POR TÉCNICA'),
           const SizedBox(height: 8),
           ...data.techniques.map((t) => _TechniqueCard(technique: t, key: ValueKey(t.techniqueName))),
         ],
-        if (data.atRiskStudents.isNotEmpty) ...[
+        if (students.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionLabel('ALUNOS PARA DAR ATENÇÃO'),
           const SizedBox(height: 8),
-          ...data.atRiskStudents.map((s) => _AtRiskCard(student: s, key: ValueKey(s.id))),
+          ...pageStudents.map((s) => _AtRiskCard(student: s, key: ValueKey(s.id))),
+          if (totalPages > 1)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left),
+                    onPressed: _atRiskPage > 0
+                        ? () => setState(() => _atRiskPage--)
+                        : null,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  Text(
+                    '${_atRiskPage + 1} / $totalPages',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right),
+                    onPressed: _atRiskPage < totalPages - 1
+                        ? () => setState(() => _atRiskPage++)
+                        : null,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+            ),
         ],
         const SizedBox(height: 8),
         _SectionLabel('SUA TRAJETÓRIA'),
@@ -355,6 +407,36 @@ class _TechniqueCard extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
+            if (technique.executions.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              ...technique.executions.map(
+                (e) => Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          e.opponentName != null
+                              ? '${e.executorName} → ${e.opponentName}'
+                              : e.executorName,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -459,6 +541,114 @@ class _MilestoneCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _VideoViewsCard extends StatelessWidget {
+  final ProfessorImpact data;
+
+  const _VideoViewsCard({required this.data});
+
+  static const _dayLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+  static String _dateKey(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final viewsMap = <String, int>{};
+    for (final v in data.dailyVideoViews) {
+      viewsMap[_dateKey(v.date)] = v.viewsCount;
+    }
+
+    final days = List.generate(7, (i) => data.weekStart.add(Duration(days: i)));
+    final counts = days.map((d) => viewsMap[_dateKey(d)] ?? 0).toList();
+    final maxCount = counts.fold(0, (a, b) => a > b ? a : b);
+    final totalViews = counts.fold(0, (a, b) => a + b);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.play_circle_outline_rounded, size: 16, color: colorScheme.primary),
+                const SizedBox(width: 4),
+                Text(
+                  'Vídeos assistidos',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$totalViews no total',
+                  style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 90,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: List.generate(7, (i) {
+                  final count = counts[i];
+                  final ratio = maxCount > 0 ? count / maxCount : 0.0;
+                  final barHeight = count == 0 ? 4.0 : max(8.0, 60.0 * ratio);
+                  final barColor = count > 0
+                      ? colorScheme.primary
+                      : colorScheme.surfaceContainerHighest;
+                  final labelColor = count > 0
+                      ? colorScheme.onSurface
+                      : colorScheme.onSurfaceVariant;
+
+                  return Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (count > 0)
+                          Text(
+                            '$count',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 14),
+                        const SizedBox(height: 2),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Container(height: barHeight, color: barColor),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _dayLabels[i],
+                          style: TextStyle(fontSize: 10, color: labelColor),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
               ),
             ),
           ],

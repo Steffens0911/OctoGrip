@@ -4,8 +4,7 @@ FROM python:3.12-slim-bookworm AS builder
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
+    PYTHONUNBUFFERED=1
 
 # Copiar apenas requirements para otimizar cache de layers
 COPY requirements.txt .
@@ -28,12 +27,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH=/home/app/.local/bin:$PATH \
     PYTHONPATH=/home/app/.local/lib/python3.12/site-packages
 
-# Copiar dependências do builder para o usuário app
-COPY --from=builder /root/.local /home/app/.local
-RUN chown -R app:app /home/app/.local
-
 # Cliente PostgreSQL 16 (pg_dump/psql) — mesma major que o serviço postgres no compose (evita "server version mismatch")
 # Dependências runtime para DeepFace/OpenCV (cv2): evita ImportError libxcb.so.1 (Coolify worker).
+# Este bloco fica ANTES do COPY do builder para maximizar cache de layer — não invalida com mudanças de código ou deps Python.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       wget \
       ca-certificates \
@@ -48,9 +44,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
+# Copiar dependências do builder para o usuário app
+COPY --from=builder /root/.local /home/app/.local
+RUN chown -R app:app /home/app/.local
+
 # Copiar código (ownership para app) e garantir permissão de escrita em /app/app_media
 COPY --chown=app:app . .
-RUN mkdir -p /app/app_media && chown -R app:app /app
+RUN mkdir -p /app/app_media && chown app:app /app/app_media
 
 COPY deploy/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

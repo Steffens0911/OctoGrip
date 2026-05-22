@@ -640,7 +640,7 @@ async def get_trophy_home_summary(
                 Trophy.deleted_at.is_(None),
             )
             .order_by(UserTrophyEarned.earned_at.desc())
-            .limit(7)
+            .limit(10)
         )
     ).all()
 

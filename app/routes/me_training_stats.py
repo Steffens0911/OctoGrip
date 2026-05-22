@@ -13,6 +13,7 @@ from app.core.auth_deps import get_current_user
 from app.database import get_db
 from app.models import AttendanceRecord, AttendanceSession, User
 from app.models.technique_execution import TechniqueExecution
+from app.models.training_video import TrainingVideoDailyView
 
 router = APIRouter()
 
@@ -26,6 +27,9 @@ class TrainingStatsRead(BaseModel):
     avg_top10_positions_last_30_days: float | None
     ranking_positions_total: int | None
     ranking_positions_total_out_of: int | None
+    videos_last_30_days: int
+    avg_top10_videos_last_30_days: float | None
+    ranking_videos_last_30_days: int | None
 
 
 @router.get("/training_stats", response_model=TrainingStatsRead)
@@ -178,6 +182,65 @@ async def my_training_stats(
         ranking = None
         total_students = None
 
+    # ── Vídeos diários assistidos nos últimos 30 dias ──
+    result_videos = await db.execute(
+        select(func.count(TrainingVideoDailyView.id)).where(
+            TrainingVideoDailyView.user_id == current_user.id,
+            TrainingVideoDailyView.completed_at >= cutoff,
+        )
+    )
+    videos_last_30_days: int = result_videos.scalar_one()
+
+    avg_top10_videos: float | None = None
+    ranking_videos: int | None = None
+    if current_user.academy_id is not None:
+        per_student_videos = (
+            select(
+                TrainingVideoDailyView.user_id,
+                func.count(TrainingVideoDailyView.id).label("cnt"),
+            )
+            .join(User, User.id == TrainingVideoDailyView.user_id)
+            .where(
+                User.academy_id == current_user.academy_id,
+                User.role == "aluno",
+                TrainingVideoDailyView.completed_at >= cutoff,
+            )
+            .group_by(TrainingVideoDailyView.user_id)
+            .order_by(func.count(TrainingVideoDailyView.id).desc())
+            .limit(10)
+            .subquery()
+        )
+        r3 = await db.execute(select(func.avg(per_student_videos.c.cnt)))
+        raw3 = r3.scalar_one()
+        if raw3 is not None:
+            avg_top10_videos = round(float(raw3), 1)
+
+        # Ranking do aluno por vídeos assistidos nos últimos 30 dias
+        all_students_videos = (
+            select(
+                TrainingVideoDailyView.user_id,
+                func.count(TrainingVideoDailyView.id).label("cnt"),
+            )
+            .join(User, User.id == TrainingVideoDailyView.user_id)
+            .where(
+                User.academy_id == current_user.academy_id,
+                User.role == "aluno",
+                TrainingVideoDailyView.completed_at >= cutoff,
+            )
+            .group_by(TrainingVideoDailyView.user_id)
+            .order_by(func.count(TrainingVideoDailyView.id).desc())
+            .subquery()
+        )
+        result_ranking_videos = await db.execute(select(all_students_videos))
+        video_rows = result_ranking_videos.fetchall()
+        for pos, row in enumerate(video_rows, start=1):
+            if row.user_id == current_user.id:
+                ranking_videos = pos
+                break
+        if ranking_videos is None:
+            # Aluno sem vídeos assistidos: último entre quem assistiu + 1
+            ranking_videos = len(video_rows) + 1
+
     return TrainingStatsRead(
         workouts_last_30_days=workouts_last_30_days,
         days_since_last_workout=days_since,
@@ -187,4 +250,7 @@ async def my_training_stats(
         avg_top10_positions_last_30_days=avg_top10_positions,
         ranking_positions_total=ranking,
         ranking_positions_total_out_of=total_students,
+        videos_last_30_days=videos_last_30_days,
+        avg_top10_videos_last_30_days=avg_top10_videos,
+        ranking_videos_last_30_days=ranking_videos,
     )

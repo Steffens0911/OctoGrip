@@ -9,6 +9,7 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/design/app_tokens.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
+import 'package:viewer/features/trophy_shelf/presentation/widgets/trophy_tier_color.dart';
 
 /// Lista colegas da academia com troféus conquistados, busca e filtro por faixa.
 class ClassmatesGalleryScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
 
   List<models.UserModel> _users = [];
   Map<String, List<AcademyUserEarnedItem>> _earnedMap = {};
+  List<AcademyRecentItem> _recentConquests = [];
   bool _loading = true;
   String? _error;
   String _filterGraduation = 'all';
@@ -68,11 +70,13 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
       final results = await Future.wait([
         _api.getUsersAll(academyId: widget.academyId),
         _api.getAcademyEarned(widget.academyId),
+        _api.getTrophyHomeSummary(),
       ]);
       if (mounted) {
         setState(() {
           _users = results[0] as List<models.UserModel>;
           _earnedMap = results[1] as Map<String, List<AcademyUserEarnedItem>>;
+          _recentConquests = (results[2] as TrophyHomeSummary).academyRecent;
           _loading = false;
         });
       }
@@ -151,6 +155,8 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
               ? _ErrorView(message: _error!, onRetry: _load)
               : Column(
                   children: [
+                    if (_recentConquests.isNotEmpty)
+                      _RecentConquestsSection(items: _recentConquests),
                     _SearchAndFilters(
                       controller: _searchCtrl,
                       selected: _filterGraduation,
@@ -193,6 +199,109 @@ class _ClassmatesGalleryScreenState extends State<ClassmatesGalleryScreen> {
                     ),
                   ],
                 ),
+    );
+  }
+}
+
+// ── Últimas conquistas (scroll horizontal) ────────────────────────────────────
+
+class _RecentConquestsSection extends StatelessWidget {
+  const _RecentConquestsSection({required this.items});
+  final List<AcademyRecentItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: Text(
+            'ÚLTIMAS CONQUISTAS',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.textMutedOf(context),
+                  letterSpacing: 0.8,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) => _ConquestCard(item: items[i]),
+          ),
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
+}
+
+class _ConquestCard extends StatelessWidget {
+  const _ConquestCard({required this.item});
+  final AcademyRecentItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final tierColor = trophyTierColor(context, item.tier);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceOf(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tierColor.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(item.tierEmoji, style: const TextStyle(fontSize: 16)),
+              const Spacer(),
+              CircleAvatar(
+                radius: 10,
+                backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                child: Text(
+                  item.initials,
+                  style: TextStyle(
+                    fontSize: 8,
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            item.trophyName,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: FantasyTheme.textPrimaryOf(context),
+                  fontSize: 11,
+                ),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Text(
+            item.firstName,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: AppTheme.textMutedOf(context),
+                  fontSize: 10,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 }

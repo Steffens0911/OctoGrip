@@ -1,7 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart' show HiveX;
 import 'package:logging/logging.dart';
 
 import 'package:viewer/features/trophies/data/models/trophy_dto.dart';
@@ -43,7 +44,7 @@ class TrophyLocalDataSourceImpl implements TrophyLocalDataSource {
       final raw = box.get(_key(academyId));
       if (raw == null || raw.isEmpty) return null;
       final decoded =
-          raw.length < 8000 ? jsonDecode(raw) as List<dynamic> : await compute(_decodeTrophyListInIsolate, raw);
+          raw.length < 8000 ? jsonDecode(raw) as List<dynamic> : await compute<String, List<dynamic>>(_decodeTrophyListInIsolate, raw);
       return decoded
           .map((e) => TrophyDto.fromHiveMap(e as Map<dynamic, dynamic>))
           .toList();

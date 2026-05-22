@@ -27,6 +27,7 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/mission_completion_report.dart';
 import 'package:viewer/models/students_attention_report.dart';
+import 'package:viewer/models/user_academy_stats.dart';
 import 'package:viewer/models/technique_execution_summary.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
 import 'package:viewer/models/attendance.dart';
@@ -850,6 +851,28 @@ class ApiService {
     return raw
         .map((e) => UserModel.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Estatísticas de todos os alunos da academia no período informado.
+  Future<Map<String, UserAcademyStats>> getAcademyStudentStats({
+    required DateTime fromDate,
+    required DateTime toDate,
+    String? academyId,
+  }) async {
+    final params = <String, String>{
+      'from_date': '${fromDate.year}-${fromDate.month.toString().padLeft(2, '0')}-${fromDate.day.toString().padLeft(2, '0')}',
+      'to_date': '${toDate.year}-${toDate.month.toString().padLeft(2, '0')}-${toDate.day.toString().padLeft(2, '0')}',
+    };
+    if (academyId != null && academyId.isNotEmpty) params['academy_id'] = academyId;
+    final uri = Uri.parse('$baseUrl/users/academy-stats').replace(queryParameters: params);
+    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data is List ? data : <dynamic>[];
+    return {
+      for (final e in list)
+        (e as Map<String, dynamic>)['user_id'] as String: UserAcademyStats.fromJson(e),
+    };
   }
 
   /// Acumula todas as páginas de utilizadores (50 por pedido).

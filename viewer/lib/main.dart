@@ -36,15 +36,6 @@ void main() async {
   }
   await Hive.initFlutter();
   await AuthService().init();
-  if (kPushNotificationsEnabled) {
-    await PushNotificationService.init();
-    if (AuthService().isLoggedIn) {
-      await PushNotificationService.registerTokenIfLoggedIn();
-      PushNotificationService.schedulePostLoginPushTokenRetries();
-    }
-  }
-  // Check-in diário silencioso ao abrir o app (avança streak sem novo login).
-  unawaited(DailyCheckinService.instance.maybeCheckin());
   runApp(
     ProviderScope(
       child: ChangeNotifierProvider<AuthService>.value(
@@ -53,6 +44,17 @@ void main() async {
       ),
     ),
   );
+  // Push notifications e check-in inicializados em background após o app renderizar,
+  // evitando tela branca causada pela inicialização do Firebase no startup.
+  if (kPushNotificationsEnabled) {
+    unawaited(PushNotificationService.init().then((_) async {
+      if (AuthService().isLoggedIn) {
+        await PushNotificationService.registerTokenIfLoggedIn();
+        PushNotificationService.schedulePostLoginPushTokenRetries();
+      }
+    }));
+  }
+  unawaited(DailyCheckinService.instance.maybeCheckin());
 }
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();

@@ -5,13 +5,17 @@ from datetime import date, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.app_time import today_in_app_tz, utc_now
 from app.models import AttendanceRecord, AttendanceSession, Technique, TechniqueExecution, User
 from app.models.mission import Mission
 from app.models.mission_usage import MissionUsage
+from app.models.training_video import TrainingVideoDailyView
 from app.schemas.professor_impact import (
     AtRiskStudent,
+    DailyVideoView,
+    ExecutionDetail,
     ProfessorImpactResponse,
     TechniqueImpact,
 )
@@ -23,7 +27,6 @@ from app.utils.iso_week import (
 
 _AT_RISK_ALERT_DAYS = 14
 _AT_RISK_WARNING_DAYS = 7
-_AT_RISK_LIMIT = 10
 _CONFIRMED = "confirmed"
 
 
@@ -62,9 +65,10 @@ async def get_professor_impact(
     prev_rate = (students_reached_prev / total_students * 100.0) if total_students > 0 else 0.0
     completion_rate_delta: float | None = round(completion_rate - prev_rate, 1) if total_students > 0 else None
 
-    # Execuções confirmadas por técnica na semana
+    # Execuções confirmadas por técnica na semana (agregado)
     technique_rows = (await db.execute(
         select(
+            Technique.id.label("technique_id"),
             Technique.name,
             func.count(func.distinct(TechniqueExecution.user_id)).label("students_completed"),
             func.count(TechniqueExecution.id).label("executions_count"),
@@ -83,6 +87,34 @@ async def get_professor_impact(
         .order_by(func.count(func.distinct(TechniqueExecution.user_id)).desc())
     )).all()
 
+    # Detalhes individuais (executor → oponente) por técnica na semana
+    OpponentUser = aliased(User, name="opponent_user")
+    detail_rows = (await db.execute(
+        select(
+            TechniqueExecution.technique_id,
+            User.name.label("executor_name"),
+            OpponentUser.name.label("opponent_name"),
+        )
+        .join(User, TechniqueExecution.user_id == User.id)
+        .outerjoin(OpponentUser, TechniqueExecution.opponent_id == OpponentUser.id)
+        .where(
+            User.academy_id == academy_id,
+            User.role == "aluno",
+            TechniqueExecution.status == _CONFIRMED,
+            TechniqueExecution.confirmed_at >= week_start_utc,
+            TechniqueExecution.confirmed_at < week_end_utc,
+            TechniqueExecution.technique_id.is_not(None),
+        )
+        .order_by(TechniqueExecution.confirmed_at.desc())
+    )).all()
+
+    # Agrupa detalhes por technique_id
+    details_by_technique: dict[uuid.UUID, list[ExecutionDetail]] = {}
+    for d in detail_rows:
+        details_by_technique.setdefault(d.technique_id, []).append(
+            ExecutionDetail(executor_name=d.executor_name or "?", opponent_name=d.opponent_name)
+        )
+
     techniques = [
         TechniqueImpact(
             technique_name=row.name,
@@ -90,6 +122,7 @@ async def get_professor_impact(
             total_students=total_students,
             completion_pct=round(row.students_completed / total_students * 100.0, 1) if total_students > 0 else 0.0,
             missions_count=row.executions_count,
+            executions=details_by_technique.get(row.technique_id, []),
         )
         for row in technique_rows
     ]
@@ -127,7 +160,6 @@ async def get_professor_impact(
             ),
         )
         .order_by(last_checkin_subq.c.last_checkin.asc().nulls_first())
-        .limit(_AT_RISK_LIMIT)
     )).all()
 
     import datetime as _dt
@@ -149,6 +181,28 @@ async def get_professor_impact(
                 risk_level=level,
             )
         )
+
+    # Visualizações diárias de vídeos na semana
+    video_rows = (await db.execute(
+        select(
+            TrainingVideoDailyView.view_date,
+            func.count(TrainingVideoDailyView.id).label("views_count"),
+        )
+        .join(User, TrainingVideoDailyView.user_id == User.id)
+        .where(
+            User.academy_id == academy_id,
+            User.role == "aluno",
+            TrainingVideoDailyView.view_date >= monday,
+            TrainingVideoDailyView.view_date <= sunday,
+        )
+        .group_by(TrainingVideoDailyView.view_date)
+        .order_by(TrainingVideoDailyView.view_date)
+    )).all()
+
+    daily_video_views = [
+        DailyVideoView(view_date=row.view_date, views_count=row.views_count)
+        for row in video_rows
+    ]
 
     # Totais históricos
     total_missions_in_academy: int = await db.scalar(
@@ -180,6 +234,7 @@ async def get_professor_impact(
         at_risk_students=at_risk,
         total_missions_in_academy=total_missions_in_academy,
         total_completions_all_time=total_completions_all_time,
+        daily_video_views=daily_video_views,
     )
 
 

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Demo: Lógica de Medalhas</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f0f1a; color: #e0e0e0; padding: 32px; }
+    h1 { color: #fff; font-size: 22px; margin-bottom: 6px; }
+    .subtitle { color: #888; font-size: 14px; margin-bottom: 32px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .card { background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; }
+    .card h2 { font-size: 15px; color: #aaa; margin-bottom: 4px; }
+    .card h3 { font-size: 13px; color: #666; margin-bottom: 20px; font-weight: normal; }
+    .rule { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 14px; }
+    .badge { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+    .bronze-bg { background: #8B4513; }
+    .silver-bg { background: #708090; }
+    .gold-bg   { background: #DAA520; }
+    .wrong  { color: #e05555; text-decoration: line-through; opacity: 0.7; }
+    .correct { color: #55e07a; }
+    hr { border: none; border-top: 1px solid #2a2a3e; margin: 20px 0; }
+    .simulator { grid-column: 1 / -1; background: #1a1a2e; border-radius: 12px; padding: 24px; border: 1px solid #2a2a3e; }
+    .inputs { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; align-items: flex-end; }
+    .input-group label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; }
+    .input-group input { background: #0f0f1a; border: 1px solid #3a3a5a; color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 14px; width: 80px; }
+    button { background: #4a4aff; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #6060ff; }
+    .tier-card { background: #0f0f1a; border-radius: 10px; padding: 16px 24px; text-align: center; border: 2px solid transparent; min-width: 120px; }
+    .tier-card.won { border-color: currentColor; }
+    .tier-label { font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+    .tier-detail { font-size: 11px; color: #666; }
+    .bronze-c { color: #cd7f32; }
+    .silver-c { color: #a0a8b0; }
+    .gold-c   { color: #DAA520; }
+  </style>
+</head>
+<body>
+  <h1>Lógica de Medalhas — Correção</h1>
+  <p class="subtitle">trophy_service.py · _tier_from_counts()</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>❌ Lógica Antiga (errada)</h2>
+      <h3>Cada tier contava apenas sua própria faixa</h3>
+      <div class="rule"><span class="badge bronze-bg">🥉</span><span class="wrong">Bronze: <b>só brancos</b> &ge; target</span></div>
+      <div class="rule"><span class="badge silver-bg">🥈</span><span class="wrong">Prata: <b>só azuis</b> &ge; target</span></div>
+      <div class="rule"><span class="badge gold-bg">🥇</span><span class="wrong">Ouro: <b>só roxas+</b> &ge; target</span></div>
+      <hr>
+      <p style="font-size:13px;color:#e05555;">Problema: aluno com 3 brancos + 2 azuis não ganhava bronze (meta 5), pois brancos e azuis eram contados separados.</p>
+    </div>
+
+    <div class="card">
+      <h2>✅ Lógica Nova (correta)</h2>
+      <h3>Tiers acumulativos — superior inclui inferior</h3>
+      <div class="rule"><span class="badge bronze-bg">🥉</span><span class="correct">Bronze: <b>qualquer faixa</b> (branco+azul+roxa+) &ge; target</span></div>
+      <div class="rule"><span class="badge silver-bg">🥈</span><span class="correct">Prata: <b>azul ou superior</b> (azul+roxa+) &ge; target</span></div>
+      <div class="rule"><span class="badge gold-bg">🥇</span><span class="correct">Ouro: <b>roxa ou superior</b> &ge; target</span></div>
+      <hr>
+      <p style="font-size:13px;color:#55e07a;">Correto: posição contra faixa superior conta para todos os tiers inferiores também.</p>
+    </div>
+
+    <div class="simulator">
+      <h2 style="margin-bottom:4px;">🧮 Simulador interativo</h2>
+      <h3>Teste a nova lógica com valores reais</h3>
+      <div class="inputs">
+        <div class="input-group">
+          <label>Meta (target)</label>
+          <input type="number" id="target" value="5" min="1" oninput="calcular()">
+        </div>
+        <div class="input-group">
+          <label>🤍 Brancos</label>
+          <input type="number" id="white" value="3" min="0" oninput="calcular()">
+        </div>
+        <div class="input-group">
+          <label>🔵 Azuis</label>
+          <input type="number" id="blue" value="2" min="0" oninput="calcular()">
+        </div>
+        <div class="input-group">
+          <label>🟣 Roxos+</label>
+          <input type="number" id="purple" value="1" min="0" oninput="calcular()">
+        </div>
+      </div>
+      <div id="result"></div>
+    </div>
+  </div>
+
+  <script>
+    function calcular() {
+      const target       = parseInt(document.getElementById('target').value) || 1;
+      const bronze_count = parseInt(document.getElementById('white').value)  || 0;
+      const silver_count = parseInt(document.getElementById('blue').value)   || 0;
+      const gold_count   = parseInt(document.getElementById('purple').value) || 0;
+
+      // Nova lógica acumulativa (_tier_from_counts)
+      const total_gold   = gold_count;
+      const total_silver = gold_count + silver_count;
+      const total_bronze = gold_count + silver_count + bronze_count;
+
+      let tier = null;
+      if (total_gold   >= target) tier = 'gold';
+      else if (total_silver >= target) tier = 'silver';
+      else if (total_bronze >= target) tier = 'bronze';
+
+      const details = [
+        { label: '🥇 Ouro',   cls: 'gold-c',   count: total_gold,   desc: 'roxas+' },
+        { label: '🥈 Prata',  cls: 'silver-c', count: total_silver, desc: 'azul + roxas+' },
+        { label: '🥉 Bronze', cls: 'bronze-c', count: total_bronze, desc: 'todas as faixas' },
+      ];
+
+      const tierName = {
+        gold:   '🥇 OURO conquistado!',
+        silver: '🥈 PRATA conquistada!',
+        bronze: '🥉 BRONZE conquistado!',
+      };
+
+      document.getElementById('result').innerHTML = `
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+          ${details.map(d => `
+            <div class="tier-card ${d.count >= target ? 'won ' + d.cls : ''}" style="${d.count >= target ? '' : 'opacity:0.35'}">
+              <div class="tier-label ${d.cls}">${d.label}</div>
+              <div style="font-size:24px;margin:6px 0;">${d.count}<span style="font-size:13px;color:#666"> / ${target}</span></div>
+              <div class="tier-detail">${d.desc}</div>
+            </div>
+          `).join('')}
+          <div style="flex:1;min-width:200px;padding:16px;background:#0f0f1a;border-radius:10px;border:2px solid ${tier ? '#4a4aff' : '#333'}">
+            <div style="font-size:17px;font-weight:bold;margin-bottom:8px;">${tier ? tierName[tier] : '⏳ Nenhum tier atingido'}</div>
+            <div style="font-size:12px;color:#666;">
+              brancos: ${bronze_count} &nbsp;·&nbsp; azuis: ${silver_count} &nbsp;·&nbsp; roxos+: ${gold_count}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    calcular();
+  </script>
+</body>
+</html>

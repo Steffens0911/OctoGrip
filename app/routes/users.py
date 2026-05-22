@@ -1,10 +1,13 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
-from datetime import date
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Final
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, File, Query, Request, UploadFile
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
@@ -14,7 +17,10 @@ from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
 from app.core.role_deps import require_admin_or_academy_access, verify_academy_access
 from app.database import get_db
-from app.models import User
+from app.models import AttendanceRecord, User
+from app.models.technique_execution import TechniqueExecution
+from app.models.training_video import TrainingVideoDailyView
+from app.models.user_trophy_earned import UserTrophyEarned
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.weekly_kit import WeeklyKitChoiceRequest, WeeklyKitChoiceResponse
 from app.services.weekly_kit_service import set_user_weekly_kit_choice
@@ -33,7 +39,17 @@ from app.tasks.face_recognition_tasks import generate_student_embedding
 
 router = APIRouter()
 
+_APP_TZ = ZoneInfo("America/Sao_Paulo")
 _ALLOWED_NON_ADMIN_CREATE_ROLES = {"aluno", "professor"}
+
+
+class UserAcademyStatsRead(BaseModel):
+    user_id: str
+    videos_in_period: int
+    positions_in_period: int
+    workouts_in_period: int
+    trophies_count: int
+    days_since_last_workout: int | None
 _MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
@@ -169,6 +185,100 @@ async def users_list(
     if academy_id is None or academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Você só pode listar usuários da sua academia.")
     return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
+
+
+@router.get("/academy-stats", response_model=list[UserAcademyStatsRead])
+async def academy_student_stats(
+    from_date: date = Query(..., description="Data de início (YYYY-MM-DD)"),
+    to_date: date = Query(..., description="Data de fim (YYYY-MM-DD)"),
+    academy_id: UUID | None = Query(None, description="ID da academia (somente admin)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Estatísticas agregadas de todos os alunos de uma academia no período informado."""
+    if current_user.role == "administrador":
+        if academy_id is None:
+            raise AppError("Informe academy_id para consultar estatísticas.", status_code=400)
+        q_academy_id = academy_id
+    else:
+        if current_user.academy_id is None:
+            return []
+        q_academy_id = current_user.academy_id
+
+    from_dt = datetime.combine(from_date, time.min).replace(tzinfo=_APP_TZ)
+    to_dt = datetime.combine(to_date, time.max).replace(tzinfo=_APP_TZ)
+
+    student_rows = await db.execute(
+        select(User.id).where(User.academy_id == q_academy_id, User.role == "aluno")
+    )
+    student_ids = [r[0] for r in student_rows.fetchall()]
+    if not student_ids:
+        return []
+
+    videos_rows = await db.execute(
+        select(TrainingVideoDailyView.user_id, func.count(TrainingVideoDailyView.id).label("cnt"))
+        .where(
+            TrainingVideoDailyView.user_id.in_(student_ids),
+            TrainingVideoDailyView.completed_at >= from_dt,
+            TrainingVideoDailyView.completed_at <= to_dt,
+        )
+        .group_by(TrainingVideoDailyView.user_id)
+    )
+    videos_map = {str(r.user_id): r.cnt for r in videos_rows.fetchall()}
+
+    positions_rows = await db.execute(
+        select(TechniqueExecution.user_id, func.count(TechniqueExecution.id).label("cnt"))
+        .where(
+            TechniqueExecution.user_id.in_(student_ids),
+            TechniqueExecution.status == "confirmed",
+            TechniqueExecution.created_at >= from_dt,
+            TechniqueExecution.created_at <= to_dt,
+        )
+        .group_by(TechniqueExecution.user_id)
+    )
+    positions_map = {str(r.user_id): r.cnt for r in positions_rows.fetchall()}
+
+    workouts_rows = await db.execute(
+        select(AttendanceRecord.user_id, func.count(AttendanceRecord.id).label("cnt"))
+        .where(
+            AttendanceRecord.user_id.in_(student_ids),
+            AttendanceRecord.checked_in_at >= from_dt,
+            AttendanceRecord.checked_in_at <= to_dt,
+        )
+        .group_by(AttendanceRecord.user_id)
+    )
+    workouts_map = {str(r.user_id): r.cnt for r in workouts_rows.fetchall()}
+
+    trophies_rows = await db.execute(
+        select(UserTrophyEarned.user_id, func.count(UserTrophyEarned.id).label("cnt"))
+        .where(UserTrophyEarned.user_id.in_(student_ids))
+        .group_by(UserTrophyEarned.user_id)
+    )
+    trophies_map = {str(r.user_id): r.cnt for r in trophies_rows.fetchall()}
+
+    last_workout_rows = await db.execute(
+        select(AttendanceRecord.user_id, func.max(AttendanceRecord.checked_in_at).label("last_at"))
+        .where(AttendanceRecord.user_id.in_(student_ids))
+        .group_by(AttendanceRecord.user_id)
+    )
+    today_app = datetime.now(tz=_APP_TZ).date()
+    last_workout_map: dict[str, int] = {}
+    for r in last_workout_rows.fetchall():
+        if r.last_at is not None:
+            last_at = r.last_at if r.last_at.tzinfo else r.last_at.replace(tzinfo=timezone.utc)
+            last_workout_map[str(r.user_id)] = (today_app - last_at.astimezone(_APP_TZ).date()).days
+
+    return [
+        UserAcademyStatsRead(
+            user_id=str(uid),
+            videos_in_period=videos_map.get(str(uid), 0),
+            positions_in_period=positions_map.get(str(uid), 0),
+            workouts_in_period=workouts_map.get(str(uid), 0),
+            trophies_count=trophies_map.get(str(uid), 0),
+            days_since_last_workout=last_workout_map.get(str(uid)),
+        )
+        for uid in student_ids
+    ]
 
 
 @router.get("/{user_id}", response_model=UserRead)

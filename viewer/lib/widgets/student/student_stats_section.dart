@@ -88,6 +88,16 @@ class StudentStatsSection extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        _StatCard(
+          icon: Icons.play_circle_outline_rounded,
+          iconColor: const Color(0xFF4A90D9),
+          value: '${stats.videosLast30Days}',
+          label: 'vídeos diários assistidos nos últimos 30 dias',
+          comparison: stats.avgTop10VideosLast30Days,
+          ranking: stats.rankingVideosLast30Days,
+          rankingOutOf: stats.rankingPositionsTotalOutOf,
+        ),
       ],
     );
   }

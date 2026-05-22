@@ -28,7 +28,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
     try {
       final cached = await _local.read(academyId);
       if (cached == null || cached.isEmpty) {
-        return const Right([]);
+        return Right<TrophyFailure, List<TrophyEntity>>([]);
       }
       return Right(cached.map((d) => TrophyMapper.toEntity(d)).toList());
     } on TrophyFailure catch (e) {
@@ -145,7 +145,7 @@ class TrophyRepositoryImpl implements TrophyRepository {
     try {
       await _remote.delete(id);
       await _removeFromCache(academyId, id);
-      return const Right(unit);
+      return Right(unit);
     } catch (e, st) {
       _log.warning('delete', e, st);
       return Left(NetworkTrophyFailure(userFacingMessage(e)));

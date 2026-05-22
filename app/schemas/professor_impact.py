@@ -5,12 +5,18 @@ from datetime import date
 from pydantic import BaseModel
 
 
+class ExecutionDetail(BaseModel):
+    executor_name: str
+    opponent_name: str | None
+
+
 class TechniqueImpact(BaseModel):
     technique_name: str
     students_completed: int
     total_students: int
     completion_pct: float
     missions_count: int
+    executions: list[ExecutionDetail]
 
 
 class AtRiskStudent(BaseModel):
@@ -18,6 +24,11 @@ class AtRiskStudent(BaseModel):
     name: str
     days_inactive: int
     risk_level: str  # "alert" (>14 dias), "warning" (7-14 dias)
+
+
+class DailyVideoView(BaseModel):
+    view_date: date
+    views_count: int
 
 
 class ProfessorImpactResponse(BaseModel):
@@ -31,3 +42,4 @@ class ProfessorImpactResponse(BaseModel):
     at_risk_students: list[AtRiskStudent]
     total_missions_in_academy: int
     total_completions_all_time: int
+    daily_video_views: list[DailyVideoView]
