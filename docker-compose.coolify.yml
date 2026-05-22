@@ -55,7 +55,8 @@ services:
       retries: 10
 
   api:
-    build: .
+    image: ghcr.io/steffens0911/octogrip-api:latest
+    pull_policy: always
     container_name: jjb_api
     restart: unless-stopped
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
@@ -96,7 +97,8 @@ services:
     mem_reservation: 256m
 
   celery-worker:
-    build: .
+    image: ghcr.io/steffens0911/octogrip-api:latest
+    pull_policy: always
     container_name: jjb_celery_worker
     restart: unless-stopped
     command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1
@@ -122,7 +124,8 @@ services:
     mem_reservation: 768m
 
   celery-beat:
-    build: .
+    image: ghcr.io/steffens0911/octogrip-api:latest
+    pull_policy: always
     container_name: jjb_celery_beat
     restart: unless-stopped
     command: celery -A celery_app beat --loglevel=info
