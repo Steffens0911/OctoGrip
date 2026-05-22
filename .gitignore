@@ -54,3 +54,4 @@ logs/
 
 # Mídias enviadas pela API (logos, horários) — não versionar conteúdo local
 app_media/
+docker-compose.dev.yml
