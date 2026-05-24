@@ -93,7 +93,7 @@ async def test_mark_read_endpoint(client: AsyncClient, aluno_user, aluno_headers
     resp = await client.post(f"/notifications/{notif.id}/read", headers=aluno_headers)
     assert resp.status_code == 204
     # Expira o identity map para forçar releitura do banco (o endpoint usou sessão diferente)
-    await db.expire_all()
+    db.expire_all()
     # conferir que ficou como lida
     notifs = await list_notifications(db, aluno_user.id, limit=50)
     found = next((n for n in notifs if n.id == notif.id), None)
