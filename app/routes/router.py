@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.routes import (
     academies,
+    notifications,
     students,
     academy_weekly_kits,
     attendance,
@@ -83,3 +84,4 @@ api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

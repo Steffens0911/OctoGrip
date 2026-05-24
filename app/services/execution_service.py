@@ -522,6 +522,23 @@ async def confirm_execution(
     except Exception:
         logger.exception("confirm_execution: erro ao verificar troféu conquistado")
 
+    # Cria notificação in-app para o executor (fire-and-forget).
+    try:
+        from app.services.notification_service import create_notification
+        from app.services.execution_notification_service import _technique_name
+        tech = _technique_name(execution)
+        body_text = f'"{tech}" foi confirmada' if tech else "Sua posição foi confirmada"
+        await create_notification(
+            db,
+            user_id=execution.user_id,
+            type="execution_confirmed",
+            title="Posição confirmada! ✅",
+            body=body_text,
+            data={"execution_id": str(execution_id)},
+        )
+    except Exception:
+        logger.exception("confirm_execution: erro ao criar notificação in-app")
+
     logger.info(
         "confirm_execution",
         extra={"execution_id": str(execution_id), "outcome": outcome, "points": points},
@@ -547,6 +564,24 @@ async def reject_execution(
     execution.status = "rejected_dont_remember" if reason == "dont_remember" else "rejected"
     await db.commit()
     await db.refresh(execution)
+
+    # Cria notificação in-app para o executor (fire-and-forget).
+    try:
+        from app.services.notification_service import create_notification
+        from app.services.execution_notification_service import _technique_name
+        tech = _technique_name(execution)
+        body_text = f'"{tech}" não foi confirmada' if tech else "Sua posição não foi confirmada"
+        await create_notification(
+            db,
+            user_id=execution.user_id,
+            type="execution_rejected",
+            title="Posição não confirmada",
+            body=body_text,
+            data={"execution_id": str(execution_id)},
+        )
+    except Exception:
+        logger.exception("reject_execution: erro ao criar notificação in-app")
+
     return execution
 
 

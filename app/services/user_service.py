@@ -137,6 +137,7 @@ async def update_user(
     if not user:
         return None
     before = user_entity_snapshot_row(user)
+    _old_frozen = user.account_frozen
     if email is not None:
         normalized = email.strip().lower()
         if normalized != (user.email or "").lower():
@@ -192,6 +193,37 @@ async def update_user(
         from app.services.leveling_service import refresh_user_level
 
         await refresh_user_level(db, user.id)
+
+    # Notifica o aluno se o status de congelamento mudou (fire-and-forget).
+    if account_frozen is not UNSET and bool(account_frozen) != _old_frozen:
+        try:
+            from app.services.notification_service import create_notification
+            if bool(account_frozen):
+                reason = (
+                    account_freeze_reason
+                    if account_freeze_reason is not UNSET and isinstance(account_freeze_reason, str)
+                    else ""
+                )
+                body_text = "Sua conta foi congelada."
+                if reason and reason.strip():
+                    body_text = f"Sua conta foi congelada. Motivo: {reason.strip()}"
+                await create_notification(
+                    db,
+                    user_id=user_id,
+                    type="account_frozen",
+                    title="Conta congelada 🔒",
+                    body=body_text,
+                )
+            else:
+                await create_notification(
+                    db,
+                    user_id=user_id,
+                    type="account_unfrozen",
+                    title="Conta reativada ✅",
+                    body="Sua conta foi reativada e está liberada para uso.",
+                )
+        except Exception:
+            logger.exception("update_user: erro ao criar notificação in-app de freeze")
 
     logger.info("update_user", extra={"user_id": str(user_id), "role": user.role})
     return user

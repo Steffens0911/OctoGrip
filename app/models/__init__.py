@@ -27,6 +27,7 @@ from app.models.attendance_record import AttendanceRecord
 from app.models.student_face_embedding import StudentFaceEmbedding
 from app.models.face_recognition_job import FaceRecognitionJob
 from app.models.user_trophy_earned import UserTrophyEarned
+from app.models.notification import Notification
 
 __all__ = [
     "Base",
@@ -60,4 +61,5 @@ __all__ = [
     "StudentFaceEmbedding",
     "FaceRecognitionJob",
     "UserTrophyEarned",
+    "Notification",
 ]

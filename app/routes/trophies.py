@@ -1,7 +1,10 @@
 """Rotas de troféus: criar, listar por academia, galeria do usuário."""
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
@@ -68,6 +71,23 @@ async def trophy_create(
         max_count_per_opponent=body.max_count_per_opponent,
         audit_user_id=current_user.id,
     )
+
+    # Notifica alunos da academia sobre o novo troféu/medalha (fire-and-forget).
+    if trophy.academy_id:
+        try:
+            from app.services.notification_service import create_notifications_for_academy_students
+            kind_label = "Medalha" if getattr(trophy, "award_kind", "trophy") == "medal" else "Troféu"
+            await create_notifications_for_academy_students(
+                db,
+                academy_id=trophy.academy_id,
+                type="trophy_new",
+                title=f"Novo {kind_label} disponível! 🏆",
+                body=trophy.name,
+                data={"trophy_id": str(trophy.id)},
+            )
+        except Exception:
+            logger.exception("trophy_create: erro ao criar notificações in-app")
+
     return _trophy_to_read(trophy)
 
 

@@ -19,6 +19,7 @@ import 'package:viewer/screens/student/student_academy_hub_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
+import 'package:viewer/screens/notifications_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/daily_checkin_service.dart';
@@ -249,12 +250,43 @@ class _MainShellState extends State<MainShell> {
   /// Último contador vindo da [StudentHomeScreen] (badge na aba Campo de treinamento).
   int _pendingConfirmationsNavBadge = 0;
 
+  /// Contagem de notificações in-app não lidas (badge no ícone de sino).
+  int _unreadNotificationsCount = 0;
+  Timer? _notifPollTimer;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AuthService().restoreImpersonation();
+      _fetchUnreadCount();
     });
+    _notifPollTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _fetchUnreadCount(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _notifPollTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    if (!AuthService().isLoggedIn) return;
+    try {
+      final count = await ApiService().getUnreadNotificationsCount();
+      if (mounted) setState(() => _unreadNotificationsCount = count);
+    } catch (_) {}
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+    );
+    _fetchUnreadCount();
   }
 
   List<String> _availableTabs(AuthService auth) {
@@ -366,7 +398,9 @@ class _MainShellState extends State<MainShell> {
             _lastEffectiveUserId = effectiveId;
             _inicioRefreshKey++;
             _pendingConfirmationsNavBadge = 0;
+            _unreadNotificationsCount = 0;
           });
+          _fetchUnreadCount();
         }
       });
     }
@@ -401,6 +435,40 @@ class _MainShellState extends State<MainShell> {
               onPressed: _showImpersonateDialog,
               tooltip: 'Atuar como',
             ),
+          IconButton(
+            tooltip: 'Notificações',
+            onPressed: _openNotifications,
+            icon: _unreadNotificationsCount > 0
+                ? Badge(
+                    backgroundColor: Colors.red,
+                    label: Text(
+                      _unreadNotificationsCount > 99
+                          ? '99+'
+                          : '$_unreadNotificationsCount',
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                    child: ColorFiltered(
+                      colorFilter: ColorFilter.mode(
+                        Theme.of(context).colorScheme.onSurface,
+                        BlendMode.srcIn,
+                      ),
+                      child: const Text(
+                        '🔔',
+                        style: TextStyle(fontSize: 20, height: 1),
+                      ),
+                    ),
+                  )
+                : ColorFiltered(
+                    colorFilter: ColorFilter.mode(
+                      Theme.of(context).colorScheme.onSurface,
+                      BlendMode.srcIn,
+                    ),
+                    child: const Text(
+                      '🔔',
+                      style: TextStyle(fontSize: 20, height: 1),
+                    ),
+                  ),
+          ),
           IconButton(
             icon: const Icon(Icons.text_fields),
             onPressed: widget.onFontToggle,

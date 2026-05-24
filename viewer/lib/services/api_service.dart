@@ -3386,4 +3386,62 @@ class ApiService {
       },
     );
   }
+
+  // ---------- Notificações in-app ----------
+
+  Future<List<Map<String, dynamic>>> getNotifications({
+    int offset = 0,
+    int limit = 50,
+    bool unreadOnly = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl/notifications').replace(queryParameters: {
+      'offset': '$offset',
+      'limit': '$limit',
+      if (unreadOnly) 'unread_only': 'true',
+    });
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data is List ? data : <dynamic>[];
+    return list.map((e) => e as Map<String, dynamic>).toList();
+  }
+
+  Future<int> getUnreadNotificationsCount() async {
+    final r = await _req(
+      http.get(
+        Uri.parse('$baseUrl/notifications/unread-count'),
+        headers: await _headers(auth: true),
+      ),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data is Map ? data as Map<String, dynamic> : null;
+    return (map?['count'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/notifications/$notificationId/read'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/notifications/read-all'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
 }

@@ -95,6 +95,22 @@ async def create_training_video(
     await db.commit()
     await db.refresh(video)
     logger.info("create_training_video", extra={"video_id": str(video.id)})
+
+    # Notifica alunos da academia sobre o novo vídeo (fire-and-forget).
+    if video.is_active and video.academy_id:
+        try:
+            from app.services.notification_service import create_notifications_for_academy_students
+            await create_notifications_for_academy_students(
+                db,
+                academy_id=video.academy_id,
+                type="video_new",
+                title="Novo vídeo diário! 🎬",
+                body=video.title,
+                data={"video_id": str(video.id)},
+            )
+        except Exception:
+            logger.exception("create_training_video: erro ao criar notificações in-app")
+
     return video
 
 
@@ -114,6 +130,7 @@ async def update_training_video(
     if not video:
         return None
     before = entity_snapshot_row(video)
+    _was_active = video.is_active
     if title is not None:
         video.title = title.strip()
     if youtube_url is not None:
@@ -144,6 +161,23 @@ async def update_training_video(
     await db.commit()
     await db.refresh(video)
     logger.info("update_training_video", extra={"video_id": str(video.id)})
+
+    # Notifica alunos quando vídeo passa de inativo → ativo (fire-and-forget).
+    became_active = not _was_active and video.is_active
+    if became_active and video.academy_id:
+        try:
+            from app.services.notification_service import create_notifications_for_academy_students
+            await create_notifications_for_academy_students(
+                db,
+                academy_id=video.academy_id,
+                type="video_new",
+                title="Novo vídeo diário! 🎬",
+                body=video.title,
+                data={"video_id": str(video.id)},
+            )
+        except Exception:
+            logger.exception("update_training_video: erro ao criar notificações in-app")
+
     return video
 
 

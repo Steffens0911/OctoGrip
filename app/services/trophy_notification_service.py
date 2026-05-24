@@ -185,4 +185,39 @@ async def check_and_notify_trophy_earned(
             },
         )
 
+        # Cria notificações in-app: pessoal + social para a academia (fire-and-forget).
+        try:
+            from app.services.notification_service import (
+                create_notification,
+                create_notifications_for_academy_students,
+            )
+            kind_label = _KIND_LABEL.get(getattr(trophy, "award_kind", "trophy"), "Troféu")
+            tier_label = _TIER_LABEL.get(current_tier, current_tier.capitalize())
+            personal_title = (
+                f"{kind_label} evoluído! {tier_label}"
+                if upgraded
+                else f"{kind_label} conquistado! {tier_label}"
+            )
+            trophy_data = {"trophy_id": str(trophy.id), "tier": current_tier}
+            await create_notification(
+                db,
+                user_id=user_id,
+                type="trophy_earned",
+                title=personal_title,
+                body=trophy.name,
+                data=trophy_data,
+            )
+            user_name = (user.name or "Um aluno").strip()
+            await create_notifications_for_academy_students(
+                db,
+                academy_id=user.academy_id,
+                type="trophy_social",
+                title=f"{user_name} conquistou {tier_label}",
+                body=f"{kind_label}: {trophy.name}",
+                data=trophy_data,
+                exclude_user_id=user_id,
+            )
+        except Exception:
+            logger.exception("trophy_notification: erro ao criar notificações in-app")
+
         await _send_trophy_pushes(db, user, user.academy_id, trophy, current_tier, upgraded)
