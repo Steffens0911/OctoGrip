@@ -5,6 +5,8 @@ from uuid import uuid4
 
 import pytest
 
+_SKIP_REASON = "Endpoint /mission_complete desabilitado — usar POST /executions com opponent_id"
+
 
 @pytest.fixture
 async def mission_ativa(db, academy, technique):
@@ -25,6 +27,7 @@ async def mission_ativa(db, academy, technique):
     return mission
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao(client, aluno_headers, aluno_user, mission_ativa):
     """Completar missão com sucesso."""
     r = await client.post(
@@ -43,6 +46,7 @@ async def test_completar_missao(client, aluno_headers, aluno_user, mission_ativa
     assert data["points_awarded"] == 10
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_pontos_iguais_ao_multiplier(
     client,
     aluno_headers,
@@ -87,6 +91,7 @@ async def test_completar_missao_pontos_iguais_ao_multiplier(
     assert r1.json()["points"] == antes + 35
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_before_training(client, aluno_headers, aluno_user, mission_ativa):
     """Completar missão com usage_type before_training."""
     r = await client.post(
@@ -102,38 +107,32 @@ async def test_completar_missao_before_training(client, aluno_headers, aluno_use
     assert data["mission_id"] == str(mission_ativa.id)
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_duplicada(client, aluno_headers, aluno_user, mission_ativa):
     """Tentar completar missão duas vezes retorna 409."""
-    # Primeira conclusão
     r1 = await client.post(
         "/mission_complete",
         headers=aluno_headers,
-        json={
-            "mission_id": str(mission_ativa.id),
-        },
+        json={"mission_id": str(mission_ativa.id)},
     )
     assert r1.status_code == 201
 
-    # Segunda conclusão (deve falhar)
     r2 = await client.post(
         "/mission_complete",
         headers=aluno_headers,
-        json={
-            "mission_id": str(mission_ativa.id),
-        },
+        json={"mission_id": str(mission_ativa.id)},
     )
     assert r2.status_code == 409
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_inexistente(client, aluno_headers):
     """Completar missão inexistente retorna 404."""
     fake_mission_id = uuid4()
     r = await client.post(
         "/mission_complete",
         headers=aluno_headers,
-        json={
-            "mission_id": str(fake_mission_id),
-        },
+        json={"mission_id": str(fake_mission_id)},
     )
     assert r.status_code == 404
 
@@ -142,13 +141,12 @@ async def test_completar_missao_sem_auth(client, mission_ativa):
     """Completar missão sem autenticação retorna 401."""
     r = await client.post(
         "/mission_complete",
-        json={
-            "mission_id": str(mission_ativa.id),
-        },
+        json={"mission_id": str(mission_ativa.id)},
     )
     assert r.status_code == 401
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_usage_type_invalido(client, aluno_headers, mission_ativa):
     """Usage_type inválido é tratado como after_training."""
     r = await client.post(
@@ -159,16 +157,15 @@ async def test_completar_missao_usage_type_invalido(client, aluno_headers, missi
             "usage_type": "invalid_type",
         },
     )
-    # Deve aceitar mas tratar como after_training
     assert r.status_code == 201
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_ativa):
     """Múltiplos usuários podem completar a mesma missão."""
     from app.core.security import create_access_token, hash_password_sync
     from app.models import User
 
-    # Criar segundo usuário
     user2 = User(
         email=f"aluno2-{uuid4().hex[:8]}@test.com",
         name="Aluno 2",
@@ -183,17 +180,13 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
 
     headers1 = {"Authorization": f"Bearer {create_access_token(user2.id)}"}
 
-    # Primeiro usuário completa
     r1 = await client.post(
         "/mission_complete",
         headers=headers1,
-        json={
-            "mission_id": str(mission_ativa.id),
-        },
+        json={"mission_id": str(mission_ativa.id)},
     )
     assert r1.status_code == 201
 
-    # Segundo usuário também pode completar
     user3 = User(
         email=f"aluno3-{uuid4().hex[:8]}@test.com",
         name="Aluno 3",
@@ -210,8 +203,6 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
     r2 = await client.post(
         "/mission_complete",
         headers=headers2,
-        json={
-            "mission_id": str(mission_ativa.id),
-        },
+        json={"mission_id": str(mission_ativa.id)},
     )
     assert r2.status_code == 201

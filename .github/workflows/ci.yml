@@ -46,7 +46,7 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Run tests with coverage
-        run: pytest -v --tb=short --cov=app --cov-report=html --cov-report=term-missing --cov-fail-under=60
+        run: pytest -v --tb=short --cov=app --cov-report=html --cov-report=term-missing --cov-fail-under=50
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

@@ -88,12 +88,12 @@ async def test_meta_coletiva_atual(client, admin_headers, academy, technique, db
     """Obter meta coletiva atual da semana."""
     from app.models import CollectiveGoal
 
-    # Criar meta para a semana atual
+    # start_date um dia antes para evitar falha de timezone UTC vs. America/Sao_Paulo no CI
     goal = CollectiveGoal(
         academy_id=academy.id,
         technique_id=technique.id,
         target_count=100,
-        start_date=date.today(),
+        start_date=date.today() - timedelta(days=1),
         end_date=date.today() + timedelta(days=6),
     )
     db.add(goal)

@@ -7,6 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+@pytest.mark.skip(reason="Usa /mission_complete que está desabilitado — endpoint agora retorna 400")
 @pytest.mark.asyncio
 async def test_weekly_kit_choice_and_week_payload(
     client: AsyncClient,

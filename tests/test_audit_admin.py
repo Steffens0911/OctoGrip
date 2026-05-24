@@ -120,7 +120,7 @@ async def test_admin_audit_feed_all_and_academy_filter(
     assert any(x["entity_id"] == str(tid) for x in body_all["items"])
 
     r_filt = await client.get(
-        f"/admin/audit/feed?academy_id={aid}&limit=200&order=desc",
+        f"/admin/audit/feed?academy_id={aid}&limit=50&order=desc",
         headers=admin_headers,
     )
     assert r_filt.status_code == 200

@@ -2,6 +2,8 @@ from datetime import date
 
 import pytest
 
+_SKIP_REASON = "Endpoint /mission_complete desabilitado — usar POST /executions com opponent_id"
+
 
 def test_threshold_for_level_progression():
     from app.core.leveling import threshold_for_level
@@ -32,6 +34,7 @@ def test_compute_level_from_total_points(total_points, expected):
     assert compute_level_from_total_points(total_points) == expected
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_get_user_points_includes_level_after_mission_complete(
     client, aluno_headers, aluno_user, db, academy, technique
 ):

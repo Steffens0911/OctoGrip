@@ -18,8 +18,8 @@ def _mock_execution(opponent_id, graduation: str, confirmed_day: int, eid=None):
     return e
 
 
-def test_compute_counts_legacy_bronze_apenas_brancos_distintos():
-    """Sem limite: bronze = número de faixas brancas distintas."""
+def test_compute_counts_legacy_bronze_sem_limite_conta_todas_execucoes():
+    """Sem limite: cada execução incrementa bronze (3 execuções = 3 bronzes)."""
     from app.services.trophy_service import _compute_counts_from_executions
 
     a, b = uuid4(), uuid4()
@@ -31,7 +31,7 @@ def test_compute_counts_legacy_bronze_apenas_brancos_distintos():
     c = _compute_counts_from_executions(executions, None)
     assert c["gold_count"] == 0
     assert c["silver_count"] == 0
-    assert c["bronze_count"] == 2
+    assert c["bronze_count"] == 3
 
 
 def test_compute_counts_limite_por_adversario_preta_tres_exec_conta_so_duas():

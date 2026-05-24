@@ -3,7 +3,12 @@
 from datetime import date, timedelta
 from uuid import uuid4
 
+import pytest
 
+_SKIP_ENDPOINT = "Endpoint desabilitado — usar POST /executions com opponent_id"
+
+
+@pytest.mark.skip(reason=_SKIP_ENDPOINT)
 async def test_fluxo_completo_missao(client, admin_headers, aluno_headers, aluno_user, academy, technique, db):
     """Fluxo completo: Criar missão → Completar missão → Verificar pontos → Verificar ranking."""
     # Criar missão
@@ -103,10 +108,11 @@ async def test_fluxo_completo_trofeu(client, admin_headers, aluno_headers, aluno
     from app.core.security import create_access_token
     from app.models import Mission
 
+    # start_date um dia antes para evitar falha de timezone UTC vs. America/Sao_Paulo no CI
     mission = Mission(
         academy_id=academy.id,
         technique_id=technique.id,
-        start_date=date.today(),
+        start_date=date.today() - timedelta(days=1),
         end_date=date.today() + timedelta(days=6),
         level="beginner",
         is_active=True,
@@ -216,6 +222,7 @@ async def test_fluxo_reset_missoes(client, admin_headers, academy, technique, db
     # Verificamos apenas que a operação foi bem-sucedida
 
 
+@pytest.mark.skip(reason=_SKIP_ENDPOINT)
 async def test_fluxo_completo_licao_e_missao(client, admin_headers, aluno_headers, aluno_user, academy, technique, db):
     """Fluxo completo: Criar lição → Completar lição → Criar missão → Completar missão."""
     # Criar lição (admin / write access)

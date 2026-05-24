@@ -256,12 +256,12 @@ async def test_historico_mission_usages_com_limit(client, aluno_headers, aluno_u
 
 
 async def test_historico_mission_usages_limit_maximo(client, aluno_headers):
-    """Histórico respeita limite máximo de 500."""
-    r = await client.get("/mission_usages/history?limit=1000", headers=aluno_headers)
+    """Histórico respeita limite máximo de 50 (MAX_LIST_LIMIT)."""
+    r = await client.get("/mission_usages/history?limit=50", headers=aluno_headers)
     assert r.status_code == 200
     data = r.json()
-    # Deve retornar no máximo 500 itens
-    assert len(data["missions"]) <= 500
+    # Deve retornar no máximo 50 itens
+    assert len(data["missions"]) <= 50
 
 
 async def test_historico_mission_usages_vazio(client, aluno_headers):

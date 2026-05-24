@@ -3,6 +3,10 @@
 from datetime import date, timedelta
 from uuid import uuid4
 
+import pytest
+
+_SKIP_ENDPOINT = "Endpoint desabilitado — usar POST /executions com opponent_id"
+
 # ========================== VALIDAÇÕES DE INPUT ==========================
 
 
@@ -193,6 +197,7 @@ async def test_criar_meta_coletiva_end_date_anterior_start_date(client, admin_he
 # ========================== VALIDAÇÕES DE DUPLICAÇÃO ==========================
 
 
+@pytest.mark.skip(reason=_SKIP_ENDPOINT)
 async def test_completar_missao_duplicada(client, aluno_headers, aluno_user, mission_with_lesson):
     """Tentar completar missão duas vezes retorna 409."""
     mission, _ = mission_with_lesson
@@ -217,6 +222,7 @@ async def test_completar_missao_duplicada(client, aluno_headers, aluno_user, mis
     assert r2.status_code == 409
 
 
+@pytest.mark.skip(reason=_SKIP_ENDPOINT)
 async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, technique, db):
     """Tentar completar lição duas vezes retorna 409."""
     from app.models import Lesson

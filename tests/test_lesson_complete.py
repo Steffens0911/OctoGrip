@@ -4,6 +4,8 @@ from uuid import uuid4
 
 import pytest
 
+_SKIP_REASON = "Endpoint POST /lesson_complete desabilitado — usar POST /executions com opponent_id"
+
 
 @pytest.fixture
 async def lesson(db, technique):
@@ -59,6 +61,7 @@ async def test_status_licao_sem_auth(client, lesson):
     assert r.status_code == 401
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
     """Completar lição com sucesso."""
     r0 = await client.get(f"/users/{aluno_user.id}/points", headers=aluno_headers)
@@ -84,6 +87,7 @@ async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
     assert r1.json()["points"] == antes + 10
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, lesson):
     """Tentar completar lição duas vezes retorna 409."""
     # Primeira conclusão
@@ -107,6 +111,7 @@ async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, less
     assert r2.status_code == 409
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_licao_inexistente(client, aluno_headers):
     """Completar lição inexistente retorna 404."""
     fake_lesson_id = uuid4()
@@ -131,6 +136,7 @@ async def test_completar_licao_sem_auth(client, lesson):
     assert r.status_code == 401
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique):
     """Múltiplos usuários podem completar a mesma lição."""
     from app.core.security import create_access_token, hash_password_sync
@@ -185,6 +191,7 @@ async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique)
     assert r2.status_code == 201
 
 
+@pytest.mark.skip(reason=_SKIP_REASON)
 async def test_status_apos_completar(client, aluno_headers, aluno_user, lesson):
     """Status deve mudar para True após completar."""
     # Verificar que não está concluída

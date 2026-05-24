@@ -138,7 +138,8 @@ async def create_lesson(db: AsyncSession, data: LessonCreate, audit_user_id: UUI
         user_id=audit_user_id,
     )
     await db.commit()
-    await db.refresh(lesson)
+    # Recarregar com relacionamentos (evita MissingGreenlet ao serializar LessonRead)
+    lesson = await get_lesson_by_id(db, lesson.id)
     logger.info("create_lesson", extra={"lesson_id": str(lesson.id), "title": lesson.title})
     return lesson
 

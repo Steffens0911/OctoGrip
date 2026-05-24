@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.app_time import today_in_app_tz
+from app.core.graduation import points_for_graduation
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution
 from app.schemas.mission import (

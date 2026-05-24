@@ -225,11 +225,12 @@ async def mission_with_lesson(db, technique, academy):
     await db.commit()
     await db.refresh(lesson)
 
+    # start_date um dia antes para evitar falhas de timezone UTC vs. America/Sao_Paulo no CI
     mission = Mission(
         technique_id=technique.id,
         academy_id=academy.id,
         lesson_id=lesson.id,
-        start_date=date.today(),
+        start_date=date.today() - timedelta(days=1),
         end_date=date.today() + timedelta(days=6),
         level="beginner",
         is_active=True,
