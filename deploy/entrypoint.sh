@@ -10,7 +10,7 @@ if [ "$(id -u)" = "0" ]; then
   mkdir -p "$MEDIA_DIR" "$FACE_JOBS_DIR" || true
   chown -R "$APP_UID:$APP_GID" "$MEDIA_DIR" || true
   chmod -R u+rwX,g+rwX "$MEDIA_DIR" || true
-  exec gosu "$APP_UID:$APP_GID" "$@"
+  exec gosu "$APP_UID:$APP_GID" "$0" "$@"
 fi
 
 if [ "${BOOTSTRAP_ON_STARTUP:-true}" = "true" ] && [ "${1:-}" = "uvicorn" ]; then
