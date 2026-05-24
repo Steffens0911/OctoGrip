@@ -1,4 +1,5 @@
 """Push notifications de indicação de posição: avisa adversário ao indicar e executor ao confirmar."""
+
 from __future__ import annotations
 
 import logging
@@ -78,7 +79,7 @@ async def notify_opponent_of_indication(
     tech = _technique_name(execution)
     body = f"{executor_name} indicou uma posição para você confirmar"
     if tech:
-        body = f"{executor_name} indicou "{tech}" para você confirmar"
+        body = f'{executor_name} indicou "{tech}" para você confirmar'
 
     await _push(
         db,
@@ -104,7 +105,7 @@ async def notify_executor_of_confirmation(
     tech = _technique_name(execution)
     body = f"{opponent_name} confirmou sua indicação"
     if tech:
-        body = f"{opponent_name} confirmou sua indicação de "{tech}""
+        body = f'{opponent_name} confirmou sua indicação de "{tech}"'
 
     await _push(
         db,
@@ -133,13 +134,13 @@ async def notify_executor_of_professor_review(
         title = "Indicação aprovada pelo professor! ✅"
         body = "Sua indicação foi aprovada pelo professor e os pontos foram contabilizados"
         if tech:
-            body = f"Sua indicação de "{tech}" foi aprovada pelo professor"
+            body = f'Sua indicação de "{tech}" foi aprovada pelo professor'
         notification_type = "execution_professor_approved"
     else:
         title = "Indicação não confirmada"
         body = "O professor não confirmou sua indicação"
         if tech:
-            body = f"O professor não confirmou sua indicação de "{tech}""
+            body = f'O professor não confirmou sua indicação de "{tech}"'
         notification_type = "execution_professor_rejected"
 
     await _push(

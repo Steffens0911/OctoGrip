@@ -52,7 +52,16 @@ ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
     "B904",   # raise without from inside except
+    "F821",   # undefined name — falsos positivos em forward-refs do SQLAlchemy
+    "UP047",  # type parameter syntax (Python 3.12+ PEP 695, ainda não adotado)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"app/routes/trophies.py"        = ["E402"]   # imports após bloco condicional intencional
+"app/routes/me_training_stats.py" = ["E402"] # imports após bloco condicional intencional
+"app/scripts/seed.py"           = ["E402"]   # imports após setup do ambiente
+"app/routes/health.py"          = ["F841"]   # variáveis de diagnóstico intencionalmente atribuídas
+"tests/**"                      = ["F841"]   # variáveis de teste às vezes atribuídas para inspeção
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
