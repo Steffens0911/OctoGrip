@@ -1,4 +1,5 @@
 """Bónus de pontos por sequência de login (múltiplos de 7 dias no calendário APP_TIMEZONE)."""
+
 from datetime import timedelta
 
 import pytest
@@ -22,10 +23,7 @@ from app.services.login_streak_service import login_streak_bonus_points_to_award
     ],
 )
 def test_login_streak_bonus_points_to_award(before, after, interval, bonus, expected):
-    assert (
-        login_streak_bonus_points_to_award(before, after, interval_days=interval, bonus_points=bonus)
-        == expected
-    )
+    assert login_streak_bonus_points_to_award(before, after, interval_days=interval, bonus_points=bonus) == expected
 
 
 @pytest.mark.asyncio

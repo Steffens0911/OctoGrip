@@ -1,4 +1,5 @@
 """Painel de administração — CRUDs: academias, usuários, lições, técnicas, posições, missões."""
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 

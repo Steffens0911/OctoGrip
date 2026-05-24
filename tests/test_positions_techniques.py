@@ -1,4 +1,5 @@
 """Testes de técnicas (CRUD). Posições foram removidas do domínio/API."""
+
 from uuid import uuid4
 
 

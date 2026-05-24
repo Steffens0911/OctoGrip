@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal, NamedTuple
 from uuid import UUID
 
@@ -8,9 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
 from app.core.cache import app_cache
-from app.core.list_pagination import clamp_list_limit
 from app.core.exceptions import (
     AppError,
     AttendanceRecordNotFoundError,
@@ -20,12 +18,13 @@ from app.core.exceptions import (
     NotFoundError,
     UserNotFoundError,
 )
+from app.core.list_pagination import clamp_list_limit
 from app.core.role_deps import verify_academy_access
 from app.models import Academy, AttendanceRecord, AttendanceSession, User
 
 
 def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 _ATTENDANCE_RANKING_TTL_SEC = 300
@@ -110,13 +109,9 @@ async def get_attendance_session(
     *,
     current_user: User,
 ) -> tuple[AttendanceSession, int]:
-    s = await get_attendance_session_basic(
-        db, session_id, current_user=current_user
-    )
+    s = await get_attendance_session_basic(db, session_id, current_user=current_user)
     present_count = (
-        await db.execute(
-            select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id)
-        )
+        await db.execute(select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id))
     ).scalar_one()
     return s, int(present_count or 0)
 
@@ -207,9 +202,7 @@ async def add_record_manual(
         raise AttendanceSessionNotFoundError()
     verify_academy_access(current_user, str(s.academy_id) if s.academy_id else None, allow_none=True)
 
-    _target_row = (await db.execute(
-        select(User.role, User.academy_id).where(User.id == target_user_id)
-    )).one_or_none()
+    _target_row = (await db.execute(select(User.role, User.academy_id).where(User.id == target_user_id))).one_or_none()
     if _target_row is None:
         raise UserNotFoundError()
     if _target_row[0] != "aluno":
@@ -286,8 +279,8 @@ async def scan_checkin(
     token: str,
 ) -> tuple[AttendanceRecord, bool]:
     """Registra presença via token QR. Idempotente por (session_id, user_id)."""
-    from app.services.qr_service import verify as qr_verify, verify_short as qr_verify_short
-    from app.core.exceptions import AttendanceQrInvalidError
+    from app.services.qr_service import verify as qr_verify
+    from app.services.qr_service import verify_short as qr_verify_short
 
     if current_user.role not in ("aluno", "professor", "gerente_academia"):
         raise ForbiddenError("Apenas alunos, professores e gerentes podem registrar presença via QR.")
@@ -323,14 +316,10 @@ async def scan_checkin(
 
     if s_academy_id is not None:
         qr_enabled = (
-            await db.execute(
-                select(Academy.qr_attendance_enabled).where(Academy.id == s_academy_id)
-            )
+            await db.execute(select(Academy.qr_attendance_enabled).where(Academy.id == s_academy_id))
         ).scalar_one_or_none()
         if qr_enabled is False:
-            raise ForbiddenError(
-                "A chamada por QR está desativada para esta academia. Faça presença manual."
-            )
+            raise ForbiddenError("A chamada por QR está desativada para esta academia. Faça presença manual.")
     if s_status != "active":
         raise AttendanceSessionClosedError()
     if s_expires_at and s_expires_at < now:
@@ -392,9 +381,7 @@ async def user_summary(
     if current_user.role not in ("aluno", "administrador", "gerente_academia", "professor", "supervisor"):
         raise ForbiddenError("Acesso negado.")
 
-    _target_academy_row = (await db.execute(
-        select(User.academy_id).where(User.id == user_id)
-    )).one_or_none()
+    _target_academy_row = (await db.execute(select(User.academy_id).where(User.id == user_id))).one_or_none()
     if _target_academy_row is None:
         raise UserNotFoundError()
 
@@ -474,9 +461,7 @@ async def stats_sessions_by_professor(
         raise ForbiddenError("Acesso negado.")
 
     if current_user.role == "gerente_academia":
-        _prof_row = (await db.execute(
-            select(User.academy_id).where(User.id == pid)
-        )).one_or_none()
+        _prof_row = (await db.execute(select(User.academy_id).where(User.id == pid))).one_or_none()
         if _prof_row is None or _prof_row[0] != current_user.academy_id:
             raise ForbiddenError("Professor inválido para esta academia.")
 
@@ -875,15 +860,15 @@ def _parse_ranking_month(month: str | None, *, default_month: date | None = None
 
 
 def _month_range_utc(month_start: date) -> tuple[datetime, datetime]:
-    start = datetime(month_start.year, month_start.month, 1, tzinfo=timezone.utc)
+    start = datetime(month_start.year, month_start.month, 1, tzinfo=UTC)
     nxt = _month_add1(month_start)
-    end = datetime(nxt.year, nxt.month, 1, tzinfo=timezone.utc)
+    end = datetime(nxt.year, nxt.month, 1, tzinfo=UTC)
     return start, end
 
 
 def _year_range_utc(year_value: int) -> tuple[datetime, datetime]:
-    start = datetime(year_value, 1, 1, tzinfo=timezone.utc)
-    end = datetime(year_value + 1, 1, 1, tzinfo=timezone.utc)
+    start = datetime(year_value, 1, 1, tzinfo=UTC)
+    end = datetime(year_value + 1, 1, 1, tzinfo=UTC)
     return start, end
 
 
@@ -898,15 +883,15 @@ def _quarter_range_utc(year_value: int, quarter_value: int) -> tuple[datetime, d
         next_start = _quarter_start_date(year_value + 1, 1)
     else:
         next_start = _quarter_start_date(year_value, quarter_value + 1)
-    start = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
-    end = datetime(next_start.year, next_start.month, next_start.day, tzinfo=timezone.utc)
+    start = datetime(start_date.year, start_date.month, start_date.day, tzinfo=UTC)
+    end = datetime(next_start.year, next_start.month, next_start.day, tzinfo=UTC)
     return start, end
 
 
 def _custom_range_utc(date_from: date, date_to: date) -> tuple[datetime, datetime]:
-    start = datetime(date_from.year, date_from.month, date_from.day, tzinfo=timezone.utc)
+    start = datetime(date_from.year, date_from.month, date_from.day, tzinfo=UTC)
     next_day = date_to + timedelta(days=1)
-    end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=timezone.utc)
+    end = datetime(next_day.year, next_day.month, next_day.day, tzinfo=UTC)
     return start, end
 
 
@@ -1070,7 +1055,7 @@ async def _ranking_rows_for_range(
     ]
 
 
-def _decode_ranking_result(d: dict) -> "AttendanceRankingResult":
+def _decode_ranking_result(d: dict) -> AttendanceRankingResult:
     return AttendanceRankingResult(
         month=d["month"],
         period_kind=d["period_kind"],
@@ -1095,7 +1080,9 @@ def _decode_ranking_result(d: dict) -> "AttendanceRankingResult":
             total_checkins=d["my_position"]["total_checkins"],
             attendance_percentage=d["my_position"]["attendance_percentage"],
             position_change=d["my_position"]["position_change"],
-        ) if d.get("my_position") is not None else None,
+        )
+        if d.get("my_position") is not None
+        else None,
     )
 
 
@@ -1243,7 +1230,9 @@ async def attendance_ranking(
             "total_checkins": result.my_position.total_checkins,
             "attendance_percentage": result.my_position.attendance_percentage,
             "position_change": result.my_position.position_change,
-        } if result.my_position is not None else None,
+        }
+        if result.my_position is not None
+        else None,
     }
     await app_cache.set(cache_key, cache_payload, ttl=_ATTENDANCE_RANKING_TTL_SEC)
     return result
@@ -1317,9 +1306,7 @@ async def stats_me(
         percentage = 1.0
 
     lt_sess_n = (
-        await db.execute(
-            select(func.count(AttendanceSession.id)).where(AttendanceSession.academy_id == aid)
-        )
+        await db.execute(select(func.count(AttendanceSession.id)).where(AttendanceSession.academy_id == aid))
     ).scalar_one()
     lifetime_total_sessions = int(lt_sess_n or 0)
 
@@ -1340,9 +1327,7 @@ async def stats_me(
     lifetime_total_checkins = int(lt_agg[0] or 0)
     lifetime_last_seen: datetime | None = lt_agg[1]
 
-    lifetime_percentage = (
-        (lifetime_total_checkins / lifetime_total_sessions) if lifetime_total_sessions else 0.0
-    )
+    lifetime_percentage = (lifetime_total_checkins / lifetime_total_sessions) if lifetime_total_sessions else 0.0
     if lifetime_percentage > 1.0:
         lifetime_percentage = 1.0
 
@@ -1443,4 +1428,3 @@ async def stats_me(
     )
     await app_cache.set(_me_cache_key, result, ttl=_STATS_ME_TTL_SEC)
     return result
-

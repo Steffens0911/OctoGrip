@@ -32,16 +32,16 @@ class Lesson(Base, UUIDMixin, SoftDeleteMixin):
         nullable=False,
     )
 
-    technique: Mapped["Technique"] = relationship(
+    technique: Mapped[Technique] = relationship(
         "Technique",
         back_populates="lessons",
     )
-    academy: Mapped["Academy | None"] = relationship(
+    academy: Mapped[Academy | None] = relationship(
         "Academy",
         foreign_keys=[academy_id],
         lazy="selectin",
     )
-    missions: Mapped[list["Mission"]] = relationship(
+    missions: Mapped[list[Mission]] = relationship(
         "Mission",
         back_populates="lesson",
         lazy="selectin",
@@ -62,17 +62,18 @@ class Lesson(Base, UUIDMixin, SoftDeleteMixin):
         if not self.technique or not self.technique.video_url or not self.technique.video_url.strip():
             return None
         return self.technique.video_url.strip()
-    lesson_progresses: Mapped[list["LessonProgress"]] = relationship(
+
+    lesson_progresses: Mapped[list[LessonProgress]] = relationship(
         "LessonProgress",
         back_populates="lesson",
         lazy="selectin",
     )
-    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+    mission_usages: Mapped[list[MissionUsage]] = relationship(
         "MissionUsage",
         back_populates="lesson",
         lazy="selectin",
     )
-    technique_executions: Mapped[list["TechniqueExecution"]] = relationship(
+    technique_executions: Mapped[list[TechniqueExecution]] = relationship(
         "TechniqueExecution",
         back_populates="lesson",
         lazy="selectin",

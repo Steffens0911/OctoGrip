@@ -1,5 +1,6 @@
 """Testes do relatório semanal de logins do painel (global/academia)."""
-from datetime import date, datetime, timedelta, timezone
+
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 from app.core.security import create_access_token, hash_password_sync
@@ -162,7 +163,7 @@ async def test_weekly_panel_logins_supervisor_requires_academy_id(client, db, ac
         role="supervisor",
         academy_id=academy.id,
         password_hash=hash_password_sync("sup123"),
-        last_login_at=datetime.now(timezone.utc) - timedelta(days=1),
+        last_login_at=datetime.now(UTC) - timedelta(days=1),
     )
     db.add(supervisor)
     await db.commit()
@@ -200,9 +201,7 @@ async def test_weekly_panel_logins_custom_date_range(client, db, admin_headers, 
     await db.commit()
 
     r = await client.get(
-        "/reports/weekly_panel_logins"
-        "?start_date=2026-05-10&end_date=2026-05-11"
-        f"&academy_id={academy.id}",
+        f"/reports/weekly_panel_logins?start_date=2026-05-10&end_date=2026-05-11&academy_id={academy.id}",
         headers=admin_headers,
     )
     assert r.status_code == 200

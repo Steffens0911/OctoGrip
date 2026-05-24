@@ -1,4 +1,5 @@
 """Notificações in-app por usuário."""
+
 from __future__ import annotations
 
 import uuid
@@ -13,9 +14,7 @@ from app.models.base import UUIDMixin
 
 class Notification(Base, UUIDMixin):
     __tablename__ = "notifications"
-    __table_args__ = (
-        Index("ix_notifications_user_read", "user_id", "read"),
-    )
+    __table_args__ = (Index("ix_notifications_user_read", "user_id", "read"),)
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

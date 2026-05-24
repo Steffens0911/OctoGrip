@@ -3,16 +3,16 @@ import os
 import time
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     import psutil
 except ImportError:
     psutil = None
 
-from app.database import async_engine, get_db
 from app.core.metrics import db_connections_active, db_pool_overflow, db_pool_size, memory_usage_bytes
+from app.database import async_engine, get_db
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ async def health():
             memory_mb = round(memory_info.rss / 1024 / 1024, 2)
         except Exception:
             pass  # Ignorar se não conseguir coletar
-    
+
     return {
         "status": "ok",
         "memory_mb": memory_mb,
@@ -49,13 +49,13 @@ async def health_db(db: AsyncSession = Depends(get_db)):
     db_status = "unknown"
     pool_size = None
     pool_checked_out = None
-    
+
     try:
         # Testar conexão e medir latência
         await db.execute(text("SELECT 1"))
         db_latency_ms = round((time.time() - start_time) * 1000, 2)
         db_status = "connected"
-        
+
         pool = async_engine.pool
         current_pool_size = pool.size()
         pool_checked_out = pool.checkedout()
@@ -89,7 +89,7 @@ async def health_db(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         db_latency_ms = round((time.time() - start_time) * 1000, 2)
         db_status = "disconnected"
-        
+
         # Em produção, não expor detalhes do erro de conexão
         if _IS_PRODUCTION:
             return {

@@ -1,7 +1,6 @@
 """Testes de CRUD de usuários."""
-import uuid
 
-import pytest
+import uuid
 
 
 async def test_listar_usuarios_admin(client, admin_user, admin_headers):
@@ -16,14 +15,18 @@ async def test_listar_usuarios_sem_auth(client):
 
 
 async def test_criar_usuario_admin(client, admin_headers, academy):
-    r = await client.post("/users", headers=admin_headers, json={
-        "email": "novo@test.com",
-        "name": "Novo Usuário",
-        "graduation": "white",
-        "role": "aluno",
-        "academy_id": str(academy.id),
-        "password": "senha123",
-    })
+    r = await client.post(
+        "/users",
+        headers=admin_headers,
+        json={
+            "email": "novo@test.com",
+            "name": "Novo Usuário",
+            "graduation": "white",
+            "role": "aluno",
+            "academy_id": str(academy.id),
+            "password": "senha123",
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["email"] == "novo@test.com"
@@ -32,11 +35,15 @@ async def test_criar_usuario_admin(client, admin_headers, academy):
 
 
 async def test_criar_usuario_email_duplicado(client, admin_headers, admin_user):
-    r = await client.post("/users", headers=admin_headers, json={
-        "email": admin_user.email,
-        "name": "Dup",
-        "role": "administrador",
-    })
+    r = await client.post(
+        "/users",
+        headers=admin_headers,
+        json={
+            "email": admin_user.email,
+            "name": "Dup",
+            "role": "administrador",
+        },
+    )
     assert r.status_code == 409
 
 
@@ -47,11 +54,15 @@ async def test_obter_usuario_por_id(client, admin_headers, admin_user):
 
 
 async def test_atualizar_usuario(client, admin_headers, aluno_user):
-    r = await client.patch(f"/users/{aluno_user.id}", headers=admin_headers, json={
-        "name": "Nome Atualizado",
-        "graduation": "blue",
-        "role": "aluno",
-    })
+    r = await client.patch(
+        f"/users/{aluno_user.id}",
+        headers=admin_headers,
+        json={
+            "name": "Nome Atualizado",
+            "graduation": "blue",
+            "role": "aluno",
+        },
+    )
     assert r.status_code == 200
     assert r.json()["name"] == "Nome Atualizado"
 
@@ -67,9 +78,7 @@ async def test_atualizar_usuario_email_unico(client, admin_headers, aluno_user):
     assert r.json()["email"] == new_email
 
 
-async def test_atualizar_usuario_email_duplicado(
-    client, admin_headers, admin_user, aluno_user
-):
+async def test_atualizar_usuario_email_duplicado(client, admin_headers, admin_user, aluno_user):
     r = await client.patch(
         f"/users/{aluno_user.id}",
         headers=admin_headers,
@@ -79,8 +88,8 @@ async def test_atualizar_usuario_email_duplicado(
 
 
 async def test_excluir_usuario(client, admin_headers, db):
-    from app.models import User
     from app.core.security import hash_password_sync
+    from app.models import User
 
     u = User(email="deletar@test.com", name="Deletar", role="administrador", password_hash=hash_password_sync("123456"))
     db.add(u)
@@ -109,8 +118,9 @@ async def test_acesso_aluno_lista_propria_academia(client, aluno_headers, aluno_
 
 
 async def test_acesso_aluno_lista_outra_academia_proibido(client, aluno_headers, db):
-    from app.models import Academy
     from uuid import uuid4
+
+    from app.models import Academy
 
     other = Academy(name="Outra", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other)

@@ -1,8 +1,9 @@
 """Auditoria: snapshots JSON, histórico e restauração (soft delete + versão por audit_log_id)."""
+
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import Boolean, Date, DateTime, Integer, String, Text, and_, func, inspect, or_, select
@@ -194,18 +195,8 @@ async def list_audit_history(
         conditions.append(AuditLog.action == action.strip().upper())
     count_stmt = select(func.count()).select_from(AuditLog).where(*conditions)
     total = int((await db.scalar(count_stmt)) or 0)
-    order_clause = (
-        AuditLog.created_at.desc()
-        if order_norm == "desc"
-        else AuditLog.created_at.asc()
-    )
-    stmt = (
-        select(AuditLog)
-        .where(*conditions)
-        .order_by(order_clause)
-        .offset(offset)
-        .limit(limit)
-    )
+    order_clause = AuditLog.created_at.desc() if order_norm == "desc" else AuditLog.created_at.asc()
+    stmt = select(AuditLog).where(*conditions).order_by(order_clause).offset(offset).limit(limit)
     rows = (await db.execute(stmt)).scalars().all()
     return list(rows), total
 
@@ -288,11 +279,7 @@ async def list_audit_feed(
         combined = and_(*conditions)
         count_stmt = count_stmt.where(combined)
         stmt = stmt.where(combined)
-    order_clause = (
-        AuditLog.created_at.desc()
-        if order_norm == "desc"
-        else AuditLog.created_at.asc()
-    )
+    order_clause = AuditLog.created_at.desc() if order_norm == "desc" else AuditLog.created_at.asc()
     stmt = stmt.order_by(order_clause).offset(offset).limit(limit)
     total = int((await db.scalar(count_stmt)) or 0)
     rows = (await db.execute(stmt)).scalars().all()
@@ -312,9 +299,7 @@ async def restore_entity(
     - Com audit_log_id: aplica snapshot old_data do log (deve ser UPDATE/DELETE da mesma entidade).
     """
     entity_label, model = resolve_entity_model(entity)
-    obj = (
-        await db.execute(select(model).where(model.id == entity_id))
-    ).scalar_one_or_none()
+    obj = (await db.execute(select(model).where(model.id == entity_id))).scalar_one_or_none()
     if not obj:
         raise NotFoundError("Registro não encontrado.")
 

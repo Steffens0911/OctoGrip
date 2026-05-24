@@ -1,4 +1,5 @@
 """Rotas de notificações in-app: listar, contar não lidas, marcar lidas, comunicados."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -32,9 +33,7 @@ async def notifications_list(
     current_user: User = Depends(get_current_user),
 ):
     """Lista notificações do usuário logado, ordenadas da mais recente à mais antiga."""
-    return await list_notifications(
-        db, current_user.id, limit=limit, offset=offset, unread_only=unread_only
-    )
+    return await list_notifications(db, current_user.id, limit=limit, offset=offset, unread_only=unread_only)
 
 
 @router.get("/unread-count")

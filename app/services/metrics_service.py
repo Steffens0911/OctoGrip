@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +12,15 @@ from app.core.app_time import (
     today_in_app_tz,
 )
 from app.core.cache import app_cache
-from app.models import AttendanceRecord, AttendanceSession, LessonProgress, MissionUsage, TechniqueExecution, User, UserLoginDay
+from app.models import (
+    AttendanceRecord,
+    AttendanceSession,
+    LessonProgress,
+    MissionUsage,
+    TechniqueExecution,
+    User,
+    UserLoginDay,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +45,7 @@ def _build_usage_metrics_result(
     after_training_count: int,
 ) -> dict:
     total_usage = before_training_count + after_training_count
-    before_percent = (
-        round((before_training_count / total_usage * 100.0), 1) if total_usage > 0 else 0.0
-    )
+    before_percent = round((before_training_count / total_usage * 100.0), 1) if total_usage > 0 else 0.0
     result = {
         "total_completions": total_completions,
         "completions_last_7_days": completions_last_7_days,
@@ -61,19 +67,17 @@ async def get_usage_metrics(db: AsyncSession) -> dict:
         return cached
     total = await db.scalar(select(func.count(LessonProgress.id))) or 0
 
-    since_7_days = datetime.now(timezone.utc) - timedelta(days=7)
-    last_7 = await db.scalar(
-        select(func.count(LessonProgress.id)).where(LessonProgress.completed_at >= since_7_days)
-    ) or 0
+    since_7_days = datetime.now(UTC) - timedelta(days=7)
+    last_7 = (
+        await db.scalar(select(func.count(LessonProgress.id)).where(LessonProgress.completed_at >= since_7_days)) or 0
+    )
 
     unique_users = await db.scalar(select(func.count(func.distinct(LessonProgress.user_id)))) or 0
 
-    before = await db.scalar(
-        select(func.count(MissionUsage.id)).where(MissionUsage.usage_type == "before_training")
-    ) or 0
-    after = await db.scalar(
-        select(func.count(MissionUsage.id)).where(MissionUsage.usage_type == "after_training")
-    ) or 0
+    before = (
+        await db.scalar(select(func.count(MissionUsage.id)).where(MissionUsage.usage_type == "before_training")) or 0
+    )
+    after = await db.scalar(select(func.count(MissionUsage.id)).where(MissionUsage.usage_type == "after_training")) or 0
 
     result = _build_usage_metrics_result(
         total_completions=total,
@@ -96,46 +100,61 @@ async def get_usage_metrics_for_academy(db: AsyncSession, academy_id: uuid.UUID)
     if cached is not None:
         return cached
     # Filtro por academia via relação com User
-    since_7_days = datetime.now(timezone.utc) - timedelta(days=7)
+    since_7_days = datetime.now(UTC) - timedelta(days=7)
 
-    total = await db.scalar(
-        select(func.count(LessonProgress.id))
-        .join(User, LessonProgress.user_id == User.id)
-        .where(User.academy_id == academy_id)
-    ) or 0
-
-    last_7 = await db.scalar(
-        select(func.count(LessonProgress.id))
-        .join(User, LessonProgress.user_id == User.id)
-        .where(
-            User.academy_id == academy_id,
-            LessonProgress.completed_at >= since_7_days,
+    total = (
+        await db.scalar(
+            select(func.count(LessonProgress.id))
+            .join(User, LessonProgress.user_id == User.id)
+            .where(User.academy_id == academy_id)
         )
-    ) or 0
+        or 0
+    )
 
-    unique_users = await db.scalar(
-        select(func.count(func.distinct(LessonProgress.user_id)))
-        .join(User, LessonProgress.user_id == User.id)
-        .where(User.academy_id == academy_id)
-    ) or 0
-
-    before = await db.scalar(
-        select(func.count(MissionUsage.id))
-        .join(User, MissionUsage.user_id == User.id)
-        .where(
-            User.academy_id == academy_id,
-            MissionUsage.usage_type == "before_training",
+    last_7 = (
+        await db.scalar(
+            select(func.count(LessonProgress.id))
+            .join(User, LessonProgress.user_id == User.id)
+            .where(
+                User.academy_id == academy_id,
+                LessonProgress.completed_at >= since_7_days,
+            )
         )
-    ) or 0
+        or 0
+    )
 
-    after = await db.scalar(
-        select(func.count(MissionUsage.id))
-        .join(User, MissionUsage.user_id == User.id)
-        .where(
-            User.academy_id == academy_id,
-            MissionUsage.usage_type == "after_training",
+    unique_users = (
+        await db.scalar(
+            select(func.count(func.distinct(LessonProgress.user_id)))
+            .join(User, LessonProgress.user_id == User.id)
+            .where(User.academy_id == academy_id)
         )
-    ) or 0
+        or 0
+    )
+
+    before = (
+        await db.scalar(
+            select(func.count(MissionUsage.id))
+            .join(User, MissionUsage.user_id == User.id)
+            .where(
+                User.academy_id == academy_id,
+                MissionUsage.usage_type == "before_training",
+            )
+        )
+        or 0
+    )
+
+    after = (
+        await db.scalar(
+            select(func.count(MissionUsage.id))
+            .join(User, MissionUsage.user_id == User.id)
+            .where(
+                User.academy_id == academy_id,
+                MissionUsage.usage_type == "after_training",
+            )
+        )
+        or 0
+    )
 
     result = _build_usage_metrics_result(
         total_completions=total,
@@ -183,9 +202,7 @@ async def _compute_engagement_for_period(
 
     active_students = await db.scalar(active_query) or 0
 
-    active_rate = (
-        round(active_students / total_students * 100.0, 1) if total_students > 0 else 0.0
-    )
+    active_rate = round(active_students / total_students * 100.0, 1) if total_students > 0 else 0.0
 
     return {
         "start_date": start,
@@ -368,16 +385,12 @@ async def get_weekly_panel_logins_report(
         week_start = monday
         week_end = monday + timedelta(days=6)
 
-    cache_key = await _metrics_cache_key(
-        f"weekly_logins:{week_start}:{week_end}:{academy_id}:{reference_date}"
-    )
+    cache_key = await _metrics_cache_key(f"weekly_logins:{week_start}:{week_end}:{academy_id}:{reference_date}")
     cached = await app_cache.get(cache_key)
     if cached is not None:
         return cached
 
-    eligible_users_query = select(User).where(
-        User.role.in_(_WEEKLY_LOGIN_REPORT_ROLES)
-    ).order_by(User.email)
+    eligible_users_query = select(User).where(User.role.in_(_WEEKLY_LOGIN_REPORT_ROLES)).order_by(User.email)
     if academy_id is not None:
         eligible_users_query = eligible_users_query.where(User.academy_id == academy_id)
     eligible_users = (await db.execute(eligible_users_query)).scalars().all()
@@ -474,25 +487,27 @@ async def get_technique_execution_summary(
     base_where = [TechniqueExecution.status == "confirmed"]
 
     if academy_id is not None:
-        base_where.append(
-            TechniqueExecution.user_id.in_(
-                select(User.id).where(User.academy_id == academy_id)
+        base_where.append(TechniqueExecution.user_id.in_(select(User.id).where(User.academy_id == academy_id)))
+
+    before = (
+        await db.scalar(
+            select(func.count(TechniqueExecution.id)).where(
+                *base_where,
+                TechniqueExecution.usage_type == "before_training",
             )
         )
+        or 0
+    )
 
-    before = await db.scalar(
-        select(func.count(TechniqueExecution.id)).where(
-            *base_where,
-            TechniqueExecution.usage_type == "before_training",
+    after = (
+        await db.scalar(
+            select(func.count(TechniqueExecution.id)).where(
+                *base_where,
+                TechniqueExecution.usage_type == "after_training",
+            )
         )
-    ) or 0
-
-    after = await db.scalar(
-        select(func.count(TechniqueExecution.id)).where(
-            *base_where,
-            TechniqueExecution.usage_type == "after_training",
-        )
-    ) or 0
+        or 0
+    )
 
     total = before + after
     before_percent = round(before / total * 100.0, 1) if total > 0 else 0.0
@@ -534,8 +549,6 @@ async def get_students_attention_report(
         .group_by(AttendanceRecord.user_id)
     ).subquery()
 
-    from sqlalchemy.orm import selectinload
-
     from sqlalchemy import case as sa_case
 
     users_query = (
@@ -568,23 +581,25 @@ async def get_students_attention_report(
     rows = (await db.execute(users_query)).all()
     total_students = await db.scalar(total_query) or 0
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     students = []
     for uid, email, name, grad, acad_id, last_seen in rows:
         days_absent: int | None = None
         if last_seen is not None:
-            ls = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=timezone.utc)
+            ls = last_seen if last_seen.tzinfo else last_seen.replace(tzinfo=UTC)
             days_absent = (now - ls).days
-        students.append({
-            "user_id": str(uid),
-            "email": email,
-            "name": name,
-            "graduation": grad,
-            "academy_id": str(acad_id) if acad_id is not None else None,
-            "academy_name": None,
-            "last_seen_at": last_seen,
-            "days_absent": days_absent,
-        })
+        students.append(
+            {
+                "user_id": str(uid),
+                "email": email,
+                "name": name,
+                "graduation": grad,
+                "academy_id": str(acad_id) if acad_id is not None else None,
+                "academy_name": None,
+                "last_seen_at": last_seen,
+                "days_absent": days_absent,
+            }
+        )
 
     result = {
         "academy_id": str(academy_id) if academy_id is not None else None,
@@ -639,9 +654,7 @@ async def get_mission_completion_report(
 
     users_completed = await db.scalar(select(func.count()).select_from(completed_subq)) or 0
 
-    completion_rate = (
-        round(users_completed / total_students * 100.0, 1) if total_students > 0 else 0.0
-    )
+    completion_rate = round(users_completed / total_students * 100.0, 1) if total_students > 0 else 0.0
 
     result = {
         "academy_id": str(academy_id) if academy_id is not None else None,

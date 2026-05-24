@@ -8,10 +8,12 @@ onde o browser às vezes não vê Access-Control-Allow-Origin (500 multipart, pi
 Em produção, ``Settings.CORS_ORIGINS`` (``app.config``) deve incluir as origens HTTPS do viewer;
 sem isso, ``is_allowed_cors_origin`` ficava só com regex de localhost e o fallback não ecoava ACAO.
 """
+
 from __future__ import annotations
 
 import os
 import re
+
 from starlette.requests import Request
 
 from app.config import settings

@@ -1,4 +1,5 @@
 """CRUD de missões para painel do professor (T-01)."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -7,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, MissionNotFoundError
 from app.core.list_pagination import MAX_LIST_LIMIT
-from app.core.role_deps import require_admin_or_academy_access, require_read_access, require_write_access, verify_academy_access
+from app.core.role_deps import (
+    require_read_access,
+    require_write_access,
+    verify_academy_access,
+)
 from app.database import get_db
 from app.models import User
 from app.schemas.mission import MissionCreate, MissionRead, MissionUpdate

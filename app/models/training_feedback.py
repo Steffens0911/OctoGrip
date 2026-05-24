@@ -26,4 +26,4 @@ class TrainingFeedback(Base, UUIDMixin):
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="training_feedbacks")
+    user: Mapped[User] = relationship("User", back_populates="training_feedbacks")

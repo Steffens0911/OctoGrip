@@ -19,4 +19,3 @@ def get_model() -> Any:
 
         _model = DeepFace.build_model("Facenet512")
     return _model
-

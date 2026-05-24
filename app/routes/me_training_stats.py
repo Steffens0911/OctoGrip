@@ -1,5 +1,6 @@
 """Estatísticas de treino do aluno autenticado (últimos 30 dias + total)."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 _APP_TZ = ZoneInfo("America/Sao_Paulo")
@@ -38,7 +39,7 @@ async def my_training_stats(
     current_user: User = Depends(get_current_user),
 ):
     """Estatísticas de treino do aluno: presenças nas chamadas e posições confirmadas."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     cutoff = now - timedelta(days=30)
 
     # ── Treinos: presenças registradas via chamada nos últimos 30 dias ──
@@ -65,7 +66,7 @@ async def my_training_stats(
         days_since: int | None = None
     else:
         if last_at.tzinfo is None:
-            last_at = last_at.replace(tzinfo=timezone.utc)
+            last_at = last_at.replace(tzinfo=UTC)
         today_app = now.astimezone(_APP_TZ).date()
         last_app = last_at.astimezone(_APP_TZ).date()
         days_since = (today_app - last_app).days
@@ -77,15 +78,11 @@ async def my_training_stats(
     )
 
     result_month = await db.execute(
-        select(func.count()).select_from(
-            base_confirmed.where(TechniqueExecution.created_at >= cutoff).subquery()
-        )
+        select(func.count()).select_from(base_confirmed.where(TechniqueExecution.created_at >= cutoff).subquery())
     )
     positions_last_30_days: int = result_month.scalar_one()
 
-    result_total = await db.execute(
-        select(func.count()).select_from(base_confirmed.subquery())
-    )
+    result_total = await db.execute(select(func.count()).select_from(base_confirmed.subquery()))
     positions_total: int = result_total.scalar_one()
 
     # ── Média dos top 10 alunos da mesma academia (treinos nos últimos 30 dias) ──

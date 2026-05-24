@@ -1,17 +1,21 @@
 """Testes de CRUD de lições e missões."""
-import pytest
+
 from datetime import date, timedelta
 from uuid import uuid4
 
-
 # ========================== LIÇÕES ==========================
 
+
 async def test_criar_licao(client, admin_headers, technique):
-    r = await client.post("/lessons", headers=admin_headers, json={
-        "technique_id": str(technique.id),
-        "title": "Lição sobre raspagem",
-        "order_index": 1,
-    })
+    r = await client.post(
+        "/lessons",
+        headers=admin_headers,
+        json={
+            "technique_id": str(technique.id),
+            "title": "Lição sobre raspagem",
+            "order_index": 1,
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["title"] == "Lição sobre raspagem"
@@ -66,9 +70,13 @@ async def test_atualizar_licao(client, admin_headers, technique, db):
     await db.commit()
     await db.refresh(lesson)
 
-    r = await client.put(f"/lessons/{lesson.id}", headers=admin_headers, json={
-        "title": "Depois",
-    })
+    r = await client.put(
+        f"/lessons/{lesson.id}",
+        headers=admin_headers,
+        json={
+            "title": "Depois",
+        },
+    )
     assert r.status_code == 200
     assert r.json()["title"] == "Depois"
 
@@ -92,14 +100,19 @@ async def test_excluir_licao(client, admin_headers, technique, db):
 
 # ========================== MISSÕES ==========================
 
+
 async def test_criar_missao(client, admin_headers, technique):
     today = date.today()
-    r = await client.post("/missions", headers=admin_headers, json={
-        "technique_id": str(technique.id),
-        "start_date": today.isoformat(),
-        "end_date": (today + timedelta(days=6)).isoformat(),
-        "level": "beginner",
-    })
+    r = await client.post(
+        "/missions",
+        headers=admin_headers,
+        json={
+            "technique_id": str(technique.id),
+            "start_date": today.isoformat(),
+            "end_date": (today + timedelta(days=6)).isoformat(),
+            "level": "beginner",
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["technique_id"] == str(technique.id)
@@ -155,9 +168,13 @@ async def test_atualizar_missao(client, admin_headers, technique, db):
     await db.commit()
     await db.refresh(m)
 
-    r = await client.patch(f"/missions/{m.id}", headers=admin_headers, json={
-        "theme": "Atualizado",
-    })
+    r = await client.patch(
+        f"/missions/{m.id}",
+        headers=admin_headers,
+        json={
+            "theme": "Atualizado",
+        },
+    )
     assert r.status_code == 200
     assert r.json()["theme"] == "Atualizado"
 

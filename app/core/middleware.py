@@ -1,11 +1,12 @@
 """
 Middleware para observabilidade: Request ID, logging de requisições HTTP e contexto.
 """
+
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from contextvars import ContextVar
-from typing import Callable
 
 from fastapi import Request, Response
 from starlette.datastructures import MutableHeaders
@@ -124,13 +125,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration_seconds = time.perf_counter() - start_time
             duration_ms = duration_seconds * 1000
             error_type = type(e).__name__
-            
+
             # Registrar métricas de erro
-            http_errors_total.labels(
-                method=method, path=normalized_path, status_code=500, error_type=error_type
-            ).inc()
+            http_errors_total.labels(method=method, path=normalized_path, status_code=500, error_type=error_type).inc()
             http_request_duration_seconds.labels(method=method, path=normalized_path).observe(duration_seconds)
-            
+
             logger.error(
                 "HTTP request error",
                 extra={
@@ -155,6 +154,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         """Normaliza path removendo IDs dinâmicos para métricas."""
         # Substituir UUIDs por {id}
         import re
+
         uuid_pattern = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
         normalized = re.sub(uuid_pattern, "{id}", path, flags=re.IGNORECASE)
         return normalized

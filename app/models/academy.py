@@ -1,4 +1,5 @@
 """Academia (B2B): usuário vinculado (A-01), missão por academia (A-02)."""
+
 from __future__ import annotations
 
 import uuid
@@ -117,90 +118,90 @@ class Academy(Base, UUIDMixin):
         comment="Controle da academia: habilita chamada por QR; quando false, só presença manual.",
     )
 
-    weekly_technique: Mapped["Technique | None"] = relationship(
+    weekly_technique: Mapped[Technique | None] = relationship(
         "Technique",
         foreign_keys=[weekly_technique_id],
         lazy="selectin",
     )
-    weekly_technique_2: Mapped["Technique | None"] = relationship(
+    weekly_technique_2: Mapped[Technique | None] = relationship(
         "Technique",
         foreign_keys=[weekly_technique_2_id],
         lazy="selectin",
     )
-    weekly_technique_3: Mapped["Technique | None"] = relationship(
+    weekly_technique_3: Mapped[Technique | None] = relationship(
         "Technique",
         foreign_keys=[weekly_technique_3_id],
         lazy="selectin",
     )
-    visible_lesson: Mapped["Lesson | None"] = relationship(
+    visible_lesson: Mapped[Lesson | None] = relationship(
         "Lesson",
         foreign_keys=[visible_lesson_id],
         lazy="selectin",
     )
     # passive_deletes: ao apagar a academia, não emitir UPDATE para anular academy_id nos filhos.
     # Técnicas/troféus têm academy_id NOT NULL; a FK na BD usa ON DELETE CASCADE.
-    users: Mapped[list["User"]] = relationship(
+    users: Mapped[list[User]] = relationship(
         "User",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    professors: Mapped[list["Professor"]] = relationship(
+    professors: Mapped[list[Professor]] = relationship(
         "Professor",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    missions: Mapped[list["Mission"]] = relationship(
+    missions: Mapped[list[Mission]] = relationship(
         "Mission",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    weekly_technique_kits: Mapped[list["WeeklyTechniqueKit"]] = relationship(
+    weekly_technique_kits: Mapped[list[WeeklyTechniqueKit]] = relationship(
         "WeeklyTechniqueKit",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    user_weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
+    user_weekly_kit_choices: Mapped[list[UserWeeklyKitChoice]] = relationship(
         "UserWeeklyKitChoice",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
+    collective_goals: Mapped[list[CollectiveGoal]] = relationship(
         "CollectiveGoal",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    techniques: Mapped[list["Technique"]] = relationship(
+    techniques: Mapped[list[Technique]] = relationship(
         "Technique",
         back_populates="academy",
         foreign_keys="Technique.academy_id",
         lazy="raise",
         passive_deletes=True,
     )
-    trophies: Mapped[list["Trophy"]] = relationship(
+    trophies: Mapped[list[Trophy]] = relationship(
         "Trophy",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    partners: Mapped[list["Partner"]] = relationship(
+    partners: Mapped[list[Partner]] = relationship(
         "Partner",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    training_videos: Mapped[list["TrainingVideo"]] = relationship(
+    training_videos: Mapped[list[TrainingVideo]] = relationship(
         "TrainingVideo",
         back_populates="academy",
         lazy="raise",
         passive_deletes=True,
     )
-    marketplace_items: Mapped[list["AcademyMarketplaceItem"]] = relationship(
+    marketplace_items: Mapped[list[AcademyMarketplaceItem]] = relationship(
         "AcademyMarketplaceItem",
         back_populates="academy",
         lazy="raise",

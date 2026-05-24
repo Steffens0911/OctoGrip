@@ -1,4 +1,5 @@
 """Serviço de notificações in-app: criar, listar, marcar como lida, broadcasts."""
+
 from __future__ import annotations
 
 import logging
@@ -41,10 +42,7 @@ async def create_notifications_bulk(
 ) -> int:
     if not user_ids:
         return 0
-    notifs = [
-        Notification(user_id=uid, type=type, title=title, body=body, data=data)
-        for uid in user_ids
-    ]
+    notifs = [Notification(user_id=uid, type=type, title=title, body=body, data=data) for uid in user_ids]
     db.add_all(notifs)
     await db.commit()
     return len(notifs)
@@ -75,9 +73,7 @@ async def create_notifications_for_academy_students(
     exclude_user_id: UUID | None = None,
 ) -> int:
     user_ids = await _get_academy_student_ids(db, academy_id, exclude_user_id)
-    return await create_notifications_bulk(
-        db, user_ids=user_ids, type=type, title=title, body=body, data=data
-    )
+    return await create_notifications_bulk(db, user_ids=user_ids, type=type, title=title, body=body, data=data)
 
 
 async def create_notifications_for_all_students(
@@ -88,12 +84,8 @@ async def create_notifications_for_all_students(
     body: str,
     data: dict[str, Any] | None = None,
 ) -> int:
-    user_ids = list(
-        (await db.execute(select(User.id).where(User.role == "aluno"))).scalars().all()
-    )
-    return await create_notifications_bulk(
-        db, user_ids=user_ids, type=type, title=title, body=body, data=data
-    )
+    user_ids = list((await db.execute(select(User.id).where(User.role == "aluno"))).scalars().all())
+    return await create_notifications_bulk(db, user_ids=user_ids, type=type, title=title, body=body, data=data)
 
 
 async def list_notifications(
@@ -126,9 +118,7 @@ async def get_unread_count(db: AsyncSession, user_id: UUID) -> int:
     return result or 0
 
 
-async def mark_as_read(
-    db: AsyncSession, notification_id: UUID, user_id: UUID
-) -> bool:
+async def mark_as_read(db: AsyncSession, notification_id: UUID, user_id: UUID) -> bool:
     result = await db.execute(
         update(Notification)
         .where(Notification.id == notification_id, Notification.user_id == user_id)
@@ -140,9 +130,7 @@ async def mark_as_read(
 
 async def mark_all_as_read(db: AsyncSession, user_id: UUID) -> int:
     result = await db.execute(
-        update(Notification)
-        .where(Notification.user_id == user_id, Notification.read.is_(False))
-        .values(read=True)
+        update(Notification).where(Notification.user_id == user_id, Notification.read.is_(False)).values(read=True)
     )
     await db.commit()
     return result.rowcount or 0

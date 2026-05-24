@@ -1,4 +1,5 @@
 """Schemas para execuções de técnica (gamificação)."""
+
 from datetime import datetime
 from uuid import UUID
 

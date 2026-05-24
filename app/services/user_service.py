@@ -1,10 +1,14 @@
 """Serviços CRUD para User (painel desenvolvedores)."""
+
 import logging
 from uuid import UUID
 
-from sqlalchemy import or_, select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.exceptions import ConflictError, UserNotFoundError
+from app.core.security import hash_password
 from app.models import (
     LessonProgress,
     MissionUsage,
@@ -13,8 +17,6 @@ from app.models import (
     TrainingVideoDailyView,
     User,
 )
-from app.core.exceptions import ConflictError, UserNotFoundError
-from app.core.security import hash_password
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
     AUDIT_ACTION_DELETE,
@@ -143,9 +145,7 @@ async def update_user(
         if normalized != (user.email or "").lower():
             other = await get_user_by_email(db, normalized)
             if other is not None and other.id != user.id:
-                raise ConflictError(
-                    "E-mail já cadastrado por outro usuário (único em todo o sistema)."
-                )
+                raise ConflictError("E-mail já cadastrado por outro usuário (único em todo o sistema).")
         user.email = normalized
     if name is not None:
         user.name = name.strip() if name else None
@@ -198,6 +198,7 @@ async def update_user(
     if account_frozen is not UNSET and bool(account_frozen) != _old_frozen:
         try:
             from app.services.notification_service import create_notification
+
             if bool(account_frozen):
                 reason = (
                     account_freeze_reason

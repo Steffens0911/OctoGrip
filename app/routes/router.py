@@ -2,20 +2,19 @@
 Agregação de todos os routers da API.
 Centraliza prefixos e tags; main.py só inclui este router.
 """
+
 from fastapi import APIRouter
 
 from app.routes import (
     academies,
-    notifications,
-    students,
     academy_weekly_kits,
-    attendance,
     admin,
     admin_audit,
     admin_backup,
     admin_global_partners,
     admin_push,
     admin_undo,
+    attendance,
     auth,
     executions,
     face_recognition,
@@ -33,9 +32,11 @@ from app.routes import (
     mission_complete,
     mission_usages,
     missions,
+    notifications,
     partners,
     professors,
     reports,
+    students,
     techniques,
     training_feedback,
     training_videos,

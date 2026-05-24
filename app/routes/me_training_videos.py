@@ -15,8 +15,8 @@ from app.schemas.training_video import (
 from app.services.me_header_service import get_me_header_stats
 from app.services.training_video_service import (
     complete_training_video_for_user,
-    get_training_videos_for_user_today,
     get_training_video,
+    get_training_videos_for_user_today,
 )
 
 router = APIRouter()
@@ -69,4 +69,3 @@ async def my_training_video_complete(
         video=video,
     )
     return TrainingVideoCompletionResponse(**payload)
-

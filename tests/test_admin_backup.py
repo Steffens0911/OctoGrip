@@ -1,4 +1,5 @@
 """Backup e restauração admin (/admin/backup/*)."""
+
 import io
 import shutil
 import tempfile
@@ -13,9 +14,7 @@ from app.routes.admin_backup import safe_extract_zip
 
 
 @pytest.mark.asyncio
-async def test_backup_database_forbidden_for_non_admin(
-    client: AsyncClient, professor_headers: dict
-):
+async def test_backup_database_forbidden_for_non_admin(client: AsyncClient, professor_headers: dict):
     r = await client.get("/admin/backup/database", headers=professor_headers)
     assert r.status_code == 403
 
@@ -27,17 +26,13 @@ async def test_backup_database_forbidden_for_aluno(client: AsyncClient, aluno_he
 
 
 @pytest.mark.asyncio
-async def test_backup_archive_forbidden_for_non_admin(
-    client: AsyncClient, professor_headers: dict
-):
+async def test_backup_archive_forbidden_for_non_admin(client: AsyncClient, professor_headers: dict):
     r = await client.get("/admin/backup/archive", headers=professor_headers)
     assert r.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_backup_restore_forbidden_for_non_admin(
-    client: AsyncClient, professor_headers: dict
-):
+async def test_backup_restore_forbidden_for_non_admin(client: AsyncClient, professor_headers: dict):
     files = {"file": ("x.zip", b"PK\x05\x06" + b"\x00" * 18, "application/zip")}
     r = await client.post("/admin/backup/restore", headers=professor_headers, files=files)
     assert r.status_code == 403
@@ -99,9 +94,7 @@ def test_build_full_backup_zip_includes_media_files(monkeypatch: pytest.MonkeyPa
 
 
 @pytest.mark.asyncio
-async def test_backup_database_admin_returns_sql_when_pg_dump_available(
-    client: AsyncClient, admin_headers: dict
-):
+async def test_backup_database_admin_returns_sql_when_pg_dump_available(client: AsyncClient, admin_headers: dict):
     if not shutil.which("pg_dump"):
         pytest.skip("pg_dump não está no PATH (instale postgresql-client ou use Docker)")
     r = await client.get("/admin/backup/database", headers=admin_headers)
@@ -115,9 +108,7 @@ async def test_backup_database_admin_returns_sql_when_pg_dump_available(
 
 
 @pytest.mark.asyncio
-async def test_backup_archive_admin_returns_zip_when_pg_dump_available(
-    client: AsyncClient, admin_headers: dict
-):
+async def test_backup_archive_admin_returns_zip_when_pg_dump_available(client: AsyncClient, admin_headers: dict):
     if not shutil.which("pg_dump"):
         pytest.skip("pg_dump não está no PATH (instale postgresql-client ou use Docker)")
     r = await client.get("/admin/backup/archive", headers=admin_headers)

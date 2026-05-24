@@ -1,11 +1,13 @@
 """Turmas semanais (1–5 técnicas; rótulo = nome da turma) e escolha do aluno por semana ISO."""
+
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import delete as sa_delete, func, select
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -149,7 +151,7 @@ async def update_kit_meta(
         kit.label = label.strip()
     if sort_order is not None:
         kit.sort_order = sort_order
-    kit.updated_at = datetime.now(timezone.utc)
+    kit.updated_at = datetime.now(UTC)
     await db.flush()
     kit_after = await get_kit(db, kit_id, academy_id)
     if not kit_after:
@@ -195,7 +197,7 @@ async def soft_delete_kit(
     if not kit:
         return False
     before = _weekly_kit_snapshot(kit)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     kit.deleted_at = now
     kit.updated_at = now
     await _cleanup_kit_trailing_slots(db, academy_id, kit_id, 0)
@@ -263,7 +265,7 @@ async def replace_kit_items_and_sync_missions(
                 multiplier=clamp_reward_points(mult),
             )
         )
-    kit.updated_at = datetime.now(timezone.utc)
+    kit.updated_at = datetime.now(UTC)
     await db.flush()
     kit_after = await get_kit(db, kit_id, academy_id)
     if not kit_after:
@@ -329,43 +331,37 @@ async def has_user_kit_mission_activity_in_iso_week(
     """True se o usuário concluiu (MissionUsage ou execução confirmada) alguma missão de kit nesta semana ISO."""
     start, end = utc_datetime_bounds_for_iso_week(iso_year, iso_week)
     mu = (
-        (
-            await db.execute(
-                select(MissionUsage.id)
-                .join(Mission, MissionUsage.mission_id == Mission.id)
-                .where(
-                    MissionUsage.user_id == user_id,
-                    Mission.academy_id == academy_id,
-                    Mission.weekly_kit_id.isnot(None),
-                    MissionUsage.completed_at >= start,
-                    MissionUsage.completed_at < end,
-                )
-                .limit(1)
+        await db.execute(
+            select(MissionUsage.id)
+            .join(Mission, MissionUsage.mission_id == Mission.id)
+            .where(
+                MissionUsage.user_id == user_id,
+                Mission.academy_id == academy_id,
+                Mission.weekly_kit_id.isnot(None),
+                MissionUsage.completed_at >= start,
+                MissionUsage.completed_at < end,
             )
+            .limit(1)
         )
-        .first()
-    )
+    ).first()
     if mu:
         return True
     te = (
-        (
-            await db.execute(
-                select(TechniqueExecution.id)
-                .join(Mission, TechniqueExecution.mission_id == Mission.id)
-                .where(
-                    TechniqueExecution.user_id == user_id,
-                    Mission.academy_id == academy_id,
-                    Mission.weekly_kit_id.isnot(None),
-                    TechniqueExecution.status == "confirmed",
-                    TechniqueExecution.confirmed_at.isnot(None),
-                    TechniqueExecution.confirmed_at >= start,
-                    TechniqueExecution.confirmed_at < end,
-                )
-                .limit(1)
+        await db.execute(
+            select(TechniqueExecution.id)
+            .join(Mission, TechniqueExecution.mission_id == Mission.id)
+            .where(
+                TechniqueExecution.user_id == user_id,
+                Mission.academy_id == academy_id,
+                Mission.weekly_kit_id.isnot(None),
+                TechniqueExecution.status == "confirmed",
+                TechniqueExecution.confirmed_at.isnot(None),
+                TechniqueExecution.confirmed_at >= start,
+                TechniqueExecution.confirmed_at < end,
             )
+            .limit(1)
         )
-        .first()
-    )
+    ).first()
     return te is not None
 
 
@@ -382,9 +378,7 @@ async def set_user_weekly_kit_choice(
     if not kit:
         raise NotFoundError("Kit não encontrado ou não pertence à sua academia.")
     items_count = (
-        await db.execute(
-            select(func.count()).select_from(WeeklyKitItem).where(WeeklyKitItem.kit_id == kit_id)
-        )
+        await db.execute(select(func.count()).select_from(WeeklyKitItem).where(WeeklyKitItem.kit_id == kit_id))
     ).scalar_one()
     ic = int(items_count or 0)
     if ic < 1 or ic > 5:
@@ -392,9 +386,7 @@ async def set_user_weekly_kit_choice(
 
     existing = await get_user_kit_choice(db, user_id, academy_id, iso_year, iso_week)
     if existing and existing.kit_id != kit_id:
-        blocked = await has_user_kit_mission_activity_in_iso_week(
-            db, user_id, academy_id, iso_year, iso_week
-        )
+        blocked = await has_user_kit_mission_activity_in_iso_week(db, user_id, academy_id, iso_year, iso_week)
         if blocked:
             raise AppError(
                 "Não é possível trocar de kit: já há conclusão ou execução confirmada "
@@ -402,7 +394,7 @@ async def set_user_weekly_kit_choice(
                 status_code=409,
             )
         existing.kit_id = kit_id
-        existing.chosen_at = datetime.now(timezone.utc)
+        existing.chosen_at = datetime.now(UTC)
         await db.commit()
         await db.refresh(existing)
         return existing

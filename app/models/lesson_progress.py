@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -40,5 +40,5 @@ class LessonProgress(Base, UUIDMixin):
         comment="Pontos creditados nesta conclusão (soma no total do usuário).",
     )
 
-    user: Mapped["User"] = relationship("User", back_populates="lesson_progresses")
-    lesson: Mapped["Lesson"] = relationship("Lesson", back_populates="lesson_progresses")
+    user: Mapped[User] = relationship("User", back_populates="lesson_progresses")
+    lesson: Mapped[Lesson] = relationship("Lesson", back_populates="lesson_progresses")

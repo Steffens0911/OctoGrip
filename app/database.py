@@ -1,12 +1,10 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.config import settings
 
-_async_url = settings.DATABASE_URL.replace(
-    "postgresql://", "postgresql+asyncpg://", 1
-)
+_async_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 async_engine = create_async_engine(
     _async_url,
@@ -18,9 +16,7 @@ async_engine = create_async_engine(
     echo=False,
 )
 
-AsyncSessionLocal = async_sessionmaker(
-    async_engine, class_=AsyncSession, expire_on_commit=False
-)
+AsyncSessionLocal = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 # Sync engine kept for migrations (run_migrations.py) and seed
 sync_engine = create_engine(

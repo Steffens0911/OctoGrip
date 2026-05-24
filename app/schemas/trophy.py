@@ -1,4 +1,5 @@
 """Schemas para troféus (galeria no perfil)."""
+
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
@@ -25,7 +26,9 @@ class TrophyCreate(BaseModel):
         ge=0,
         description="Nível mínimo (reward_level) para desbloquear; 0 = sem requisito",
     )
-    min_graduation_to_unlock: str | None = Field(default=None, description="Faixa mínima (white, blue, purple, brown, black); null = todos")
+    min_graduation_to_unlock: str | None = Field(
+        default=None, description="Faixa mínima (white, blue, purple, brown, black); null = todos"
+    )
     max_count_per_opponent: PositiveInt | None = Field(
         default=None,
         description="Máx. execuções que contam por adversário no período; null = sem limite (legado)",
@@ -100,6 +103,7 @@ TrophyTier = Literal["bronze", "silver", "gold"]
 
 class UserTrophyEarned(BaseModel):
     """Item da galeria: troféu ou medalha com tier conquistado (ou nenhum)."""
+
     trophy_id: UUID
     technique_id: UUID
     academy_id: UUID | None = None
@@ -123,6 +127,7 @@ class UserTrophyEarned(BaseModel):
 
 class TrophyHomeSummaryItem(BaseModel):
     """Troféu/medalha recentemente conquistado pelo próprio usuário."""
+
     trophy_id: UUID
     name: str
     award_kind: str
@@ -131,6 +136,7 @@ class TrophyHomeSummaryItem(BaseModel):
 
 class AcademyRecentItem(BaseModel):
     """Conquista recente de um colega da academia."""
+
     user_id: UUID
     user_name: str
     tier: TrophyTier
@@ -153,6 +159,7 @@ class AcademyUserEarned(BaseModel):
 
 class TrophyHomeSummaryResponse(BaseModel):
     """Resumo para os cards da home: conquistas próprias + feed da academia."""
+
     my_earned_count: int
     my_recent: list[TrophyHomeSummaryItem]
     academy_recent: list[AcademyRecentItem]

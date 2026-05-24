@@ -1,4 +1,5 @@
 """Endpoints admin: histórico de auditoria e restauração (soft delete / snapshot)."""
+
 from typing import Literal, cast
 from uuid import UUID
 

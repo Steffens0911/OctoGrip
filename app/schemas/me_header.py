@@ -1,4 +1,5 @@
 """Schemas do header da home do aluno."""
+
 from __future__ import annotations
 
 from uuid import UUID

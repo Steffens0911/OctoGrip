@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_db
 from app.core.exceptions import AppError
 from app.core.role_deps import require_admin
+from app.database import get_db
 from app.models import User
 from app.schemas.push_notification import AcademyPushNotifyRequest, AcademyPushNotifyResponse
 from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message

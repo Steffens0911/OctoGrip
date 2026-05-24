@@ -1,5 +1,6 @@
 """Testes de CRUD de troféus."""
-from datetime import date, datetime, timedelta, timezone
+
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -13,7 +14,7 @@ def _mock_execution(opponent_id, graduation: str, confirmed_day: int, eid=None):
     opp = MagicMock()
     opp.graduation = graduation
     e.opponent = opp
-    e.confirmed_at = datetime(2026, 1, confirmed_day, 12, 0, tzinfo=timezone.utc)
+    e.confirmed_at = datetime(2026, 1, confirmed_day, 12, 0, tzinfo=UTC)
     return e
 
 
@@ -70,14 +71,18 @@ async def trophy(db, academy, technique):
 
 async def test_criar_trofeu_admin(client, admin_headers, academy, technique):
     """Admin pode criar troféu."""
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Novo Troféu",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 15,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Novo Troféu",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 15,
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Novo Troféu"
@@ -89,27 +94,35 @@ async def test_criar_trofeu_admin(client, admin_headers, academy, technique):
 
 async def test_criar_trofeu_professor(client, professor_headers, academy, technique):
     """Professor pode criar troféu na própria academia."""
-    r = await client.post("/trophies", headers=professor_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Professor",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 20,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=professor_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Professor",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 20,
+        },
+    )
     assert r.status_code == 201
 
 
 async def test_criar_trofeu_aluno_proibido(client, aluno_headers, academy, technique):
     """Aluno não pode criar troféu."""
-    r = await client.post("/trophies", headers=aluno_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Aluno",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=aluno_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Aluno",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 403
 
 
@@ -131,28 +144,36 @@ async def test_criar_trofeu_tecnica_outra_academia(client, admin_headers, academ
     await db.commit()
     await db.refresh(other_technique)
 
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(other_technique.id),  # Técnica de outra academia
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(other_technique.id),  # Técnica de outra academia
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 400
 
 
 async def test_criar_trofeu_max_count_per_opponent(client, admin_headers, academy, technique):
     """Criar troféu com limite de execuções contáveis por adversário."""
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Limite Parceiro",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-        "max_count_per_opponent": 2,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Limite Parceiro",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+            "max_count_per_opponent": 2,
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["max_count_per_opponent"] == 2
@@ -160,56 +181,72 @@ async def test_criar_trofeu_max_count_per_opponent(client, admin_headers, academ
 
 async def test_criar_trofeu_max_count_per_opponent_invalido(client, admin_headers, academy, technique):
     """max_count_per_opponent < 1 é rejeitado."""
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-        "max_count_per_opponent": 0,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+            "max_count_per_opponent": 0,
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_criar_trofeu_data_invalida(client, admin_headers, academy, technique):
     """Não pode criar troféu com end_date < start_date."""
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_criar_trofeu_academia_inexistente(client, admin_headers, technique):
     """Não pode criar troféu com academia inexistente."""
     fake_academy_id = uuid4()
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(fake_academy_id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(fake_academy_id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 404
 
 
 async def test_criar_trofeu_tecnica_inexistente(client, admin_headers, academy):
     """Não pode criar troféu com técnica inexistente."""
     fake_technique_id = uuid4()
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(fake_technique_id),
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=30)).isoformat(),
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(fake_technique_id),
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=30)).isoformat(),
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 404
 
 
@@ -302,8 +339,8 @@ async def test_galeria_trofeus_usuario_inexistente(client, admin_headers):
 
 async def test_galeria_trofeus_aluno_acesso_outro_aluno_proibido(client, aluno_headers, db):
     """Aluno não pode ver galeria de outro aluno de outra academia."""
-    from app.models import Academy, User
     from app.core.security import hash_password_sync
+    from app.models import Academy, User
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -328,8 +365,8 @@ async def test_galeria_trofeus_aluno_acesso_outro_aluno_proibido(client, aluno_h
 
 async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_headers, db, academy):
     """Admin pode ver galeria de qualquer usuário."""
-    from app.models import User
     from app.core.security import hash_password_sync
+    from app.models import User
 
     other_user = User(
         email=f"outro-{uuid4().hex[:8]}@test.com",
@@ -349,8 +386,8 @@ async def test_galeria_trofeus_admin_pode_ver_qualquer_usuario(client, admin_hea
 
 async def test_galeria_privada_retorna_403(client, aluno_headers, admin_headers, db, academy, trophy):
     """Quando o dono da galeria tem gallery_visible=False, outro usuário recebe 403."""
+    from app.core.security import hash_password_sync
     from app.models import User
-    from app.core.security import create_access_token, hash_password_sync
 
     other_user = User(
         email=f"outro-{uuid4().hex[:8]}@test.com",

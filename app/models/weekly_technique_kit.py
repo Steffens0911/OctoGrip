@@ -1,4 +1,5 @@
 """Kit semanal de técnicas (rótulo de turma), 1–5 itens por kit."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,22 +22,20 @@ class WeeklyTechniqueKit(Base, UUIDMixin):
     )
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    academy: Mapped["Academy"] = relationship("Academy", back_populates="weekly_technique_kits")
-    items: Mapped[list["WeeklyKitItem"]] = relationship(
+    academy: Mapped[Academy] = relationship("Academy", back_populates="weekly_technique_kits")
+    items: Mapped[list[WeeklyKitItem]] = relationship(
         "WeeklyKitItem",
         back_populates="kit",
         order_by="WeeklyKitItem.order_index",
         cascade="all, delete-orphan",
     )
-    missions: Mapped[list["Mission"]] = relationship(
+    missions: Mapped[list[Mission]] = relationship(
         "Mission",
         back_populates="weekly_kit",
         lazy="dynamic",
@@ -58,15 +57,13 @@ class WeeklyKitItem(Base, UUIDMixin):
         index=True,
     )
     multiplier: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    kit: Mapped["WeeklyTechniqueKit"] = relationship("WeeklyTechniqueKit", back_populates="items")
-    technique: Mapped["Technique"] = relationship("Technique", lazy="joined")
+    kit: Mapped[WeeklyTechniqueKit] = relationship("WeeklyTechniqueKit", back_populates="items")
+    technique: Mapped[Technique] = relationship("Technique", lazy="joined")
 
 
 class UserWeeklyKitChoice(Base, UUIDMixin):
@@ -89,10 +86,8 @@ class UserWeeklyKitChoice(Base, UUIDMixin):
         nullable=False,
         index=True,
     )
-    chosen_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    chosen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    user: Mapped["User"] = relationship("User", back_populates="weekly_kit_choices", lazy="raise")
-    academy: Mapped["Academy"] = relationship("Academy", back_populates="user_weekly_kit_choices")
-    kit: Mapped["WeeklyTechniqueKit"] = relationship("WeeklyTechniqueKit", lazy="joined")
+    user: Mapped[User] = relationship("User", back_populates="weekly_kit_choices", lazy="raise")
+    academy: Mapped[Academy] = relationship("Academy", back_populates="user_weekly_kit_choices")
+    kit: Mapped[WeeklyTechniqueKit] = relationship("WeeklyTechniqueKit", lazy="joined")

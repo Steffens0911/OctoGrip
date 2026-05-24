@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Index
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -36,17 +36,17 @@ class TrainingVideo(Base, UUIDMixin):
         nullable=True,
         index=True,
     )
-    academy: Mapped["Academy | None"] = relationship(
+    academy: Mapped[Academy | None] = relationship(
         "Academy",
         back_populates="training_videos",
         lazy="selectin",
     )
-    created_by: Mapped["User | None"] = relationship(
+    created_by: Mapped[User | None] = relationship(
         "User",
         back_populates="training_videos",
         lazy="selectin",
     )
-    daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
+    daily_views: Mapped[list[TrainingVideoDailyView]] = relationship(
         "TrainingVideoDailyView",
         back_populates="training_video",
         lazy="selectin",
@@ -83,9 +83,8 @@ class TrainingVideoDailyView(Base, UUIDMixin):
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     points_awarded: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    user: Mapped["User"] = relationship("User", back_populates="training_video_daily_views")
-    training_video: Mapped["TrainingVideo"] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="training_video_daily_views")
+    training_video: Mapped[TrainingVideo] = relationship(
         "TrainingVideo",
         back_populates="daily_views",
     )
-

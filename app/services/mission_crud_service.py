@@ -1,11 +1,13 @@
 """CRUD de Mission para painel do professor (T-01). Missão = técnica + slot da academia (sem datas)."""
+
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import joinedload
 
 from app.core.exceptions import AcademyNotFoundError, AppError, LessonNotFoundError, TechniqueNotFoundError
 from app.core.list_pagination import clamp_list_limit
@@ -81,15 +83,19 @@ async def _validate_lesson_for_mission(
 async def _first_lesson_id_for_technique(db: AsyncSession, technique_id: UUID) -> UUID | None:
     """Retorna o id da primeira lição da técnica (por order_index)."""
     first = (
-        await db.execute(
-            select(Lesson)
-            .where(
-                Lesson.technique_id == technique_id,
-                Lesson.deleted_at.is_(None),
+        (
+            await db.execute(
+                select(Lesson)
+                .where(
+                    Lesson.technique_id == technique_id,
+                    Lesson.deleted_at.is_(None),
+                )
+                .order_by(Lesson.order_index.asc())
             )
-            .order_by(Lesson.order_index.asc())
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     return first.id if first else None
 
 
@@ -178,9 +184,7 @@ async def create_mission(
     return mission
 
 
-async def get_mission(
-    db: AsyncSession, mission_id: UUID, *, include_deleted: bool = False
-) -> Mission | None:
+async def get_mission(db: AsyncSession, mission_id: UUID, *, include_deleted: bool = False) -> Mission | None:
     """Retorna uma missão por ID. Por padrão ignora soft-deletadas."""
     stmt = select(Mission).where(Mission.id == mission_id)
     if not include_deleted:
@@ -330,15 +334,13 @@ async def update_mission(
     return mission
 
 
-async def delete_mission(
-    db: AsyncSession, mission_id: UUID, audit_user_id: UUID | None = None
-) -> bool:
+async def delete_mission(db: AsyncSession, mission_id: UUID, audit_user_id: UUID | None = None) -> bool:
     """Soft delete de uma missão. Retorna True se marcou como removida."""
     mission = (await db.execute(select(Mission).where(Mission.id == mission_id))).scalar_one_or_none()
     if not mission or mission.deleted_at is not None:
         return False
     before = entity_snapshot_row(mission)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     mission.deleted_at = now
     await write_audit_log(
         db,
@@ -377,27 +379,29 @@ async def _upsert_slot_missions(
     ).scalar_one_or_none()
     if not technique:
         raise TechniqueNotFoundError("Técnica não encontrada.")
-    
+
     result: list[Mission] = []
     try:
         for level in ("beginner", "intermediate"):
             cond_kit = (
-                Mission.weekly_kit_id == weekly_kit_id
-                if weekly_kit_id is not None
-                else Mission.weekly_kit_id.is_(None)
+                Mission.weekly_kit_id == weekly_kit_id if weekly_kit_id is not None else Mission.weekly_kit_id.is_(None)
             )
             existing = (
-                await db.execute(
-                    select(Mission).where(
-                        Mission.academy_id == academy_id,
-                        Mission.level == level,
-                        Mission.slot_index == slot_idx,
-                        Mission.deleted_at.is_(None),
-                        cond_kit,
+                (
+                    await db.execute(
+                        select(Mission).where(
+                            Mission.academy_id == academy_id,
+                            Mission.level == level,
+                            Mission.slot_index == slot_idx,
+                            Mission.deleted_at.is_(None),
+                            cond_kit,
+                        )
                     )
                 )
-            ).scalars().first()
-            
+                .scalars()
+                .first()
+            )
+
             if existing:
                 if existing.technique_id != tech_id:
                     # Técnica mudou: desativar antiga e criar nova
@@ -440,7 +444,7 @@ async def _upsert_slot_missions(
     except Exception:
         await db.rollback()
         raise
-    
+
     return result
 
 
@@ -456,19 +460,23 @@ async def _cleanup_kit_trailing_slots(
             for slot_idx in range(keep_slot_count, 5):
                 cond_kit = Mission.weekly_kit_id == weekly_kit_id
                 old = (
-                    await db.execute(
-                        select(Mission).where(
-                            Mission.academy_id == academy_id,
-                            Mission.level == level,
-                            Mission.slot_index == slot_idx,
-                            Mission.deleted_at.is_(None),
-                            cond_kit,
+                    (
+                        await db.execute(
+                            select(Mission).where(
+                                Mission.academy_id == academy_id,
+                                Mission.level == level,
+                                Mission.slot_index == slot_idx,
+                                Mission.deleted_at.is_(None),
+                                cond_kit,
+                            )
                         )
                     )
-                ).scalars().first()
+                    .scalars()
+                    .first()
+                )
                 if old:
                     before = entity_snapshot_row(old)
-                    old.deleted_at = datetime.now(timezone.utc)
+                    old.deleted_at = datetime.now(UTC)
                     await write_audit_log(
                         db,
                         action=AUDIT_ACTION_DELETE,
@@ -529,7 +537,7 @@ async def _cleanup_empty_slots(
     Se todos os slots estão vazios, remove todas as missões.
     """
     t1, t2, t3 = tech_slots[0][0], tech_slots[1][0], tech_slots[2][0]
-    
+
     try:
         if t1 is None and t2 is None and t3 is None:
             # Todos os slots vazios: remover todas as missões
@@ -548,7 +556,7 @@ async def _cleanup_empty_slots(
                     ).scalar_one_or_none()
                     if old:
                         before = entity_snapshot_row(old)
-                        old.deleted_at = datetime.now(timezone.utc)
+                        old.deleted_at = datetime.now(UTC)
                         await write_audit_log(
                             db,
                             action=AUDIT_ACTION_DELETE,
@@ -578,7 +586,7 @@ async def _cleanup_empty_slots(
                     ).scalar_one_or_none()
                     if old:
                         before = entity_snapshot_row(old)
-                        old.deleted_at = datetime.now(timezone.utc)
+                        old.deleted_at = datetime.now(UTC)
                         await write_audit_log(
                             db,
                             action=AUDIT_ACTION_DELETE,
@@ -616,7 +624,7 @@ async def upsert_academy_week_missions(
 
     tech_slots = [(t1, m1), (t2, m2), (t3, m3)]
     result: list[Mission] = []
-    
+
     try:
         # Criar/atualizar missões para slots preenchidos
         for slot_idx, (tech_id, mult) in enumerate(tech_slots):
@@ -624,12 +632,12 @@ async def upsert_academy_week_missions(
                 continue
             slot_missions = await _upsert_slot_missions(db, academy_id, slot_idx, tech_id, mult)
             result.extend(slot_missions)
-        
+
         # Limpar slots vazios
         await _cleanup_empty_slots(db, academy_id, tech_slots)
-        
+
     except Exception:
         await db.rollback()
         raise
-    
+
     return result

@@ -1,4 +1,5 @@
 """Rotas de sync de MissionUsage (PB-01) e histórico (PB-03). Requerem autenticação."""
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -1,13 +1,12 @@
 """Normalização de telefone BR e geração de URL WhatsApp para anúncios do marketplace."""
+
 from __future__ import annotations
 
 import re
 from urllib.parse import quote
 
 # Texto fixo embutido no parâmetro `text=` do wa.me (inclui título do produto).
-MARKETPLACE_WHATSAPP_MESSAGE_TEMPLATE = (
-    'Olá! Tenho interesse no produto "{title}" (anúncio FlowRoll).'
-)
+MARKETPLACE_WHATSAPP_MESSAGE_TEMPLATE = 'Olá! Tenho interesse no produto "{title}" (anúncio FlowRoll).'
 
 
 def normalize_br_whatsapp_phone(ddd: str | None, number: str | None) -> str | None:

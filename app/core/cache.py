@@ -1,4 +1,5 @@
 """Cache in-memory com suporte opcional a Redis para cenários multi-worker."""
+
 import asyncio
 import json
 import time

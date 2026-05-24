@@ -1,4 +1,5 @@
 """Parceiro global exibido no banner da Central para todos os alunos."""
+
 from __future__ import annotations
 
 from sqlalchemy import Boolean, Integer, String, Text

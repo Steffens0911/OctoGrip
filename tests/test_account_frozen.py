@@ -1,4 +1,5 @@
 """Conta congelada: PATCH pelo admin/gestor e bloqueio de escrita para aluno."""
+
 from datetime import date, timedelta
 
 import pytest
@@ -22,9 +23,7 @@ async def mission_ativa(db, academy, technique):
     return mission
 
 
-async def test_admin_congela_aluno_me_retorna_flags(
-    client, admin_headers, aluno_user, aluno_headers
-):
+async def test_admin_congela_aluno_me_retorna_flags(client, admin_headers, aluno_user, aluno_headers):
     r = await client.patch(
         f"/users/{aluno_user.id}",
         headers=admin_headers,
@@ -45,9 +44,7 @@ async def test_admin_congela_aluno_me_retorna_flags(
     assert body["account_freeze_reason"] == "Mensalidade em atraso"
 
 
-async def test_aluno_congelado_nao_completa_missao(
-    client, admin_headers, aluno_headers, aluno_user, mission_ativa
-):
+async def test_aluno_congelado_nao_completa_missao(client, admin_headers, aluno_headers, aluno_user, mission_ativa):
     await client.patch(
         f"/users/{aluno_user.id}",
         headers=admin_headers,
@@ -66,9 +63,7 @@ async def test_aluno_congelado_nao_completa_missao(
     assert err.get("error", {}).get("type") == "AccountFrozenError"
 
 
-async def test_gerente_congela_somente_aluno_da_academia(
-    client, gerente_headers, aluno_user
-):
+async def test_gerente_congela_somente_aluno_da_academia(client, gerente_headers, aluno_user):
     r = await client.patch(
         f"/users/{aluno_user.id}",
         headers=gerente_headers,
@@ -78,9 +73,7 @@ async def test_gerente_congela_somente_aluno_da_academia(
     assert r.json()["account_frozen"] is True
 
 
-async def test_professor_nao_altera_congelamento(
-    client, professor_headers, aluno_user, db
-):
+async def test_professor_nao_altera_congelamento(client, professor_headers, aluno_user, db):
     from sqlalchemy import select
 
     from app.models import User
@@ -92,7 +85,5 @@ async def test_professor_nao_altera_congelamento(
     )
     assert r.status_code == 200
     assert r.json().get("account_frozen") is False
-    row = (
-        await db.execute(select(User).where(User.id == aluno_user.id))
-    ).scalar_one()
+    row = (await db.execute(select(User).where(User.id == aluno_user.id))).scalar_one()
     assert row.account_frozen is False

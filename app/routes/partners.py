@@ -1,4 +1,5 @@
 """CRUD de parceiros por academia (gestor e admin)."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query

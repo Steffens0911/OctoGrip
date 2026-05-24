@@ -1,4 +1,5 @@
 """Schemas para metas coletivas."""
+
 from datetime import date, datetime
 from uuid import UUID
 
@@ -37,6 +38,7 @@ class CollectiveGoalCreate(BaseModel):
 
 class CollectiveGoalCurrentResponse(BaseModel):
     """Meta atual da semana com progresso."""
+
     goal: CollectiveGoalRead
     current_count: int
     target_count: int

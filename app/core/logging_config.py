@@ -2,6 +2,7 @@
 Logs estruturados: formato consistente para facilitar leitura e filtro.
 Uso nos services: logger.info("mensagem", extra={"chave": "valor"})
 """
+
 import json
 import logging
 import sys
@@ -9,10 +10,28 @@ from datetime import datetime
 
 # Atributos padrão do LogRecord; o resto vem de extra={}
 _STANDARD_ATTRS = {
-    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-    "module", "lineno", "funcName", "created", "msecs", "relativeCreated",
-    "thread", "threadName", "process", "processName", "message",
-    "exc_info", "exc_text", "stack_info", "taskName",
+    "name",
+    "msg",
+    "args",
+    "levelname",
+    "levelno",
+    "pathname",
+    "filename",
+    "module",
+    "lineno",
+    "funcName",
+    "created",
+    "msecs",
+    "relativeCreated",
+    "thread",
+    "threadName",
+    "process",
+    "processName",
+    "message",
+    "exc_info",
+    "exc_text",
+    "stack_info",
+    "taskName",
 }
 
 
@@ -59,27 +78,27 @@ class JSONFormatter(logging.Formatter):
 def setup_logging(level: str = "INFO", format_type: str = "text") -> None:
     """
     Configura logging da aplicação: stdout, formato estruturado.
-    
+
     Args:
         level: Nível de log (DEBUG, INFO, WARNING, ERROR, CRITICAL)
         format_type: Formato de log ("text" ou "json")
     """
     from app.core.middleware import ContextFilter
-    
+
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
     if not root.handlers:
         handler = logging.StreamHandler(sys.stdout)
         handler.setLevel(root.level)
-        
+
         if format_type.lower() == "json":
             handler.setFormatter(JSONFormatter())
         else:
             fmt = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
             handler.setFormatter(StructuredFormatter(fmt, datefmt="%Y-%m-%d %H:%M:%S"))
-        
+
         # Adicionar filter para contexto (request_id, user_id, academy_id)
         handler.addFilter(ContextFilter())
-        
+
         root.addHandler(handler)

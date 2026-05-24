@@ -1,7 +1,8 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -9,31 +10,30 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.staticfiles import StaticFiles
-from pathlib import Path
-from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
-from app.core.error_tracking import init_sentry
 from app.core.cors_policy import CORS_ORIGIN_REGEX, is_allowed_cors_origin, merge_json_response_headers
+from app.core.error_tracking import init_sentry
 from app.core.exceptions import AppError, AuthenticationError
 from app.core.logging_config import setup_logging
+from app.core.metrics import http_errors_total
 from app.core.middleware import (
-    ContextFilter,
     CorsFallbackMiddleware,
     RequestIDMiddleware,
     RequestLoggingMiddleware,
     SecurityHeadersMiddleware,
     get_request_id,
 )
-from app.core.metrics import http_errors_total
 from app.core.rate_limit import limiter
 from app.routes.router import api_router
 
 logger = logging.getLogger(__name__)
 
 _IS_PRODUCTION = os.getenv("ENVIRONMENT", "").lower() == "production"
+
 
 def register_exception_handlers(application: FastAPI) -> None:
     """Mapeia exceções de domínio e erros não tratados para respostas HTTP (com CORS)."""
@@ -58,7 +58,7 @@ def register_exception_handlers(application: FastAPI) -> None:
             },
             "request_id": get_request_id(),
             "path": request.url.path,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     @application.exception_handler(AppError)
@@ -225,7 +225,7 @@ def register_exception_handlers(application: FastAPI) -> None:
             status_code=500,
             error_type=error_type,
         ).inc()
-        
+
         # Logar com contexto completo
         logger.exception(
             "Exceção não tratada: %s",
@@ -239,14 +239,14 @@ def register_exception_handlers(application: FastAPI) -> None:
                 "error_message": str(exc),
             },
         )
-        
+
         # Em produção, não expor detalhes do erro para evitar vazamento de informações
         if _IS_PRODUCTION:
             detail = "Erro interno do servidor."
         else:
             # Em desenvolvimento, mostrar detalhes para facilitar debug
             detail = str(exc) or "Erro interno do servidor."
-        
+
         return JSONResponse(
             status_code=500,
             content=error_payload(

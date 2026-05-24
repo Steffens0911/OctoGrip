@@ -1,14 +1,15 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, Response, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.exceptions import ForbiddenError
-from app.core.rate_limit import limiter
 from app.core.list_pagination import MAX_LIST_LIMIT
+from app.core.rate_limit import limiter
 from app.core.role_deps import require_read_access, require_write_access
 from app.core.security import decode_access_token
 from app.database import get_db
@@ -32,10 +33,10 @@ from app.schemas.attendance import (
     QrScanIn,
     QrTokenOut,
 )
+from app.services import qr_service
 from app.services.attendance_realtime import attendance_manager
 from app.services.attendance_service import (
     add_record_manual,
-    attendance_ranking as attendance_ranking_service,
     close_attendance_session,
     create_attendance_session,
     delete_attendance_record,
@@ -49,7 +50,9 @@ from app.services.attendance_service import (
     stats_students,
     user_summary,
 )
-from app.services import qr_service
+from app.services.attendance_service import (
+    attendance_ranking as attendance_ranking_service,
+)
 from app.services.user_service import get_user
 
 router = APIRouter()
@@ -57,9 +60,7 @@ router = APIRouter()
 
 async def _present_count_for_session(db: AsyncSession, session_id: UUID) -> int:
     n = (
-        await db.execute(
-            select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id)
-        )
+        await db.execute(select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id))
     ).scalar_one()
     return int(n or 0)
 
@@ -441,9 +442,7 @@ async def attendance_record_delete(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    session_id, user_id = await delete_attendance_record(
-        db, current_user=current_user, record_id=record_id
-    )
+    session_id, user_id = await delete_attendance_record(db, current_user=current_user, record_id=record_id)
     present_count = await _present_count_for_session(db, session_id)
     await attendance_manager.broadcast(
         session_id,
@@ -506,19 +505,13 @@ async def attendance_session_qr(
     current_user: User = Depends(require_write_access),
     ttl_seconds: int = Query(60, ge=15, le=180),
 ):
-    session = await get_attendance_session_basic(
-        db, session_id, current_user=current_user
-    )
+    session = await get_attendance_session_basic(db, session_id, current_user=current_user)
     if session.academy_id is not None:
         qr_enabled = (
-            await db.execute(
-                select(Academy.qr_attendance_enabled).where(Academy.id == session.academy_id)
-            )
+            await db.execute(select(Academy.qr_attendance_enabled).where(Academy.id == session.academy_id))
         ).scalar_one_or_none()
         if qr_enabled is False:
-            raise ForbiddenError(
-                "A chamada por QR está desativada para esta academia. Faça presença manual."
-            )
+            raise ForbiddenError("A chamada por QR está desativada para esta academia. Faça presença manual.")
     token, expires_at = qr_service.issue(session_id, ttl_seconds=ttl_seconds)
     short_code = qr_service.issue_short(session_id, int(expires_at.timestamp()))
     return QrTokenOut(token=token, expires_at=expires_at, short_code=short_code)
@@ -601,7 +594,7 @@ async def attendance_me_summary(
     current_user: User = Depends(get_current_user),
     from_days: int = Query(30, ge=1, le=365),
 ):
-    to_dt = datetime.now(timezone.utc)
+    to_dt = datetime.now(UTC)
     from_dt = to_dt - timedelta(days=from_days)
     count, last_seen = await user_summary(
         db,
@@ -626,7 +619,7 @@ async def attendance_user_summary(
     current_user: User = Depends(get_current_user),
     from_days: int = Query(30, ge=1, le=365),
 ):
-    to_dt = datetime.now(timezone.utc)
+    to_dt = datetime.now(UTC)
     from_dt = to_dt - timedelta(days=from_days)
     count, last_seen = await user_summary(
         db,
@@ -642,4 +635,3 @@ async def attendance_user_summary(
         present_count=count,
         last_seen_at=last_seen,
     )
-

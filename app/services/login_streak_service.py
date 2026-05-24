@@ -1,4 +1,5 @@
 """Sequência de dias consecutivos com login (calendário no fuso APP_TIMEZONE), persistida em user_login_days."""
+
 from __future__ import annotations
 
 import logging
@@ -106,11 +107,7 @@ async def record_login_day(db: AsyncSession, user_id: uuid.UUID, *, now: datetim
     """Regista o dia de login no calendário do fuso do app (idempotente por dia)."""
     dt = now if now is not None else utc_now()
     day = calendar_date_in_app_tz(dt)
-    stmt = (
-        insert(UserLoginDay)
-        .values(user_id=user_id, login_day=day)
-        .on_conflict_do_nothing()
-    )
+    stmt = insert(UserLoginDay).values(user_id=user_id, login_day=day).on_conflict_do_nothing()
     await db.execute(stmt)
 
 

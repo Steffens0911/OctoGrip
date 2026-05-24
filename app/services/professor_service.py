@@ -1,4 +1,5 @@
 """Serviços CRUD para Professor (seção professor)."""
+
 import logging
 from uuid import UUID
 

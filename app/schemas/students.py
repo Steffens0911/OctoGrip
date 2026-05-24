@@ -1,4 +1,5 @@
 """Schemas para listagens de alunos (chamada, relatórios)."""
+
 from uuid import UUID
 
 from pydantic import BaseModel

@@ -1,4 +1,5 @@
 """Serviços CRUD para Partner."""
+
 import logging
 from uuid import UUID
 
@@ -31,14 +32,12 @@ async def list_partners(
     """Lista parceiros da academia ordenados por nome."""
     safe_limit = clamp_list_limit(limit)
     safe_offset = max(0, int(offset))
-    stmt = (
-        select(Partner)
-        .where(Partner.academy_id == academy_id)
-    )
+    stmt = select(Partner).where(Partner.academy_id == academy_id)
     if search:
         stmt = stmt.where(Partner.name.ilike(f"%{search.strip()}%"))
     stmt = stmt.order_by(Partner.name).offset(safe_offset).limit(safe_limit)
     return (await db.execute(stmt)).scalars().all()
+
 
 async def get_partner(db: AsyncSession, partner_id: UUID) -> Partner | None:
     """Retorna um parceiro por ID."""

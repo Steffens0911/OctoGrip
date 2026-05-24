@@ -1,4 +1,5 @@
 """Tasks Celery de execuções de técnica: escalada de confirmações ignoradas para revisão do professor."""
+
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select

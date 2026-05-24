@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.app_time import today_in_app_tz, utc_now
@@ -53,9 +53,7 @@ async def list_training_videos(
 
 
 async def get_training_video(db: AsyncSession, video_id: UUID) -> TrainingVideo | None:
-    return (await db.execute(
-        select(TrainingVideo).where(TrainingVideo.id == video_id)
-    )).scalar_one_or_none()
+    return (await db.execute(select(TrainingVideo).where(TrainingVideo.id == video_id))).scalar_one_or_none()
 
 
 async def create_training_video(
@@ -100,6 +98,7 @@ async def create_training_video(
     if video.is_active and video.academy_id:
         try:
             from app.services.notification_service import create_notifications_for_academy_students
+
             await create_notifications_for_academy_students(
                 db,
                 academy_id=video.academy_id,
@@ -167,6 +166,7 @@ async def update_training_video(
     if became_active and video.academy_id:
         try:
             from app.services.notification_service import create_notifications_for_academy_students
+
             await create_notifications_for_academy_students(
                 db,
                 academy_id=video.academy_id,
@@ -233,24 +233,36 @@ async def get_training_videos_for_user_today(
     else:
         base_query = base_query.where(TrainingVideo.academy_id.is_(None))
 
-    videos = (await db.execute(
-        base_query.order_by(
-            TrainingVideo.order_index.nulls_last(),
-            TrainingVideo.created_at.desc(),
+    videos = (
+        (
+            await db.execute(
+                base_query.order_by(
+                    TrainingVideo.order_index.nulls_last(),
+                    TrainingVideo.created_at.desc(),
+                )
+                .offset(safe_offset)
+                .limit(safe_limit)
+            )
         )
-        .offset(safe_offset)
-        .limit(safe_limit)
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
     if not videos:
         return []
 
     video_ids = [v.id for v in videos]
-    views = (await db.execute(
-        select(TrainingVideoDailyView).where(
-            TrainingVideoDailyView.user_id == user.id,
-            TrainingVideoDailyView.training_video_id.in_(video_ids),
+    views = (
+        (
+            await db.execute(
+                select(TrainingVideoDailyView).where(
+                    TrainingVideoDailyView.user_id == user.id,
+                    TrainingVideoDailyView.training_video_id.in_(video_ids),
+                )
+            )
         )
-    )).scalars().all()
+        .scalars()
+        .all()
+    )
 
     by_video: dict[UUID, list[TrainingVideoDailyView]] = {}
     for view in views:
@@ -287,13 +299,15 @@ async def complete_training_video_for_user(
     """Registra uma visualização diária, garantindo no máximo 1 pontuação por dia."""
     today = today_in_app_tz()
 
-    existing = (await db.execute(
-        select(TrainingVideoDailyView).where(
-            TrainingVideoDailyView.user_id == user.id,
-            TrainingVideoDailyView.training_video_id == video.id,
-            TrainingVideoDailyView.view_date == today,
+    existing = (
+        await db.execute(
+            select(TrainingVideoDailyView).where(
+                TrainingVideoDailyView.user_id == user.id,
+                TrainingVideoDailyView.training_video_id == video.id,
+                TrainingVideoDailyView.view_date == today,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
 
     if existing:
         points_total = await total_points_for_user(db, user.id)
@@ -339,4 +353,3 @@ async def complete_training_video_for_user(
         "new_points_balance": points_total,
         "message": "Pontos de vídeo de treinamento registrados.",
     }
-

@@ -1,5 +1,4 @@
 """Testes de health check."""
-import pytest
 
 
 async def test_health_ok(client):

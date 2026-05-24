@@ -28,9 +28,7 @@ class UserDeviceToken(Base):
     )
     fcm_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     platform: Mapped[str] = mapped_column(String(16), nullable=False, default="android")
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )

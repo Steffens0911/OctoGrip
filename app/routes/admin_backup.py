@@ -13,10 +13,9 @@ from pathlib import Path
 from urllib.parse import unquote, urlparse
 from uuid import UUID
 
-from sqlalchemy import text
-
 from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy import text
 
 from app.config import settings
 from app.core.cors_policy import merge_json_response_headers
@@ -53,10 +52,14 @@ def _require_admin_bearer_no_db_session(request: Request) -> str:
         raise AuthenticationError("Token inválido.")
 
     with sync_engine.connect() as conn:
-        row = conn.execute(
-            text("SELECT id, role FROM users WHERE id = :uid"),
-            {"uid": str(user_id)},
-        ).mappings().first()
+        row = (
+            conn.execute(
+                text("SELECT id, role FROM users WHERE id = :uid"),
+                {"uid": str(user_id)},
+            )
+            .mappings()
+            .first()
+        )
     if not row:
         raise AuthenticationError("Usuário não encontrado.")
     if row.get("role") != "administrador":
@@ -378,9 +381,7 @@ def _run_psql_restore_from_dump_file(sql_file: Path) -> None:
         raise RuntimeError("Restore interno: subprocesso psql não produziu resultado.")
     if proc.returncode != 0:
         excerpt = _log_psql_streams("Restore psql falhou", proc.stdout, proc.stderr)
-        raise RuntimeError(
-            f"psql exit {proc.returncode}. Excerto:\n{excerpt}"
-        )
+        raise RuntimeError(f"psql exit {proc.returncode}. Excerto:\n{excerpt}")
 
     logger.info("Restore: psql concluído (rc=0).")
 
@@ -413,14 +414,10 @@ END $$;
             timeout=120,
         )
     except Exception as e:
-        raise RuntimeError(
-            f"Falha ao validar schema/public search_path após restore: {e}"
-        ) from e
+        raise RuntimeError(f"Falha ao validar schema/public search_path após restore: {e}") from e
     if r.returncode != 0:
         excerpt = _log_psql_streams("Pós-restore: garantir public/search_path falhou", r.stdout, r.stderr)
-        raise RuntimeError(
-            f"Não foi possível garantir schema public/search_path após restore. Excerto:\n{excerpt}"
-        )
+        raise RuntimeError(f"Não foi possível garantir schema public/search_path após restore. Excerto:\n{excerpt}")
 
 
 def _sync_media_from_zip(media_src: Path, media_dest: Path) -> bool:

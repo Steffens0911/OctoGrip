@@ -1,5 +1,6 @@
 """Reset da semana ISO atual (turmas): escolhas + conclusões na janela do fuso APP_TIMEZONE; pontos preservados."""
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -61,11 +62,7 @@ async def test_reset_weekly_turmas_week_clears_choice_usage_preserves_points(
 
     missions = await client.get("/missions", headers=professor_headers)
     assert missions.status_code == 200
-    m_list = [
-        m
-        for m in missions.json()
-        if m.get("academy_id") == str(academy.id) and m.get("weekly_kit_id") == kit_id
-    ]
+    m_list = [m for m in missions.json() if m.get("academy_id") == str(academy.id) and m.get("weekly_kit_id") == kit_id]
     mission_beginner = next((m for m in m_list if m.get("level") == "beginner"), None)
     assert mission_beginner is not None
     mid = mission_beginner["id"]
@@ -80,9 +77,7 @@ async def test_reset_weekly_turmas_week_clears_choice_usage_preserves_points(
     await db.refresh(aluno_user)
     adj_before = aluno_user.points_adjustment or 0
 
-    usages_now = (
-        await db.execute(select(MissionUsage).where(MissionUsage.mission_id == mid))
-    ).scalars().all()
+    usages_now = (await db.execute(select(MissionUsage).where(MissionUsage.mission_id == mid))).scalars().all()
     assert len(usages_now) >= 1
     pts_awarded = usages_now[0].points_awarded or 0
 
@@ -98,16 +93,14 @@ async def test_reset_weekly_turmas_week_clears_choice_usage_preserves_points(
     assert w2.status_code == 200
     assert w2.json().get("needs_kit_choice") is True
 
-    usages_after = (
-        await db.execute(select(MissionUsage).where(MissionUsage.mission_id == mid))
-    ).scalars().all()
+    usages_after = (await db.execute(select(MissionUsage).where(MissionUsage.mission_id == mid))).scalars().all()
     assert usages_after == []
 
     await db.refresh(aluno_user)
     assert (aluno_user.points_adjustment or 0) == adj_before + int(pts_awarded)
 
     # Conclusão fora da semana ISO atual (app) não deve ser removida pelo reset desta semana
-    old_completed = datetime.now(timezone.utc) - timedelta(days=14)
+    old_completed = datetime.now(UTC) - timedelta(days=14)
     mu_old = MissionUsage(
         user_id=aluno_user.id,
         mission_id=mid,
@@ -127,14 +120,18 @@ async def test_reset_weekly_turmas_week_clears_choice_usage_preserves_points(
     assert r_reset2.status_code == 200, r_reset2.text
 
     kept = (
-        await db.execute(
-            select(MissionUsage).where(
-                MissionUsage.user_id == aluno_user.id,
-                MissionUsage.mission_id == mid,
-                MissionUsage.points_awarded == 7,
+        (
+            await db.execute(
+                select(MissionUsage).where(
+                    MissionUsage.user_id == aluno_user.id,
+                    MissionUsage.mission_id == mid,
+                    MissionUsage.points_awarded == 7,
+                )
             )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     assert kept is not None
 
     u_final = (await db.execute(select(User).where(User.id == aluno_user.id))).scalar_one()

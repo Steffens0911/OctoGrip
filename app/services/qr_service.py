@@ -5,6 +5,7 @@ Formato do token: <header_b64>.<payload_b64>.<assinatura_b64>
   payload : {"sid":"<uuid>","iat":<unix>,"exp":<unix>,"jti":"<nonce>"}
   assinatura: HMAC-SHA256(secret, "<header_b64>.<payload_b64>")
 """
+
 from __future__ import annotations
 
 import base64
@@ -13,7 +14,7 @@ import hmac
 import json
 import secrets
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from app.config import settings
@@ -26,7 +27,7 @@ _short_lock = threading.Lock()
 
 
 def _cleanup_expired() -> None:
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     expired = [k for k, (_, exp) in _short_codes.items() if exp <= now]
     for k in expired:
         _short_codes.pop(k, None)
@@ -48,7 +49,7 @@ def issue_short(session_id: UUID, exp_unix: int) -> str:
 
 def verify_short(code: str) -> UUID:
     """Valida código curto e retorna session_id. Lança AttendanceQrInvalidError se inválido."""
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     with _short_lock:
         entry = _short_codes.get(code.upper())
     if entry is None:
@@ -59,9 +60,11 @@ def verify_short(code: str) -> UUID:
     return session_id
 
 
-_HEADER_B64 = base64.urlsafe_b64encode(
-    json.dumps({"alg": "HS256", "typ": "ATTP"}, separators=(",", ":")).encode()
-).rstrip(b"=").decode()
+_HEADER_B64 = (
+    base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "ATTP"}, separators=(",", ":")).encode())
+    .rstrip(b"=")
+    .decode()
+)
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -80,7 +83,7 @@ def _sign(secret: str, message: str) -> str:
 
 def issue(session_id: UUID, ttl_seconds: int = 60) -> tuple[str, datetime]:
     """Gera um token QR assinado. Retorna (token, expires_at)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = now + timedelta(seconds=max(15, min(ttl_seconds, 180)))
     payload_b64 = _b64url_encode(
         json.dumps(
@@ -121,7 +124,7 @@ def verify(token: str) -> UUID:
     except Exception:
         raise AttendanceQrInvalidError()
 
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     if exp_i <= now:
         raise AttendanceQrInvalidError()
     if exp_i - iat_i > 600:

@@ -1,4 +1,5 @@
 """Lista compacta de alunos por academia (chamada manual)."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query

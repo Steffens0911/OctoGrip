@@ -1,5 +1,4 @@
 from datetime import date, datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -34,7 +33,7 @@ class EngagementReportResponse(BaseModel):
     - Geral (todas as academias) quando academy_id é null.
     """
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     weekly: EngagementPeriodMetrics
     monthly: EngagementPeriodMetrics
 
@@ -43,12 +42,12 @@ class ActiveStudentItem(BaseModel):
     """Aluno ativo dentro da janela de 7 dias (login)."""
 
     id: str
-    name: Optional[str] = None
+    name: str | None = None
     email: str
-    academy_id: Optional[str] = None
-    academy_name: Optional[str] = None
-    graduation: Optional[str] = None
-    last_login_at: Optional[datetime] = None
+    academy_id: str | None = None
+    academy_name: str | None = None
+    graduation: str | None = None
+    last_login_at: datetime | None = None
 
 
 class ActiveStudentsReportResponse(BaseModel):
@@ -58,7 +57,7 @@ class ActiveStudentsReportResponse(BaseModel):
     - Local (academy_id informado) ou global (academy_id null).
     """
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     start_date: date
     end_date: date
     total_students: int
@@ -71,10 +70,10 @@ class WeeklyPanelLoginUserItem(BaseModel):
     """Usuário elegível (staff ou aluno) e seus dias de login no período (semana ISO ou intervalo)."""
 
     user_id: str
-    name: Optional[str] = None
+    name: str | None = None
     email: str
     role: str
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     distinct_login_days_in_week: int
     login_days: list[date]
 
@@ -82,7 +81,7 @@ class WeeklyPanelLoginUserItem(BaseModel):
 class TechniqueExecutionSummaryResponse(BaseModel):
     """Resumo de execuções de técnicas confirmadas (planejadas vs naturais)."""
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     before_training_count: int
     after_training_count: int
     total: int
@@ -91,19 +90,19 @@ class TechniqueExecutionSummaryResponse(BaseModel):
 
 class StudentAttentionItem(BaseModel):
     user_id: str
-    name: Optional[str] = None
+    name: str | None = None
     email: str
-    graduation: Optional[str] = None
-    academy_id: Optional[str] = None
-    academy_name: Optional[str] = None
-    last_seen_at: Optional[datetime] = None
-    days_absent: Optional[int] = None
+    graduation: str | None = None
+    academy_id: str | None = None
+    academy_name: str | None = None
+    last_seen_at: datetime | None = None
+    days_absent: int | None = None
 
 
 class StudentsAttentionReportResponse(BaseModel):
     """Alunos que há mais tempo não aparecem em nenhuma aula."""
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     total_students: int
     students: list[StudentAttentionItem]
 
@@ -111,7 +110,7 @@ class StudentsAttentionReportResponse(BaseModel):
 class MissionCompletionReportResponse(BaseModel):
     """Taxa de conclusão de missões: % de alunos que concluíram ≥1 missão no período."""
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     from_date: date
     to_date: date
     total_students: int
@@ -128,7 +127,7 @@ class WeeklyPanelLoginsReportResponse(BaseModel):
     - week_start / week_end são as datas de início e fim do período (inclusive).
     """
 
-    academy_id: Optional[str] = None
+    academy_id: str | None = None
     week_start: date
     week_end: date
     eligible_users_count: int

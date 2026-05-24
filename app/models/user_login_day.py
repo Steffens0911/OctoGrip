@@ -1,4 +1,5 @@
 """Dias UTC com login bem-sucedido (sequência de login)."""
+
 from __future__ import annotations
 
 import uuid

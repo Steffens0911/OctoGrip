@@ -17,7 +17,9 @@ class User(Base, UUIDMixin):
 
     # Único em toda a tabela users (todas as academias); não há unicidade “por academia”.
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="Hash pbkdf2_sha256 da senha para login.")
+    password_hash: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, comment="Hash pbkdf2_sha256 da senha para login."
+    )
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     points_adjustment: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     reward_level: Mapped[int] = mapped_column(
@@ -80,67 +82,67 @@ class User(Base, UUIDMixin):
         comment="URL pública da foto do utilizador usada por módulos de reconhecimento facial.",
     )
 
-    academy: Mapped["Academy | None"] = relationship(
+    academy: Mapped[Academy | None] = relationship(
         "Academy",
         back_populates="users",
         lazy="raise",
     )
-    lesson_progresses: Mapped[list["LessonProgress"]] = relationship(
+    lesson_progresses: Mapped[list[LessonProgress]] = relationship(
         "LessonProgress",
         back_populates="user",
         lazy="raise",
     )
-    training_feedbacks: Mapped[list["TrainingFeedback"]] = relationship(
+    training_feedbacks: Mapped[list[TrainingFeedback]] = relationship(
         "TrainingFeedback",
         back_populates="user",
         lazy="raise",
     )
-    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+    mission_usages: Mapped[list[MissionUsage]] = relationship(
         "MissionUsage",
         back_populates="user",
         lazy="raise",
     )
-    technique_executions_as_executor: Mapped[list["TechniqueExecution"]] = relationship(
+    technique_executions_as_executor: Mapped[list[TechniqueExecution]] = relationship(
         "TechniqueExecution",
         foreign_keys="TechniqueExecution.user_id",
         back_populates="user",
         lazy="raise",
     )
-    technique_executions_as_opponent: Mapped[list["TechniqueExecution"]] = relationship(
+    technique_executions_as_opponent: Mapped[list[TechniqueExecution]] = relationship(
         "TechniqueExecution",
         foreign_keys="TechniqueExecution.opponent_id",
         back_populates="opponent",
         lazy="raise",
         passive_deletes=True,
     )
-    training_videos: Mapped[list["TrainingVideo"]] = relationship(
+    training_videos: Mapped[list[TrainingVideo]] = relationship(
         "TrainingVideo",
         back_populates="created_by",
         lazy="raise",
     )
-    marketplace_items_created: Mapped[list["AcademyMarketplaceItem"]] = relationship(
+    marketplace_items_created: Mapped[list[AcademyMarketplaceItem]] = relationship(
         "AcademyMarketplaceItem",
         back_populates="created_by",
         lazy="raise",
     )
-    training_video_daily_views: Mapped[list["TrainingVideoDailyView"]] = relationship(
+    training_video_daily_views: Mapped[list[TrainingVideoDailyView]] = relationship(
         "TrainingVideoDailyView",
         back_populates="user",
         lazy="raise",
     )
-    device_tokens: Mapped[list["UserDeviceToken"]] = relationship(
+    device_tokens: Mapped[list[UserDeviceToken]] = relationship(
         "UserDeviceToken",
         back_populates="user",
         lazy="selectin",
         cascade="all, delete-orphan",
     )
-    weekly_kit_choices: Mapped[list["UserWeeklyKitChoice"]] = relationship(
+    weekly_kit_choices: Mapped[list[UserWeeklyKitChoice]] = relationship(
         "UserWeeklyKitChoice",
         back_populates="user",
         lazy="raise",
         passive_deletes=True,
     )
-    trophy_earned: Mapped[list["UserTrophyEarned"]] = relationship(
+    trophy_earned: Mapped[list[UserTrophyEarned]] = relationship(
         "UserTrophyEarned",
         back_populates="user",
         lazy="raise",

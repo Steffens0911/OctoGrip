@@ -1,4 +1,5 @@
 """Testes da lógica de sequência de login (calendário no fuso APP_TIMEZONE)."""
+
 from datetime import date, timedelta
 
 import pytest

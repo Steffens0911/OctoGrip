@@ -68,9 +68,7 @@ async def mission_today(
     Retorna a missão do dia por nível para a academia do usuário autenticado.
     Requer autenticação obrigatória.
     """
-    key = await _today_cache_key(
-        current_user.id, level, current_user.academy_id, review_after_days
-    )
+    key = await _today_cache_key(current_user.id, level, current_user.academy_id, review_after_days)
     cached = await app_cache.get(key)
     if cached is not None:
         return MissionTodayResponse.model_validate(cached)

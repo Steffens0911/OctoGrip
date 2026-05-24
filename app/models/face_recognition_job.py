@@ -37,6 +37,6 @@ class FaceRecognitionJob(Base, UUIDMixin):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    session: Mapped["AttendanceSession"] = relationship("AttendanceSession", lazy="selectin")
-    academy: Mapped["Academy"] = relationship("Academy", lazy="selectin")
-    created_by: Mapped["User"] = relationship("User", lazy="selectin")
+    session: Mapped[AttendanceSession] = relationship("AttendanceSession", lazy="selectin")
+    academy: Mapped[Academy] = relationship("Academy", lazy="selectin")
+    created_by: Mapped[User] = relationship("User", lazy="selectin")

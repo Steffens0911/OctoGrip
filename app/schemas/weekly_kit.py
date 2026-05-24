@@ -1,4 +1,5 @@
 """Schemas para turmas semanais (1–5 técnicas; rótulo = nome da turma). Rotas HTTP mantêm o segmento `weekly-kits`."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field

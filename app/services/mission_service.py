@@ -1,21 +1,20 @@
 import logging
-from datetime import date, timedelta
 from uuid import UUID
 
-from sqlalchemy import or_, exists, select
+from sqlalchemy import exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.app_time import today_in_app_tz
 from app.core.points_limits import MIN_REWARD_POINTS, clamp_reward_points
 from app.models import Academy, Lesson, Mission, MissionUsage, Technique, TechniqueExecution
-from app.services.academy_service import ensure_weekly_missions_if_needed
 from app.schemas.mission import (
     MissionTodayResponse,
     MissionWeekResponse,
     MissionWeekSlotResponse,
     WeeklyKitOptionResponse,
 )
+from app.services.academy_service import ensure_weekly_missions_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -42,38 +41,48 @@ async def get_today_mission(
     mission = None
     if academy_id is not None:
         mission = (
-            await db.execute(
-                select(Mission)
-                .where(
-                    Mission.is_active.is_(True),
-                    Mission.academy_id == academy_id,
-                    Mission.level == level_normalized,
-                    Mission.slot_index.isnot(None),
-                    Mission.weekly_kit_id.is_(None),
-                    Mission.deleted_at.is_(None),
+            (
+                await db.execute(
+                    select(Mission)
+                    .where(
+                        Mission.is_active.is_(True),
+                        Mission.academy_id == academy_id,
+                        Mission.level == level_normalized,
+                        Mission.slot_index.isnot(None),
+                        Mission.weekly_kit_id.is_(None),
+                        Mission.deleted_at.is_(None),
+                    )
+                    .options(*options)
+                    .order_by(Mission.slot_index.asc())
                 )
-                .options(*options)
-                .order_by(Mission.slot_index.asc())
             )
-        ).unique().scalars().first()
+            .unique()
+            .scalars()
+            .first()
+        )
     if mission is None:
         mission = (
-            await db.execute(
-                select(Mission)
-                .where(
-                    Mission.is_active.is_(True),
-                    Mission.academy_id.is_(None),
-                    Mission.level == level_normalized,
-                    Mission.start_date.isnot(None),
-                    Mission.end_date.isnot(None),
-                    Mission.start_date <= today,
-                    Mission.end_date >= today,
-                    Mission.deleted_at.is_(None),
+            (
+                await db.execute(
+                    select(Mission)
+                    .where(
+                        Mission.is_active.is_(True),
+                        Mission.academy_id.is_(None),
+                        Mission.level == level_normalized,
+                        Mission.start_date.isnot(None),
+                        Mission.end_date.isnot(None),
+                        Mission.start_date <= today,
+                        Mission.end_date >= today,
+                        Mission.deleted_at.is_(None),
+                    )
+                    .options(*options)
+                    .order_by(Mission.start_date.asc())
                 )
-                .options(*options)
-                .order_by(Mission.start_date.asc())
             )
-        ).unique().scalars().first()
+            .unique()
+            .scalars()
+            .first()
+        )
 
     if mission:
         logger.info(
@@ -120,7 +129,9 @@ async def _mission_to_today_response(
     if lesson is not None:
         lesson_title = lesson.title
         description = (lesson.content or "").strip() or (technique.description or "")
-        video_url = (lesson.video_url or "").strip() or (lesson.technique_video_url or "").strip() or _get_video_url(technique)
+        video_url = (
+            (lesson.video_url or "").strip() or (lesson.technique_video_url or "").strip() or _get_video_url(technique)
+        )
         position_name = lesson.position_name or ""
         lesson_id = lesson.id
     else:
@@ -157,9 +168,7 @@ async def _mission_to_today_response(
             )
             already_completed = (await db.execute(stmt)).scalar() or False
     raw_mult = (
-        display_multiplier
-        if display_multiplier is not None
-        else getattr(mission, "multiplier", MIN_REWARD_POINTS)
+        display_multiplier if display_multiplier is not None else getattr(mission, "multiplier", MIN_REWARD_POINTS)
     )
     mult = clamp_reward_points(raw_mult or MIN_REWARD_POINTS)
     return MissionTodayResponse(
@@ -196,7 +205,8 @@ async def get_mission_today_response(
 
     _user_row = (
         (await db.execute(select(User.academy_id, User.graduation).where(User.id == user_id))).one_or_none()
-        if user_id else None
+        if user_id
+        else None
     )
     resolved_academy_id = academy_id
     if resolved_academy_id is None and _user_row and _user_row[0] is not None:
@@ -283,9 +293,7 @@ async def _get_mission_week_kit_response(
     for k in kits:
         n_items = len(k.items or [])
         if 1 <= n_items <= 5:
-            available.append(
-                WeeklyKitOptionResponse(kit_id=k.id, label=k.label, item_count=n_items)
-            )
+            available.append(WeeklyKitOptionResponse(kit_id=k.id, label=k.label, item_count=n_items))
     iso_y, iso_w = iso_week_key_for_date()
     selected_kit_id: UUID | None = None
     if user_id is not None:
@@ -394,12 +402,17 @@ async def get_mission_week_response(
     user = None
     if user_id:
         user = (
-            await db.execute(
-                select(User)
-                .options(selectinload(User.academy).selectinload(Academy.weekly_technique))
-                .where(User.id == user_id)
+            (
+                await db.execute(
+                    select(User)
+                    .options(selectinload(User.academy).selectinload(Academy.weekly_technique))
+                    .where(User.id == user_id)
+                )
             )
-        ).unique().scalars().first()
+            .unique()
+            .scalars()
+            .first()
+        )
     resolved_academy_id = academy_id or (user.academy_id if user else None)
 
     level_n = (level or "beginner").lower().strip()
@@ -421,12 +434,17 @@ async def get_mission_week_response(
             academy = user.academy
         else:
             academy = (
-                await db.execute(
-                    select(Academy)
-                    .where(Academy.id == resolved_academy_id)
-                    .options(selectinload(Academy.weekly_technique))
+                (
+                    await db.execute(
+                        select(Academy)
+                        .where(Academy.id == resolved_academy_id)
+                        .options(selectinload(Academy.weekly_technique))
+                    )
                 )
-            ).unique().scalars().first()
+                .unique()
+                .scalars()
+                .first()
+            )
         if await academy_has_active_weekly_kits(db, resolved_academy_id):
             return await _get_mission_week_kit_response(
                 db,
@@ -437,27 +455,7 @@ async def get_mission_week_response(
                 options=options,
             )
         all_missions = (
-            await db.execute(
-                select(Mission)
-                .where(
-                    Mission.is_active.is_(True),
-                    Mission.academy_id == resolved_academy_id,
-                    Mission.level == level_n,
-                    Mission.slot_index.in_((0, 1, 2)),
-                    Mission.weekly_kit_id.is_(None),
-                    Mission.deleted_at.is_(None),
-                )
-                .options(*options)
-            )
-        ).unique().scalars().all()
-        need_ensure = (
-            academy is not None
-            and (academy.weekly_technique_id or academy.weekly_technique_2_id or academy.weekly_technique_3_id)
-            and sum(1 for m in all_missions if m.technique) < 3
-        )
-        if need_ensure:
-            await ensure_weekly_missions_if_needed(db, resolved_academy_id, academy=academy)
-            all_missions = (
+            (
                 await db.execute(
                     select(Mission)
                     .where(
@@ -470,7 +468,37 @@ async def get_mission_week_response(
                     )
                     .options(*options)
                 )
-            ).unique().scalars().all()
+            )
+            .unique()
+            .scalars()
+            .all()
+        )
+        need_ensure = (
+            academy is not None
+            and (academy.weekly_technique_id or academy.weekly_technique_2_id or academy.weekly_technique_3_id)
+            and sum(1 for m in all_missions if m.technique) < 3
+        )
+        if need_ensure:
+            await ensure_weekly_missions_if_needed(db, resolved_academy_id, academy=academy)
+            all_missions = (
+                (
+                    await db.execute(
+                        select(Mission)
+                        .where(
+                            Mission.is_active.is_(True),
+                            Mission.academy_id == resolved_academy_id,
+                            Mission.level == level_n,
+                            Mission.slot_index.in_((0, 1, 2)),
+                            Mission.weekly_kit_id.is_(None),
+                            Mission.deleted_at.is_(None),
+                        )
+                        .options(*options)
+                    )
+                )
+                .unique()
+                .scalars()
+                .all()
+            )
         missions_by_slot = {m.slot_index: m for m in all_missions if m.technique}
 
     completed_mission_ids: set[UUID] = set()

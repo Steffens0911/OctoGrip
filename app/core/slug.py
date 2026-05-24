@@ -1,4 +1,5 @@
 """Geração de slug a partir de texto e garantia de unicidade."""
+
 import re
 from typing import TypeVar
 from uuid import UUID

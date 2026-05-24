@@ -1,4 +1,5 @@
 """Kits semanais (1–5 técnicas) e escolha por semana ISO."""
+
 from uuid import UUID, uuid4
 
 import pytest
@@ -88,7 +89,9 @@ async def test_weekly_kit_choice_and_week_payload(
 
     missions = await client.get("/missions", headers=professor_headers)
     assert missions.status_code == 200
-    m_b_list = [m for m in missions.json() if m.get("academy_id") == str(academy.id) and m.get("technique_id") == str(t2.id)]
+    m_b_list = [
+        m for m in missions.json() if m.get("academy_id") == str(academy.id) and m.get("technique_id") == str(t2.id)
+    ]
     mission_b_beginner = next(
         (m for m in m_b_list if m.get("level") == "beginner" and m.get("weekly_kit_id") == kit_b),
         None,
@@ -103,7 +106,9 @@ async def test_weekly_kit_choice_and_week_payload(
     )
     assert bad.status_code == 403
 
-    m_a_list = [m for m in missions.json() if m.get("academy_id") == str(academy.id) and m.get("weekly_kit_id") == kit_a]
+    m_a_list = [
+        m for m in missions.json() if m.get("academy_id") == str(academy.id) and m.get("weekly_kit_id") == kit_a
+    ]
     mission_a_beginner = next((m for m in m_a_list if m.get("level") == "beginner" and m.get("slot_index") == 0), None)
     assert mission_a_beginner is not None
     mid_ok = mission_a_beginner["id"]

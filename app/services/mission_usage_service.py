@@ -1,6 +1,7 @@
 """Serviço de sync de MissionUsage (PB-01) e conclusão por missão."""
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -53,7 +54,7 @@ async def sync_mission_usages(
         if not lesson:
             logger.debug("sync_mission_usages lesson_not_found", extra={"lesson_id": str(lesson_id)})
             continue
-        
+
         # Validar isolamento de academy: não-admins só podem sincronizar lições da própria academy
         if user.role != "administrador":
             if user.academy_id is None:
@@ -116,21 +117,19 @@ async def sync_mission_usages(
 
 def _parse_dt(value) -> datetime:
     if value is None:
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         try:
             dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+            return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
         except ValueError:
             pass
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
-async def get_mission_history(
-    db: AsyncSession, user_id: UUID, limit: int = 7, offset: int = 0
-) -> list[dict]:
+async def get_mission_history(db: AsyncSession, user_id: UUID, limit: int = 7, offset: int = 0) -> list[dict]:
     """
     Últimas conclusões (por missão ou legado por lição), com paginação sobre o feed unificado.
     Retorna dict com lesson_id (opcional), lesson_title, completed_at, usage_type.
@@ -145,33 +144,42 @@ async def get_mission_history(
     cap = min(max(window_end * 3, 60), 500)
 
     usage_rows = (
-        await db.execute(
-            select(MissionUsage)
-            .where(MissionUsage.user_id == user_id)
-            .options(
-                selectinload(MissionUsage.mission).selectinload(Mission.technique),
-                selectinload(MissionUsage.lesson),
+        (
+            await db.execute(
+                select(MissionUsage)
+                .where(MissionUsage.user_id == user_id)
+                .options(
+                    selectinload(MissionUsage.mission).selectinload(Mission.technique),
+                    selectinload(MissionUsage.lesson),
+                )
+                .order_by(MissionUsage.completed_at.desc())
+                .limit(cap)
             )
-            .order_by(MissionUsage.completed_at.desc())
-            .limit(cap)
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
     items = []
     for r in usage_rows:
         if r.mission_id and r.mission and r.mission.technique:
-            items.append({
-                "lesson_id": None,
-                "lesson_title": r.mission.technique.name,
-                "completed_at": r.completed_at,
-                "usage_type": r.usage_type,
-            })
+            items.append(
+                {
+                    "lesson_id": None,
+                    "lesson_title": r.mission.technique.name,
+                    "completed_at": r.completed_at,
+                    "usage_type": r.usage_type,
+                }
+            )
         elif r.lesson_id and r.lesson:
-            items.append({
-                "lesson_id": r.lesson_id,
-                "lesson_title": r.lesson.title,
-                "completed_at": r.completed_at,
-                "usage_type": r.usage_type,
-            })
+            items.append(
+                {
+                    "lesson_id": r.lesson_id,
+                    "lesson_title": r.lesson.title,
+                    "completed_at": r.completed_at,
+                    "usage_type": r.usage_type,
+                }
+            )
 
     lesson_ids_in_usage = {r.lesson_id for r in usage_rows if r.lesson_id is not None}
 
@@ -185,12 +193,14 @@ async def get_mission_history(
         stmt = stmt.where(~LessonProgress.lesson_id.in_(lesson_ids_in_usage))
     progress_rows = (await db.execute(stmt.limit(cap))).unique().scalars().all()
     for r in progress_rows:
-        items.append({
-            "lesson_id": r.lesson_id,
-            "lesson_title": r.lesson.title if r.lesson else "",
-            "completed_at": r.completed_at,
-            "usage_type": "after_training",
-        })
+        items.append(
+            {
+                "lesson_id": r.lesson_id,
+                "lesson_title": r.lesson.title if r.lesson else "",
+                "completed_at": r.completed_at,
+                "usage_type": "after_training",
+            }
+        )
 
     items.sort(key=lambda x: x["completed_at"], reverse=True)
     page = items[offset:window_end]

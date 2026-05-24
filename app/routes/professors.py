@@ -1,4 +1,5 @@
 """CRUD de professores (seção professor)."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
@@ -65,9 +66,7 @@ async def professor_create(
         body.academy_id = current_user.academy_id
     elif body.academy_id:
         verify_academy_access(current_user, str(body.academy_id))
-    existing = (
-        await db.execute(select(Professor).where(Professor.email == body.email))
-    ).scalar_one_or_none()
+    existing = (await db.execute(select(Professor).where(Professor.email == body.email))).scalar_one_or_none()
     if existing:
         raise ConflictError("E-mail já cadastrado.")
     return await create_professor(

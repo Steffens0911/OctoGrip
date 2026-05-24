@@ -1,4 +1,5 @@
 """Schemas para parceiros globais (admin global + banner da Central)."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field

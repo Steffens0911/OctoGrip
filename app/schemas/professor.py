@@ -1,4 +1,5 @@
 """Schemas para Professor (CRUD seção professor)."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field

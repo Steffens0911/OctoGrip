@@ -1,4 +1,5 @@
 """Schema para Partner (listagem e CRUD)."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field

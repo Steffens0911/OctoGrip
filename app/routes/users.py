@@ -1,5 +1,6 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
-from datetime import date, datetime, time, timezone
+
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Final
 from uuid import UUID
@@ -23,7 +24,8 @@ from app.models.training_video import TrainingVideoDailyView
 from app.models.user_trophy_earned import UserTrophyEarned
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.weekly_kit import WeeklyKitChoiceRequest, WeeklyKitChoiceResponse
-from app.services.weekly_kit_service import set_user_weekly_kit_choice
+from app.services.execution_service import get_points_log, total_points_for_user
+from app.services.leveling_service import refresh_user_level
 from app.services.user_service import (
     UNSET,
     create_user,
@@ -33,8 +35,7 @@ from app.services.user_service import (
     list_users,
     update_user,
 )
-from app.services.execution_service import get_points_log, total_points_for_user
-from app.services.leveling_service import refresh_user_level
+from app.services.weekly_kit_service import set_user_weekly_kit_choice
 from app.tasks.face_recognition_tasks import generate_student_embedding
 
 router = APIRouter()
@@ -50,6 +51,8 @@ class UserAcademyStatsRead(BaseModel):
     workouts_in_period: int
     trophies_count: int
     days_since_last_workout: int | None
+
+
 _MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024
 _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
@@ -175,16 +178,22 @@ async def users_list(
 ):
     """Lista usuários com paginação."""
     if current_user.role == "administrador":
-        return await list_users(db, academy_id=academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
+        return await list_users(
+            db, academy_id=academy_id, offset=offset, limit=limit, search=search, graduation=graduation
+        )
     if current_user.role in ("gerente_academia", "professor"):
         if current_user.academy_id is None:
             return []
-        return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
+        return await list_users(
+            db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation
+        )
     if current_user.academy_id is None:
         raise ForbiddenError("Acesso negado. Você não está vinculado a uma academia.")
     if academy_id is None or academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Você só pode listar usuários da sua academia.")
-    return await list_users(db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation)
+    return await list_users(
+        db, academy_id=current_user.academy_id, offset=offset, limit=limit, search=search, graduation=graduation
+    )
 
 
 @router.get("/academy-stats", response_model=list[UserAcademyStatsRead])
@@ -208,9 +217,7 @@ async def academy_student_stats(
     from_dt = datetime.combine(from_date, time.min).replace(tzinfo=_APP_TZ)
     to_dt = datetime.combine(to_date, time.max).replace(tzinfo=_APP_TZ)
 
-    student_rows = await db.execute(
-        select(User.id).where(User.academy_id == q_academy_id, User.role == "aluno")
-    )
+    student_rows = await db.execute(select(User.id).where(User.academy_id == q_academy_id, User.role == "aluno"))
     student_ids = [r[0] for r in student_rows.fetchall()]
     if not student_ids:
         return []
@@ -265,7 +272,7 @@ async def academy_student_stats(
     last_workout_map: dict[str, int] = {}
     for r in last_workout_rows.fetchall():
         if r.last_at is not None:
-            last_at = r.last_at if r.last_at.tzinfo else r.last_at.replace(tzinfo=timezone.utc)
+            last_at = r.last_at if r.last_at.tzinfo else r.last_at.replace(tzinfo=UTC)
             last_workout_map[str(r.user_id)] = (today_app - last_at.astimezone(_APP_TZ).date()).days
 
     return [
@@ -345,9 +352,7 @@ async def user_create(
     """Cria um usuário; o e-mail deve ser único em todo o sistema (tabela users), não só na academia."""
     existing = await get_user_by_email(db, body.email)
     if existing:
-        raise ConflictError(
-            "E-mail já cadastrado por outro usuário (único em todo o sistema)."
-        )
+        raise ConflictError("E-mail já cadastrado por outro usuário (único em todo o sistema).")
     if current_user.role == "administrador":
         academy_id = body.academy_id
         role = body.role
@@ -412,9 +417,7 @@ async def user_update(
                     "Apenas contas de aluno ou professor podem ter o congelamento alterado pelo gestor da academia."
                 )
             if target.academy_id is None or target.academy_id != current_user.academy_id:
-                raise ForbiddenError(
-                    "Acesso negado. Só pode congelar usuários vinculados à sua academia."
-                )
+                raise ForbiddenError("Acesso negado. Só pode congelar usuários vinculados à sua academia.")
     updated = await update_user(
         db,
         user_id,
@@ -428,9 +431,7 @@ async def user_update(
         password=payload.get("password"),
         gallery_visible=payload.get("gallery_visible"),
         account_frozen=payload["account_frozen"] if "account_frozen" in payload else UNSET,
-        account_freeze_reason=payload["account_freeze_reason"]
-        if "account_freeze_reason" in payload
-        else UNSET,
+        account_freeze_reason=payload["account_freeze_reason"] if "account_freeze_reason" in payload else UNSET,
         audit_user_id=current_user.id,
     )
     if not updated:
@@ -455,9 +456,7 @@ async def user_delete(
     if current_user.role != "administrador" and target.academy_id != current_user.academy_id:
         raise ForbiddenError("Acesso negado. Você só pode excluir usuários da sua academia.")
     if (confirm_email or "").strip().lower() != (target.email or "").strip().lower():
-        raise ForbiddenError(
-            "Confirmação inválida: o parâmetro confirm_email deve ser igual ao e-mail do utilizador."
-        )
+        raise ForbiddenError("Confirmação inválida: o parâmetro confirm_email deve ser igual ao e-mail do utilizador.")
     if not await delete_user(db, user_id, audit_user_id=current_user.id):
         raise UserNotFoundError()
     return None

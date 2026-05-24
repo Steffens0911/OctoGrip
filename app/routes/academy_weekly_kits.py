@@ -2,6 +2,7 @@
 
 Na UI o produto chama **turma**; as rotas mantêm o segmento ``/weekly-kits`` (e alias ``/weekly_kits``).
 """
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends

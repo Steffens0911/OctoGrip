@@ -10,8 +10,8 @@ ou, com o ambiente configurado localmente:
     python -m app.scripts.cleanup_keep_admin
 """
 
-import sys
 import logging
+import sys
 
 from app.core.security import hash_password_sync
 from app.database import SessionLocal
@@ -30,7 +30,6 @@ from app.models import (
     User,
 )
 
-
 logger = logging.getLogger(__name__)
 
 ADMIN_EMAIL = "admin@jjb.com"
@@ -41,11 +40,7 @@ def cleanup_db_keep_admin() -> None:
     db = SessionLocal()
     try:
         # Garante que o admin exista
-        admin = (
-            db.query(User)
-            .filter(User.email.ilike(ADMIN_EMAIL))
-            .first()
-        )
+        admin = db.query(User).filter(User.email.ilike(ADMIN_EMAIL)).first()
 
         if not admin:
             logger.info("Usuário admin@jjb.com não encontrado; criando novo admin (senha: saas).")
@@ -85,11 +80,7 @@ def cleanup_db_keep_admin() -> None:
             logger.info("Removidos %s registros de %s", deleted, model.__tablename__)
 
         # Remove todos os usuários exceto o admin
-        deleted_users = (
-            db.query(User)
-                .filter(User.id != admin.id)
-                .delete(synchronize_session=False)
-        )
+        deleted_users = db.query(User).filter(User.id != admin.id).delete(synchronize_session=False)
         logger.info("Removidos %s usuários (mantido apenas %s).", deleted_users, ADMIN_EMAIL)
 
         db.commit()
@@ -105,4 +96,3 @@ def cleanup_db_keep_admin() -> None:
 
 if __name__ == "__main__":
     cleanup_db_keep_admin()
-

@@ -1,4 +1,5 @@
 """Rotas de execuções de técnica (gamificação): criar, pendentes, confirmar. Requerem autenticação."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Query, Request
@@ -7,9 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
+from app.core.role_deps import require_write_access
 from app.database import get_db
 from app.models import User
-from app.core.role_deps import require_write_access
 from app.schemas.execution import (
     ExecutionConfirmRequest,
     ExecutionConfirmResponse,

@@ -28,5 +28,5 @@ class StudentFaceEmbedding(Base, UUIDMixin):
     )
     embedding: Mapped[list[float]] = mapped_column(JSONB, nullable=False)
 
-    student: Mapped["User"] = relationship("User", lazy="selectin")
-    academy: Mapped["Academy"] = relationship("Academy", lazy="selectin")
+    student: Mapped[User] = relationship("User", lazy="selectin")
+    academy: Mapped[Academy] = relationship("Academy", lazy="selectin")

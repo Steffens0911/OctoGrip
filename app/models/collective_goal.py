@@ -1,4 +1,5 @@
 """Meta coletiva semanal por técnica (gamificação)."""
+
 from __future__ import annotations
 
 import uuid
@@ -30,5 +31,5 @@ class CollectiveGoal(Base, UUIDMixin):
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    academy: Mapped["Academy | None"] = relationship("Academy", back_populates="collective_goals")
-    technique: Mapped["Technique"] = relationship("Technique", back_populates="collective_goals")
+    academy: Mapped[Academy | None] = relationship("Academy", back_populates="collective_goals")
+    technique: Mapped[Technique] = relationship("Technique", back_populates="collective_goals")

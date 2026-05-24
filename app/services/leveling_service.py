@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
@@ -20,8 +19,8 @@ async def refresh_user_level(
     db: AsyncSession,
     user_id: UUID,
     *,
-    total_points: Optional[int] = None,
-) -> Tuple[int, int, int]:
+    total_points: int | None = None,
+) -> tuple[int, int, int]:
     """Recalcula e persiste (reward_level, reward_level_points) do usuário.
 
     Retorna (level, level_points, next_level_threshold).
@@ -57,4 +56,3 @@ async def refresh_user_level(
     )
 
     return level, level_points, next_threshold
-

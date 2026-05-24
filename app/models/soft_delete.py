@@ -1,4 +1,5 @@
 """Mixin reutilizável para soft delete (deleted_at)."""
+
 from __future__ import annotations
 
 from datetime import datetime

@@ -1,4 +1,5 @@
 """Dependências FastAPI para autorização baseada em roles."""
+
 import logging
 
 from fastapi import Depends
@@ -26,11 +27,13 @@ def _log_access_denied(user: User, required: str) -> None:
 
 def require_role(allowed_roles: list[str]):
     """Factory que retorna dependência exigindo um dos roles permitidos."""
+
     def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
             _log_access_denied(current_user, f"role in {allowed_roles}")
             raise ForbiddenError(f"Acesso negado. Roles permitidos: {', '.join(allowed_roles)}")
         return current_user
+
     return role_checker
 
 
@@ -46,9 +49,7 @@ def require_admin_or_supervisor(current_user: User = Depends(get_current_user)) 
     """Administrador ou supervisor (leitura de métricas globais / relatórios)."""
     if current_user.role not in ("administrador", "supervisor"):
         _log_access_denied(current_user, "administrador|supervisor")
-        raise ForbiddenError(
-            "Acesso negado. Apenas administradores ou supervisores podem acessar este recurso."
-        )
+        raise ForbiddenError("Acesso negado. Apenas administradores ou supervisores podem acessar este recurso.")
     return current_user
 
 
@@ -56,9 +57,7 @@ def require_admin_manager_or_supervisor(current_user: User = Depends(get_current
     """Administrador, gerente de academia ou supervisor (métricas por academia, relatórios)."""
     if current_user.role not in ("administrador", "gerente_academia", "supervisor"):
         _log_access_denied(current_user, "administrador|gerente_academia|supervisor")
-        raise ForbiddenError(
-            "Acesso negado. Apenas administradores, gerentes de academia ou supervisores."
-        )
+        raise ForbiddenError("Acesso negado. Apenas administradores, gerentes de academia ou supervisores.")
     return current_user
 
 
@@ -81,9 +80,7 @@ def require_admin_or_professor(current_user: User = Depends(get_current_user)) -
 def require_admin_or_academy_access(current_user: User = Depends(get_current_user)) -> User:
     """Exige administrador, gerente_academia, professor ou supervisor (lista de academias filtrada na rota)."""
     if current_user.role not in ("administrador", "gerente_academia", "professor", "supervisor"):
-        _log_access_denied(
-            current_user, "administrador|gerente_academia|professor|supervisor"
-        )
+        _log_access_denied(current_user, "administrador|gerente_academia|professor|supervisor")
         raise ForbiddenError(
             "Acesso negado. Apenas administradores, gerentes de academia, professores ou supervisores."
         )

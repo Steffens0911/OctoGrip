@@ -1,7 +1,8 @@
 """
 Métricas Prometheus para monitoramento da aplicação.
 """
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 # Métricas HTTP
 http_requests_total = Counter(

@@ -1,13 +1,13 @@
 """Conclusão por missão: POST /mission_complete (requer autenticação)."""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.core.auth_deps import require_aluno_not_frozen
 from app.core.exceptions import AppError
+from app.database import get_db
 from app.models import User
 from app.schemas.mission_complete import MissionCompleteRequest, MissionCompleteResponse
-from app.services.mission_complete_service import complete_mission
 
 router = APIRouter()
 

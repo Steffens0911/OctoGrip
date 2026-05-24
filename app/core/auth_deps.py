@@ -1,4 +1,5 @@
 """Dependências FastAPI para autenticação JWT."""
+
 import logging
 from uuid import UUID
 

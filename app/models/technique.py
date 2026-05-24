@@ -25,32 +25,32 @@ class Technique(Base, UUIDMixin, SoftDeleteMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     base_points: Mapped[int | None] = mapped_column(Integer, nullable=True, default=10)
-    academy: Mapped["Academy"] = relationship(
+    academy: Mapped[Academy] = relationship(
         "Academy",
         back_populates="techniques",
         foreign_keys=[academy_id],
     )
-    lessons: Mapped[list["Lesson"]] = relationship(
+    lessons: Mapped[list[Lesson]] = relationship(
         "Lesson",
         back_populates="technique",
         lazy="selectin",
     )
-    missions: Mapped[list["Mission"]] = relationship(
+    missions: Mapped[list[Mission]] = relationship(
         "Mission",
         back_populates="technique",
         lazy="selectin",
     )
-    collective_goals: Mapped[list["CollectiveGoal"]] = relationship(
+    collective_goals: Mapped[list[CollectiveGoal]] = relationship(
         "CollectiveGoal",
         back_populates="technique",
         lazy="selectin",
     )
-    trophies: Mapped[list["Trophy"]] = relationship(
+    trophies: Mapped[list[Trophy]] = relationship(
         "Trophy",
         back_populates="technique",
         lazy="selectin",
     )
-    technique_executions_direct: Mapped[list["TechniqueExecution"]] = relationship(
+    technique_executions_direct: Mapped[list[TechniqueExecution]] = relationship(
         "TechniqueExecution",
         back_populates="technique",
         foreign_keys="TechniqueExecution.technique_id",

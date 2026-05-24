@@ -1,4 +1,5 @@
 """Professor: responsável por uma academia (área do professor)."""
+
 from __future__ import annotations
 
 import uuid
@@ -23,7 +24,7 @@ class Professor(Base, UUIDMixin):
         index=True,
     )
 
-    academy: Mapped["Academy | None"] = relationship(
+    academy: Mapped[Academy | None] = relationship(
         "Academy",
         back_populates="professors",
         lazy="selectin",

@@ -1,4 +1,5 @@
 """Acções administrativas globais: reverter confirmação de execução, anular mission_usage."""
+
 from uuid import UUID
 
 from fastapi import APIRouter, Depends

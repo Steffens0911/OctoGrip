@@ -23,9 +23,7 @@ def ensure_public_schema_sync() -> None:
         conn.execute(text("GRANT USAGE ON SCHEMA public TO PUBLIC"))
         conn.execute(
             text(
-                "DO $$ BEGIN "
-                "EXECUTE format('ALTER DATABASE %I SET search_path TO public', current_database()); "
-                "END $$;"
+                "DO $$ BEGIN EXECUTE format('ALTER DATABASE %I SET search_path TO public', current_database()); END $$;"
             )
         )
 

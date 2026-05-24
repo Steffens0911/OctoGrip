@@ -1,5 +1,6 @@
 """Serviço de metas coletivas: criar, listar, obter atual com contagem."""
-from datetime import date, datetime, time, timedelta
+
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -51,11 +52,7 @@ async def list_goals_for_academy(
         stmt = stmt.where(CollectiveGoal.end_date >= start_date)
     if end_date is not None:
         stmt = stmt.where(CollectiveGoal.start_date <= end_date)
-    stmt = (
-        stmt.order_by(CollectiveGoal.start_date.desc())
-        .offset(safe_offset)
-        .limit(safe_limit)
-    )
+    stmt = stmt.order_by(CollectiveGoal.start_date.desc()).offset(safe_offset).limit(safe_limit)
     return (await db.execute(stmt)).unique().scalars().all()
 
 
@@ -66,17 +63,22 @@ async def get_current_goal_for_academy(
 ) -> CollectiveGoal | None:
     day = today or today_in_app_tz()
     return (
-        await db.execute(
-            select(CollectiveGoal)
-            .options(selectinload(CollectiveGoal.technique))
-            .where(
-                CollectiveGoal.academy_id == academy_id,
-                CollectiveGoal.start_date <= day,
-                CollectiveGoal.end_date >= day,
+        (
+            await db.execute(
+                select(CollectiveGoal)
+                .options(selectinload(CollectiveGoal.technique))
+                .where(
+                    CollectiveGoal.academy_id == academy_id,
+                    CollectiveGoal.start_date <= day,
+                    CollectiveGoal.end_date >= day,
+                )
+                .order_by(CollectiveGoal.created_at.desc())
             )
-            .order_by(CollectiveGoal.created_at.desc())
         )
-    ).unique().scalars().first()
+        .unique()
+        .scalars()
+        .first()
+    )
 
 
 async def count_executions_for_goal(

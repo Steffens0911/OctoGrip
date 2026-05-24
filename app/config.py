@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import List
 from zoneinfo import ZoneInfo
 
 from pydantic import field_validator
@@ -16,7 +15,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://jjb:dev_local_only@localhost:5432/jjb_db"
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "text"  # text ou json
-    
+
     # Observabilidade
     SENTRY_DSN: str | None = None
     ENABLE_METRICS: bool = True
@@ -31,7 +30,7 @@ class Settings(BaseSettings):
     # CORS
     # Em desenvolvimento, o backend aceita localhost em qualquer porta via allow_origin_regex
     # configurado em app.main. Em produção, defina origens explícitas aqui (ex.: URLs do frontend).
-    CORS_ORIGINS: List[str] = []
+    CORS_ORIGINS: list[str] = []
 
     # Banco - pool
     DB_POOL_SIZE: int = 8
@@ -87,8 +86,7 @@ class Settings(BaseSettings):
         is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
         if is_production and (not v or len(v) < _MIN_JWT_SECRET_LENGTH or "dev" in v.lower()):
             raise ValueError(
-                "QR_SECRET não pode usar o valor padrão em produção. "
-                "Defina um secret forte via variável de ambiente."
+                "QR_SECRET não pode usar o valor padrão em produção. Defina um secret forte via variável de ambiente."
             )
         return v
 
@@ -98,7 +96,7 @@ class Settings(BaseSettings):
         """Valida força do JWT_SECRET."""
         # Em produção, secret é obrigatório e deve ser forte
         is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
-        
+
         if v == _DEFAULT_JWT_SECRET:
             if is_production:
                 raise ValueError(
@@ -108,14 +106,13 @@ class Settings(BaseSettings):
             logging.getLogger(__name__).warning(
                 "JWT_SECRET está com o valor padrão! Defina JWT_SECRET no .env para produção."
             )
-        
+
         # Validar força mínima (exceto se for o default em dev)
         if v != _DEFAULT_JWT_SECRET and len(v) < _MIN_JWT_SECRET_LENGTH:
             raise ValueError(
-                f"JWT_SECRET deve ter pelo menos {_MIN_JWT_SECRET_LENGTH} caracteres. "
-                f"Atual: {len(v)} caracteres."
+                f"JWT_SECRET deve ter pelo menos {_MIN_JWT_SECRET_LENGTH} caracteres. Atual: {len(v)} caracteres."
             )
-        
+
         return v
 
     @field_validator("APP_TIMEZONE")
@@ -140,14 +137,13 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS")
     @classmethod
-    def validate_cors_origins(cls, v: List[str]) -> List[str]:
+    def validate_cors_origins(cls, v: list[str]) -> list[str]:
         """Valida CORS; remove '*' (quebra Flutter Web + Authorization: browser exige origem explícita)."""
         is_production = os.getenv("ENVIRONMENT", "").lower() == "production"
 
         if is_production and "*" in v:
             raise ValueError(
-                "CORS_ORIGINS não pode conter '*' em produção. "
-                "Defina origens específicas via variável de ambiente."
+                "CORS_ORIGINS não pode conter '*' em produção. Defina origens específicas via variável de ambiente."
             )
 
         return [o for o in v if o and str(o).strip() != "*"]
@@ -160,6 +156,4 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if settings.JWT_SECRET == _DEFAULT_JWT_SECRET:
-    logging.getLogger(__name__).warning(
-        "JWT_SECRET está com o valor padrão! Defina JWT_SECRET no .env para produção."
-    )
+    logging.getLogger(__name__).warning("JWT_SECRET está com o valor padrão! Defina JWT_SECRET no .env para produção.")

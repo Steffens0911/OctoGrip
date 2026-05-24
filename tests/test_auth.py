@@ -1,12 +1,14 @@
 """Testes de autenticação: login, JWT, /me."""
-import pytest
 
 
 async def test_login_sucesso(client, admin_user):
-    r = await client.post("/auth/login", json={
-        "email": admin_user.email,
-        "password": "admin123",
-    })
+    r = await client.post(
+        "/auth/login",
+        json={
+            "email": admin_user.email,
+            "password": "admin123",
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert "access_token" in data
@@ -15,18 +17,24 @@ async def test_login_sucesso(client, admin_user):
 
 
 async def test_login_email_invalido(client):
-    r = await client.post("/auth/login", json={
-        "email": "naoexiste@test.com",
-        "password": "qualquer",
-    })
+    r = await client.post(
+        "/auth/login",
+        json={
+            "email": "naoexiste@test.com",
+            "password": "qualquer",
+        },
+    )
     assert r.status_code == 401
 
 
 async def test_login_senha_errada(client, admin_user):
-    r = await client.post("/auth/login", json={
-        "email": admin_user.email,
-        "password": "senhaerrada",
-    })
+    r = await client.post(
+        "/auth/login",
+        json={
+            "email": admin_user.email,
+            "password": "senhaerrada",
+        },
+    )
     assert r.status_code == 401
 
 

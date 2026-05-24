@@ -1,6 +1,7 @@
 """Conclusão por missão: registra que o usuário concluiu a missão do dia."""
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -78,7 +79,7 @@ async def complete_mission(
     if usage_type not in ("before_training", "after_training"):
         usage_type = "after_training"
     points_awarded = clamp_reward_points(mission.multiplier)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     usage = MissionUsage(
         user_id=user_id,
         mission_id=mission_id,

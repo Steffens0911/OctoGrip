@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError
 from app.core.list_pagination import MAX_LIST_LIMIT
-from app.core.role_deps import require_write_access, verify_academy_access
+from app.core.role_deps import require_write_access
 from app.database import get_db
 from app.models import User
 from app.schemas.training_video import (
@@ -94,9 +94,7 @@ async def training_video_update(
         points_per_day=payload.get("points_per_day"),
         is_active=payload.get("is_active"),
         duration_seconds=payload.get("duration_seconds"),
-        position_description=payload["position_description"]
-        if "position_description" in payload
-        else PATCH_UNSET,
+        position_description=payload["position_description"] if "position_description" in payload else PATCH_UNSET,
         audit_user_id=current_user.id,
     )
     assert updated is not None
@@ -124,4 +122,3 @@ async def training_video_delete(
 
         raise NotFoundError("Vídeo de treinamento não encontrado.")
     return None
-

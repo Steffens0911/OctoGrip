@@ -1,25 +1,26 @@
 """Autenticação: login e token JWT com account lockout."""
+
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.app_time import today_in_app_tz
 from app.core.auth_deps import get_current_user
 from app.core.exceptions import AppError
 from app.core.metrics import security_events_total
 from app.core.rate_limit import limiter
-from app.core.security import verify_password, create_access_token
+from app.core.security import create_access_token, verify_password
 from app.database import get_db
 from app.models import User
 from app.models.user_login_day import UserLoginDay
 from app.schemas.auth import DailyCheckinResponse, LoginRequest, TokenResponse
 from app.schemas.user import MeUpdate, UserRead
 from app.services.leveling_service import refresh_user_level
-from app.core.app_time import today_in_app_tz
 from app.services.login_streak_service import (
     apply_login_streak_bonus,
     user_read_with_login_streak,
@@ -96,7 +97,7 @@ async def login(
     _clear_failed_attempts(body.email)
 
     # Atualiza last_login_at, regista dia no fuso APP_TIMEZONE e aplica bónus de sequência se aplicável
-    user.last_login_at = datetime.now(timezone.utc)
+    user.last_login_at = datetime.now(UTC)
     streak_bonus_points = await apply_login_streak_bonus(db, user, now=user.last_login_at)
     await db.commit()
     if streak_bonus_points > 0:

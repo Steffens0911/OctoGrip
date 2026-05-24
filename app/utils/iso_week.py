@@ -1,7 +1,8 @@
 """Semana ISO (ano + número da semana) para escolha de kit semanal."""
+
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import UTC, date, datetime, time, timedelta
 
 from app.core.app_time import get_app_tz, today_in_app_tz
 
@@ -32,4 +33,4 @@ def utc_datetime_bounds_for_iso_week(iso_year: int, iso_week: int) -> tuple[date
     tz = get_app_tz()
     start_local = datetime.combine(monday, time.min, tzinfo=tz)
     end_local = datetime.combine(monday + timedelta(days=7), time.min, tzinfo=tz)
-    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+    return start_local.astimezone(UTC), end_local.astimezone(UTC)

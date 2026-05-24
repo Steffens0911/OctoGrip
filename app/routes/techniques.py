@@ -1,8 +1,9 @@
 """CRUD de técnicas (listagem por academia)."""
-from uuid import UUID
 
 import traceback
-from fastapi import APIRouter, Depends, Query, HTTPException
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -118,9 +119,7 @@ async def technique_update(
         if not technique or technique.academy_id != academy_id:
             raise TechniqueNotFoundError()
         payload = body.model_dump(exclude_unset=True)
-        updated = await update_technique(
-            db, technique_id, audit_user_id=current_user.id, **payload
-        )
+        updated = await update_technique(db, technique_id, audit_user_id=current_user.id, **payload)
         if not updated:
             raise TechniqueNotFoundError()
         return updated
@@ -147,9 +146,7 @@ async def technique_delete(
         if not technique or technique.academy_id != academy_id:
             raise TechniqueNotFoundError()
         try:
-            if not await delete_technique(
-                db, technique_id, audit_user_id=current_user.id
-            ):
+            if not await delete_technique(db, technique_id, audit_user_id=current_user.id):
                 raise TechniqueNotFoundError()
             return None
         except IntegrityError:

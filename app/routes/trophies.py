@@ -1,4 +1,5 @@
 """Rotas de troféus: criar, listar por academia, galeria do usuário."""
+
 import logging
 from uuid import UUID
 
@@ -13,7 +14,14 @@ from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
-from app.schemas.trophy import AcademyUserEarned, TrophyCreate, TrophyHomeSummaryResponse, TrophyRead, TrophyUpdate, UserTrophyEarned
+from app.schemas.trophy import (
+    AcademyUserEarned,
+    TrophyCreate,
+    TrophyHomeSummaryResponse,
+    TrophyRead,
+    TrophyUpdate,
+    UserTrophyEarned,
+)
 from app.services.trophy_service import (
     create_trophy,
     get_trophy,
@@ -76,6 +84,7 @@ async def trophy_create(
     if trophy.academy_id:
         try:
             from app.services.notification_service import create_notifications_for_academy_students
+
             kind_label = "Medalha" if getattr(trophy, "award_kind", "trophy") == "medal" else "Troféu"
             await create_notifications_for_academy_students(
                 db,

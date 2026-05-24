@@ -1,4 +1,5 @@
 """Parceiro da academia: divulgação para alunos (nome, descrição, link)."""
+
 from __future__ import annotations
 
 import uuid
@@ -31,4 +32,4 @@ class Partner(Base, UUIDMixin):
         server_default="false",
     )
 
-    academy: Mapped["Academy"] = relationship("Academy", back_populates="partners")
+    academy: Mapped[Academy] = relationship("Academy", back_populates="partners")

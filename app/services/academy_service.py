@@ -1,10 +1,12 @@
 """Serviços de Academia (A-03, A-04)."""
+
 import logging
 import re
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import func, select, delete as sa_delete
+from sqlalchemy import delete as sa_delete
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.app_time import (
@@ -26,7 +28,6 @@ from app.models import (
     User,
     UserWeeklyKitChoice,
 )
-from app.utils.iso_week import iso_week_key_for_date, utc_datetime_bounds_for_iso_week
 from app.services.audit_service import (
     AUDIT_ACTION_CREATE,
     AUDIT_ACTION_DELETE,
@@ -37,6 +38,7 @@ from app.services.audit_service import (
 from app.services.metrics_service import invalidate_metrics_cache
 from app.services.mission_crud_service import upsert_academy_week_missions
 from app.services.weekly_kit_service import academy_has_active_weekly_kits
+from app.utils.iso_week import iso_week_key_for_date, utc_datetime_bounds_for_iso_week
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +92,11 @@ async def ensure_weekly_missions_if_needed(
     t3 = academy.weekly_technique_3_id
     try:
         await upsert_academy_week_missions(
-            db, academy_id, (t1, t2, t3),
-            date(2020, 1, 6), date(2099, 12, 31),
+            db,
+            academy_id,
+            (t1, t2, t3),
+            date(2020, 1, 6),
+            date(2099, 12, 31),
         )
         logger.info(
             "ensure_weekly_missions_if_needed",
@@ -127,33 +132,21 @@ async def reset_academy_missions(db: AsyncSession, academy_id: UUID) -> dict:
     # Agregar pontos de MissionUsage por usuário
     mu_points_rows = (
         await db.execute(
-            select(
-                MissionUsage.user_id,
-                func.sum(MissionUsage.points_awarded).label("total_points")
-            )
-            .where(
-                MissionUsage.mission_id.in_(mission_ids),
-                MissionUsage.user_id.isnot(None)
-            )
+            select(MissionUsage.user_id, func.sum(MissionUsage.points_awarded).label("total_points"))
+            .where(MissionUsage.mission_id.in_(mission_ids), MissionUsage.user_id.isnot(None))
             .group_by(MissionUsage.user_id)
         )
     ).all()
-    
+
     # Agregar pontos de TechniqueExecution por usuário
     te_points_rows = (
         await db.execute(
-            select(
-                TechniqueExecution.user_id,
-                func.sum(TechniqueExecution.points_awarded).label("total_points")
-            )
-            .where(
-                TechniqueExecution.mission_id.in_(mission_ids),
-                TechniqueExecution.status == "confirmed"
-            )
+            select(TechniqueExecution.user_id, func.sum(TechniqueExecution.points_awarded).label("total_points"))
+            .where(TechniqueExecution.mission_id.in_(mission_ids), TechniqueExecution.status == "confirmed")
             .group_by(TechniqueExecution.user_id)
         )
     ).all()
-    
+
     # Combinar pontos de ambas as fontes
     user_points: dict[UUID, int] = {}
     for row in mu_points_rows:
@@ -162,7 +155,7 @@ async def reset_academy_missions(db: AsyncSession, academy_id: UUID) -> dict:
     for row in te_points_rows:
         if row.user_id and row.total_points:
             user_points[row.user_id] = user_points.get(row.user_id, 0) + int(row.total_points)
-    
+
     # Otimização: buscar todos os usuários de uma vez em vez de N+1 queries
     if user_points:
         user_ids = list(user_points.keys())
@@ -446,8 +439,11 @@ async def update_academy(
             t3 = academy.weekly_technique_3_id
             try:
                 await upsert_academy_week_missions(
-                    db, academy_id, (t1, t2, t3),
-                    date(2020, 1, 6), date(2099, 12, 31),
+                    db,
+                    academy_id,
+                    (t1, t2, t3),
+                    date(2020, 1, 6),
+                    date(2099, 12, 31),
                 )
             except Exception as e:
                 logger.exception("update_academy upsert_academy_week_missions: %s", e)
@@ -502,12 +498,10 @@ async def _get_user_completions_by_period(
     )
     if end is not None:
         lp_query = lp_query.where(LessonProgress.completed_at < end)
-    
+
     lp_rows = (await db.execute(lp_query.group_by(User.id, User.name))).all()
-    lp_by_user: dict[UUID, tuple[str | None, int]] = {
-        r[0]: (r[1], r[2]) for r in lp_rows
-    }
-    
+    lp_by_user: dict[UUID, tuple[str | None, int]] = {r[0]: (r[1], r[2]) for r in lp_rows}
+
     # Query MissionUsage
     mu_query = (
         select(
@@ -523,11 +517,9 @@ async def _get_user_completions_by_period(
     )
     if end is not None:
         mu_query = mu_query.where(MissionUsage.completed_at < end)
-    
+
     mu_rows = (await db.execute(mu_query.group_by(User.id, User.name))).all()
-    mu_by_user: dict[UUID, tuple[str | None, int]] = {
-        r[0]: (r[1], r[2]) for r in mu_rows
-    }
+    mu_by_user: dict[UUID, tuple[str | None, int]] = {r[0]: (r[1], r[2]) for r in mu_rows}
 
     # Query TechniqueExecution (somente confirmadas no período)
     te_event_time = func.coalesce(TechniqueExecution.confirmed_at, TechniqueExecution.created_at)
@@ -548,9 +540,7 @@ async def _get_user_completions_by_period(
         te_query = te_query.where(te_event_time < end)
 
     te_rows = (await db.execute(te_query.group_by(User.id, User.name))).all()
-    te_by_user: dict[UUID, tuple[str | None, int]] = {
-        r[0]: (r[1], r[2]) for r in te_rows
-    }
+    te_by_user: dict[UUID, tuple[str | None, int]] = {r[0]: (r[1], r[2]) for r in te_rows}
 
     return lp_by_user, mu_by_user, te_by_user
 
@@ -568,7 +558,7 @@ def _merge_user_completions(
     all_user_ids = set(lp_by_user) | set(mu_by_user) | set(te_by_user)
     if not all_user_ids:
         return []
-    
+
     merged = []
     for uid in all_user_ids:
         # Priorizar nome de lp_by_user, depois mu_by_user, depois te_by_user
@@ -582,11 +572,11 @@ def _merge_user_completions(
         count_mu = (mu_by_user.get(uid) or (None, 0))[1]
         count_te = (te_by_user.get(uid) or (None, 0))[1]
         merged.append((uid, name, count_lp + count_mu + count_te))
-    
+
     merged.sort(key=lambda x: x[2], reverse=True)
     if limit is not None:
         merged = merged[:limit]
-    
+
     return merged
 
 
@@ -630,15 +620,11 @@ async def get_academy_ranking(
     if range_start is not None and range_end is not None:
         start_dt = combine_local_date_start_utc(range_start)
         end_dt = combine_local_date_exclusive_end_utc(range_end)
-        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
-            db, academy_id, start_dt, end_dt
-        )
+        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(db, academy_id, start_dt, end_dt)
     else:
-        since = datetime.now(timezone.utc) - timedelta(days=period_days)
-        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
-            db, academy_id, since
-        )
-    
+        since = datetime.now(UTC) - timedelta(days=period_days)
+        lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(db, academy_id, since)
+
     # Merge e formatação
     merged = _merge_user_completions(lp_by_user, mu_by_user, te_by_user, limit=limit)
     logger.debug(
@@ -651,11 +637,8 @@ async def get_academy_ranking(
             "total_users": len(merged),
         },
     )
-    
-    result = [
-        {"rank": i + 1, "user_id": r[0], "name": r[1], "completions_count": r[2]}
-        for i, r in enumerate(merged)
-    ]
+
+    result = [{"rank": i + 1, "user_id": r[0], "name": r[1], "completions_count": r[2]} for i, r in enumerate(merged)]
     await app_cache.set(cache_key, result, ttl=_ACADEMY_RANKING_TTL_SEC)
     return result
 
@@ -712,13 +695,11 @@ async def get_academy_weekly_report(
         week_end = combine_local_date_exclusive_end_utc(monday_d + timedelta(days=6))
 
     # Usar função comum para buscar completions
-    lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(
-        db, academy_id, week_start, week_end
-    )
-    
+    lp_by_user, mu_by_user, te_by_user = await _get_user_completions_by_period(db, academy_id, week_start, week_end)
+
     # Merge usando função comum
     merged = _merge_user_completions(lp_by_user, mu_by_user, te_by_user)
-    
+
     logger.debug(
         "get_academy_weekly_report merge",
         extra={
@@ -750,8 +731,7 @@ async def get_academy_weekly_report(
         "completions_count": total_completions,
         "active_users_count": len(merged),
         "entries": [
-            {"rank": i + 1, "user_id": r[0], "name": r[1], "completions_count": r[2]}
-            for i, r in enumerate(merged)
+            {"rank": i + 1, "user_id": r[0], "name": r[1], "completions_count": r[2]} for i, r in enumerate(merged)
         ],
     }
     await app_cache.set(cache_key, out, ttl=_ACADEMY_WEEKLY_REPORT_TTL_SEC)

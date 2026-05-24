@@ -32,9 +32,7 @@ def _access_token_from_service_account(path: str) -> str:
 
 async def fetch_fcm_access_token(service_account_path: str) -> str:
     """OAuth2 bearer para FCM HTTP v1 (um por pedido de broadcast costuma bastar)."""
-    return await asyncio.to_thread(
-        _access_token_from_service_account, service_account_path
-    )
+    return await asyncio.to_thread(_access_token_from_service_account, service_account_path)
 
 
 async def send_fcm_data_message(
@@ -58,9 +56,7 @@ async def send_fcm_data_message(
     try:
         bearer = access_token
         if not bearer:
-            bearer = await asyncio.to_thread(
-                _access_token_from_service_account, service_account_path
-            )
+            bearer = await asyncio.to_thread(_access_token_from_service_account, service_account_path)
         url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
         payload = {
             "message": {
@@ -90,19 +86,15 @@ async def send_fcm_data_message(
         if r.status_code == 200:
             return True, False
         # Token expirado ou app desinstalada
-        if r.status_code == 404 and (
-            "NOT_FOUND" in text or "Requested entity was not found" in text
-        ):
+        if r.status_code == 404 and ("NOT_FOUND" in text or "Requested entity was not found" in text):
             return False, True
-        if r.status_code == 400 and (
-            "UNREGISTERED" in text or "not a valid FCM registration token" in text
-        ):
+        if r.status_code == 400 and ("UNREGISTERED" in text or "not a valid FCM registration token" in text):
             return False, True
         logger.warning(
             "FCM: envio falhou",
             extra={"status_code": r.status_code, "snippet": text[:400]},
         )
         return False, False
-    except Exception as e:
+    except Exception:
         logger.exception("FCM: erro inesperado no envio")
         return False, False

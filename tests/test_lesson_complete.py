@@ -1,6 +1,8 @@
 """Testes de conclusão de lição."""
-import pytest
+
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.fixture
@@ -63,9 +65,13 @@ async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
     assert r0.status_code == 200
     antes = r0.json()["points"]
 
-    r = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["user_id"] == str(aluno_user.id)
@@ -81,39 +87,54 @@ async def test_completar_licao(client, aluno_headers, aluno_user, lesson):
 async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, lesson):
     """Tentar completar lição duas vezes retorna 409."""
     # Primeira conclusão
-    r1 = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r1 = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r1.status_code == 201
 
     # Segunda conclusão (deve falhar)
-    r2 = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r2 = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r2.status_code == 409
 
 
 async def test_completar_licao_inexistente(client, aluno_headers):
     """Completar lição inexistente retorna 404."""
     fake_lesson_id = uuid4()
-    r = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(fake_lesson_id),
-    })
+    r = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(fake_lesson_id),
+        },
+    )
     assert r.status_code == 404
 
 
 async def test_completar_licao_sem_auth(client, lesson):
     """Completar lição sem autenticação retorna 401."""
-    r = await client.post("/lesson_complete", json={
-        "lesson_id": str(lesson.id),
-    })
+    r = await client.post(
+        "/lesson_complete",
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r.status_code == 401
 
 
 async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique):
     """Múltiplos usuários podem completar a mesma lição."""
-    from app.models import User
     from app.core.security import create_access_token, hash_password_sync
+    from app.models import User
 
     # Mesma academia da técnica/lição (obrigatório para alunos)
     aid = technique.academy_id
@@ -144,15 +165,23 @@ async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique)
     headers2 = {"Authorization": f"Bearer {create_access_token(user2.id)}"}
 
     # Primeiro usuário completa
-    r1 = await client.post("/lesson_complete", headers=headers1, json={
-        "lesson_id": str(lesson.id),
-    })
+    r1 = await client.post(
+        "/lesson_complete",
+        headers=headers1,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r1.status_code == 201
 
     # Segundo usuário também pode completar
-    r2 = await client.post("/lesson_complete", headers=headers2, json={
-        "lesson_id": str(lesson.id),
-    })
+    r2 = await client.post(
+        "/lesson_complete",
+        headers=headers2,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r2.status_code == 201
 
 
@@ -163,9 +192,13 @@ async def test_status_apos_completar(client, aluno_headers, aluno_user, lesson):
     assert r1.json()["completed"] is False
 
     # Completar
-    r2 = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r2 = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r2.status_code == 201
 
     # Verificar que agora está concluída

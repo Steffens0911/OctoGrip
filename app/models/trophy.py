@@ -1,4 +1,5 @@
 """Troféu por academia: meta de execuções de uma técnica em período; tiers ouro/prata/bronze pela faixa do adversário."""
+
 from __future__ import annotations
 
 import uuid
@@ -49,17 +50,17 @@ class Trophy(Base, UUIDMixin, SoftDeleteMixin):
         comment="Máx. execuções que contam por adversário no período; null = legado (bronze distinto).",
     )
 
-    academy: Mapped["Academy"] = relationship(
+    academy: Mapped[Academy] = relationship(
         "Academy",
         back_populates="trophies",
         lazy="selectin",
     )
-    technique: Mapped["Technique"] = relationship(
+    technique: Mapped[Technique] = relationship(
         "Technique",
         back_populates="trophies",
         lazy="joined",
     )
-    earned_by: Mapped[list["UserTrophyEarned"]] = relationship(
+    earned_by: Mapped[list[UserTrophyEarned]] = relationship(
         "UserTrophyEarned",
         back_populates="trophy",
         lazy="raise",

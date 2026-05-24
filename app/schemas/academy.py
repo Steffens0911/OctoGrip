@@ -1,4 +1,5 @@
 """Schemas para Academia (A-03, A-04)."""
+
 from datetime import date, datetime
 from uuid import UUID
 

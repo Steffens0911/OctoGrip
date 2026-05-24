@@ -1,10 +1,10 @@
 """Testes de edge cases: validações de input, relacionamentos, datas, duplicação, deleção, permissões, paginação."""
-import pytest
+
 from datetime import date, timedelta
 from uuid import uuid4
 
-
 # ========================== VALIDAÇÕES DE INPUT ==========================
+
 
 async def test_criar_usuario_sem_campos_obrigatorios(client, admin_headers):
     """Criar usuário sem campos obrigatórios retorna 422."""
@@ -14,17 +14,25 @@ async def test_criar_usuario_sem_campos_obrigatorios(client, admin_headers):
 
 async def test_rota_posicoes_removida(client, admin_headers):
     """CRUD de posições foi removido da API."""
-    r = await client.post("/positions", headers=admin_headers, json={
-        "name": "Posição Teste",
-    })
+    r = await client.post(
+        "/positions",
+        headers=admin_headers,
+        json={
+            "name": "Posição Teste",
+        },
+    )
     assert r.status_code == 404
 
 
 async def test_criar_tecnica_sem_academy_id(client, admin_headers):
     """Criar técnica sem academy_id falha na validação do body (422)."""
-    r = await client.post("/techniques", headers=admin_headers, json={
-        "name": "Técnica Teste",
-    })
+    r = await client.post(
+        "/techniques",
+        headers=admin_headers,
+        json={
+            "name": "Técnica Teste",
+        },
+    )
     assert r.status_code == 422
 
 
@@ -54,24 +62,33 @@ async def test_offset_negativo(client, admin_headers, aluno_user):
 
 # ========================== VALIDAÇÕES DE RELACIONAMENTOS ==========================
 
+
 async def test_criar_tecnica_posicoes_academias_diferentes(client, admin_headers, academy, db):
     """Mantido apenas por compatibilidade histórica; hoje técnica não usa posições."""
-    r = await client.post("/techniques", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "name": "Técnica Sem Posição",
-    })
+    r = await client.post(
+        "/techniques",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "name": "Técnica Sem Posição",
+        },
+    )
     assert r.status_code in (201, 400, 422)
 
 
 async def test_criar_missao_tecnica_inexistente(client, admin_headers):
     """Criar missão com técnica inexistente retorna 404."""
     fake_technique_id = uuid4()
-    r = await client.post("/missions", headers=admin_headers, json={
-        "technique_id": str(fake_technique_id),
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=6)).isoformat(),
-        "level": "beginner",
-    })
+    r = await client.post(
+        "/missions",
+        headers=admin_headers,
+        json={
+            "technique_id": str(fake_technique_id),
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=6)).isoformat(),
+            "level": "beginner",
+        },
+    )
     assert r.status_code == 404
 
 
@@ -91,8 +108,8 @@ async def test_criar_missao_multiplier_fora_intervalo(client, admin_headers, tec
 
 async def test_criar_execucao_oponente_academia_diferente(client, aluno_headers, aluno_user, mission_with_lesson, db):
     """Não pode criar execução com oponente de academia diferente."""
-    from app.models import Academy, User
     from app.core.security import hash_password_sync
+    from app.models import Academy, User
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -112,65 +129,91 @@ async def test_criar_execucao_oponente_academia_diferente(client, aluno_headers,
     await db.refresh(other_user)
 
     mission, _ = mission_with_lesson
-    r = await client.post("/executions", headers=aluno_headers, json={
-        "mission_id": str(mission.id),
-        "opponent_id": str(other_user.id),  # Oponente de outra academia
-    })
+    r = await client.post(
+        "/executions",
+        headers=aluno_headers,
+        json={
+            "mission_id": str(mission.id),
+            "opponent_id": str(other_user.id),  # Oponente de outra academia
+        },
+    )
     assert r.status_code == 400
 
 
 # ========================== VALIDAÇÕES DE DATAS ==========================
 
+
 async def test_criar_missao_end_date_anterior_start_date(client, admin_headers, technique):
     """Não pode criar missão com end_date < start_date (validação Pydantic → 422)."""
-    r = await client.post("/missions", headers=admin_headers, json={
-        "technique_id": str(technique.id),
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
-        "level": "beginner",
-    })
+    r = await client.post(
+        "/missions",
+        headers=admin_headers,
+        json={
+            "technique_id": str(technique.id),
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() - timedelta(days=1)).isoformat(),  # Data anterior
+            "level": "beginner",
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_criar_trofeu_end_date_anterior_start_date(client, admin_headers, academy, technique):
     """Não pode criar troféu com end_date < start_date."""
-    r = await client.post("/trophies", headers=admin_headers, json={
-        "academy_id": str(academy.id),
-        "technique_id": str(technique.id),
-        "name": "Troféu Inválido",
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
-        "target_count": 10,
-    })
+    r = await client.post(
+        "/trophies",
+        headers=admin_headers,
+        json={
+            "academy_id": str(academy.id),
+            "technique_id": str(technique.id),
+            "name": "Troféu Inválido",
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() - timedelta(days=1)).isoformat(),
+            "target_count": 10,
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_criar_meta_coletiva_end_date_anterior_start_date(client, admin_headers, academy, technique):
     """Não pode criar meta coletiva com end_date < start_date."""
-    r = await client.post(f"/academies/{academy.id}/collective_goals", headers=admin_headers, json={
-        "technique_id": str(technique.id),
-        "target_count": 100,
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() - timedelta(days=1)).isoformat(),
-    })
+    r = await client.post(
+        f"/academies/{academy.id}/collective_goals",
+        headers=admin_headers,
+        json={
+            "technique_id": str(technique.id),
+            "target_count": 100,
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() - timedelta(days=1)).isoformat(),
+        },
+    )
     assert r.status_code == 422  # Validação do Pydantic
 
 
 # ========================== VALIDAÇÕES DE DUPLICAÇÃO ==========================
 
+
 async def test_completar_missao_duplicada(client, aluno_headers, aluno_user, mission_with_lesson):
     """Tentar completar missão duas vezes retorna 409."""
     mission, _ = mission_with_lesson
     # Primeira conclusão
-    r1 = await client.post("/mission_complete", headers=aluno_headers, json={
-        "mission_id": str(mission.id),
-    })
+    r1 = await client.post(
+        "/mission_complete",
+        headers=aluno_headers,
+        json={
+            "mission_id": str(mission.id),
+        },
+    )
     assert r1.status_code == 201
 
     # Segunda conclusão
-    r2 = await client.post("/mission_complete", headers=aluno_headers, json={
-        "mission_id": str(mission.id),
-    })
+    r2 = await client.post(
+        "/mission_complete",
+        headers=aluno_headers,
+        json={
+            "mission_id": str(mission.id),
+        },
+    )
     assert r2.status_code == 409
 
 
@@ -189,19 +232,28 @@ async def test_completar_licao_duplicada(client, aluno_headers, aluno_user, tech
     await db.refresh(lesson)
 
     # Primeira conclusão
-    r1 = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r1 = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r1.status_code == 201
 
     # Segunda conclusão
-    r2 = await client.post("/lesson_complete", headers=aluno_headers, json={
-        "lesson_id": str(lesson.id),
-    })
+    r2 = await client.post(
+        "/lesson_complete",
+        headers=aluno_headers,
+        json={
+            "lesson_id": str(lesson.id),
+        },
+    )
     assert r2.status_code == 409
 
 
 # ========================== VALIDAÇÕES DE DELEÇÃO ==========================
+
 
 async def test_deletar_tecnica_com_missoes(client, admin_headers, academy, technique, db):
     """Não pode deletar técnica com missões ativas."""
@@ -223,10 +275,11 @@ async def test_deletar_tecnica_com_missoes(client, admin_headers, academy, techn
 
 # ========================== VALIDAÇÕES DE PERMISSÕES ==========================
 
+
 async def test_aluno_modificar_outro_aluno(client, aluno_headers, db):
     """Aluno não pode modificar outro aluno."""
-    from app.models import Academy, User
     from app.core.security import hash_password_sync
+    from app.models import Academy, User
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -245,9 +298,13 @@ async def test_aluno_modificar_outro_aluno(client, aluno_headers, db):
     await db.commit()
     await db.refresh(other_user)
 
-    r = await client.patch(f"/users/{other_user.id}", headers=aluno_headers, json={
-        "name": "Tentativa",
-    })
+    r = await client.patch(
+        f"/users/{other_user.id}",
+        headers=aluno_headers,
+        json={
+            "name": "Tentativa",
+        },
+    )
     assert r.status_code == 403
 
 
@@ -268,15 +325,16 @@ async def test_operacao_sem_auth(client):
     """Operações sem autenticação retornam 401."""
     r = await client.get("/users")
     assert r.status_code == 401
-    
+
     r = await client.post("/missions", json={})
     assert r.status_code == 401
-    
+
     r = await client.get("/academies")
     assert r.status_code == 401
 
 
 # ========================== VALIDAÇÕES DE PAGINAÇÃO ==========================
+
 
 async def test_paginação_limit_zero(client, admin_headers, aluno_user):
     """Limit zero retorna 422."""
@@ -298,12 +356,12 @@ async def test_paginação_combinacao_limit_offset(client, admin_headers, aluno_
     r1 = await client.get(f"/users/{aluno_user.id}/points_log?limit=5&offset=0", headers=admin_headers)
     assert r1.status_code == 200
     data1 = r1.json()
-    
+
     # Segunda página
     r2 = await client.get(f"/users/{aluno_user.id}/points_log?limit=5&offset=5", headers=admin_headers)
     assert r2.status_code == 200
     data2 = r2.json()
-    
+
     # Não deve haver sobreposição se houver dados suficientes
     if len(data1["entries"]) > 0 and len(data2["entries"]) > 0:
         assert data1["entries"][0] != data2["entries"][0]

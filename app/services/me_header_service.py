@@ -1,4 +1,5 @@
 """Serviço agregado para dados do header da home do aluno."""
+
 from __future__ import annotations
 
 from sqlalchemy import select
@@ -15,11 +16,7 @@ async def get_me_header_stats(db: AsyncSession, *, current_user: User) -> MeHead
     Usa campos persistidos (`reward_level`, `reward_level_points`) para evitar
     recomputações custosas em cada carregamento.
     """
-    user = (
-        await db.execute(
-            select(User).where(User.id == current_user.id)
-        )
-    ).scalar_one_or_none()
+    user = (await db.execute(select(User).where(User.id == current_user.id))).scalar_one_or_none()
     if user is None:
         user = current_user
 
@@ -29,11 +26,7 @@ async def get_me_header_stats(db: AsyncSession, *, current_user: User) -> MeHead
 
     academy_payload: MeHeaderAcademyRead | None = None
     if user.academy_id:
-        academy = (
-            await db.execute(
-                select(Academy).where(Academy.id == user.academy_id)
-            )
-        ).scalar_one_or_none()
+        academy = (await db.execute(select(Academy).where(Academy.id == user.academy_id))).scalar_one_or_none()
         if academy is not None:
             academy_payload = MeHeaderAcademyRead(
                 id=academy.id,

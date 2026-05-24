@@ -1,10 +1,11 @@
 """Rotas de Academia (A-03 tema semanal, A-04 ranking)."""
+
 import io
 import json
 import unicodedata
-from datetime import date
 import urllib.parse
 import urllib.request
+from datetime import date
 from pathlib import Path
 from typing import Final
 from uuid import UUID
@@ -225,6 +226,7 @@ async def schedule_display_url(
     url = url.strip()
     if "instagram.com" in url.lower():
         import asyncio
+
         thumb = await asyncio.to_thread(_fetch_instagram_thumbnail, url)
         if thumb:
             return {"display_url": thumb, "original_url": url}
@@ -775,9 +777,7 @@ async def academy_report_weekly(
         raise AppError("Informe start_date e end_date juntos, ou omita ambos.", status_code=400)
     if start_date is not None and end_date is not None:
         _validate_academy_report_date_range(start_date, end_date)
-        report = await get_academy_weekly_report(
-            db, academy_id, start_date=start_date, end_date=end_date
-        )
+        report = await get_academy_weekly_report(db, academy_id, start_date=start_date, end_date=end_date)
     else:
         report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
     if not report:
@@ -808,19 +808,14 @@ async def academy_report_weekly_csv(
         raise AppError("Informe start_date e end_date juntos, ou omita ambos.", status_code=400)
     if start_date is not None and end_date is not None:
         _validate_academy_report_date_range(start_date, end_date)
-        report = await get_academy_weekly_report(
-            db, academy_id, start_date=start_date, end_date=end_date
-        )
+        report = await get_academy_weekly_report(db, academy_id, start_date=start_date, end_date=end_date)
     else:
         report = await get_academy_weekly_report(db, academy_id, year=year, week=week)
     if not report:
         raise AcademyNotFoundError()
     lines = [
         "rank;user_id;name;completions_count",
-        *[
-            f"{e['rank']};{e['user_id']};{e.get('name') or ''};{e['completions_count']}"
-            for e in report["entries"]
-        ],
+        *[f"{e['rank']};{e['user_id']};{e.get('name') or ''};{e['completions_count']}" for e in report["entries"]],
     ]
     return "\n".join(lines)
 
@@ -967,9 +962,7 @@ async def collective_goal_create(
     )
     await db.refresh(goal)
     result = await db.execute(
-        select(CollectiveGoal)
-        .options(selectinload(CollectiveGoal.technique))
-        .where(CollectiveGoal.id == goal.id)
+        select(CollectiveGoal).options(selectinload(CollectiveGoal.technique)).where(CollectiveGoal.id == goal.id)
     )
     goal = result.scalar_one_or_none()
     return _goal_to_read(goal)

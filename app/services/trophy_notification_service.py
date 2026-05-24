@@ -1,4 +1,5 @@
 """Detecta troféus/medalhas recém-conquistados após confirmação de execução e envia push."""
+
 from __future__ import annotations
 
 import logging
@@ -146,14 +147,18 @@ async def check_and_notify_trophy_earned(
         return
 
     trophies: list[Trophy] = (
-        await db.execute(
-            select(Trophy).where(
-                Trophy.academy_id == user.academy_id,
-                Trophy.technique_id == technique_id,
-                Trophy.deleted_at.is_(None),
+        (
+            await db.execute(
+                select(Trophy).where(
+                    Trophy.academy_id == user.academy_id,
+                    Trophy.technique_id == technique_id,
+                    Trophy.deleted_at.is_(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     if not trophies:
         return
@@ -191,12 +196,11 @@ async def check_and_notify_trophy_earned(
                 create_notification,
                 create_notifications_for_academy_students,
             )
+
             kind_label = _KIND_LABEL.get(getattr(trophy, "award_kind", "trophy"), "Troféu")
             tier_label = _TIER_LABEL.get(current_tier, current_tier.capitalize())
             personal_title = (
-                f"{kind_label} evoluído! {tier_label}"
-                if upgraded
-                else f"{kind_label} conquistado! {tier_label}"
+                f"{kind_label} evoluído! {tier_label}" if upgraded else f"{kind_label} conquistado! {tier_label}"
             )
             trophy_data = {"trophy_id": str(trophy.id), "tier": current_tier}
             await create_notification(

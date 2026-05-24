@@ -1,7 +1,9 @@
 """Testes de sync e histórico de Mission Usages."""
-import pytest
-from datetime import datetime, timezone, timedelta
+
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.fixture
@@ -23,15 +25,21 @@ async def lesson_para_sync(db, technique):
 
 async def test_sync_mission_usages(client, aluno_headers, aluno_user, lesson_para_sync):
     """Sync de usos de missão com sucesso."""
-    now = datetime.now(timezone.utc)
-    r = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    now = datetime.now(UTC)
+    r = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["synced"] == 1
@@ -52,23 +60,27 @@ async def test_sync_mission_usages_multiplos(client, aluno_headers, aluno_user, 
     await db.commit()
     await db.refresh(lesson2)
 
-    now = datetime.now(timezone.utc)
-    r = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [
-            {
-                "lesson_id": str(lesson_para_sync.id),
-                "opened_at": now.isoformat(),
-                "completed_at": now.isoformat(),
-                "usage_type": "after_training",
-            },
-            {
-                "lesson_id": str(lesson2.id),
-                "opened_at": (now + timedelta(hours=1)).isoformat(),
-                "completed_at": (now + timedelta(hours=1)).isoformat(),
-                "usage_type": "before_training",
-            },
-        ],
-    })
+    now = datetime.now(UTC)
+    r = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                },
+                {
+                    "lesson_id": str(lesson2.id),
+                    "opened_at": (now + timedelta(hours=1)).isoformat(),
+                    "completed_at": (now + timedelta(hours=1)).isoformat(),
+                    "usage_type": "before_training",
+                },
+            ],
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["synced"] == 2
@@ -76,29 +88,41 @@ async def test_sync_mission_usages_multiplos(client, aluno_headers, aluno_user, 
 
 async def test_sync_mission_usages_duplicado(client, aluno_headers, aluno_user, lesson_para_sync):
     """Sync ignora duplicatas (mesmo lesson_id e completed_at)."""
-    now = datetime.now(timezone.utc)
-    
+    now = datetime.now(UTC)
+
     # Primeiro sync
-    r1 = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    r1 = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r1.status_code == 200
     assert r1.json()["synced"] == 1
 
     # Segundo sync com mesmo completed_at (deve ignorar)
-    r2 = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),  # Mesmo completed_at
-            "usage_type": "after_training",
-        }],
-    })
+    r2 = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),  # Mesmo completed_at
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r2.status_code == 200
     assert r2.json()["synced"] == 0  # Duplicata ignorada
 
@@ -106,15 +130,21 @@ async def test_sync_mission_usages_duplicado(client, aluno_headers, aluno_user, 
 async def test_sync_mission_usages_licao_inexistente(client, aluno_headers):
     """Sync ignora lições inexistentes."""
     fake_lesson_id = uuid4()
-    now = datetime.now(timezone.utc)
-    r = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(fake_lesson_id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    now = datetime.now(UTC)
+    r = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(fake_lesson_id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["synced"] == 0  # Lição inexistente ignorada
@@ -122,43 +152,60 @@ async def test_sync_mission_usages_licao_inexistente(client, aluno_headers):
 
 async def test_sync_mission_usages_sem_lesson_id(client, aluno_headers):
     """Item sem lesson_id falha na validação do body (lesson_id obrigatório)."""
-    now = datetime.now(timezone.utc)
-    r = await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    now = datetime.now(UTC)
+    r = await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r.status_code == 422
 
 
 async def test_sync_mission_usages_sem_auth(client, lesson_para_sync):
     """Sync sem autenticação retorna 401."""
-    now = datetime.now(timezone.utc)
-    r = await client.post("/mission_usages/sync", json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    now = datetime.now(UTC)
+    r = await client.post(
+        "/mission_usages/sync",
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
     assert r.status_code == 401
 
 
 async def test_historico_mission_usages(client, aluno_headers, aluno_user, lesson_para_sync):
     """Obter histórico de missões."""
     # Primeiro fazer sync para ter dados
-    now = datetime.now(timezone.utc)
-    await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    now = datetime.now(UTC)
+    await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
 
     r = await client.get("/mission_usages/history", headers=aluno_headers)
     assert r.status_code == 200
@@ -188,13 +235,16 @@ async def test_historico_mission_usages_com_limit(client, aluno_headers, aluno_u
         await db.refresh(lesson)
 
     # Sync de todas
-    now = datetime.now(timezone.utc)
-    usages = [{
-        "lesson_id": str(lesson.id),
-        "opened_at": (now + timedelta(hours=i)).isoformat(),
-        "completed_at": (now + timedelta(hours=i)).isoformat(),
-        "usage_type": "after_training",
-    } for i, lesson in enumerate(lessons)]
+    now = datetime.now(UTC)
+    usages = [
+        {
+            "lesson_id": str(lesson.id),
+            "opened_at": (now + timedelta(hours=i)).isoformat(),
+            "completed_at": (now + timedelta(hours=i)).isoformat(),
+            "usage_type": "after_training",
+        }
+        for i, lesson in enumerate(lessons)
+    ]
 
     await client.post("/mission_usages/sync", headers=aluno_headers, json={"usages": usages})
 
@@ -242,27 +292,39 @@ async def test_historico_mission_usages_ordenado_por_data(client, aluno_headers,
     await db.commit()
     await db.refresh(lesson2)
 
-    now = datetime.now(timezone.utc)
-    
+    now = datetime.now(UTC)
+
     # Sync lição mais antiga primeiro
-    await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson2.id),
-            "opened_at": (now - timedelta(hours=2)).isoformat(),
-            "completed_at": (now - timedelta(hours=2)).isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson2.id),
+                    "opened_at": (now - timedelta(hours=2)).isoformat(),
+                    "completed_at": (now - timedelta(hours=2)).isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
 
     # Sync lição mais recente depois
-    await client.post("/mission_usages/sync", headers=aluno_headers, json={
-        "usages": [{
-            "lesson_id": str(lesson_para_sync.id),
-            "opened_at": now.isoformat(),
-            "completed_at": now.isoformat(),
-            "usage_type": "after_training",
-        }],
-    })
+    await client.post(
+        "/mission_usages/sync",
+        headers=aluno_headers,
+        json={
+            "usages": [
+                {
+                    "lesson_id": str(lesson_para_sync.id),
+                    "opened_at": now.isoformat(),
+                    "completed_at": now.isoformat(),
+                    "usage_type": "after_training",
+                }
+            ],
+        },
+    )
 
     r = await client.get("/mission_usages/history", headers=aluno_headers)
     assert r.status_code == 200

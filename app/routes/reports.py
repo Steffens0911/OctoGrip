@@ -48,8 +48,7 @@ async def reports_engagement(
         ...,
         description="Data de referência para calcular semana (últimos 7 dias) e mês.",
     ),
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
@@ -89,8 +88,7 @@ async def reports_weekly_panel_logins(
         None,
         description="Fim do intervalo (inclusive). Exige start_date.",
     ),
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
@@ -134,8 +132,7 @@ async def reports_weekly_panel_logins(
 
 @router.get("/technique_execution_summary", response_model=TechniqueExecutionSummaryResponse)
 async def reports_technique_execution_summary(
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral.",
     ),
@@ -152,8 +149,7 @@ async def reports_technique_execution_summary(
 
 @router.get("/students_attention", response_model=StudentsAttentionReportResponse)
 async def reports_students_attention(
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral.",
     ),
@@ -188,8 +184,7 @@ async def reports_mission_completion(
         ...,
         description="Fim do período (inclusive).",
     ),
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral.",
     ),
@@ -218,8 +213,7 @@ async def reports_active_students(
         ...,
         description="Data de referência. A janela considerada é os últimos 7 dias (inclusive).",
     ),
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
@@ -251,8 +245,7 @@ async def reports_active_students_csv(
         ...,
         description="Data de referência. A janela considerada é os últimos 7 dias (inclusive).",
     ),
-    academy_id: UUID
-    | None = Query(
+    academy_id: UUID | None = Query(
         None,
         description="Academia para visão local. Se omitido, usa visão geral (todas as academias).",
     ),
@@ -280,9 +273,7 @@ async def reports_active_students_csv(
         "id,name,email,graduation,academy_id,academy_name,last_login_at\n",
     )
     for s in report["students"]:
-        last_login_str = (
-            s["last_login_at"].isoformat() if s.get("last_login_at") else ""
-        )
+        last_login_str = s["last_login_at"].isoformat() if s.get("last_login_at") else ""
         row = [
             s.get("id") or "",
             (s.get("name") or "").replace(",", " "),
@@ -298,7 +289,5 @@ async def reports_active_students_csv(
     return Response(
         content=csv_content,
         media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="active_students.csv"'
-        },
+        headers={"Content-Disposition": 'attachment; filename="active_students.csv"'},
     )

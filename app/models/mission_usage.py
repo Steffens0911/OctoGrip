@@ -1,8 +1,9 @@
 """Registro de uso da missão (sync do app): antes/depois do treino (PB-01)."""
+
 from __future__ import annotations
 
-from datetime import datetime
 import uuid
+from datetime import datetime
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -48,13 +49,13 @@ class MissionUsage(Base, UUIDMixin):
     )
     points_awarded: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    user: Mapped["User"] = relationship("User", back_populates="mission_usages")
-    mission: Mapped["Mission | None"] = relationship(
+    user: Mapped[User] = relationship("User", back_populates="mission_usages")
+    mission: Mapped[Mission | None] = relationship(
         "Mission",
         back_populates="mission_usages",
         lazy="selectin",
     )
-    lesson: Mapped["Lesson | None"] = relationship(
+    lesson: Mapped[Lesson | None] = relationship(
         "Lesson",
         back_populates="mission_usages",
         lazy="selectin",

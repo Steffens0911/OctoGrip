@@ -42,9 +42,8 @@ def run_regenerate(academy_id: UUID | None = None, dry_run: bool = False) -> Non
     from app.tasks.face_recognition_tasks import generate_student_embedding
 
     with SyncSessionLocal() as db:
-        query = (
-            select(User.id, User.email, User.name, User.academy_id)
-            .where(User.role == "aluno", User.avatar_url.is_not(None))
+        query = select(User.id, User.email, User.name, User.academy_id).where(
+            User.role == "aluno", User.avatar_url.is_not(None)
         )
         if academy_id:
             query = query.where(User.academy_id == academy_id)
@@ -57,10 +56,10 @@ def run_regenerate(academy_id: UUID | None = None, dry_run: bool = False) -> Non
 
         existing_ids = set(
             db.execute(
-                select(StudentFaceEmbedding.student_id).where(
-                    StudentFaceEmbedding.student_id.in_([r[0] for r in rows])
-                )
-            ).scalars().all()
+                select(StudentFaceEmbedding.student_id).where(StudentFaceEmbedding.student_id.in_([r[0] for r in rows]))
+            )
+            .scalars()
+            .all()
         )
 
     total = len(rows)

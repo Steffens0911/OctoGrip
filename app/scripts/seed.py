@@ -3,9 +3,10 @@ Seed expandido com dados iniciais para testar a API (S-04: 10+ lições; PF-01: 
 Popula BD para que ranking, dificuldades, relatório semanal e listas não fiquem em branco.
 Roda automaticamente no startup da API (Docker). Também: docker compose exec api python -m app.scripts.seed
 """
+
 import logging
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -159,18 +160,78 @@ def run_seed():
 
         # 12 lições para iniciante (order_index 0..11)
         lessons_data = [
-            ("Abertura de guarda e passagem", "abertura-guarda-passagem", "Controle de ombros, abertura e passagem para side.", 0, techniques[0].id),
-            ("Passagem de guarda: base e postura", "passagem-guarda-base-postura", "Base e postura na passagem de guarda.", 1, techniques[0].id),
-            ("Passagem de guarda: quebrando a guarda", "passagem-guarda-quebrando", "Como quebrar a guarda fechada.", 2, techniques[1].id),
-            ("Side control: estabilidade", "side-control-estabilidade", "Posição estável na side control.", 3, techniques[2].id),
+            (
+                "Abertura de guarda e passagem",
+                "abertura-guarda-passagem",
+                "Controle de ombros, abertura e passagem para side.",
+                0,
+                techniques[0].id,
+            ),
+            (
+                "Passagem de guarda: base e postura",
+                "passagem-guarda-base-postura",
+                "Base e postura na passagem de guarda.",
+                1,
+                techniques[0].id,
+            ),
+            (
+                "Passagem de guarda: quebrando a guarda",
+                "passagem-guarda-quebrando",
+                "Como quebrar a guarda fechada.",
+                2,
+                techniques[1].id,
+            ),
+            (
+                "Side control: estabilidade",
+                "side-control-estabilidade",
+                "Posição estável na side control.",
+                3,
+                techniques[2].id,
+            ),
             ("Da side para a montada", "side-para-montada", "Transição side control → montada.", 4, techniques[2].id),
-            ("Escape da side com ponte", "escape-side-ponte-aula", "Técnica de ponte para escapar da side.", 5, techniques[3].id),
-            ("Montada: posição e controle", "montada-posicao-controle", "Como manter a montada com segurança.", 6, techniques[4].id),
+            (
+                "Escape da side com ponte",
+                "escape-side-ponte-aula",
+                "Técnica de ponte para escapar da side.",
+                5,
+                techniques[3].id,
+            ),
+            (
+                "Montada: posição e controle",
+                "montada-posicao-controle",
+                "Como manter a montada com segurança.",
+                6,
+                techniques[4].id,
+            ),
             ("Escape da montada (upa)", "escape-montada-upa-aula", "Escape básico da montada.", 7, techniques[5].id),
-            ("Pegada de costas pela montada", "pegada-costas-aula", "Chegando às costas a partir da montada.", 8, techniques[6].id),
-            ("Controle de costas: gancho e mão", "controle-costas-gancho", "Ganchos e controle pelas costas.", 9, techniques[7].id),
-            ("Meia guarda: passagem básica", "meia-guarda-passagem-aula", "Passagem básica da meia guarda.", 10, techniques[8].id),
-            ("Recuperar guarda da meia", "recuperar-guarda-meia-aula", "Saindo da meia e recuperando a guarda.", 11, techniques[9].id),
+            (
+                "Pegada de costas pela montada",
+                "pegada-costas-aula",
+                "Chegando às costas a partir da montada.",
+                8,
+                techniques[6].id,
+            ),
+            (
+                "Controle de costas: gancho e mão",
+                "controle-costas-gancho",
+                "Ganchos e controle pelas costas.",
+                9,
+                techniques[7].id,
+            ),
+            (
+                "Meia guarda: passagem básica",
+                "meia-guarda-passagem-aula",
+                "Passagem básica da meia guarda.",
+                10,
+                techniques[8].id,
+            ),
+            (
+                "Recuperar guarda da meia",
+                "recuperar-guarda-meia-aula",
+                "Saindo da meia e recuperando a guarda.",
+                11,
+                techniques[9].id,
+            ),
         ]
         lessons = []
         for i, (title, slug, content, order, tech_id) in enumerate(lessons_data):
@@ -240,14 +301,14 @@ def run_seed():
         monday_date = local.date() - timedelta(days=local.weekday())
         base_week = combine_local_date_start_utc(monday_date)
         progress_data = [
-            (user.id, lessons[0].id, base_week + timedelta(days=1)),   # Aluno Teste, lição 0
+            (user.id, lessons[0].id, base_week + timedelta(days=1)),  # Aluno Teste, lição 0
             (user.id, lessons[1].id, base_week + timedelta(days=2)),
             (user.id, lessons[2].id, base_week + timedelta(days=3)),
-            (user2.id, lessons[0].id, base_week + timedelta(days=1)),     # Maria, lição 0
+            (user2.id, lessons[0].id, base_week + timedelta(days=1)),  # Maria, lição 0
             (user2.id, lessons[1].id, base_week + timedelta(days=2)),
             (user2.id, lessons[2].id, base_week + timedelta(days=3)),
-            (user2.id, lessons[3].id, base_week + timedelta(days=4)),   # Maria mais uma
-            (user3.id, lessons[0].id, base_week + timedelta(days=2)),    # Pedro
+            (user2.id, lessons[3].id, base_week + timedelta(days=4)),  # Maria mais uma
+            (user3.id, lessons[0].id, base_week + timedelta(days=2)),  # Pedro
             (user3.id, lessons[1].id, base_week + timedelta(days=3)),
             (user_norte.id, lessons[3].id, base_week + timedelta(days=1)),  # Atleta Norte
         ]
@@ -284,10 +345,10 @@ def run_seed():
         print()
         print("Resumo:")
         print(f"  Academias:  2 ({academy.name}, {academy2.name})")
-        print(f"  Usuários:   4 (3 em Academia Teste, 1 em Academia Norte)")
+        print("  Usuários:   4 (3 em Academia Teste, 1 em Academia Norte)")
         print(f"  Técnicas:   {len(techniques)} (Academia Teste) + {len(techniques_norte)} (Academia Norte)")
         print(f"  Lições:     {len(lessons)} (4 com video_url)")
-        print(f"  Missões:    4 (2 globais + 2 por academia)")
+        print("  Missões:    4 (2 globais + 2 por academia)")
         print(f"  Conclusões (LessonProgress): {len(progress_data)}")
         print(f"  Dificuldades (TrainingFeedback): {len(feedback_data)}")
         print()
@@ -297,7 +358,7 @@ def run_seed():
         print(f"  mission_id:   {mission_beginner.id} (missão do dia, GET /mission_today)")
         print()
         print("Login (JWT):")
-        print("  POST /auth/login  body: {\"email\": \"aluno@jjb.com\", \"password\": \"senha123\"}")
+        print('  POST /auth/login  body: {"email": "aluno@jjb.com", "password": "senha123"}')
         print("  Use o access_token no header: Authorization: Bearer <token>")
         print()
         print("Endpoints para testar:")
@@ -306,7 +367,7 @@ def run_seed():
         print("  GET  /lessons")
         print("  GET  /academies, /academies/{id}/ranking, /difficulties, /report/weekly")
         print("  POST /lesson_complete   (body: lesson_id; requer Authorization)")
-        print("  POST /training_feedback (body: {\"observation\": \"...\"} opcional; requer Authorization)")
+        print('  POST /training_feedback (body: {"observation": "..."} opcional; requer Authorization)')
     except Exception as e:
         db.rollback()
         print(f"Erro no seed: {e}", file=sys.stderr)

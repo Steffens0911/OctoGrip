@@ -1,4 +1,5 @@
 """Schemas para User (CRUD desenvolvedores)."""
+
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
@@ -37,9 +38,7 @@ def _validate_graduation(v: str | None) -> str:
         raise ValueError("graduation é obrigatório")
     g = v.strip().lower()
     if g not in VALID_GRADUATIONS:
-        raise ValueError(
-            f"graduation deve ser um de: {', '.join(sorted(VALID_GRADUATIONS))}"
-        )
+        raise ValueError(f"graduation deve ser um de: {', '.join(sorted(VALID_GRADUATIONS))}")
     return g
 
 
@@ -48,9 +47,7 @@ def _validate_role(v: str | None) -> str:
         return "aluno"  # padrão
     r = v.strip().lower()
     if r not in VALID_ROLES:
-        raise ValueError(
-            f"role deve ser um de: {', '.join(sorted(VALID_ROLES))}"
-        )
+        raise ValueError(f"role deve ser um de: {', '.join(sorted(VALID_ROLES))}")
     return r
 
 
@@ -183,6 +180,7 @@ class UserUpdate(BaseModel):
 
 class MeUpdate(BaseModel):
     """Atualização do perfil do usuário autenticado (apenas campos permitidos para o próprio usuário)."""
+
     model_config = ConfigDict(extra="forbid")
 
     gallery_visible: bool | None = Field(

@@ -10,9 +10,6 @@ Regra:
 
 from __future__ import annotations
 
-from typing import Tuple
-
-
 BASE_LEVEL_THRESHOLD: int = 50
 GROWTH_NUM: int = 6
 GROWTH_DEN: int = 5
@@ -30,7 +27,7 @@ def threshold_for_level(level: int) -> int:
     return threshold
 
 
-def compute_level_from_total_points(total_points: int) -> Tuple[int, int, int]:
+def compute_level_from_total_points(total_points: int) -> tuple[int, int, int]:
     """Calcula (level, level_points, next_threshold) a partir do total acumulado.
 
     `level_points` é a pontuação acumulada dentro do nível atual (carry over),
@@ -49,4 +46,3 @@ def compute_level_from_total_points(total_points: int) -> Tuple[int, int, int]:
             level += 1
             continue
         return level, remaining, next_threshold
-

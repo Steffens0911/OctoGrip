@@ -3,16 +3,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.core.auth_deps import get_current_user, require_aluno_not_frozen
 from app.core.exceptions import AppError
+from app.database import get_db
 from app.models import User
 from app.schemas.lesson_complete import (
     LessonCompleteRequest,
     LessonCompleteResponse,
     LessonCompleteStatusResponse,
 )
-from app.services.lesson_complete_service import complete_lesson, is_lesson_completed
+from app.services.lesson_complete_service import is_lesson_completed
 
 router = APIRouter()
 

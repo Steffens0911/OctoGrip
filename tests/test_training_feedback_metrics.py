@@ -1,6 +1,7 @@
 """Testes de Training Feedback e Métricas."""
-from uuid import uuid4
 
+from datetime import UTC
+from uuid import uuid4
 
 # ========================== TRAINING FEEDBACK ==========================
 
@@ -74,8 +75,9 @@ async def test_metricas_uso_basicas(client, db, admin_headers):
 
 async def test_metricas_uso_com_dados(client, db, academy, aluno_user, admin_headers):
     """Métricas com dados existentes."""
+    from datetime import datetime, timedelta
+
     from app.models import Lesson, LessonProgress, MissionUsage, Technique
-    from datetime import datetime, timezone, timedelta
 
     technique = Technique(
         academy_id=academy.id,
@@ -107,7 +109,7 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user, admin_hea
     progress2 = LessonProgress(
         user_id=aluno_user.id,
         lesson_id=lesson2.id,
-        completed_at=datetime.now(timezone.utc) - timedelta(days=3),
+        completed_at=datetime.now(UTC) - timedelta(days=3),
     )
     db.add_all([progress1, progress2])
 
@@ -115,8 +117,8 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user, admin_hea
         user_id=aluno_user.id,
         lesson_id=lesson1.id,
         usage_type="before_training",
-        opened_at=datetime.now(timezone.utc),
-        completed_at=datetime.now(timezone.utc),
+        opened_at=datetime.now(UTC),
+        completed_at=datetime.now(UTC),
     )
     db.add(usage)
     await db.commit()
@@ -132,8 +134,9 @@ async def test_metricas_uso_com_dados(client, db, academy, aluno_user, admin_hea
 
 async def test_metricas_uso_percentual(client, db, academy, aluno_user, admin_headers):
     """Métricas calculam percentual corretamente."""
+    from datetime import datetime
+
     from app.models import Lesson, MissionUsage, Technique
-    from datetime import datetime, timezone
 
     technique = Technique(
         academy_id=academy.id,
@@ -154,7 +157,7 @@ async def test_metricas_uso_percentual(client, db, academy, aluno_user, admin_he
     await db.commit()
     await db.refresh(lesson)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for _ in range(3):
         usage = MissionUsage(
@@ -197,8 +200,9 @@ async def test_metricas_uso_sem_dados(client, admin_headers):
 
 async def test_metricas_uso_por_academia(client, db, academy, aluno_user, admin_headers):
     """Métricas por academy_id retornam estrutura igual ao global e respeitam filtro."""
+    from datetime import datetime
+
     from app.models import Lesson, LessonProgress, MissionUsage, Technique
-    from datetime import datetime, timezone
 
     technique = Technique(
         academy_id=academy.id,
@@ -219,7 +223,7 @@ async def test_metricas_uso_por_academia(client, db, academy, aluno_user, admin_
     await db.commit()
     await db.refresh(lesson)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     db.add(LessonProgress(user_id=aluno_user.id, lesson_id=lesson.id, completed_at=now))
     db.add(

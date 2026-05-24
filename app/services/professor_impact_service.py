@@ -45,68 +45,71 @@ async def get_professor_impact(
     prev_start_utc, prev_end_utc = utc_datetime_bounds_for_iso_week(prev_year, prev_week)
 
     # Total de alunos ativos na academia
-    total_students: int = await db.scalar(
-        select(func.count(User.id)).where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            User.account_frozen == False,  # noqa: E712
+    total_students: int = (
+        await db.scalar(
+            select(func.count(User.id)).where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                User.account_frozen == False,  # noqa: E712
+            )
         )
-    ) or 0
+        or 0
+    )
 
     # Alunos que tiveram pelo menos 1 execução confirmada na semana
-    students_reached_this = await _count_distinct_students_reached(
-        db, academy_id, week_start_utc, week_end_utc
-    )
-    students_reached_prev = await _count_distinct_students_reached(
-        db, academy_id, prev_start_utc, prev_end_utc
-    )
+    students_reached_this = await _count_distinct_students_reached(db, academy_id, week_start_utc, week_end_utc)
+    students_reached_prev = await _count_distinct_students_reached(db, academy_id, prev_start_utc, prev_end_utc)
 
     completion_rate = (students_reached_this / total_students * 100.0) if total_students > 0 else 0.0
     prev_rate = (students_reached_prev / total_students * 100.0) if total_students > 0 else 0.0
     completion_rate_delta: float | None = round(completion_rate - prev_rate, 1) if total_students > 0 else None
 
     # Execuções confirmadas por técnica na semana (agregado)
-    technique_rows = (await db.execute(
-        select(
-            Technique.id.label("technique_id"),
-            Technique.name,
-            func.count(func.distinct(TechniqueExecution.user_id)).label("students_completed"),
-            func.count(TechniqueExecution.id).label("executions_count"),
+    technique_rows = (
+        await db.execute(
+            select(
+                Technique.id.label("technique_id"),
+                Technique.name,
+                func.count(func.distinct(TechniqueExecution.user_id)).label("students_completed"),
+                func.count(TechniqueExecution.id).label("executions_count"),
+            )
+            .join(User, TechniqueExecution.user_id == User.id)
+            .join(Technique, TechniqueExecution.technique_id == Technique.id)
+            .where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                TechniqueExecution.status == _CONFIRMED,
+                TechniqueExecution.confirmed_at >= week_start_utc,
+                TechniqueExecution.confirmed_at < week_end_utc,
+                TechniqueExecution.technique_id.is_not(None),
+            )
+            .group_by(Technique.id, Technique.name)
+            .order_by(func.count(func.distinct(TechniqueExecution.user_id)).desc())
         )
-        .join(User, TechniqueExecution.user_id == User.id)
-        .join(Technique, TechniqueExecution.technique_id == Technique.id)
-        .where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            TechniqueExecution.status == _CONFIRMED,
-            TechniqueExecution.confirmed_at >= week_start_utc,
-            TechniqueExecution.confirmed_at < week_end_utc,
-            TechniqueExecution.technique_id.is_not(None),
-        )
-        .group_by(Technique.id, Technique.name)
-        .order_by(func.count(func.distinct(TechniqueExecution.user_id)).desc())
-    )).all()
+    ).all()
 
     # Detalhes individuais (executor → oponente) por técnica na semana
     OpponentUser = aliased(User, name="opponent_user")
-    detail_rows = (await db.execute(
-        select(
-            TechniqueExecution.technique_id,
-            User.name.label("executor_name"),
-            OpponentUser.name.label("opponent_name"),
+    detail_rows = (
+        await db.execute(
+            select(
+                TechniqueExecution.technique_id,
+                User.name.label("executor_name"),
+                OpponentUser.name.label("opponent_name"),
+            )
+            .join(User, TechniqueExecution.user_id == User.id)
+            .outerjoin(OpponentUser, TechniqueExecution.opponent_id == OpponentUser.id)
+            .where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                TechniqueExecution.status == _CONFIRMED,
+                TechniqueExecution.confirmed_at >= week_start_utc,
+                TechniqueExecution.confirmed_at < week_end_utc,
+                TechniqueExecution.technique_id.is_not(None),
+            )
+            .order_by(TechniqueExecution.confirmed_at.desc())
         )
-        .join(User, TechniqueExecution.user_id == User.id)
-        .outerjoin(OpponentUser, TechniqueExecution.opponent_id == OpponentUser.id)
-        .where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            TechniqueExecution.status == _CONFIRMED,
-            TechniqueExecution.confirmed_at >= week_start_utc,
-            TechniqueExecution.confirmed_at < week_end_utc,
-            TechniqueExecution.technique_id.is_not(None),
-        )
-        .order_by(TechniqueExecution.confirmed_at.desc())
-    )).all()
+    ).all()
 
     # Agrupa detalhes por technique_id
     details_by_technique: dict[uuid.UUID, list[ExecutionDetail]] = {}
@@ -143,26 +146,29 @@ async def get_professor_impact(
         .subquery()
     )
 
-    risk_rows = (await db.execute(
-        select(
-            User.id,
-            User.name,
-            last_checkin_subq.c.last_checkin,
+    risk_rows = (
+        await db.execute(
+            select(
+                User.id,
+                User.name,
+                last_checkin_subq.c.last_checkin,
+            )
+            .outerjoin(last_checkin_subq, User.id == last_checkin_subq.c.user_id)
+            .where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                User.account_frozen == False,  # noqa: E712
+                or_(
+                    last_checkin_subq.c.last_checkin < cutoff,
+                    last_checkin_subq.c.last_checkin.is_(None),
+                ),
+            )
+            .order_by(last_checkin_subq.c.last_checkin.asc().nulls_first())
         )
-        .outerjoin(last_checkin_subq, User.id == last_checkin_subq.c.user_id)
-        .where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            User.account_frozen == False,  # noqa: E712
-            or_(
-                last_checkin_subq.c.last_checkin < cutoff,
-                last_checkin_subq.c.last_checkin.is_(None),
-            ),
-        )
-        .order_by(last_checkin_subq.c.last_checkin.asc().nulls_first())
-    )).all()
+    ).all()
 
     import datetime as _dt
+
     at_risk = []
     for row in risk_rows:
         if row.last_checkin is None:
@@ -170,7 +176,7 @@ async def get_professor_impact(
         else:
             last = row.last_checkin
             if last.tzinfo is None:
-                last = last.replace(tzinfo=_dt.timezone.utc)
+                last = last.replace(tzinfo=_dt.UTC)
             days = (now_utc - last).days
         level = "alert" if days >= _AT_RISK_ALERT_DAYS else "warning"
         at_risk.append(
@@ -183,45 +189,50 @@ async def get_professor_impact(
         )
 
     # Visualizações diárias de vídeos na semana
-    video_rows = (await db.execute(
-        select(
-            TrainingVideoDailyView.view_date,
-            func.count(TrainingVideoDailyView.id).label("views_count"),
+    video_rows = (
+        await db.execute(
+            select(
+                TrainingVideoDailyView.view_date,
+                func.count(TrainingVideoDailyView.id).label("views_count"),
+            )
+            .join(User, TrainingVideoDailyView.user_id == User.id)
+            .where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                TrainingVideoDailyView.view_date >= monday,
+                TrainingVideoDailyView.view_date <= sunday,
+            )
+            .group_by(TrainingVideoDailyView.view_date)
+            .order_by(TrainingVideoDailyView.view_date)
         )
-        .join(User, TrainingVideoDailyView.user_id == User.id)
-        .where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            TrainingVideoDailyView.view_date >= monday,
-            TrainingVideoDailyView.view_date <= sunday,
-        )
-        .group_by(TrainingVideoDailyView.view_date)
-        .order_by(TrainingVideoDailyView.view_date)
-    )).all()
+    ).all()
 
-    daily_video_views = [
-        DailyVideoView(view_date=row.view_date, views_count=row.views_count)
-        for row in video_rows
-    ]
+    daily_video_views = [DailyVideoView(view_date=row.view_date, views_count=row.views_count) for row in video_rows]
 
     # Totais históricos
-    total_missions_in_academy: int = await db.scalar(
-        select(func.count(Mission.id)).where(
-            Mission.academy_id == academy_id,
-            Mission.is_active == True,  # noqa: E712
+    total_missions_in_academy: int = (
+        await db.scalar(
+            select(func.count(Mission.id)).where(
+                Mission.academy_id == academy_id,
+                Mission.is_active == True,  # noqa: E712
+            )
         )
-    ) or 0
+        or 0
+    )
 
-    total_completions_all_time: int = await db.scalar(
-        select(func.count(MissionUsage.id))
-        .join(User, MissionUsage.user_id == User.id)
-        .join(Mission, MissionUsage.mission_id == Mission.id)
-        .where(
-            User.academy_id == academy_id,
-            User.role == "aluno",
-            Mission.academy_id == academy_id,
+    total_completions_all_time: int = (
+        await db.scalar(
+            select(func.count(MissionUsage.id))
+            .join(User, MissionUsage.user_id == User.id)
+            .join(Mission, MissionUsage.mission_id == Mission.id)
+            .where(
+                User.academy_id == academy_id,
+                User.role == "aluno",
+                Mission.academy_id == academy_id,
+            )
         )
-    ) or 0
+        or 0
+    )
 
     return ProfessorImpactResponse(
         week_start=monday,

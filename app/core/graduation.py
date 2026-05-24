@@ -4,6 +4,7 @@ Regra: pontuação = (pontuação base da técnica/slot da semana) × (valor da 
 Ex.: armlock base 1, aplicado em oponente faixa preta (5) → 1 × 5 = 5 pontos. A faixa de quem aplicou não entra no cálculo.
 Valores da faixa: branca=1, azul=2, roxa=3, marrom=4, preta=5.
 """
+
 from typing import Literal
 
 GraduationValue = Literal["white", "blue", "purple", "brown", "black"]

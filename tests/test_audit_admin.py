@@ -1,4 +1,5 @@
 """Histórico e restauração admin (audit_logs)."""
+
 from datetime import datetime
 
 import pytest
@@ -6,9 +7,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_admin_audit_history_and_restore_undelete(
-    client: AsyncClient, admin_headers: dict, technique, db
-):
+async def test_admin_audit_history_and_restore_undelete(client: AsyncClient, admin_headers: dict, technique, db):
     from sqlalchemy import select
 
     from app.models import AuditLog, Technique
@@ -40,16 +39,12 @@ async def test_admin_audit_history_and_restore_undelete(
     assert t is not None
     assert t.deleted_at is None
 
-    logs = (
-        await db.execute(select(AuditLog).where(AuditLog.entity_id == tid))
-    ).scalars().all()
+    logs = (await db.execute(select(AuditLog).where(AuditLog.entity_id == tid))).scalars().all()
     assert any(log.action == "RESTORE" for log in logs)
 
 
 @pytest.mark.asyncio
-async def test_admin_restore_snapshot_from_update_log(
-    client: AsyncClient, admin_headers: dict, technique, db
-):
+async def test_admin_restore_snapshot_from_update_log(client: AsyncClient, admin_headers: dict, technique, db):
     from sqlalchemy import select
 
     from app.models import AuditLog, Technique
@@ -66,16 +61,20 @@ async def test_admin_restore_snapshot_from_update_log(
     assert r_put.status_code == 200
 
     log_row = (
-        await db.execute(
-            select(AuditLog)
-            .where(
-                AuditLog.entity == "Technique",
-                AuditLog.entity_id == tid,
-                AuditLog.action == "UPDATE",
+        (
+            await db.execute(
+                select(AuditLog)
+                .where(
+                    AuditLog.entity == "Technique",
+                    AuditLog.entity_id == tid,
+                    AuditLog.action == "UPDATE",
+                )
+                .order_by(AuditLog.created_at.desc())
             )
-            .order_by(AuditLog.created_at.desc())
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     assert log_row is not None
     log_id = log_row.id
 
@@ -100,7 +99,9 @@ async def test_non_admin_cannot_audit_restore(client: AsyncClient, professor_hea
 
 @pytest.mark.asyncio
 async def test_admin_audit_feed_all_and_academy_filter(
-    client: AsyncClient, admin_headers: dict, technique,
+    client: AsyncClient,
+    admin_headers: dict,
+    technique,
 ):
     """Feed global: após alteração, log aparece; filtro por academia e entity funciona."""
     tid = technique.id

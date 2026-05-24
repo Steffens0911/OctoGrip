@@ -103,7 +103,9 @@ class AttendanceStudentStatRead(BaseModel):
     graduation: str | None = None
     present_count: int
     total_sessions: int
-    attendance_rate: float = Field(..., ge=0.0, le=1.0, description="present_count / total_sessions (0 se sem sessões).")
+    attendance_rate: float = Field(
+        ..., ge=0.0, le=1.0, description="present_count / total_sessions (0 se sem sessões)."
+    )
     last_seen_at: datetime | None = None
 
 
@@ -189,4 +191,3 @@ class AttendanceMyStatsRead(BaseModel):
     history_total: int
     history_limit: int
     history_offset: int
-

@@ -4,6 +4,7 @@ Fixtures compartilhadas para os testes da API.
 Usa PostgreSQL real (banco jjb_db_test).
 Todos os dados usam UUIDs únicos, dispensando limpeza entre testes.
 """
+
 import os
 from uuid import uuid4
 
@@ -68,6 +69,7 @@ async def client():
 # ---------------------------------------------------------------------------
 # Entidades reutilizáveis
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 async def admin_user(db: AsyncSession):

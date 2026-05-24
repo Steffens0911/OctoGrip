@@ -1,4 +1,5 @@
 """Schemas para sync de MissionUsage (PB-01)."""
+
 from datetime import datetime
 from uuid import UUID
 

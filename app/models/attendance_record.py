@@ -38,10 +38,9 @@ class AttendanceRecord(Base, UUIDMixin):
         comment="True quando o professor adicionou presença pelo modal manual; QR/scan usam false.",
     )
 
-    session: Mapped["AttendanceSession"] = relationship(
+    session: Mapped[AttendanceSession] = relationship(
         "AttendanceSession",
         back_populates="records",
         lazy="selectin",
     )
-    user: Mapped["User"] = relationship("User", lazy="selectin")
-
+    user: Mapped[User] = relationship("User", lazy="selectin")

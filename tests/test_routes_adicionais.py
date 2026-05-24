@@ -1,10 +1,10 @@
 """Testes de rotas adicionais: reset_missions, collective_goals, points_log, mission_today/week."""
-import pytest
+
 from datetime import date, timedelta
 from uuid import uuid4
 
-
 # ========================== RESET MISSIONS ==========================
+
 
 async def test_reset_missions(client, admin_headers, academy):
     """Reset de missões da academia."""
@@ -42,14 +42,19 @@ async def test_reset_missions_academia_inexistente(client, admin_headers):
 
 # ========================== COLLECTIVE GOALS ==========================
 
+
 async def test_criar_meta_coletiva(client, admin_headers, academy, technique):
     """Criar meta coletiva."""
-    r = await client.post(f"/academies/{academy.id}/collective_goals", headers=admin_headers, json={
-        "technique_id": str(technique.id),
-        "target_count": 100,
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=7)).isoformat(),
-    })
+    r = await client.post(
+        f"/academies/{academy.id}/collective_goals",
+        headers=admin_headers,
+        json={
+            "technique_id": str(technique.id),
+            "target_count": 100,
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=7)).isoformat(),
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["technique_id"] == str(technique.id)
@@ -114,27 +119,36 @@ async def test_meta_coletiva_atual_inexistente(client, admin_headers, academy):
 
 async def test_criar_meta_coletiva_professor(client, professor_headers, academy, technique):
     """Professor pode criar meta coletiva na própria academia."""
-    r = await client.post(f"/academies/{academy.id}/collective_goals", headers=professor_headers, json={
-        "technique_id": str(technique.id),
-        "target_count": 75,
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=7)).isoformat(),
-    })
+    r = await client.post(
+        f"/academies/{academy.id}/collective_goals",
+        headers=professor_headers,
+        json={
+            "technique_id": str(technique.id),
+            "target_count": 75,
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=7)).isoformat(),
+        },
+    )
     assert r.status_code == 201
 
 
 async def test_criar_meta_coletiva_aluno_proibido(client, aluno_headers, academy, technique):
     """Aluno não pode criar meta coletiva."""
-    r = await client.post(f"/academies/{academy.id}/collective_goals", headers=aluno_headers, json={
-        "technique_id": str(technique.id),
-        "target_count": 50,
-        "start_date": date.today().isoformat(),
-        "end_date": (date.today() + timedelta(days=7)).isoformat(),
-    })
+    r = await client.post(
+        f"/academies/{academy.id}/collective_goals",
+        headers=aluno_headers,
+        json={
+            "technique_id": str(technique.id),
+            "target_count": 50,
+            "start_date": date.today().isoformat(),
+            "end_date": (date.today() + timedelta(days=7)).isoformat(),
+        },
+    )
     assert r.status_code == 403
 
 
 # ========================== POINTS LOG ==========================
+
 
 async def test_points_log_usuario(client, admin_headers, aluno_user):
     """Obter log de pontos do usuário."""
@@ -171,8 +185,8 @@ async def test_points_log_usuario_inexistente(client, admin_headers):
 
 async def test_points_log_aluno_acesso_outro_aluno_proibido(client, aluno_headers, db):
     """Aluno não pode ver log de pontos de outro aluno de outra academia."""
-    from app.models import Academy, User
     from app.core.security import hash_password_sync
+    from app.models import Academy, User
 
     other_academy = Academy(name="Outra Academia", slug=f"outra-{uuid4().hex[:6]}")
     db.add(other_academy)
@@ -202,6 +216,7 @@ async def test_points_log_sem_auth(client, aluno_user):
 
 
 # ========================== MISSION TODAY / WEEK ==========================
+
 
 async def test_mission_today(client, aluno_headers, academy, technique, db):
     """Obter missão do dia (requer autenticação)."""

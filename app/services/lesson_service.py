@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -42,17 +42,22 @@ async def list_lessons(
         academy = (await db.execute(select(Academy).where(Academy.id == academy_id))).scalar_one_or_none()
         if academy and academy.visible_lesson_id:
             lesson = (
-                await db.execute(
-            select(Lesson)
-            .options(
-                selectinload(Lesson.technique),
-            )
-            .where(
-                Lesson.id == academy.visible_lesson_id,
-                Lesson.deleted_at.is_(None),
-            )
+                (
+                    await db.execute(
+                        select(Lesson)
+                        .options(
+                            selectinload(Lesson.technique),
+                        )
+                        .where(
+                            Lesson.id == academy.visible_lesson_id,
+                            Lesson.deleted_at.is_(None),
+                        )
+                    )
                 )
-            ).unique().scalars().first()
+                .unique()
+                .scalars()
+                .first()
+            )
             if lesson:
                 logger.debug("list_lessons", extra={"academy_id": str(academy_id), "count": 1})
                 return [lesson]
@@ -61,11 +66,7 @@ async def list_lessons(
     limit = clamp_list_limit(limit)
     offset = max(0, offset)
 
-    stmt = (
-        select(Lesson)
-        .options(selectinload(Lesson.technique))
-        .where(Lesson.deleted_at.is_(None))
-    )
+    stmt = select(Lesson).options(selectinload(Lesson.technique)).where(Lesson.deleted_at.is_(None))
     if search:
         stmt = stmt.where(Lesson.title.ilike(f"%{search.strip()}%"))
     stmt = stmt.order_by(Lesson.order_index.asc()).offset(offset).limit(limit)
@@ -78,23 +79,26 @@ async def list_lessons(
 async def get_lesson_by_id(db: AsyncSession, lesson_id: UUID) -> Lesson:
     """Retorna uma aula por ID. Levanta LessonNotFoundError se não existir."""
     lesson = (
-        await db.execute(
-            select(Lesson)
-            .options(
-                selectinload(Lesson.technique),
+        (
+            await db.execute(
+                select(Lesson)
+                .options(
+                    selectinload(Lesson.technique),
+                )
+                .where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
             )
-            .where(Lesson.id == lesson_id, Lesson.deleted_at.is_(None))
         )
-    ).unique().scalars().first()
+        .unique()
+        .scalars()
+        .first()
+    )
     if not lesson:
         logger.info("get_lesson_by_id not_found", extra={"lesson_id": str(lesson_id)})
         raise LessonNotFoundError("Lição não encontrada.")
     return lesson
 
 
-async def create_lesson(
-    db: AsyncSession, data: LessonCreate, audit_user_id: UUID | None = None
-) -> Lesson:
+async def create_lesson(db: AsyncSession, data: LessonCreate, audit_user_id: UUID | None = None) -> Lesson:
     """Cria uma aula. Slug gerado automaticamente a partir do título se omitido."""
     technique = (
         await db.execute(
@@ -183,18 +187,14 @@ async def update_lesson(
     return lesson
 
 
-async def delete_lesson(
-    db: AsyncSession, lesson_id: UUID, audit_user_id: UUID | None = None
-) -> None:
+async def delete_lesson(db: AsyncSession, lesson_id: UUID, audit_user_id: UUID | None = None) -> None:
     """Soft delete de uma aula. Levanta LessonNotFoundError se não existir."""
     lesson = await get_lesson_by_id(db, lesson_id)
     academy_using_lesson = (
         await db.execute(select(Academy).where(Academy.visible_lesson_id == lesson_id))
     ).scalar_one_or_none()
     if academy_using_lesson:
-        raise ConflictError(
-            "Não é possível excluir: esta lição está definida como lição visível de uma academia."
-        )
+        raise ConflictError("Não é possível excluir: esta lição está definida como lição visível de uma academia.")
     mission_using_lesson = (
         await db.execute(
             select(Mission).where(
@@ -204,11 +204,9 @@ async def delete_lesson(
         )
     ).scalar_one_or_none()
     if mission_using_lesson:
-        raise ConflictError(
-            "Não é possível excluir: existem missões ativas vinculadas a esta lição."
-        )
+        raise ConflictError("Não é possível excluir: existem missões ativas vinculadas a esta lição.")
     before = entity_snapshot_row(lesson)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     lesson.deleted_at = now
     await write_audit_log(
         db,

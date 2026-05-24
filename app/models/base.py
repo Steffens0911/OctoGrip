@@ -1,10 +1,11 @@
 """Mixin com PK UUID e timestamps para todos os models (Alembic-friendly)."""
+
 import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 
 class UUIDMixin:

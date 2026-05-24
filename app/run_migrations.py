@@ -3,8 +3,9 @@ Executa os arquivos .sql da pasta migrations/ em ordem numérica (001, 002, ...)
 Mantém uma tabela _migrations para rastrear quais já foram aplicadas (versionamento).
 Migrações só rodam UMA vez; novas migrações são detectadas automaticamente.
 """
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import text
@@ -62,9 +63,7 @@ def _split_statements(content: str) -> list[str]:
             continue
         if content[i] == ";" and (i + 1 >= n or content[i + 1 :].lstrip().startswith(("\n", "\r", "--"))):
             st = "".join(current).strip()
-            if st and not all(
-                line.strip().startswith("--") or not line.strip() for line in st.splitlines()
-            ):
+            if st and not all(line.strip().startswith("--") or not line.strip() for line in st.splitlines()):
                 statements.append(st)
             current = []
             i += 1
@@ -75,9 +74,7 @@ def _split_statements(content: str) -> list[str]:
         i += 1
 
     st = "".join(current).strip()
-    if st and not all(
-        line.strip().startswith("--") or not line.strip() for line in st.splitlines()
-    ):
+    if st and not all(line.strip().startswith("--") or not line.strip() for line in st.splitlines()):
         statements.append(st)
     return statements
 
@@ -91,7 +88,7 @@ def _get_applied(conn) -> set[str]:
 def _record_applied(conn, filename: str) -> None:
     conn.execute(
         text(f"INSERT INTO {_TRACKING_TABLE} (filename, applied_at) VALUES (:f, :t)"),
-        {"f": filename, "t": datetime.now(timezone.utc)},
+        {"f": filename, "t": datetime.now(UTC)},
     )
 
 

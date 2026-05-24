@@ -1,7 +1,6 @@
 """Testes de CRUD de academias."""
-from datetime import datetime, timezone
 
-import pytest
+from datetime import UTC, datetime
 
 
 async def test_listar_academias(client, admin_headers, academy):
@@ -13,9 +12,13 @@ async def test_listar_academias(client, admin_headers, academy):
 
 
 async def test_criar_academia(client, admin_headers):
-    r = await client.post("/academies", headers=admin_headers, json={
-        "name": "Nova Academia Teste",
-    })
+    r = await client.post(
+        "/academies",
+        headers=admin_headers,
+        json={
+            "name": "Nova Academia Teste",
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Nova Academia Teste"
@@ -29,18 +32,23 @@ async def test_obter_academia_por_id(client, admin_headers, academy):
 
 
 async def test_atualizar_academia(client, admin_headers, academy):
-    r = await client.patch(f"/academies/{academy.id}", headers=admin_headers, json={
-        "name": "Nome Atualizado",
-        "weekly_theme": "Passagem de guarda",
-    })
+    r = await client.patch(
+        f"/academies/{academy.id}",
+        headers=admin_headers,
+        json={
+            "name": "Nome Atualizado",
+            "weekly_theme": "Passagem de guarda",
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "Nome Atualizado"
 
 
 async def test_excluir_academia(client, admin_headers, db):
-    from app.models import Academy
     from uuid import uuid4
+
+    from app.models import Academy
 
     a = Academy(name="Para Deletar", slug=f"del-{uuid4().hex[:6]}")
     db.add(a)
@@ -76,6 +84,7 @@ async def test_excluir_academia_com_tecnicas(client, admin_headers, db):
 
 async def test_academia_nao_encontrada(client, admin_headers):
     from uuid import uuid4
+
     fake_id = uuid4()
     r = await client.get(f"/academies/{fake_id}", headers=admin_headers)
     assert r.status_code == 404
@@ -90,8 +99,7 @@ async def test_ranking_academia_vazio(client, admin_headers, academy):
 
 async def test_ranking_intervalo_calendario(client, admin_headers, academy):
     r = await client.get(
-        f"/academies/{academy.id}/ranking"
-        "?start_date=2020-01-01&end_date=2020-01-05",
+        f"/academies/{academy.id}/ranking?start_date=2020-01-01&end_date=2020-01-05",
         headers=admin_headers,
     )
     assert r.status_code == 200
@@ -104,8 +112,7 @@ async def test_ranking_intervalo_calendario(client, admin_headers, academy):
 
 async def test_relatorio_conclusoes_intervalo_calendario(client, admin_headers, academy):
     r = await client.get(
-        f"/academies/{academy.id}/report/weekly"
-        "?start_date=2020-06-10&end_date=2020-06-12",
+        f"/academies/{academy.id}/report/weekly?start_date=2020-06-10&end_date=2020-06-12",
         headers=admin_headers,
     )
     assert r.status_code == 200
@@ -156,7 +163,7 @@ async def test_relatorio_semanal_inclui_execucoes_confirmadas(
         status="confirmed",
         outcome="executed_successfully",
         points_awarded=10,
-        confirmed_at=datetime.now(timezone.utc),
+        confirmed_at=datetime.now(UTC),
         confirmed_by=opponent_user.id,
     )
     db.add(execucao)
@@ -167,10 +174,7 @@ async def test_relatorio_semanal_inclui_execucoes_confirmadas(
     data = r.json()
     assert data["completions_count"] >= 1
     assert data["active_users_count"] >= 1
-    assert any(
-        e["user_id"] == str(aluno_user.id) and e["completions_count"] >= 1
-        for e in data["entries"]
-    )
+    assert any(e["user_id"] == str(aluno_user.id) and e["completions_count"] >= 1 for e in data["entries"])
 
 
 async def test_professor_ve_apenas_propria_academia(client, professor_headers, academy):
@@ -181,7 +185,11 @@ async def test_professor_ve_apenas_propria_academia(client, professor_headers, a
 
 
 async def test_professor_nao_pode_criar_academia(client, professor_headers):
-    r = await client.post("/academies", headers=professor_headers, json={
-        "name": "Proibido",
-    })
+    r = await client.post(
+        "/academies",
+        headers=professor_headers,
+        json={
+            "name": "Proibido",
+        },
+    )
     assert r.status_code == 403

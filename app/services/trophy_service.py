@@ -1,6 +1,7 @@
 """Serviço de troféus: CRUD e cálculo de tier conquistado (ouro/prata/bronze) por execuções confirmadas."""
+
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -141,7 +142,11 @@ async def create_trophy(
         award_kind=award_kind,
         min_duration_days=min_duration_days if award_kind == "trophy" else None,
         min_reward_level_to_unlock=max(0, min_reward_level_to_unlock),
-        min_graduation_to_unlock=(min_graduation_to_unlock.strip().lower() if min_graduation_to_unlock and min_graduation_to_unlock.strip() else None),
+        min_graduation_to_unlock=(
+            min_graduation_to_unlock.strip().lower()
+            if min_graduation_to_unlock and min_graduation_to_unlock.strip()
+            else None
+        ),
         max_count_per_opponent=max_count_per_opponent,
     )
     db.add(trophy)
@@ -180,23 +185,26 @@ async def list_trophies_by_academy(
     safe_limit = clamp_list_limit(limit)
     safe_offset = max(0, int(offset))
     return (
-        await db.execute(
-            select(Trophy)
-            .options(joinedload(Trophy.technique))
-            .where(Trophy.academy_id == academy_id, Trophy.deleted_at.is_(None))
-            .order_by(Trophy.name)
-            .offset(safe_offset)
-            .limit(safe_limit)
+        (
+            await db.execute(
+                select(Trophy)
+                .options(joinedload(Trophy.technique))
+                .where(Trophy.academy_id == academy_id, Trophy.deleted_at.is_(None))
+                .order_by(Trophy.name)
+                .offset(safe_offset)
+                .limit(safe_limit)
+            )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
 
 
 async def get_trophy(db: AsyncSession, trophy_id: UUID) -> Trophy | None:
     """Obtém troféu por id (inclui soft-deletados)."""
     result = await db.execute(
-        select(Trophy)
-        .options(selectinload(Trophy.technique))
-        .where(Trophy.id == trophy_id),
+        select(Trophy).options(selectinload(Trophy.technique)).where(Trophy.id == trophy_id),
     )
     return result.scalar_one_or_none()
 
@@ -232,11 +240,7 @@ async def update_trophy(
     else:
         mgrad = trophy.min_graduation_to_unlock
 
-    mcpo = (
-        updates["max_count_per_opponent"]
-        if "max_count_per_opponent" in updates
-        else trophy.max_count_per_opponent
-    )
+    mcpo = updates["max_count_per_opponent"] if "max_count_per_opponent" in updates else trophy.max_count_per_opponent
     if mcpo is not None and mcpo < 1:
         raise AppError("max_count_per_opponent deve ser >= 1 ou null.", status_code=400)
 
@@ -271,9 +275,7 @@ async def update_trophy(
     trophy.award_kind = ak
     trophy.min_duration_days = mdd if ak == "trophy" else None
     trophy.min_reward_level_to_unlock = max(0, mrl)
-    trophy.min_graduation_to_unlock = (
-        mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
-    )
+    trophy.min_graduation_to_unlock = mgrad.strip().lower() if mgrad and str(mgrad).strip() else None
     if "max_count_per_opponent" in updates:
         trophy.max_count_per_opponent = updates["max_count_per_opponent"]
 
@@ -299,15 +301,13 @@ async def update_trophy(
     return trophy
 
 
-async def soft_delete_trophy(
-    db: AsyncSession, trophy_id: UUID, audit_user_id: UUID | None = None
-) -> None:
+async def soft_delete_trophy(db: AsyncSession, trophy_id: UUID, audit_user_id: UUID | None = None) -> None:
     """Marca troféu como removido (soft delete)."""
     trophy = await get_trophy(db, trophy_id)
     if not trophy or trophy.deleted_at is not None:
         raise TrophyNotFoundError()
     before = entity_snapshot_row(trophy)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     trophy.deleted_at = now
     await write_audit_log(
         db,
@@ -322,38 +322,37 @@ async def soft_delete_trophy(
     logger.info("soft_delete_trophy", extra={"trophy_id": str(trophy_id)})
 
 
-async def _load_confirmed_executions_for_user(
-    db: AsyncSession, user_id: UUID
-) -> list[TechniqueExecution]:
+async def _load_confirmed_executions_for_user(db: AsyncSession, user_id: UUID) -> list[TechniqueExecution]:
     """Carrega todas as execuções confirmadas do usuário uma única vez (para reuso na galeria)."""
     return (
-        await db.execute(
-            select(TechniqueExecution)
-            .options(
-                selectinload(TechniqueExecution.opponent),
-                selectinload(TechniqueExecution.mission),
-                selectinload(TechniqueExecution.lesson),
-            )
-            .where(
-                TechniqueExecution.user_id == user_id,
-                TechniqueExecution.status == "confirmed",
-                TechniqueExecution.confirmed_at.isnot(None),
+        (
+            await db.execute(
+                select(TechniqueExecution)
+                .options(
+                    selectinload(TechniqueExecution.opponent),
+                    selectinload(TechniqueExecution.mission),
+                    selectinload(TechniqueExecution.lesson),
+                )
+                .where(
+                    TechniqueExecution.user_id == user_id,
+                    TechniqueExecution.status == "confirmed",
+                    TechniqueExecution.confirmed_at.isnot(None),
+                )
             )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
 
 
-async def _executions_in_period_for_trophy(
-    db: AsyncSession, user_id: UUID, trophy: Trophy
-) -> list[TechniqueExecution]:
+async def _executions_in_period_for_trophy(db: AsyncSession, user_id: UUID, trophy: Trophy) -> list[TechniqueExecution]:
     """Retorna execuções confirmadas do user na técnica e período do troféu (chamada única por user)."""
     executions = await _load_confirmed_executions_for_user(db, user_id)
     return _executions_in_period_from_list(executions, trophy)
 
 
-def _executions_in_period_from_list(
-    executions: list[TechniqueExecution], trophy: Trophy
-) -> list[TechniqueExecution]:
+def _executions_in_period_from_list(executions: list[TechniqueExecution], trophy: Trophy) -> list[TechniqueExecution]:
     """Filtra lista de execuções por técnica e período do troféu (em memória)."""
     in_period = []
     for e in executions:
@@ -371,7 +370,7 @@ def _sorted_executions_for_opponent_cap(in_period: list[TechniqueExecution]) -> 
     """Ordem estável por confirmação (para limite por adversário ser reproduzível)."""
 
     def sort_key(e: TechniqueExecution):
-        ca = e.confirmed_at or datetime(1970, 1, 1, tzinfo=timezone.utc)
+        ca = e.confirmed_at or datetime(1970, 1, 1, tzinfo=UTC)
         return (ca, e.id)
 
     return sorted(in_period, key=sort_key)
@@ -514,12 +513,15 @@ async def list_user_trophies_with_earned(
     trophies = await list_trophies_by_academy(db, user.academy_id)
     all_executions = await _load_confirmed_executions_for_user(db, user_id)
     all_mission_usages = (
-        await db.execute(
-            select(MissionUsage)
-            .options(selectinload(MissionUsage.mission))
-            .where(MissionUsage.user_id == user_id)
+        (
+            await db.execute(
+                select(MissionUsage).options(selectinload(MissionUsage.mission)).where(MissionUsage.user_id == user_id)
+            )
         )
-    ).unique().scalars().all()
+        .unique()
+        .scalars()
+        .all()
+    )
 
     logger.debug(
         "list_user_trophies_with_earned loaded",
@@ -600,11 +602,7 @@ async def get_trophy_home_summary(
     from app.models.user_trophy_earned import UserTrophyEarned
 
     # Total e recentes do próprio usuário
-    my_earned_count: int = (
-        await db.scalar(
-            select(func.count()).where(UserTrophyEarned.user_id == user_id)
-        )
-    ) or 0
+    my_earned_count: int = (await db.scalar(select(func.count()).where(UserTrophyEarned.user_id == user_id))) or 0
 
     my_recent_rows = (
         await db.execute(
@@ -694,11 +692,13 @@ async def list_academy_earned_by_user(
                 "user_id": uid,
                 "items": [],
             }
-        grouped[uid]["items"].append({
-            "trophy_id": str(row.UserTrophyEarned.trophy_id),
-            "name": row.Trophy.name,
-            "tier": row.UserTrophyEarned.tier,
-            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
-        })
+        grouped[uid]["items"].append(
+            {
+                "trophy_id": str(row.UserTrophyEarned.trophy_id),
+                "name": row.Trophy.name,
+                "tier": row.UserTrophyEarned.tier,
+                "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
+            }
+        )
 
     return list(grouped.values())

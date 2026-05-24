@@ -1,6 +1,7 @@
 """Utilitários de segurança: hash de senha e JWT."""
+
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from jose import JWTError, jwt
@@ -31,7 +32,7 @@ def create_access_token(subject: str | UUID) -> str:
     """Cria JWT com sub = user_id (string)."""
     if isinstance(subject, UUID):
         subject = str(subject)
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     to_encode = {"sub": subject, "exp": expire}
     return jwt.encode(
         to_encode,

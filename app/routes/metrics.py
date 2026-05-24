@@ -28,9 +28,7 @@ async def metrics_usage(
     """Métricas de uso: globais para administrador; supervisor vê só a própria academia."""
     if current_user.role == "supervisor":
         if current_user.academy_id is None:
-            raise ForbiddenError(
-                "Supervisor sem academia vinculada não pode consultar métricas de uso."
-            )
+            raise ForbiddenError("Supervisor sem academia vinculada não pode consultar métricas de uso.")
         return await get_usage_metrics_for_academy(db, current_user.academy_id)
     return await get_usage_metrics(db)
 
@@ -57,6 +55,7 @@ async def metrics_prometheus(current_user: User = Depends(require_admin)):
     _ = current_user
     if not settings.ENABLE_METRICS:
         from app.core.exceptions import NotFoundError
+
         raise NotFoundError("Métricas desabilitadas")
 
     metrics_data, content_type = get_metrics_response()

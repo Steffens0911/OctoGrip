@@ -20,7 +20,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.config import settings
 from app.database import SyncSessionLocal
 from app.models import (
-    AttendanceRecord,
     AttendanceSession,
     FaceRecognitionJob,
     StudentFaceEmbedding,
@@ -159,6 +158,7 @@ def _read_avatar_bytes(avatar_url: str) -> bytes:
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
 def process_face_recognition(self, job_id: str) -> None:
     from deepface import DeepFace
+
     from app.face_model import get_model
 
     uid = UUID(job_id)
@@ -175,27 +175,20 @@ def process_face_recognition(self, job_id: str) -> None:
             db.commit()
 
             load_embeddings_started = time.perf_counter()
-            emb_rows = (
-                db.execute(
-                    select(StudentFaceEmbedding.student_id, StudentFaceEmbedding.embedding).where(
-                        StudentFaceEmbedding.academy_id == job.academy_id
-                    )
+            emb_rows = db.execute(
+                select(StudentFaceEmbedding.student_id, StudentFaceEmbedding.embedding).where(
+                    StudentFaceEmbedding.academy_id == job.academy_id
                 )
-                .all()
-            )
+            ).all()
             emb_map: dict[UUID, list[float]] = {row[0]: row[1] for row in emb_rows if row[1]}
             students = (
-                db.execute(select(User).where(User.id.in_(list(emb_map.keys())))).scalars().all()
-                if emb_map
-                else []
+                db.execute(select(User).where(User.id.in_(list(emb_map.keys())))).scalars().all() if emb_map else []
             )
             student_by_id = {s.id: s for s in students}
             load_embeddings_ms = (time.perf_counter() - load_embeddings_started) * 1000.0
 
             resize_started = time.perf_counter()
-            face_img_path, scale_x, scale_y, resized_tmp_path = _prepare_face_input_image(
-                job.photo_path
-            )
+            face_img_path, scale_x, scale_y, resized_tmp_path = _prepare_face_input_image(job.photo_path)
             resize_ms = (time.perf_counter() - resize_started) * 1000.0
 
             represent_started = time.perf_counter()
@@ -303,17 +296,13 @@ def process_face_recognition(self, job_id: str) -> None:
             ):
                 tokens = (
                     db.execute(
-                        select(UserDeviceToken.fcm_token).where(
-                            UserDeviceToken.user_id == session.created_by_user_id
-                        )
+                        select(UserDeviceToken.fcm_token).where(UserDeviceToken.user_id == session.created_by_user_id)
                     )
                     .scalars()
                     .all()
                 )
                 if tokens:
-                    access_token = asyncio.run(
-                        fetch_fcm_access_token(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
-                    )
+                    access_token = asyncio.run(fetch_fcm_access_token(settings.FIREBASE_SERVICE_ACCOUNT_PATH))
                     identified = sum(1 for r in results if r.get("status") == "auto_identified")
                     title = "Chamada processada"
                     body = f"{identified} alunos identificados em {(session.title or 'sessão')}. Toque para revisar."
@@ -377,6 +366,7 @@ def process_face_recognition(self, job_id: str) -> None:
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
 def generate_student_embedding(self, student_id: str) -> None:
     from deepface import DeepFace
+
     from app.face_model import get_model
 
     uid = UUID(student_id)

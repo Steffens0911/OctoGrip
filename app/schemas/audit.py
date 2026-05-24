@@ -1,4 +1,5 @@
 """Schemas para histórico e restauração via auditoria."""
+
 from __future__ import annotations
 
 from datetime import datetime

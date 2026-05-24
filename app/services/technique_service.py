@@ -1,6 +1,7 @@
 """Serviços CRUD para Technique (sem dependência de Position)."""
+
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -36,11 +37,7 @@ async def list_techniques(
     stmt = select(Technique).where(Technique.deleted_at.is_(None))
     if academy_id is not None:
         stmt = stmt.where(Technique.academy_id == academy_id)
-    return (
-        await db.execute(
-            stmt.order_by(Technique.name).offset(safe_offset).limit(safe_limit)
-        )
-    ).scalars().all()
+    return (await db.execute(stmt.order_by(Technique.name).offset(safe_offset).limit(safe_limit))).scalars().all()
 
 
 async def get_technique(db: AsyncSession, technique_id: UUID) -> Technique | None:
@@ -140,9 +137,7 @@ async def update_technique(
     return technique
 
 
-async def delete_technique(
-    db: AsyncSession, technique_id: UUID, audit_user_id: UUID | None = None
-) -> bool:
+async def delete_technique(db: AsyncSession, technique_id: UUID, audit_user_id: UUID | None = None) -> bool:
     """Soft delete de uma técnica. Retorna True se marcou como removida."""
     technique = await get_technique(db, technique_id)
     if not technique:
@@ -164,12 +159,10 @@ async def delete_technique(
         )
     )
     if (nm or 0) + (nl or 0) > 0:
-        raise ConflictError(
-            "Não é possível excluir: existem lições ou missões vinculadas a esta técnica."
-        )
+        raise ConflictError("Não é possível excluir: existem lições ou missões vinculadas a esta técnica.")
     academy_id = technique.academy_id
     before = entity_snapshot_row(technique)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     technique.deleted_at = now
     await write_audit_log(
         db,

@@ -1,9 +1,10 @@
 import traceback
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
 from app.core.auth_deps import require_aluno_not_frozen
+from app.database import get_db
 from app.models import User
 from app.schemas.training_feedback import TrainingFeedbackRequest, TrainingFeedbackResponse
 from app.services.training_feedback_service import create_feedback

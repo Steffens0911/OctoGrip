@@ -1,4 +1,5 @@
 """Serviços CRUD para parceiros globais (admin global)."""
+
 import logging
 from uuid import UUID
 

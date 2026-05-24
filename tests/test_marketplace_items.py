@@ -1,11 +1,13 @@
 """Marketplace por academia: CRUD (gestor/professor) e leitura para aluno via /me."""
+
 from urllib.parse import parse_qs, unquote, urlparse
 from uuid import uuid4
 
 import pytest
-from app.core.security import create_access_token, hash_password_sync
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.security import create_access_token, hash_password_sync
 
 
 def _item_json(**overrides):

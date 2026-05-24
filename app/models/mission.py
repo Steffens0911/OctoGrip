@@ -4,7 +4,6 @@ import uuid
 from datetime import date
 
 from sqlalchemy import Boolean, Date, ForeignKey, Index, Integer, String
-
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -20,9 +19,7 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
     """
 
     __tablename__ = "missions"
-    __table_args__ = (
-        Index("idx_mission_academy_level_slot_active", "academy_id", "level", "slot_index", "is_active"),
-    )
+    __table_args__ = (Index("idx_mission_academy_level_slot_active", "academy_id", "level", "slot_index", "is_active"),)
 
     technique_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("techniques.id", ondelete="RESTRICT"),
@@ -65,31 +62,31 @@ class Mission(Base, UUIDMixin, SoftDeleteMixin):
         comment="Pontos fixos ao concluir a missão (10–50).",
     )
 
-    academy: Mapped["Academy | None"] = relationship(
+    academy: Mapped[Academy | None] = relationship(
         "Academy",
         back_populates="missions",
         lazy="raise",
     )
-    weekly_kit: Mapped["WeeklyTechniqueKit | None"] = relationship(
+    weekly_kit: Mapped[WeeklyTechniqueKit | None] = relationship(
         "WeeklyTechniqueKit",
         lazy="selectin",
     )
-    technique: Mapped["Technique"] = relationship(
+    technique: Mapped[Technique] = relationship(
         "Technique",
         back_populates="missions",
         lazy="joined",
     )
-    lesson: Mapped["Lesson | None"] = relationship(
+    lesson: Mapped[Lesson | None] = relationship(
         "Lesson",
         back_populates="missions",
         lazy="joined",
     )
-    mission_usages: Mapped[list["MissionUsage"]] = relationship(
+    mission_usages: Mapped[list[MissionUsage]] = relationship(
         "MissionUsage",
         back_populates="mission",
         lazy="raise",
     )
-    technique_executions: Mapped[list["TechniqueExecution"]] = relationship(
+    technique_executions: Mapped[list[TechniqueExecution]] = relationship(
         "TechniqueExecution",
         back_populates="mission",
         lazy="raise",

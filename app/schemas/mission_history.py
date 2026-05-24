@@ -1,4 +1,5 @@
 """Schema para histórico de missões (PB-03)."""
+
 from datetime import datetime
 from uuid import UUID
 

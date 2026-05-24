@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.config import settings
-from app.core.auth_deps import get_current_user
 from app.core.exceptions import (
     AppError,
     AttendanceSessionNotFoundError,
@@ -95,9 +94,7 @@ async def _get_session_for_face(
 
 async def _present_count_for_session(db: AsyncSession, session_id: UUID) -> int:
     n = (
-        await db.execute(
-            select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id)
-        )
+        await db.execute(select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id))
     ).scalar_one()
     return int(n or 0)
 
@@ -328,12 +325,16 @@ async def face_embedding_status(
     verify_academy_access(current_user, str(target_academy_id), allow_none=False)
 
     students = (
-        await db.execute(
-            select(User)
-            .where(User.academy_id == target_academy_id, User.role == "aluno")
-            .order_by(User.name.asc().nulls_last(), User.email.asc())
+        (
+            await db.execute(
+                select(User)
+                .where(User.academy_id == target_academy_id, User.role == "aluno")
+                .order_by(User.name.asc().nulls_last(), User.email.asc())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     emb_rows = (
         await db.execute(
             select(

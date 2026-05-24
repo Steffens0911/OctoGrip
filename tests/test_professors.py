@@ -1,13 +1,15 @@
 """Testes de CRUD de professores."""
-import pytest
+
 from uuid import uuid4
+
+import pytest
 
 
 @pytest.fixture
 async def professor_user_2(db, academy):
     """Cria um segundo professor para testes."""
-    from app.models import User
     from app.core.security import hash_password_sync
+    from app.models import User
 
     user = User(
         email=f"prof2-{uuid4().hex[:8]}@test.com",
@@ -73,7 +75,9 @@ async def test_listar_professores_com_filtro_academia(client, admin_headers, aca
     assert all(p["academy_id"] == str(academy.id) for p in data)
 
 
-async def test_listar_professores_professor_ve_apenas_propria_academia(client, professor_headers, academy, professor_record, db):
+async def test_listar_professores_professor_ve_apenas_propria_academia(
+    client, professor_headers, academy, professor_record, db
+):
     """Professor só vê professores da própria academia."""
     from app.models import Academy, Professor
 
@@ -145,11 +149,15 @@ async def test_obter_professor_professor_acesso_outra_academia_proibido(client, 
 
 async def test_criar_professor_admin(client, admin_headers, academy):
     """Admin pode criar professor."""
-    r = await client.post("/professors", headers=admin_headers, json={
-        "name": "Novo Professor",
-        "email": f"novo-{uuid4().hex[:8]}@test.com",
-        "academy_id": str(academy.id),
-    })
+    r = await client.post(
+        "/professors",
+        headers=admin_headers,
+        json={
+            "name": "Novo Professor",
+            "email": f"novo-{uuid4().hex[:8]}@test.com",
+            "academy_id": str(academy.id),
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     assert data["name"] == "Novo Professor"
@@ -158,11 +166,15 @@ async def test_criar_professor_admin(client, admin_headers, academy):
 
 async def test_criar_professor_professor_forca_propria_academia(client, professor_headers, academy):
     """Professor cria professor na própria academia (academy_id ignorado)."""
-    r = await client.post("/professors", headers=professor_headers, json={
-        "name": "Novo Professor",
-        "email": f"novo-{uuid4().hex[:8]}@test.com",
-        "academy_id": str(uuid4()),  # Tentar outra academia
-    })
+    r = await client.post(
+        "/professors",
+        headers=professor_headers,
+        json={
+            "name": "Novo Professor",
+            "email": f"novo-{uuid4().hex[:8]}@test.com",
+            "academy_id": str(uuid4()),  # Tentar outra academia
+        },
+    )
     assert r.status_code == 201
     data = r.json()
     # Deve ser criado na academia do professor, não na fornecida
@@ -171,28 +183,39 @@ async def test_criar_professor_professor_forca_propria_academia(client, professo
 
 async def test_criar_professor_email_duplicado(client, admin_headers, professor_record):
     """Criar professor com email duplicado retorna 409."""
-    r = await client.post("/professors", headers=admin_headers, json={
-        "name": "Duplicado",
-        "email": professor_record.email,  # Email já existente
-    })
+    r = await client.post(
+        "/professors",
+        headers=admin_headers,
+        json={
+            "name": "Duplicado",
+            "email": professor_record.email,  # Email já existente
+        },
+    )
     assert r.status_code == 409
 
 
 async def test_criar_professor_sem_auth(client):
     """Criar professor sem autenticação retorna 401."""
-    r = await client.post("/professors", json={
-        "name": "Teste",
-        "email": f"teste-{uuid4().hex[:8]}@test.com",
-    })
+    r = await client.post(
+        "/professors",
+        json={
+            "name": "Teste",
+            "email": f"teste-{uuid4().hex[:8]}@test.com",
+        },
+    )
     assert r.status_code == 401
 
 
 async def test_atualizar_professor(client, admin_headers, professor_record):
     """Atualizar professor."""
-    r = await client.patch(f"/professors/{professor_record.id}", headers=admin_headers, json={
-        "name": "Nome Atualizado",
-        "email": f"atualizado-{uuid4().hex[:8]}@test.com",
-    })
+    r = await client.patch(
+        f"/professors/{professor_record.id}",
+        headers=admin_headers,
+        json={
+            "name": "Nome Atualizado",
+            "email": f"atualizado-{uuid4().hex[:8]}@test.com",
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "Nome Atualizado"
@@ -201,9 +224,13 @@ async def test_atualizar_professor(client, admin_headers, professor_record):
 async def test_atualizar_professor_parcial(client, admin_headers, professor_record):
     """Atualizar apenas nome do professor."""
     original_email = professor_record.email
-    r = await client.patch(f"/professors/{professor_record.id}", headers=admin_headers, json={
-        "name": "Só Nome",
-    })
+    r = await client.patch(
+        f"/professors/{professor_record.id}",
+        headers=admin_headers,
+        json={
+            "name": "Só Nome",
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     assert data["name"] == "Só Nome"
@@ -213,22 +240,29 @@ async def test_atualizar_professor_parcial(client, admin_headers, professor_reco
 async def test_atualizar_professor_nao_encontrado(client, admin_headers):
     """Atualizar professor inexistente retorna 404."""
     fake_id = uuid4()
-    r = await client.patch(f"/professors/{fake_id}", headers=admin_headers, json={
-        "name": "Teste",
-    })
+    r = await client.patch(
+        f"/professors/{fake_id}",
+        headers=admin_headers,
+        json={
+            "name": "Teste",
+        },
+    )
     assert r.status_code == 404
 
 
 async def test_atualizar_professor_professor_nao_pode_mudar_academia(client, professor_headers, professor_record):
     """Professor não pode alterar academy_id."""
-    from app.models import Academy
     from uuid import uuid4
 
     # Tentar atualizar academy_id (deve ser ignorado)
-    r = await client.patch(f"/professors/{professor_record.id}", headers=professor_headers, json={
-        "name": "Atualizado",
-        "academy_id": str(uuid4()),  # Tentar mudar academia
-    })
+    r = await client.patch(
+        f"/professors/{professor_record.id}",
+        headers=professor_headers,
+        json={
+            "name": "Atualizado",
+            "academy_id": str(uuid4()),  # Tentar mudar academia
+        },
+    )
     assert r.status_code == 200
     data = r.json()
     # academy_id deve permanecer o mesmo
@@ -253,9 +287,13 @@ async def test_atualizar_professor_professor_acesso_outra_academia_proibido(clie
     await db.commit()
     await db.refresh(other_prof)
 
-    r = await client.patch(f"/professors/{other_prof.id}", headers=professor_headers, json={
-        "name": "Tentativa",
-    })
+    r = await client.patch(
+        f"/professors/{other_prof.id}",
+        headers=professor_headers,
+        json={
+            "name": "Tentativa",
+        },
+    )
     assert r.status_code == 403
 
 

@@ -1,5 +1,6 @@
-import pytest
 from datetime import date
+
+import pytest
 
 
 def test_threshold_for_level_progression():
@@ -69,4 +70,3 @@ async def test_get_user_points_includes_level_after_mission_complete(
     assert data["level"] == 1
     assert data["level_points"] == 10
     assert data["next_level_threshold"] == 50
-

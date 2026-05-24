@@ -1,4 +1,5 @@
 """Schemas para autenticação (login e token)."""
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
