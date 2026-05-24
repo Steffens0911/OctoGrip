@@ -125,7 +125,7 @@ services:
     build: .
     container_name: jjb_celery_beat
     restart: unless-stopped
-    command: celery -A celery_app beat --loglevel=info
+    command: celery -A celery_app beat --loglevel=info --schedule=/app/app_media/celerybeat-schedule
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
