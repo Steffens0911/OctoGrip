@@ -1,16 +1,13 @@
 name: Build & Push API
 
 on:
-  push:
+  # Só builda após o CI (testes + lint) terminar com sucesso no main.
+  # Isso garante que código quebrado nunca chegue ao Coolify.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
-    paths:
-      - 'app/**'
-      - 'alembic/**'
-      - 'deploy/**'
-      - 'Dockerfile'
-      - 'requirements.txt'
-      - 'celery_app.py'
-      - '.github/workflows/build-api.yml'
+  # Permite disparo manual pelo painel do GitHub Actions.
   workflow_dispatch:
 
 env:
@@ -19,6 +16,11 @@ env:
 
 jobs:
   build-and-push:
+    # Quando disparado por workflow_run: só continua se o CI passou.
+    # Quando disparado manualmente (workflow_dispatch): sempre roda.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
