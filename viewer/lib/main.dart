@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' show ProviderScope;
 import 'package:hive_flutter/hive_flutter.dart';
@@ -412,7 +413,31 @@ class _MainShellState extends State<MainShell> {
       });
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Sair do app?'),
+            content: const Text('Deseja fechar o FlowRoll?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Sair'),
+              ),
+            ],
+          ),
+        ).then((confirmed) {
+          if (confirmed == true) SystemNavigator.pop();
+        });
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -637,6 +662,7 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

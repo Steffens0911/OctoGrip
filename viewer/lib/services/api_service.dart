@@ -3444,4 +3444,15 @@ class ApiService {
       _throwIfNotOk(r, data);
     }
   }
+
+  Future<void> deleteNotification(String notificationId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/notifications/$notificationId'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
 }

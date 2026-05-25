@@ -66,6 +66,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _deleteNotification(NotificationModel n) async {
+    try {
+      await ApiService().deleteNotification(n.id);
+      setState(() => _all.removeWhere((x) => x.id == n.id));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao excluir: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _markAllRead() async {
     try {
       await ApiService().markAllNotificationsRead();
@@ -130,6 +143,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               itemBuilder: (_, i) => _NotifTile(
                                 notif: filtered[i],
                                 onTap: () => _markRead(filtered[i]),
+                                onDelete: () => _deleteNotification(filtered[i]),
                               ),
                             ),
                           ),
@@ -186,8 +200,9 @@ class _FilterChips extends StatelessWidget {
 class _NotifTile extends StatelessWidget {
   final NotificationModel notif;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
-  const _NotifTile({required this.notif, required this.onTap});
+  const _NotifTile({required this.notif, required this.onTap, required this.onDelete});
 
   static const _typeIcon = {
     'execution_confirmed': ('✅', Color(0xFF2E7D32)),
@@ -271,18 +286,34 @@ class _NotifTile extends StatelessWidget {
                 ],
               ),
             ),
-            if (isUnread)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, left: 8),
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    shape: BoxShape.circle,
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isUnread)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, left: 8, bottom: 4),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: cs.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
                   ),
+                IconButton(
+                  onPressed: onDelete,
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  tooltip: 'Excluir notificação',
                 ),
-              ),
+              ],
+            ),
           ],
         ),
       ),

@@ -13,6 +13,7 @@ from app.schemas.notification_schemas import AnnouncementCreate, NotificationRea
 from app.services.notification_service import (
     create_notifications_for_academy_students,
     create_notifications_for_all_students,
+    delete_notification,
     get_unread_count,
     list_notifications,
     mark_all_as_read,
@@ -64,6 +65,16 @@ async def notifications_read_all(
     await mark_all_as_read(db, current_user.id)
 
 
+@router.delete("/{notification_id}", status_code=204)
+async def notification_delete(
+    notification_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Soft-delete de uma notificação: some apenas para o usuário que executou a ação."""
+    await delete_notification(db, notification_id, current_user.id)
+
+
 @router.post("/announcement", status_code=204)
 async def create_announcement(
     body: AnnouncementCreate,
@@ -72,26 +83,32 @@ async def create_announcement(
 ):
     """
     Envia comunicado como notificação in-app.
-    Gestor/supervisor: apenas alunos da própria academia.
-    Admin: todos os alunos do sistema.
+    Gestor/supervisor: alunos e professores da própria academia.
+    Admin: todos os alunos, professores, gestores e supervisores do sistema.
     """
     if current_user.role not in _STAFF_ROLES:
         raise ForbiddenError("Apenas gestores e administradores podem enviar comunicados.")
 
     if current_user.role == "administrador":
+        # Comunicado global: chega para toda a base de usuários operacionais
         await create_notifications_for_all_students(
             db,
             type="announcement_global",
             title=body.title,
             body=body.body,
+            roles=("aluno", "professor", "gerente_academia", "supervisor"),
         )
     else:
         if not current_user.academy_id:
             raise ForbiddenError("Você não está associado a nenhuma academia.")
+        # Comunicado de academia: chega para alunos e professores da academia,
+        # excluindo o próprio remetente para evitar notificação redundante.
         await create_notifications_for_academy_students(
             db,
             academy_id=current_user.academy_id,
             type="announcement_academy",
             title=body.title,
             body=body.body,
+            roles=("aluno", "professor", "gerente_academia", "supervisor"),
+            exclude_user_id=current_user.id,
         )
