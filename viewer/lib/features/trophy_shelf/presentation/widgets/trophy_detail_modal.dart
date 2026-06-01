@@ -32,6 +32,16 @@ class TrophyDetailModal extends StatelessWidget {
     );
   }
 
+  static String _formatSingleDate(String iso) {
+    try {
+      final d = DateTime.tryParse(iso);
+      if (d == null) return iso;
+      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
   static String _formatDateRange(String startIso, String endIso) {
     try {
       final start = DateTime.tryParse(startIso);
@@ -124,6 +134,31 @@ class TrophyDetailModal extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
+          if (t.isManualAward) ...[
+            if (t.championshipEventName != null)
+              Text(
+                t.championshipEventName!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textMutedOf(context),
+                ),
+              ),
+            if (t.awardNote != null && t.awardNote!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  t.awardNote!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textMutedOf(context),
+                  ),
+                ),
+              ),
+            Text(
+              'Concedido em ${_formatSingleDate(t.startDate)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppTheme.textMutedOf(context),
+              ),
+            ),
+          ] else
           Text(
             '${_formatDateRange(t.startDate, t.endDate)} · Meta: ${t.targetCount} execuções',
             style: theme.textTheme.bodySmall?.copyWith(
@@ -170,7 +205,7 @@ class TrophyDetailModal extends StatelessWidget {
               ],
             ),
           ],
-          if (t.unlocked && _hasProgress(t)) ...[
+          if (!t.isManualAward && t.unlocked && _hasProgress(t)) ...[
             const SizedBox(height: 12),
             _progressSection(context, t),
           ],

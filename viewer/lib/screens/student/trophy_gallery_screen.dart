@@ -3,12 +3,15 @@ import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
+import 'package:viewer/models/manual_trophy.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/services/api_service.dart' show ApiException, ApiService;
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
+import 'package:viewer/models/user.dart';
+import 'package:viewer/widgets/execution_confirm_sheet.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
@@ -57,7 +60,10 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       filtered = filtered.where((t) {
         final name = t.name.toLowerCase();
         final techniqueName = (t.techniqueName ?? '').toLowerCase();
-        return name.contains(query) || techniqueName.contains(query);
+        final note = (t.awardNote ?? '').toLowerCase();
+        final event = (t.championshipEventName ?? '').toLowerCase();
+        return name.contains(query) || techniqueName.contains(query) ||
+            note.contains(query) || event.contains(query);
       }).toList();
     }
     if (_filterTier != null) {
@@ -80,10 +86,24 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
       _error = null;
     });
     try {
-      final list = await _api.getTrophiesForUser(widget.userId);
+      final trophiesFuture = _api.getTrophiesForUser(widget.userId);
+      final manualFuture = _api.getUserManualTrophyAwards(widget.userId);
+      final list = await trophiesFuture;
+      List<TrophyWithEarned> manualItems = [];
+      try {
+        final raw = await manualFuture;
+        final manual = UserTrophyAwardsResponse.fromJson(raw);
+        final allAwards = [...manual.championshipAwards, ...manual.customAwards];
+        manualItems = allAwards
+            .map((a) => TrophyWithEarned.fromManualAward(a))
+            .toList();
+      } catch (_) {
+        // Silencia erro das conquistas manuais para não bloquear a galeria
+      }
       if (mounted) {
         setState(() {
-          _allItems = list;
+          // Manuais primeiro (mais recentes no topo), depois os regulares
+          _allItems = [...manualItems, ...list];
           _loading = false;
         });
       }
@@ -115,6 +135,16 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
           type: AppFeedbackType.error,
         );
       }
+    }
+  }
+
+  static String _formatSingleDate(String iso) {
+    try {
+      final d = DateTime.tryParse(iso);
+      if (d == null) return iso;
+      return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+    } catch (_) {
+      return iso;
     }
   }
 
@@ -184,8 +214,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     );
   }
 
-  Future<String?> _showOpponentDialog(String academyId) {
-    return OpponentPickerSheet.show(
+  Future<UserModel?> _showOpponentDialogWithUser(String academyId) {
+    return OpponentPickerSheet.showWithUser(
       context,
       academyId: academyId,
       currentUserId: widget.userId,
@@ -212,13 +242,19 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
         : usageTypeUi == 'natural'
             ? 'before_training'
             : usageTypeUi;
-    final opponentId = await _showOpponentDialog(academyId);
-    if (opponentId == null || !mounted) return;
+    final opponent = await _showOpponentDialogWithUser(academyId);
+    if (opponent == null || !mounted) return;
+    final confirmed = await ExecutionConfirmSheet.show(
+      context,
+      techniqueName: t.techniqueName ?? t.name,
+      opponentName: opponent.name ?? opponent.email,
+    );
+    if (!confirmed || !mounted) return;
     try {
       final res = await _api.postExecution(
         techniqueId: t.techniqueId,
         academyId: academyId,
-        opponentId: opponentId,
+        opponentId: opponent.id,
         usageType: usageType,
       );
       if (!mounted) return;
@@ -348,6 +384,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     }
     return lines;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -556,7 +593,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                     children: [
                                       Expanded(
                                         child: Text(
-                                          'Mostrando ${_filteredItems.length} de ${_allItems.length}',
+                                          'Mostrando ${_filteredItems.length} de ${_allItems.length} premiações',
                                           style: const TextStyle(
                                               fontSize: 12,
                                               color: AppTheme.textSecondary),
@@ -709,7 +746,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                             ),
                                                           ],
                                                         ),
-                                                        if (t.techniqueName !=
+                                                        if (!t.isManualAward &&
+                                                            t.techniqueName !=
                                                                 null &&
                                                             t.techniqueName!
                                                                 .isNotEmpty)
@@ -722,6 +760,31 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                                       context),
                                                             ),
                                                           ),
+                                                        if (t.isManualAward) ...[
+                                                          if (t.championshipEventName != null)
+                                                            Text(
+                                                              t.championshipEventName!,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: AppTheme.textSecondaryOf(context),
+                                                              ),
+                                                            ),
+                                                          if (t.awardNote != null && t.awardNote!.isNotEmpty)
+                                                            Text(
+                                                              t.awardNote!,
+                                                              style: TextStyle(
+                                                                fontSize: 12,
+                                                                color: AppTheme.textSecondaryOf(context),
+                                                              ),
+                                                            ),
+                                                          Text(
+                                                            'Concedido em ${_formatSingleDate(t.startDate)}',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: AppTheme.textMutedOf(context),
+                                                            ),
+                                                          ),
+                                                        ] else
                                                         Text(
                                                           '${_formatDateRange(t.startDate, t.endDate)} · Meta: ${t.targetCount} execuções',
                                                           style: TextStyle(
@@ -829,7 +892,7 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                       ),
                                                   ],
                                                 ),
-                                              ] else
+                                              ] else if (!t.isManualAward)
                                                 ...() {
                                                   final progressLines =
                                                       _progressLines(
@@ -864,7 +927,8 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
                                                   ),
                                                 ),
                                               ],
-                                              if (_isOwnGallery &&
+                                              if (!t.isManualAward &&
+                                                  _isOwnGallery &&
                                                   t.unlocked &&
                                                   t.academyId != null &&
                                                   t.academyId!.isNotEmpty) ...[
@@ -895,3 +959,4 @@ class _TrophyGalleryScreenState extends State<TrophyGalleryScreen> {
     );
   }
 }
+

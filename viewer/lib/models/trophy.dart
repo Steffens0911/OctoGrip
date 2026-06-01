@@ -1,3 +1,5 @@
+import 'package:viewer/models/manual_trophy.dart';
+
 /// Item da galeria de troféus e medalhas: premiação com tier conquistado (ouro/prata/bronze) ou nenhum.
 class TrophyWithEarned {
   final String trophyId;
@@ -20,10 +22,16 @@ class TrophyWithEarned {
   final int? maxCountPerOpponent;
   /// Se o aluno já atingiu nível e faixa mínimos para poder competir por este troféu.
   final bool unlocked;
-  final String? earnedTier; // 'gold' | 'silver' | 'bronze' | null
+  final String? earnedTier; // 'gold' | 'silver' | 'bronze' | 'participation' | null
   final int goldCount;
   final int silverCount;
   final int bronzeCount;
+  /// true quando veio de uma concessão manual (professor concedeu), não de execuções.
+  final bool isManualAward;
+  /// Observação livre do professor ao conceder o troféu manualmente.
+  final String? awardNote;
+  /// Nome do campeonato (para concessões de campeonato).
+  final String? championshipEventName;
 
   TrophyWithEarned({
     required this.trophyId,
@@ -45,6 +53,9 @@ class TrophyWithEarned {
     this.goldCount = 0,
     this.silverCount = 0,
     this.bronzeCount = 0,
+    this.isManualAward = false,
+    this.awardNote,
+    this.championshipEventName,
   });
 
   factory TrophyWithEarned.fromJson(Map<String, dynamic> json) {
@@ -72,6 +83,24 @@ class TrophyWithEarned {
     );
   }
 
+  factory TrophyWithEarned.fromManualAward(TrophyAward award) {
+    final isChampionship = award.trophyType == 'championship';
+    return TrophyWithEarned(
+      trophyId: award.id,
+      techniqueId: '',
+      name: award.templateName,
+      startDate: award.awardedAt,
+      endDate: award.awardedAt,
+      targetCount: 0,
+      awardKind: isChampionship ? 'medal' : 'trophy',
+      unlocked: true,
+      earnedTier: isChampionship ? award.medalType : 'gold',
+      isManualAward: true,
+      awardNote: award.note,
+      championshipEventName: award.championshipEventName,
+    );
+  }
+
   bool get isTrophy => awardKind == 'trophy';
   bool get isMedal => awardKind == 'medal';
   String get awardKindLabel => isTrophy ? 'Troféu' : 'Medalha';
@@ -81,16 +110,19 @@ class TrophyWithEarned {
       case 'gold': return '🥇';
       case 'silver': return '🥈';
       case 'bronze': return '🥉';
+      case 'participation': return '🎖️';
       default: return '🏆';
     }
   }
 
   String get tierLabel {
+    if (isManualAward && !isMedal) return 'Concedido';
     if (earnedTier == null) return 'A conquistar';
     switch (earnedTier!) {
       case 'gold': return 'Ouro';
       case 'silver': return 'Prata';
       case 'bronze': return 'Bronze';
+      case 'participation': return 'Participação';
       default: return earnedTier!;
     }
   }

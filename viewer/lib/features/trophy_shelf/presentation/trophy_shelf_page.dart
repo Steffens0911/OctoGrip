@@ -5,6 +5,7 @@ import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/features/trophy_shelf/utils/shelf_layout_config.dart';
 import 'package:viewer/features/trophy_shelf/presentation/widgets/trophy_detail_modal.dart';
 import 'package:viewer/features/trophy_shelf/presentation/widgets/trophy_shelf_layout.dart';
+import 'package:viewer/models/manual_trophy.dart';
 import 'package:viewer/models/trophy.dart';
 import 'package:viewer/services/api_service.dart' show ApiException, ApiService;
 import 'package:viewer/services/auth_service.dart';
@@ -78,10 +79,24 @@ class _TrophyShelfPageState extends State<TrophyShelfPage> {
       _error = null;
     });
     try {
-      final list = await _api.getTrophiesForUser(widget.userId);
+      final trophiesFuture = _api.getTrophiesForUser(widget.userId);
+      final manualFuture = _api.getUserManualTrophyAwards(widget.userId);
+      final list = await trophiesFuture;
+      List<TrophyWithEarned> manualItems = [];
+      try {
+        final raw = await manualFuture;
+        final manual = UserTrophyAwardsResponse.fromJson(raw);
+        final allAwards = [...manual.championshipAwards, ...manual.customAwards];
+        manualItems = allAwards
+            .map((a) => TrophyWithEarned.fromManualAward(a))
+            .toList();
+      } catch (_) {
+        // Silencia erro dos manuais para não bloquear a estante
+      }
       if (mounted) {
         setState(() {
-          _list = list;
+          // Mescla manuais (sempre conquistados) com os regulares
+          _list = [...manualItems, ...list];
           _loading = false;
         });
       }
