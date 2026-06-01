@@ -295,13 +295,16 @@ async def award_trophy(
     if not template or template.deleted_at is not None:
         raise AppError("Template de troféu não encontrado.", status_code=404)
 
+    VALID_MEDAL_TYPES_CHAMPIONSHIP = frozenset({"gold", "silver", "bronze", "participation"})
+    VALID_MEDAL_TYPES_CUSTOM = frozenset({"gold", "silver", "bronze"})
+
     if template.trophy_type == "championship":
         if not championship_event_id:
             raise AppError("Troféu de campeonato requer championship_event_id.", status_code=400)
         if not medal_type:
             raise AppError("Troféu de campeonato requer medal_type (gold, silver, bronze, participation).", status_code=400)
-        if medal_type not in VALID_MEDAL_TYPES:
-            raise AppError(f"medal_type inválido. Use: {', '.join(sorted(VALID_MEDAL_TYPES))}", status_code=400)
+        if medal_type not in VALID_MEDAL_TYPES_CHAMPIONSHIP:
+            raise AppError(f"medal_type inválido. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CHAMPIONSHIP))}", status_code=400)
         event = await get_championship_event(db, championship_event_id)
         if not event or event.deleted_at is not None:
             raise AppError("Campeonato não encontrado.", status_code=404)
@@ -309,7 +312,8 @@ async def award_trophy(
             raise AppError("Campeonato não pertence à academia do troféu.", status_code=400)
     else:
         championship_event_id = None
-        medal_type = None
+        if medal_type and medal_type not in VALID_MEDAL_TYPES_CUSTOM:
+            raise AppError(f"medal_type inválido para troféu custom. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CUSTOM))}", status_code=400)
 
     award = AcademyTrophyAward(
         template_id=template_id,

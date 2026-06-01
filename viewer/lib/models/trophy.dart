@@ -94,7 +94,7 @@ class TrophyWithEarned {
       targetCount: 0,
       awardKind: isChampionship ? 'medal' : 'trophy',
       unlocked: true,
-      earnedTier: isChampionship ? award.medalType : 'gold',
+      earnedTier: award.medalType,
       isManualAward: true,
       awardNote: award.note,
       championshipEventName: award.championshipEventName,
@@ -116,7 +116,7 @@ class TrophyWithEarned {
   }
 
   String get tierLabel {
-    if (isManualAward && !isMedal) return 'Concedido';
+    if (isManualAward && earnedTier == null) return 'Concedido';
     if (earnedTier == null) return 'A conquistar';
     switch (earnedTier!) {
       case 'gold': return 'Ouro';
