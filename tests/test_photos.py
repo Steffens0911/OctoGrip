@@ -1,6 +1,7 @@
 """Testes dos endpoints OctoPhotos — GET/POST/DELETE feed, like, restrições."""
 
 import io
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -9,6 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password_sync
 from app.models import Academy, User
+
+
+@pytest.fixture(autouse=True)
+def mock_photo_task():
+    """Impede que process_photo_upload.delay tente conectar ao broker Celery nos testes."""
+    mock_task = MagicMock()
+    mock_task.delay = MagicMock(return_value=None)
+    with patch("app.tasks.photo_tasks.process_photo_upload", mock_task):
+        yield
 
 # ─── helpers ────────────────────────────────────────────────────────────────
 
