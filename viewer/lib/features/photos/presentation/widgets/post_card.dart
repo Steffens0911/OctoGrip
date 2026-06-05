@@ -357,7 +357,7 @@ class _LikeRow extends StatelessWidget {
           IconButton(
             icon: Icon(
               photo.likedByMe ? Icons.favorite_rounded : Icons.favorite_border,
-              color: photo.likedByMe ? Colors.red : null,
+              color: photo.likedByMe ? Colors.red : cs.onSurfaceVariant,
             ),
             onPressed: photo.likedByMe ? onUnlike : onLike,
             tooltip: photo.likedByMe ? 'Descurtir' : 'Curtir',
@@ -369,7 +369,7 @@ class _LikeRow extends StatelessWidget {
             ),
           const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, size: 22),
+            icon: Icon(Icons.chat_bubble_outline, size: 22, color: cs.onSurfaceVariant),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
