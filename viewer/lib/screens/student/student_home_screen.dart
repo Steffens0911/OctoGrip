@@ -184,6 +184,14 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     _load().then((_) => _maybeShowTour());
   }
 
+  /// Esconde o banner de parceiros antes de abrir o tour, para não sobrepor
+  /// o painel destacado.
+  void _openTour() {
+    if (!mounted) return;
+    setState(() => _showPartners = false);
+    showTrainingFieldTour(context);
+  }
+
   Future<void> _maybeShowTour() async {
     if (!mounted) return;
     final userId = AuthService().currentUser?.id;
@@ -192,7 +200,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     if (!mounted || done) return;
     await markTrainingFieldTourDone(userId);
     if (!mounted) return;
-    showTrainingFieldTour(context);
+    _openTour();
   }
 
   @override
@@ -903,7 +911,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                       onDailyVideoTap:
                           frozenStudent ? _notifyAccountFrozen : _onDailyVideoTap,
                       onOpenRules: () => showStudentRulesSheet(context),
-                      onOpenTour: () => showTrainingFieldTour(context),
+                      onOpenTour: _openTour,
                       onAvatarTap: frozenStudent ? null : _onAvatarTap,
                     ),
                     ),
