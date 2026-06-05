@@ -448,6 +448,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     final academyId = user.academyId;
     if (academyId == null || academyId.isEmpty) return;
 
+    // Não mostrar parceiro em destaque se o tour ainda não foi visto —
+    // o dialog ficaria na frente do painel destacado pelo tour.
+    final tourDone = await trainingFieldTourDone(user.id);
+    if (!mounted || !tourDone) return;
+
     try {
       final partners = await _api.getPartners(academyId);
       if (!mounted || partners.isEmpty) return;
