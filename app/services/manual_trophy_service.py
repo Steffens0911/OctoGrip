@@ -341,98 +341,14 @@ async def award_trophy(
         extra={"award_id": str(award.id), "template_id": str(template_id), "user_id": str(user_id)},
     )
 
-    # Notificação in-app + push para o aluno e academia (fire-and-forget)
+    # Notificação in-app + push despachado como task Celery (fire-and-forget real)
     try:
-        await _notify_manual_award(db, award=award, template=template)
+        from app.tasks.manual_trophy_tasks import notify_manual_trophy_awarded
+        notify_manual_trophy_awarded.delay(str(award.id))
     except Exception:
-        logger.exception("award_trophy: erro ao enviar notificações", extra={"award_id": str(award.id)})
+        logger.exception("award_trophy: erro ao despachar task de notificação", extra={"award_id": str(award.id)})
 
     return award
-
-
-async def _notify_manual_award(
-    db: AsyncSession,
-    *,
-    award: "AcademyTrophyAward",
-    template: "AcademyTrophyTemplate",
-) -> None:
-    """Cria notificação in-app para o aluno e envia push (aluno + academia)."""
-    from app.models.user import User
-    from app.services.notification_service import create_notification, create_notifications_for_academy_students
-    from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
-    from app.services.push_token_service import list_fcm_tokens_for_academy, list_fcm_tokens_for_user
-    from app.config import settings
-
-    user = (await db.execute(select(User).where(User.id == award.user_id))).scalar_one_or_none()
-    if not user:
-        return
-
-    kind_label = "Medalha" if template.trophy_type == "championship" else "Troféu"
-    _tier_labels = {"gold": "Ouro 🥇", "silver": "Prata 🥈", "bronze": "Bronze 🥉", "participation": "Participação 🎖️"}
-    tier_label = _tier_labels.get(award.medal_type or "", "🏆")
-    title = f"{kind_label} concedido! {tier_label}"
-    body = template.name
-    notif_data = {"type": "manual_trophy_awarded", "award_id": str(award.id)}
-
-    # Notificação in-app pessoal
-    await create_notification(
-        db,
-        user_id=award.user_id,
-        type="manual_trophy_awarded",
-        title=title,
-        body=body,
-        data=notif_data,
-    )
-
-    # Notificação social (academia toda) — sem excluir o aluno para ele também ver no feed
-    user_name = (user.name or "Um aluno").strip()
-    if user.academy_id:
-        await create_notifications_for_academy_students(
-            db,
-            academy_id=user.academy_id,
-            type="trophy_social",
-            title=f"{user_name} recebeu {kind_label}! {tier_label}",
-            body=body,
-            data=notif_data,
-            exclude_user_id=award.user_id,
-        )
-
-    # Push notification
-    if not settings.FIREBASE_PROJECT_ID or not settings.FIREBASE_SERVICE_ACCOUNT_PATH:
-        return
-    try:
-        access_token = await fetch_fcm_access_token(settings.FIREBASE_SERVICE_ACCOUNT_PATH)
-    except Exception:
-        logger.exception("manual_trophy: falha ao obter FCM access token")
-        return
-
-    push_data = {"type": "manual_trophy_awarded", "award_id": str(award.id)}
-    personal_tokens = await list_fcm_tokens_for_user(db, user_id=award.user_id)
-    for token in personal_tokens:
-        await send_fcm_data_message(
-            project_id=settings.FIREBASE_PROJECT_ID,
-            service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-            device_token=token,
-            title=title,
-            body=body,
-            access_token=access_token,
-            data=push_data,
-        )
-
-    if user.academy_id:
-        personal_set = set(personal_tokens)
-        academy_tokens = await list_fcm_tokens_for_academy(db, academy_id=user.academy_id)
-        social_tokens = [t for t in academy_tokens if t not in personal_set]
-        for token in social_tokens:
-            await send_fcm_data_message(
-                project_id=settings.FIREBASE_PROJECT_ID,
-                service_account_path=settings.FIREBASE_SERVICE_ACCOUNT_PATH,
-                device_token=token,
-                title=f"{user_name} recebeu {kind_label}! {tier_label}",
-                body=body,
-                access_token=access_token,
-                data=push_data,
-            )
 
 
 async def revoke_award(
