@@ -15,7 +15,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements.txt .
 
 # Instala deps como usuário app → /home/app/.local (sem precisar de chown depois)
-RUN pip install --upgrade pip && \
+USER app
+RUN pip install --upgrade pip --user && \
     pip install --user --no-warn-script-location -r requirements.txt
 
 # Estágio 2: Runtime - imagem final
