@@ -130,6 +130,51 @@
   </script>
   <!-- Cropper.js JS — deve vir antes do Flutter bootstrap -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <!-- Atualização automática do PWA: detecta novo service worker e ativa imediatamente. -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      // Recarrega a página quando o novo service worker assumir o controle.
+      var _swRefreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (_swRefreshing) return;
+        _swRefreshing = true;
+        window.location.reload();
+      });
+
+      function _activateWaiting(sw) {
+        // Flutter 3.x responde a { type: 'SKIP_WAITING' }
+        sw.postMessage({ type: 'SKIP_WAITING' });
+      }
+
+      function _watchRegistration(registration) {
+        // Já existe um SW esperando (deploy ocorreu enquanto o app estava aberto)?
+        if (registration.waiting) {
+          _activateWaiting(registration.waiting);
+          return;
+        }
+        // Observa instalações futuras
+        registration.addEventListener('updatefound', function () {
+          var newSW = registration.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', function () {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              _activateWaiting(newSW);
+            }
+          });
+        });
+      }
+
+      navigator.serviceWorker.ready.then(function (registration) {
+        _watchRegistration(registration);
+        // Verifica atualizações a cada 5 minutos (para apps abertos por muito tempo).
+        setInterval(function () {
+          registration.update().then(function () {
+            _watchRegistration(registration);
+          });
+        }, 5 * 60 * 1000);
+      });
+    }
+  </script>
   <!-- defer: registo do service worker mais previsível que async (critério de instalação PWA no Chrome). -->
   <script src="flutter_bootstrap.js" defer></script>
 </body>
