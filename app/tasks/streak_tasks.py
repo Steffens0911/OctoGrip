@@ -90,17 +90,25 @@ async def _run() -> None:
             if streak < 4:
                 continue
 
+            title = "Seu streak está em risco! 🔥"
+            body = f"Você tem {streak} dias seguidos de acesso. Abra o app hoje para não perder!"
+
+            # Notificação in-app sempre (independente de ter token FCM)
+            from app.services.notification_service import create_notification
+
+            await create_notification(
+                db,
+                user_id=user_id,
+                type=_NOTIF_TYPE,
+                title=title,
+                body=body,
+            )
+
             tokens = (
                 (await db.execute(select(UserDeviceToken.fcm_token).where(UserDeviceToken.user_id == user_id)))
                 .scalars()
                 .all()
             )
-
-            if not tokens:
-                continue
-
-            title = "Seu streak está em risco! 🔥"
-            body = f"Você tem {streak} dias seguidos de acesso. Abra o app hoje para não perder!"
 
             for token in tokens:
                 success, should_drop = await send_fcm_data_message(

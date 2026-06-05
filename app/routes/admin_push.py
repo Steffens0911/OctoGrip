@@ -12,6 +12,7 @@ from app.database import get_db
 from app.models import User
 from app.schemas.push_notification import AcademyPushNotifyRequest, AcademyPushNotifyResponse
 from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
+from app.services.notification_service import create_notifications_for_all_students
 from app.services.push_token_service import delete_device_token, list_all_fcm_tokens
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,15 @@ async def admin_push_broadcast(
                     await delete_device_token(db, fcm_token=device_token)
                 except Exception:
                     logger.exception("FCM broadcast: falha ao remover token inválido")
+
+    if sent > 0:
+        await create_notifications_for_all_students(
+            db,
+            type="global_push",
+            title=body.title.strip(),
+            body=body.body.strip(),
+            roles=("aluno", "professor", "gerente_academia", "supervisor"),
+        )
 
     return AcademyPushNotifyResponse(
         target_tokens=len(tokens),

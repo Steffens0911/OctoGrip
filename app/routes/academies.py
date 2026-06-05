@@ -67,6 +67,7 @@ from app.services.collective_goal_service import (
 )
 from app.services.execution_service import batch_total_points_for_users
 from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
+from app.services.notification_service import create_notifications_for_academy_students
 from app.services.push_token_service import delete_device_token, list_fcm_tokens_for_academy
 from app.services.user_service import create_user, get_user_by_email, list_users
 
@@ -926,6 +927,16 @@ async def academy_send_push_notification(
                     await delete_device_token(db, fcm_token=device_token)
                 except Exception:
                     pass
+
+    if sent > 0:
+        await create_notifications_for_academy_students(
+            db,
+            academy_id=academy_id,
+            type="academy_push",
+            title=body.title.strip(),
+            body=body.body.strip(),
+            roles=("aluno", "professor", "gerente_academia", "supervisor"),
+        )
 
     return AcademyPushNotifyResponse(
         target_tokens=len(tokens),

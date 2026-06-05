@@ -95,6 +95,22 @@ async def _run() -> None:
             if at_risk_count == 0:
                 continue
 
+            aluno_txt = "aluno" if at_risk_count == 1 else "alunos"
+            title = "Alunos precisam de atenção"
+            body = f"{at_risk_count} {aluno_txt} sem aparecer há mais de 7 dias. Que tal dar um alô?"
+
+            # Notificação in-app sempre (independente de ter token FCM)
+            from app.services.notification_service import create_notifications_for_academy_students
+
+            await create_notifications_for_academy_students(
+                db,
+                academy_id=academy_id,
+                type="at_risk_alert",
+                title=title,
+                body=body,
+                roles=_STAFF_ROLES,
+            )
+
             # Tokens dos professores/gestores desta academia
             tokens_rows = (
                 (
@@ -111,13 +127,6 @@ async def _run() -> None:
                 .scalars()
                 .all()
             )
-
-            if not tokens_rows:
-                continue
-
-            aluno_txt = "aluno" if at_risk_count == 1 else "alunos"
-            title = "Alunos precisam de atenção"
-            body = f"{at_risk_count} {aluno_txt} sem aparecer há mais de 7 dias. Que tal dar um alô?"
 
             for token in tokens_rows:
                 success, should_drop = await send_fcm_data_message(
