@@ -73,20 +73,14 @@ def process_photo_upload(self, photo_id: str, raw_file_path: str) -> None:
     except Exception as exc:
         logger.exception("Erro ao processar imagem photo_id=%s: %s", photo_id, exc)
         with SyncSessionLocal() as db:
-            db.execute(
-                update(AcademyPhoto)
-                .where(AcademyPhoto.id == uuid.UUID(photo_id))
-                .values(status="failed")
-            )
+            db.execute(update(AcademyPhoto).where(AcademyPhoto.id == uuid.UUID(photo_id)).values(status="failed"))
             db.commit()
         raise self.retry(exc=exc)
 
     academy_id_str: str | None = None
     with SyncSessionLocal() as db:
         # Obtém academy_id antes do UPDATE (fetchone pós-commit fecha o cursor)
-        photo_row = db.execute(
-            select(AcademyPhoto.academy_id).where(AcademyPhoto.id == uuid.UUID(photo_id))
-        ).fetchone()
+        photo_row = db.execute(select(AcademyPhoto.academy_id).where(AcademyPhoto.id == uuid.UUID(photo_id))).fetchone()
         if photo_row:
             academy_id_str = str(photo_row[0])
 

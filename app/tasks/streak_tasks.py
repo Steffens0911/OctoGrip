@@ -38,26 +38,29 @@ async def _run() -> None:
     async with AsyncSessionLocal() as db:
         # Alunos que logaram ontem mas NÃO logaram hoje → streak em risco
         logged_yesterday_not_today = (
-            await db.execute(
-                select(User.id)
-                .where(
-                    User.role == "aluno",
-                    User.account_frozen == False,  # noqa: E712
-                    exists(
-                        select(UserLoginDay.user_id).where(
-                            UserLoginDay.user_id == User.id,
-                            UserLoginDay.login_day == yesterday,
-                        )
-                    ),
-                    ~exists(
-                        select(UserLoginDay.user_id).where(
-                            UserLoginDay.user_id == User.id,
-                            UserLoginDay.login_day == today,
-                        )
-                    ),
+            (
+                await db.execute(
+                    select(User.id).where(
+                        User.role == "aluno",
+                        User.account_frozen == False,  # noqa: E712
+                        exists(
+                            select(UserLoginDay.user_id).where(
+                                UserLoginDay.user_id == User.id,
+                                UserLoginDay.login_day == yesterday,
+                            )
+                        ),
+                        ~exists(
+                            select(UserLoginDay.user_id).where(
+                                UserLoginDay.user_id == User.id,
+                                UserLoginDay.login_day == today,
+                            )
+                        ),
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         if not logged_yesterday_not_today:
             return
@@ -71,25 +74,27 @@ async def _run() -> None:
         for user_id in logged_yesterday_not_today:
             # Calcula o streak atual (baseado em ontem como referência)
             login_days = (
-                await db.execute(
-                    select(UserLoginDay.login_day)
-                    .where(UserLoginDay.user_id == user_id)
-                    .order_by(UserLoginDay.login_day.desc())
-                    .limit(400)
+                (
+                    await db.execute(
+                        select(UserLoginDay.login_day)
+                        .where(UserLoginDay.user_id == user_id)
+                        .order_by(UserLoginDay.login_day.desc())
+                        .limit(400)
+                    )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
             streak = login_streak_from_distinct_days(list(login_days), yesterday)
 
             if streak < 4:
                 continue
 
             tokens = (
-                await db.execute(
-                    select(UserDeviceToken.fcm_token).where(
-                        UserDeviceToken.user_id == user_id
-                    )
-                )
-            ).scalars().all()
+                (await db.execute(select(UserDeviceToken.fcm_token).where(UserDeviceToken.user_id == user_id)))
+                .scalars()
+                .all()
+            )
 
             if not tokens:
                 continue

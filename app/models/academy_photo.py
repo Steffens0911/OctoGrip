@@ -20,10 +20,8 @@ class AcademyPhoto(Base, UUIDMixin, SoftDeleteMixin):
     __tablename__ = "academy_photos"
     __table_args__ = (
         # Índice parcial cobre o feed paginado (academy_id + created_at DESC, só posts ativos)
-        Index("ix_academy_photos_feed", "academy_id", "created_at",
-              postgresql_where="deleted_at IS NULL"),
-        Index("ix_academy_photos_status", "status",
-              postgresql_where="deleted_at IS NULL"),
+        Index("ix_academy_photos_feed", "academy_id", "created_at", postgresql_where="deleted_at IS NULL"),
+        Index("ix_academy_photos_status", "status", postgresql_where="deleted_at IS NULL"),
     )
 
     academy_id: Mapped[uuid.UUID] = mapped_column(
@@ -59,8 +57,7 @@ class AcademyPhotoComment(Base, UUIDMixin):
 
     __tablename__ = "academy_photo_comments"
     __table_args__ = (
-        Index("ix_photo_comments_photo", "photo_id", "created_at",
-              postgresql_where="deleted_at IS NULL"),
+        Index("ix_photo_comments_photo", "photo_id", "created_at", postgresql_where="deleted_at IS NULL"),
     )
 
     photo_id: Mapped[uuid.UUID] = mapped_column(

@@ -30,9 +30,7 @@ class EnrollmentInvite(Base, UUIDMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     academy = relationship("Academy", foreign_keys=[academy_id])
-    pending_enrollments = relationship(
-        "PendingEnrollment", back_populates="invite", cascade="all, delete-orphan"
-    )
+    pending_enrollments = relationship("PendingEnrollment", back_populates="invite", cascade="all, delete-orphan")
 
 
 class PendingEnrollment(Base, UUIDMixin):

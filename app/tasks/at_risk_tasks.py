@@ -35,16 +35,20 @@ async def _run() -> None:
     async with AsyncSessionLocal() as db:
         # Academias que têm ao menos 1 aluno ativo
         academy_ids = (
-            await db.execute(
-                select(User.academy_id)
-                .where(
-                    User.role == "aluno",
-                    User.account_frozen == False,  # noqa: E712
-                    User.academy_id.is_not(None),
+            (
+                await db.execute(
+                    select(User.academy_id)
+                    .where(
+                        User.role == "aluno",
+                        User.account_frozen == False,  # noqa: E712
+                        User.academy_id.is_not(None),
+                    )
+                    .distinct()
                 )
-                .distinct()
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         if not academy_ids:
             return
@@ -93,16 +97,20 @@ async def _run() -> None:
 
             # Tokens dos professores/gestores desta academia
             tokens_rows = (
-                await db.execute(
-                    select(UserDeviceToken.fcm_token)
-                    .join(User, User.id == UserDeviceToken.user_id)
-                    .where(
-                        User.academy_id == academy_id,
-                        User.role.in_(list(_STAFF_ROLES)),
+                (
+                    await db.execute(
+                        select(UserDeviceToken.fcm_token)
+                        .join(User, User.id == UserDeviceToken.user_id)
+                        .where(
+                            User.academy_id == academy_id,
+                            User.role.in_(list(_STAFF_ROLES)),
+                        )
+                        .distinct()
                     )
-                    .distinct()
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             if not tokens_rows:
                 continue

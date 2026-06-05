@@ -18,6 +18,7 @@ from app.services.user_service import create_user, get_user_by_email
 # Convite (token/QR)
 # ---------------------------------------------------------------------------
 
+
 async def get_or_create_invite(db: AsyncSession, academy_id: UUID) -> EnrollmentInvite:
     """Retorna o convite ativo da academia ou cria um novo."""
     stmt = select(EnrollmentInvite).where(
@@ -64,10 +65,10 @@ async def rotate_invite(db: AsyncSession, academy_id: UUID) -> EnrollmentInvite:
 # Acesso público ao link
 # ---------------------------------------------------------------------------
 
+
 async def get_invite_by_token(db: AsyncSession, token: str) -> EnrollmentInvite | None:
     stmt = (
-        select(EnrollmentInvite)
-        .where(EnrollmentInvite.token == token, EnrollmentInvite.is_active == True)  # noqa: E712
+        select(EnrollmentInvite).where(EnrollmentInvite.token == token, EnrollmentInvite.is_active == True)  # noqa: E712
     )
     return (await db.execute(stmt)).scalar_one_or_none()
 
@@ -82,6 +83,7 @@ async def get_academy_by_invite_token(db: AsyncSession, token: str) -> Academy |
 # ---------------------------------------------------------------------------
 # Envio do formulário (aluno)
 # ---------------------------------------------------------------------------
+
 
 async def submit_enrollment(
     db: AsyncSession,
@@ -134,6 +136,7 @@ async def submit_enrollment(
 # ---------------------------------------------------------------------------
 # Fila de aprovação (gestor)
 # ---------------------------------------------------------------------------
+
 
 async def list_pending(
     db: AsyncSession,
@@ -196,9 +199,7 @@ async def reject_enrollment(
     return enrollment
 
 
-async def _get_enrollment_or_raise(
-    db: AsyncSession, enrollment_id: UUID, academy_id: UUID
-) -> PendingEnrollment:
+async def _get_enrollment_or_raise(db: AsyncSession, enrollment_id: UUID, academy_id: UUID) -> PendingEnrollment:
     stmt = select(PendingEnrollment).where(
         PendingEnrollment.id == enrollment_id,
         PendingEnrollment.academy_id == academy_id,

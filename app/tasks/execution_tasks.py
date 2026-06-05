@@ -82,7 +82,9 @@ def notify_professor_pending_reviews(self) -> None:
             for user_id in staff:
                 # Deduplicação: já foi notificado hoje?
                 already = db.execute(
-                    select(func.count()).select_from(Notification).where(
+                    select(func.count())
+                    .select_from(Notification)
+                    .where(
                         Notification.user_id == user_id,
                         Notification.type == _NOTIF_TYPE,
                         Notification.created_at >= today_utc,

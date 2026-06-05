@@ -20,12 +20,14 @@ def mock_photo_task():
     with patch("app.tasks.photo_tasks.process_photo_upload", mock_task):
         yield
 
+
 # ─── helpers ────────────────────────────────────────────────────────────────
 
 
 def _tiny_jpeg() -> bytes:
     """JPEG mínimo válido (10×10 px branco) para testes de upload."""
     from PIL import Image
+
     buf = io.BytesIO()
     Image.new("RGB", (10, 10), color=(255, 255, 255)).save(buf, "JPEG")
     return buf.getvalue()
@@ -198,6 +200,7 @@ async def test_like_unlike_ciclo(client: AsyncClient, db: AsyncSession):
     assert item["liked_by_me"] is True
     # likes_count no feed pode estar cacheado; verifica no DB diretamente
     from sqlalchemy import text
+
     count_row = await db.execute(
         text("SELECT likes_count FROM academy_photos WHERE id = :pid"),
         {"pid": photo_id},

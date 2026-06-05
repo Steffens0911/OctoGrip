@@ -302,9 +302,13 @@ async def award_trophy(
         if not championship_event_id:
             raise AppError("Troféu de campeonato requer championship_event_id.", status_code=400)
         if not medal_type:
-            raise AppError("Troféu de campeonato requer medal_type (gold, silver, bronze, participation).", status_code=400)
+            raise AppError(
+                "Troféu de campeonato requer medal_type (gold, silver, bronze, participation).", status_code=400
+            )
         if medal_type not in VALID_MEDAL_TYPES_CHAMPIONSHIP:
-            raise AppError(f"medal_type inválido. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CHAMPIONSHIP))}", status_code=400)
+            raise AppError(
+                f"medal_type inválido. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CHAMPIONSHIP))}", status_code=400
+            )
         event = await get_championship_event(db, championship_event_id)
         if not event or event.deleted_at is not None:
             raise AppError("Campeonato não encontrado.", status_code=404)
@@ -313,7 +317,10 @@ async def award_trophy(
     else:
         championship_event_id = None
         if medal_type and medal_type not in VALID_MEDAL_TYPES_CUSTOM:
-            raise AppError(f"medal_type inválido para troféu custom. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CUSTOM))}", status_code=400)
+            raise AppError(
+                f"medal_type inválido para troféu custom. Use: {', '.join(sorted(VALID_MEDAL_TYPES_CUSTOM))}",
+                status_code=400,
+            )
 
     award = AcademyTrophyAward(
         template_id=template_id,
@@ -344,6 +351,7 @@ async def award_trophy(
     # Notificação in-app + push despachado como task Celery (fire-and-forget real)
     try:
         from app.tasks.manual_trophy_tasks import notify_manual_trophy_awarded
+
         notify_manual_trophy_awarded.delay(str(award.id))
     except Exception:
         logger.exception("award_trophy: erro ao despachar task de notificação", extra={"award_id": str(award.id)})
@@ -356,9 +364,7 @@ async def revoke_award(
     award_id: UUID,
     audit_user_id: UUID | None = None,
 ) -> None:
-    award = (
-        await db.execute(select(AcademyTrophyAward).where(AcademyTrophyAward.id == award_id))
-    ).scalar_one_or_none()
+    award = (await db.execute(select(AcademyTrophyAward).where(AcademyTrophyAward.id == award_id))).scalar_one_or_none()
     if not award:
         raise AppError("Concessão não encontrada.", status_code=404)
     before = entity_snapshot_row(award)

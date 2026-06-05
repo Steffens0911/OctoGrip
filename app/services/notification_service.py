@@ -98,9 +98,7 @@ async def create_notifications_for_all_students(
     Por padrão só envia para alunos. Para comunicados globais do admin, passe
     roles=("aluno", "professor", "gerente_academia", "supervisor").
     """
-    user_ids = list(
-        (await db.execute(select(User.id).where(User.role.in_(roles)))).scalars().all()
-    )
+    user_ids = list((await db.execute(select(User.id).where(User.role.in_(roles)))).scalars().all())
     return await create_notifications_bulk(db, user_ids=user_ids, type=type, title=title, body=body, data=data)
 
 

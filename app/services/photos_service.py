@@ -105,10 +105,7 @@ async def list_photos_feed(
         if anchor:
             q = q.where(
                 (AcademyPhoto.created_at < anchor.created_at)
-                | (
-                    (AcademyPhoto.created_at == anchor.created_at)
-                    & (AcademyPhoto.id < anchor.id)
-                )
+                | ((AcademyPhoto.created_at == anchor.created_at) & (AcademyPhoto.id < anchor.id))
             )
     q = q.limit(limit + 1)
     result = await db.execute(q)
@@ -207,22 +204,14 @@ async def mark_photo_ready(
 
 
 async def mark_photo_failed(db: AsyncSession, *, photo_id: uuid.UUID) -> None:
-    await db.execute(
-        update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(status="failed")
-    )
+    await db.execute(update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(status="failed"))
 
 
 async def soft_delete_photo(db: AsyncSession, *, photo_id: uuid.UUID) -> None:
-    await db.execute(
-        update(AcademyPhoto)
-        .where(AcademyPhoto.id == photo_id)
-        .values(deleted_at=func.now())
-    )
+    await db.execute(update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(deleted_at=func.now()))
 
 
-async def like_photo(
-    db: AsyncSession, *, photo_id: uuid.UUID, user_id: uuid.UUID
-) -> bool:
+async def like_photo(db: AsyncSession, *, photo_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Cria curtida e incrementa contador. Retorna False se já curtiu."""
     existing = await db.execute(
         select(AcademyPhotoLike).where(
@@ -234,16 +223,12 @@ async def like_photo(
         return False
     db.add(AcademyPhotoLike(photo_id=photo_id, user_id=user_id))
     await db.execute(
-        update(AcademyPhoto)
-        .where(AcademyPhoto.id == photo_id)
-        .values(likes_count=AcademyPhoto.likes_count + 1)
+        update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(likes_count=AcademyPhoto.likes_count + 1)
     )
     return True
 
 
-async def unlike_photo(
-    db: AsyncSession, *, photo_id: uuid.UUID, user_id: uuid.UUID
-) -> bool:
+async def unlike_photo(db: AsyncSession, *, photo_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Remove curtida e decrementa contador. Retorna False se não havia curtida."""
     result = await db.execute(
         delete(AcademyPhotoLike).where(
@@ -261,9 +246,7 @@ async def unlike_photo(
     return True
 
 
-async def get_liked_photo_ids(
-    db: AsyncSession, *, user_id: uuid.UUID, photo_ids: list[uuid.UUID]
-) -> set[uuid.UUID]:
+async def get_liked_photo_ids(db: AsyncSession, *, user_id: uuid.UUID, photo_ids: list[uuid.UUID]) -> set[uuid.UUID]:
     """Retorna quais dos photo_ids o usuário já curtiu."""
     if not photo_ids:
         return set()
@@ -310,9 +293,7 @@ async def create_comment(
     comment = AcademyPhotoComment(photo_id=photo_id, author_id=author_id, body=body)
     db.add(comment)
     await db.execute(
-        update(AcademyPhoto)
-        .where(AcademyPhoto.id == photo_id)
-        .values(comments_count=AcademyPhoto.comments_count + 1)
+        update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(comments_count=AcademyPhoto.comments_count + 1)
     )
     await db.flush()
     await db.refresh(comment)
@@ -362,9 +343,7 @@ async def get_active_restriction(
 async def list_restrictions(
     db: AsyncSession, *, academy_id: uuid.UUID, only_active: bool = True
 ) -> list[AcademyPhotoRestriction]:
-    q = select(AcademyPhotoRestriction).where(
-        AcademyPhotoRestriction.academy_id == academy_id
-    )
+    q = select(AcademyPhotoRestriction).where(AcademyPhotoRestriction.academy_id == academy_id)
     if only_active:
         q = q.where(AcademyPhotoRestriction.active.is_(True))
     q = q.order_by(AcademyPhotoRestriction.created_at.desc())
@@ -402,9 +381,7 @@ async def patch_restriction(
     reason: str | None = None,
     expires_at: datetime | None = None,
 ) -> AcademyPhotoRestriction | None:
-    result = await db.execute(
-        select(AcademyPhotoRestriction).where(AcademyPhotoRestriction.id == restriction_id)
-    )
+    result = await db.execute(select(AcademyPhotoRestriction).where(AcademyPhotoRestriction.id == restriction_id))
     restriction = result.scalar_one_or_none()
     if not restriction:
         return None

@@ -30,19 +30,14 @@ async def _run(award_id: UUID) -> None:
 
     async with AsyncSessionLocal() as db:
         award = (
-            await db.execute(
-                select(AcademyTrophyAward)
-                .where(AcademyTrophyAward.id == award_id)
-            )
+            await db.execute(select(AcademyTrophyAward).where(AcademyTrophyAward.id == award_id))
         ).scalar_one_or_none()
         if not award:
             logger.warning("notify_manual_trophy_awarded: award não encontrado", extra={"award_id": str(award_id)})
             return
 
         template = (
-            await db.execute(
-                select(AcademyTrophyTemplate).where(AcademyTrophyTemplate.id == award.template_id)
-            )
+            await db.execute(select(AcademyTrophyTemplate).where(AcademyTrophyTemplate.id == award.template_id))
         ).scalar_one_or_none()
         if not template:
             return
@@ -52,7 +47,12 @@ async def _run(award_id: UUID) -> None:
             return
 
         kind_label = "Medalha" if template.trophy_type == "championship" else "Troféu"
-        _tier_labels = {"gold": "Ouro 🥇", "silver": "Prata 🥈", "bronze": "Bronze 🥉", "participation": "Participação 🎖️"}
+        _tier_labels = {
+            "gold": "Ouro 🥇",
+            "silver": "Prata 🥈",
+            "bronze": "Bronze 🥉",
+            "participation": "Participação 🎖️",
+        }
         tier_label = _tier_labels.get(award.medal_type or "", "🏆")
         title = f"{kind_label} concedido! {tier_label}"
         body = template.name

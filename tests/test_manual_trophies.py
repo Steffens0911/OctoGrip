@@ -296,9 +296,7 @@ async def test_conceder_medalha_campeonato_ouro(
     assert data["championship_event_name"] == championship_event.name
 
 
-async def test_campeonato_sem_event_id_rejeitado(
-    client, professor_headers, aluno_user, championship_template
-):
+async def test_campeonato_sem_event_id_rejeitado(client, professor_headers, aluno_user, championship_template):
     r = await client.post(
         "/manual-trophies/awards",
         headers=professor_headers,
@@ -347,9 +345,7 @@ async def test_medal_type_invalido_rejeitado(
 # ---------------------------------------------------------------------------
 
 
-async def test_listar_premios_por_template(
-    client, professor_headers, aluno_user, custom_template, db
-):
+async def test_listar_premios_por_template(client, professor_headers, aluno_user, custom_template, db):
     from app.models.manual_trophy import AcademyTrophyAward
 
     award = AcademyTrophyAward(template_id=custom_template.id, user_id=aluno_user.id)

@@ -39,9 +39,7 @@ class AcademyTrophyTemplate(Base):
         nullable=True,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     awards: Mapped[list[AcademyTrophyAward]] = relationship(
         "AcademyTrophyAward",
@@ -77,9 +75,7 @@ class AcademyChampionshipEvent(Base):
         nullable=True,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     awards: Mapped[list[AcademyTrophyAward]] = relationship(
         "AcademyTrophyAward",
@@ -111,9 +107,7 @@ class AcademyTrophyAward(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
-    awarded_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    awarded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     championship_event_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("academy_championship_events.id", ondelete="SET NULL"),
@@ -122,9 +116,7 @@ class AcademyTrophyAward(Base):
     )
     medal_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     template: Mapped[AcademyTrophyTemplate] = relationship(
         "AcademyTrophyTemplate",

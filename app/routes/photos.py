@@ -146,6 +146,7 @@ async def photos_feed(
     if author_id is not None:
         # Feed filtrado por autor — não usa cache pois é específico por aluno
         from app.services.photos_service import list_photos_feed
+
         photos, next_cursor = await list_photos_feed(
             db, academy_id=academy_id, limit=limit, before_id=cursor, author_id=author_id
         )
@@ -155,9 +156,7 @@ async def photos_feed(
         return PhotoFeedPage(items=items, next_cursor=str(next_cursor) if next_cursor else None)
 
     # Feed geral — usa cache (dados sem liked_by_me; injetado por usuário após)
-    cached_items, next_cursor = await list_photos_feed_cached(
-        db, academy_id=academy_id, limit=limit, before_id=cursor
-    )
+    cached_items, next_cursor = await list_photos_feed_cached(db, academy_id=academy_id, limit=limit, before_id=cursor)
     photo_ids = [uuid.UUID(item["id"]) for item in cached_items]
     liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=photo_ids)
     items = [_cached_dict_to_read(item, liked_ids) for item in cached_items]
@@ -229,6 +228,7 @@ async def create_post(
 
     # Disparar task Celery de resize em background
     from app.tasks.photo_tasks import process_photo_upload
+
     process_photo_upload.delay(str(photo.id), str(raw_path))
 
     return _photo_to_read(photo, set())
@@ -518,6 +518,7 @@ async def restrict_student(
     existing = await get_active_restriction(db, academy_id=academy_id, user_id=body.user_id)
     if existing:
         from app.core.exceptions import ConflictError
+
         raise ConflictError("Aluno já possui restrição ativa.")
 
     restriction = await create_restriction(

@@ -35,6 +35,7 @@ def _require_academy_manager(user: User, academy_id: UUID) -> None:
 # Públicas (sem autenticação)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/register/{token}", response_model=InvitePublicInfo, tags=["enrollment"])
 async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
     """Retorna nome da academia para exibir no formulário público."""
@@ -64,14 +65,13 @@ async def submit_enrollment(
         phone=body.phone,
         graduation=body.graduation,
     )
-    return EnrollmentSubmitResponse(
-        message="Solicitação enviada! Aguarde a aprovação da academia."
-    )
+    return EnrollmentSubmitResponse(message="Solicitação enviada! Aguarde a aprovação da academia.")
 
 
 # ---------------------------------------------------------------------------
 # Protegidas (gestor/professor)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/academies/{academy_id}/enrollment-invite",
@@ -137,9 +137,7 @@ async def decide_enrollment(
     _require_academy_manager(current_user, academy_id)
 
     if body.action == "approve":
-        user = await enrollment_service.approve_enrollment(
-            db, enrollment_id, academy_id, approver_id=current_user.id
-        )
+        user = await enrollment_service.approve_enrollment(db, enrollment_id, academy_id, approver_id=current_user.id)
         return {"status": "approved", "user_id": str(user.id)}
     else:
         enrollment = await enrollment_service.reject_enrollment(

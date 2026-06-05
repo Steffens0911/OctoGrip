@@ -100,7 +100,9 @@ async def template_update(
     if not template or template.deleted_at is not None:
         raise AppError("Template não encontrado.", status_code=404)
     verify_academy_access(current_user, str(template.academy_id))
-    updated = await update_trophy_template(db, template_id, body.model_dump(exclude_unset=True), audit_user_id=current_user.id)
+    updated = await update_trophy_template(
+        db, template_id, body.model_dump(exclude_unset=True), audit_user_id=current_user.id
+    )
     return TrophyTemplateRead.model_validate(updated)
 
 
@@ -168,7 +170,9 @@ async def championship_update(
     if not event or event.deleted_at is not None:
         raise AppError("Campeonato não encontrado.", status_code=404)
     verify_academy_access(current_user, str(event.academy_id))
-    updated = await update_championship_event(db, event_id, body.model_dump(exclude_unset=True), audit_user_id=current_user.id)
+    updated = await update_championship_event(
+        db, event_id, body.model_dump(exclude_unset=True), audit_user_id=current_user.id
+    )
     return ChampionshipEventRead.model_validate(updated)
 
 
@@ -270,8 +274,12 @@ async def awards_by_user(
         verify_academy_access(current_user, str(target_user.academy_id) if target_user.academy_id else None)
 
     awards = await list_awards_for_user(db, user_id)
-    championship_awards = [TrophyAwardRead(**_award_to_dict(a)) for a in awards if a.template and a.template.trophy_type == "championship"]
-    custom_awards = [TrophyAwardRead(**_award_to_dict(a)) for a in awards if a.template and a.template.trophy_type == "custom"]
+    championship_awards = [
+        TrophyAwardRead(**_award_to_dict(a)) for a in awards if a.template and a.template.trophy_type == "championship"
+    ]
+    custom_awards = [
+        TrophyAwardRead(**_award_to_dict(a)) for a in awards if a.template and a.template.trophy_type == "custom"
+    ]
 
     return UserTrophyAwardsResponse(
         user_id=user_id,

@@ -229,11 +229,7 @@ async def update_user(
 
     # Post automático de promoção de faixa no OctoPhotos (opt-out).
     new_graduation = user.graduation
-    graduation_changed = (
-        graduation is not None
-        and new_graduation
-        and new_graduation != _old_graduation
-    )
+    graduation_changed = graduation is not None and new_graduation and new_graduation != _old_graduation
     if graduation_changed and user.academy_id:
         try:
             from app.services.academy_service import get_academy
@@ -242,8 +238,11 @@ async def update_user(
             academy = await get_academy(db, user.academy_id)
             if academy and getattr(academy, "octophotos_enabled", False):
                 _belt_labels = {
-                    "white": "Branca", "blue": "Azul", "purple": "Roxa",
-                    "brown": "Marrom", "black": "Preta",
+                    "white": "Branca",
+                    "blue": "Azul",
+                    "purple": "Roxa",
+                    "brown": "Marrom",
+                    "black": "Preta",
                 }
                 belt_label = _belt_labels.get(new_graduation.lower(), new_graduation.capitalize())
                 user_name = (user.name or "Aluno").strip()
