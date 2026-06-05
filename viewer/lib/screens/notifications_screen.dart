@@ -200,12 +200,19 @@ class _FilterChips extends StatelessWidget {
 
 // ---- Notification tile ----
 
-class _NotifTile extends StatelessWidget {
+class _NotifTile extends StatefulWidget {
   final NotificationModel notif;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _NotifTile({required this.notif, required this.onTap, required this.onDelete});
+
+  @override
+  State<_NotifTile> createState() => _NotifTileState();
+}
+
+class _NotifTileState extends State<_NotifTile> {
+  bool _expanded = false;
 
   static const _typeIcon = {
     'execution_confirmed': ('✅', Color(0xFF2E7D32)),
@@ -220,15 +227,22 @@ class _NotifTile extends StatelessWidget {
     'account_unfrozen': ('🔓', Color(0xFF2E7D32)),
   };
 
+  // Retorna true se o body precisar de expansão (mais de 2 linhas ~80 chars)
+  bool _needsExpansion(String body) => body.length > 80;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final (emoji, color) =
-        _typeIcon[notif.type] ?? ('🔔', cs.primary);
+    final notif = widget.notif;
+    final (emoji, color) = _typeIcon[notif.type] ?? ('🔔', cs.primary);
     final isUnread = !notif.read;
+    final canExpand = _needsExpansion(notif.body);
 
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        widget.onTap();
+        if (canExpand) setState(() => _expanded = !_expanded);
+      },
       child: Container(
         decoration: BoxDecoration(
           color: isUnread
@@ -269,15 +283,33 @@ class _NotifTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    notif.body,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: cs.onSurfaceVariant,
+                  AnimatedCrossFade(
+                    duration: const Duration(milliseconds: 200),
+                    crossFadeState: _expanded
+                        ? CrossFadeState.showSecond
+                        : CrossFadeState.showFirst,
+                    firstChild: Text(
+                      notif.body,
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    secondChild: Text(
+                      notif.body,
+                      style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
                   ),
+                  if (canExpand) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _expanded ? 'ver menos' : 'ver mais',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cs.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Text(
                     _formatTime(notif.createdAt),
@@ -305,7 +337,7 @@ class _NotifTile extends StatelessWidget {
                     ),
                   ),
                 IconButton(
-                  onPressed: onDelete,
+                  onPressed: widget.onDelete,
                   icon: Icon(
                     Icons.delete_outline_rounded,
                     size: 18,
