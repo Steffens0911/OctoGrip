@@ -1,6 +1,6 @@
 -- Migration 080: convite de auto-cadastro e fila de aprovação de alunos
 
-CREATE TABLE enrollment_invites (
+CREATE TABLE IF NOT EXISTS enrollment_invites (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     academy_id  UUID NOT NULL REFERENCES academies(id) ON DELETE CASCADE,
     token       VARCHAR(64) NOT NULL UNIQUE,
@@ -9,10 +9,10 @@ CREATE TABLE enrollment_invites (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX ix_enrollment_invites_academy_id ON enrollment_invites (academy_id);
-CREATE INDEX ix_enrollment_invites_token      ON enrollment_invites (token);
+CREATE INDEX IF NOT EXISTS ix_enrollment_invites_academy_id ON enrollment_invites (academy_id);
+CREATE INDEX IF NOT EXISTS ix_enrollment_invites_token      ON enrollment_invites (token);
 
-CREATE TABLE pending_enrollments (
+CREATE TABLE IF NOT EXISTS pending_enrollments (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invite_id        UUID NOT NULL REFERENCES enrollment_invites(id) ON DELETE CASCADE,
     academy_id       UUID NOT NULL REFERENCES academies(id) ON DELETE CASCADE,
@@ -27,6 +27,6 @@ CREATE TABLE pending_enrollments (
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX ix_pending_enrollments_academy_id ON pending_enrollments (academy_id);
-CREATE INDEX ix_pending_enrollments_email      ON pending_enrollments (email);
-CREATE INDEX ix_pending_enrollments_status     ON pending_enrollments (status);
+CREATE INDEX IF NOT EXISTS ix_pending_enrollments_academy_id ON pending_enrollments (academy_id);
+CREATE INDEX IF NOT EXISTS ix_pending_enrollments_email      ON pending_enrollments (email);
+CREATE INDEX IF NOT EXISTS ix_pending_enrollments_status     ON pending_enrollments (status);
