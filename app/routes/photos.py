@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import tempfile
 import uuid
 from pathlib import Path
 
@@ -19,7 +18,6 @@ from app.models import User
 from app.schemas.photos import (
     CommentCreate,
     CommentRead,
-    PhotoCreate,
     PhotoFeedPage,
     PhotoRead,
     RestrictionCreate,
@@ -447,8 +445,9 @@ async def remove_comment(
 ):
     await _require_octophotos(academy_id, db)
 
-    from app.models.academy_photo import AcademyPhotoComment
     from sqlalchemy import select as _select
+
+    from app.models.academy_photo import AcademyPhotoComment
 
     result = await db.execute(
         _select(AcademyPhotoComment).where(

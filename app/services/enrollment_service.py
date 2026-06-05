@@ -12,9 +12,7 @@ from app.core.exceptions import AppError, ConflictError
 from app.core.security import hash_password
 from app.models import Academy, User
 from app.models.enrollment_invite import EnrollmentInvite, PendingEnrollment
-from app.services.audit_service import AUDIT_ACTION_CREATE, user_entity_snapshot_row, write_audit_log
 from app.services.user_service import create_user, get_user_by_email
-
 
 # ---------------------------------------------------------------------------
 # Convite (token/QR)

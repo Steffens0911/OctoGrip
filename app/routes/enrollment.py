@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
 from app.core.exceptions import AppError, ForbiddenError
-from app.core.role_deps import require_write_access
 from app.database import get_db
 from app.models import User
 from app.schemas.enrollment_invite import (
@@ -42,7 +41,6 @@ async def get_invite_info(token: str, db: AsyncSession = Depends(get_db)):
     academy = await enrollment_service.get_academy_by_invite_token(db, token)
     if not academy:
         raise AppError("Link inválido ou desativado.", status_code=404)
-    invite = await enrollment_service.get_invite_by_token(db, token)
     return InvitePublicInfo(
         academy_id=academy.id,
         academy_name=academy.name,

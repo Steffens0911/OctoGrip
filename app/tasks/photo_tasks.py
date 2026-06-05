@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import os
 import uuid
 from pathlib import Path
@@ -107,6 +106,7 @@ def process_photo_upload(self, photo_id: str, raw_file_path: str) -> None:
     if academy_id_str:
         try:
             from redis import Redis as SyncRedis
+
             from app.config import settings
 
             r = SyncRedis.from_url(settings.REDIS_URL, decode_responses=True)
@@ -131,7 +131,7 @@ def expire_photo_restrictions() -> None:
     """Desativa restrições com expires_at no passado (rodar periodicamente via beat)."""
     from datetime import UTC, datetime
 
-    from sqlalchemy import and_, update
+    from sqlalchemy import update
 
     from app.models.academy_photo import AcademyPhotoRestriction
 

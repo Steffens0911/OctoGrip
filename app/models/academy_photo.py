@@ -48,8 +48,8 @@ class AcademyPhoto(Base, UUIDMixin, SoftDeleteMixin):
     system_post_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     system_post_ref_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
 
-    author: Mapped["User"] = relationship("User", foreign_keys=[author_id], lazy="selectin")
-    likes: Mapped[list["AcademyPhotoLike"]] = relationship(
+    author: Mapped[User] = relationship("User", foreign_keys=[author_id], lazy="selectin")
+    likes: Mapped[list[AcademyPhotoLike]] = relationship(
         "AcademyPhotoLike", back_populates="photo", lazy="raise", passive_deletes=True
     )
 
@@ -77,7 +77,7 @@ class AcademyPhotoComment(Base, UUIDMixin):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    author: Mapped["User"] = relationship("User", foreign_keys=[author_id], lazy="selectin")
+    author: Mapped[User] = relationship("User", foreign_keys=[author_id], lazy="selectin")
 
 
 class AcademyPhotoLike(Base):
@@ -102,7 +102,7 @@ class AcademyPhotoLike(Base):
         nullable=False,
     )
 
-    photo: Mapped["AcademyPhoto"] = relationship("AcademyPhoto", back_populates="likes")
+    photo: Mapped[AcademyPhoto] = relationship("AcademyPhoto", back_populates="likes")
 
 
 class AcademyPhotoRestriction(Base, UUIDMixin):
@@ -131,5 +131,5 @@ class AcademyPhotoRestriction(Base, UUIDMixin):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    restricted_user: Mapped["User"] = relationship("User", foreign_keys=[user_id], lazy="selectin")
-    restricted_by_user: Mapped["User"] = relationship("User", foreign_keys=[restricted_by], lazy="selectin")
+    restricted_user: Mapped[User] = relationship("User", foreign_keys=[user_id], lazy="selectin")
+    restricted_by_user: Mapped[User] = relationship("User", foreign_keys=[restricted_by], lazy="selectin")

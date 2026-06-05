@@ -6,7 +6,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import func, select, update, and_
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notification import Notification

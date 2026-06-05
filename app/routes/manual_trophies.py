@@ -6,11 +6,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth_deps import get_current_user
 from app.core.exceptions import AppError, ForbiddenError
 from app.core.role_deps import require_write_access, verify_academy_access
 from app.database import get_db
 from app.models import User
-from app.core.auth_deps import get_current_user
 from app.schemas.manual_trophy import (
     ChampionshipEventCreate,
     ChampionshipEventRead,
@@ -229,6 +229,7 @@ async def award_revoke(
 ):
     """Remove concessão de troféu."""
     from sqlalchemy import select
+
     from app.models.manual_trophy import AcademyTrophyAward
 
     award = (await db.execute(select(AcademyTrophyAward).where(AcademyTrophyAward.id == award_id))).scalar_one_or_none()

@@ -7,8 +7,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import create_access_token, hash_password_sync
 from app.models import Academy, User
-from app.core.security import hash_password_sync, create_access_token
 
 # ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -187,7 +187,7 @@ async def test_like_unlike_ciclo(client: AsyncClient, db: AsyncSession):
     item = next(p for p in r.json()["items"] if p["id"] == photo_id)
     assert item["liked_by_me"] is True
     # likes_count no feed pode estar cacheado; verifica no DB diretamente
-    from sqlalchemy import select, text
+    from sqlalchemy import text
     count_row = await db.execute(
         text("SELECT likes_count FROM academy_photos WHERE id = :pid"),
         {"pid": photo_id},
