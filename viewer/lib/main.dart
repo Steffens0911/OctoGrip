@@ -705,7 +705,7 @@ class _MainShellState extends State<MainShell> {
                   ),
                 if (tabs.contains('Fotos'))
                   _NavItem(
-                    icon: Icons.perm_media_rounded,
+                    icon: Icons.photo_library_rounded,
                     label: 'Fotos',
                     selected: tabIndex == tabs.indexOf('Fotos'),
                     onTap: () =>
