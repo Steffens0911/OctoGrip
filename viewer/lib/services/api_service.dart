@@ -8,6 +8,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:viewer/config.dart';
 import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/models/academy_student_list_item.dart';
 import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
@@ -438,7 +439,10 @@ class ApiService {
       }
     }
     if (r.statusCode == 404) {
-      msg = 'Não encontrado (404). Verifique se a API está rodando em $baseUrl';
+      // Só sobrescreve a mensagem se não vier um detalhe específico da API
+      if (msg.isEmpty || msg == 'Not Found') {
+        msg = 'Recurso não encontrado (404).';
+      }
     }
     throw ApiException(r.statusCode, msg, errorType: errorType);
   }
@@ -745,6 +749,8 @@ class ApiService {
     bool? showGlobalSupporters,
     bool? faceRecognitionEnabled,
     bool? qrAttendanceEnabled,
+    bool? octophotosEnabled,
+    int? userPhotosQuota,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -766,6 +772,12 @@ class ApiService {
     }
     if (qrAttendanceEnabled != null) {
       body['qr_attendance_enabled'] = qrAttendanceEnabled;
+    }
+    if (octophotosEnabled != null) {
+      body['octophotos_enabled'] = octophotosEnabled;
+    }
+    if (userPhotosQuota != null) {
+      body['user_photos_quota'] = userPhotosQuota;
     }
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(http.patch(
@@ -1900,6 +1912,31 @@ class ApiService {
     return UserModel.fromJson(data! as Map<String, dynamic>);
   }
 
+  Future<UserModel> uploadMyFacialPhoto({
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final safeFilename = filename.trim().isEmpty ? 'facial.jpg' : filename.trim();
+    final uri = Uri.parse('$baseUrl/users/me/facial-photo');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: safeFilename,
+        contentType:
+            _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
+      ),
+    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return UserModel.fromJson(data! as Map<String, dynamic>);
+  }
+
   Future<UserModel> uploadUserAvatar(
     String userId, {
     required Uint8List bytes,
@@ -2437,6 +2474,18 @@ class ApiService {
   Future<int> getPendingConfirmationsCount() async {
     final r = await _getWithCache(
       Uri.parse('$baseUrl/executions/pending_confirmations/count'),
+      _cacheTtlShort,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data is Map ? data as Map<String, dynamic> : null;
+    return (map?['count'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Retorna o número de indicações aguardando revisão do professor (para badge no card de gestão).
+  Future<int> getProfessorReviewCount() async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/executions/professor_review/count'),
       _cacheTtlShort,
     );
     final data = await _decodeResponse(r);
@@ -3455,4 +3504,489 @@ class ApiService {
       _throwIfNotOk(r, data);
     }
   }
+
+  // ---------- OctoPhotos ----------
+
+  Future<PhotoFeedPage> getPhotosFeed(
+    String academyId, {
+    String? cursor,
+    int limit = 20,
+    String? authorId,
+  }) async {
+    final params = <String, String>{'limit': '$limit'};
+    if (cursor != null) params['cursor'] = cursor;
+    if (authorId != null) params['author_id'] = authorId;
+    final uri = Uri.parse('$baseUrl/academies/$academyId/photos')
+        .replace(queryParameters: params);
+    final r = await _getWithCache(uri, 0);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return PhotoFeedPage.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<AcademyPhoto> createPhoto(
+    String academyId, {
+    required List<int> bytes,
+    required String filename,
+    required MediaType contentType,
+    String? caption,
+  }) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/photos');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+        contentType: contentType,
+      ),
+    );
+    if (caption != null && caption.isNotEmpty) {
+      request.fields['caption'] = caption;
+    }
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return AcademyPhoto.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<void> likePhoto(String academyId, String photoId) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/like'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  Future<void> unlikePhoto(String academyId, String photoId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/like'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  Future<void> deletePhoto(String academyId, String photoId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204 && r.statusCode >= 400) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  Future<List<PhotoRestriction>> getPhotoRestrictions(
+      String academyId) async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/academies/$academyId/photos/restrictions'),
+      0,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data! as List<dynamic>)
+        .map((e) => PhotoRestriction.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PhotoRestriction> createPhotoRestriction(
+    String academyId,
+    String userId, {
+    String? reason,
+    DateTime? expiresAt,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/photos/restrictions'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({
+        'user_id': userId,
+        if (reason != null) 'reason': reason,
+        if (expiresAt != null) 'expires_at': expiresAt.toIso8601String(),
+      }),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return PhotoRestriction.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<PhotoRestriction> patchPhotoRestriction(
+    String academyId,
+    String restrictionId, {
+    bool? active,
+    String? reason,
+    DateTime? expiresAt,
+  }) async {
+    final body = <String, dynamic>{};
+    if (active != null) body['active'] = active;
+    if (reason != null) body['reason'] = reason;
+    if (expiresAt != null) body['expires_at'] = expiresAt.toIso8601String();
+    final r = await _req(http.patch(
+      Uri.parse(
+          '$baseUrl/academies/$academyId/photos/restrictions/$restrictionId'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return PhotoRestriction.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<List<PhotoComment>> listComments(
+      String academyId, String photoId) async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/comments'),
+      0,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final list = data! as List<dynamic>;
+    return list
+        .map((e) => PhotoComment.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<PhotoComment> addComment(
+      String academyId, String photoId, String body) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/comments'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'body': body}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return PhotoComment.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<void> deleteComment(
+      String academyId, String photoId, String commentId) async {
+    final r = await _req(http.delete(
+      Uri.parse(
+          '$baseUrl/academies/$academyId/photos/$photoId/comments/$commentId'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  // ---------- Enrollment Invite ----------
+
+  Future<Map<String, dynamic>> getEnrollmentInvite(String academyId) async {
+    final r = await _req(
+      http.get(
+        Uri.parse('$baseUrl/academies/$academyId/enrollment-invite'),
+        headers: await _headers(auth: true),
+      ),
+    );
+    return await _decodeResponse(r);
+  }
+
+  Future<Map<String, dynamic>> rotateEnrollmentInvite(String academyId) async {
+    final r = await _req(
+      http.post(
+        Uri.parse('$baseUrl/academies/$academyId/enrollment-invite/rotate'),
+        headers: await _jsonHeaders(auth: true),
+        body: '{}',
+      ),
+    );
+    return await _decodeResponse(r);
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingEnrollments(
+    String academyId, {
+    String status = 'pending',
+  }) async {
+    final r = await _req(
+      http.get(
+        Uri.parse(
+            '$baseUrl/academies/$academyId/pending-enrollments?status=$status'),
+        headers: await _headers(auth: true),
+      ),
+    );
+    final data = await _decodeResponse(r);
+    return List<Map<String, dynamic>>.from(data as List);
+  }
+
+  Future<Map<String, dynamic>> decideEnrollment(
+    String academyId,
+    String enrollmentId, {
+    required String action,
+    String? rejectionReason,
+  }) async {
+    final r = await _req(
+      http.post(
+        Uri.parse(
+            '$baseUrl/academies/$academyId/pending-enrollments/$enrollmentId/decide'),
+        headers: await _jsonHeaders(auth: true),
+        body: jsonEncode({
+          'action': action,
+          if (rejectionReason != null) 'rejection_reason': rejectionReason,
+        }),
+      ),
+    );
+    return await _decodeResponse(r);
+  }
+
+  /// Público — sem autenticação.
+  Future<Map<String, dynamic>> getInvitePublicInfo(String token) async {
+    final r = await _req(
+      http.get(Uri.parse('$baseUrl/register/$token')),
+    );
+    return await _decodeResponse(r);
+  }
+
+  /// Público — envia formulário de cadastro.
+  Future<String> submitEnrollment(
+    String token, {
+    required String name,
+    required String email,
+    required String password,
+    required String confirmPassword,
+    String? phone,
+    String? graduation,
+  }) async {
+    final r = await _req(
+      http.post(
+        Uri.parse('$baseUrl/register/$token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'email': email,
+          'password': password,
+          'confirm_password': confirmPassword,
+          if (phone != null && phone.isNotEmpty) 'phone': phone,
+          if (graduation != null && graduation.isNotEmpty)
+            'graduation': graduation,
+        }),
+      ),
+    );
+    final data = await _decodeResponse(r);
+    return data['message'] as String;
+  }
+
+  // -------------------------------------------------------------------------
+  // Troféus Manuais
+  // -------------------------------------------------------------------------
+
+  /// Lista templates de troféus da academia.
+  Future<List<Map<String, dynamic>>> getManualTrophyTemplates(
+    String academyId, {
+    String? trophyType,
+  }) async {
+    final params = <String, String>{'academy_id': academyId};
+    if (trophyType != null) params['trophy_type'] = trophyType;
+    final uri = Uri.parse('$baseUrl/manual-trophies/templates')
+        .replace(queryParameters: params);
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  /// Cria template de troféu.
+  Future<Map<String, dynamic>> createManualTrophyTemplate({
+    required String academyId,
+    required String name,
+    String? description,
+    String? icon,
+    String? color,
+    String trophyType = 'custom',
+  }) async {
+    final body = <String, dynamic>{
+      'academy_id': academyId,
+      'name': name,
+      'trophy_type': trophyType,
+      if (description != null && description.isNotEmpty) 'description': description,
+      if (icon != null && icon.isNotEmpty) 'icon': icon,
+      if (color != null && color.isNotEmpty) 'color': color,
+    };
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/manual-trophies/templates'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/manual-trophies/templates');
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Atualiza template de troféu.
+  Future<Map<String, dynamic>> updateManualTrophyTemplate(
+    String templateId, {
+    String? name,
+    String? description,
+    String? icon,
+    String? color,
+  }) async {
+    final body = <String, dynamic>{};
+    if (name != null) body['name'] = name;
+    if (description != null) body['description'] = description.isEmpty ? null : description;
+    if (icon != null) body['icon'] = icon.isEmpty ? null : icon;
+    if (color != null) body['color'] = color.isEmpty ? null : color;
+    final r = await _req(http.patch(
+      Uri.parse('$baseUrl/manual-trophies/templates/${Uri.encodeComponent(templateId)}'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/manual-trophies/templates');
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Remove template (soft delete).
+  Future<void> deleteManualTrophyTemplate(String templateId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/manual-trophies/templates/${Uri.encodeComponent(templateId)}'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+    invalidateCache('GET:$baseUrl/manual-trophies/templates');
+  }
+
+  /// Lista campeonatos da academia.
+  Future<List<Map<String, dynamic>>> getChampionshipEvents(String academyId) async {
+    final uri = Uri.parse('$baseUrl/manual-trophies/championships')
+        .replace(queryParameters: {'academy_id': academyId});
+    final r = await _req(
+      http.get(uri, headers: await _headers(auth: true)),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  /// Cria campeonato.
+  Future<Map<String, dynamic>> createChampionshipEvent({
+    required String academyId,
+    required String name,
+    required String eventDate,
+    String? location,
+  }) async {
+    final body = <String, dynamic>{
+      'academy_id': academyId,
+      'name': name,
+      'event_date': eventDate,
+      if (location != null && location.isNotEmpty) 'location': location,
+    };
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/manual-trophies/championships'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/manual-trophies/championships');
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Remove campeonato (soft delete).
+  Future<void> deleteChampionshipEvent(String eventId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/manual-trophies/championships/${Uri.encodeComponent(eventId)}'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+    invalidateCache('GET:$baseUrl/manual-trophies/championships');
+  }
+
+  /// Concede troféu/medalha a um aluno.
+  Future<Map<String, dynamic>> awardManualTrophy({
+    required String templateId,
+    required String userId,
+    String? championshipEventId,
+    String? medalType,
+    String? note,
+  }) async {
+    final body = <String, dynamic>{
+      'template_id': templateId,
+      'user_id': userId,
+      if (championshipEventId != null) 'championship_event_id': championshipEventId,
+      if (medalType != null) 'medal_type': medalType,
+      if (note != null && note.isNotEmpty) 'note': note,
+    };
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/manual-trophies/awards'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Remove concessão de troféu.
+  Future<void> revokeManualTrophyAward(String awardId) async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/manual-trophies/awards/${Uri.encodeComponent(awardId)}'),
+      headers: await _headers(auth: true),
+    ));
+    if (r.statusCode != 204) {
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+    }
+  }
+
+  /// Concessões de um aluno agrupadas por tipo.
+  Future<Map<String, dynamic>> getUserManualTrophyAwards(String userId) async {
+    final r = await _req(
+      http.get(
+        Uri.parse('$baseUrl/manual-trophies/awards/user/${Uri.encodeComponent(userId)}'),
+        headers: await _headers(auth: true),
+      ),
+      timeout: _getTimeout,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Lista alunos da academia para seleção — pagina até buscar todos (limit máx 50).
+  Future<List<Map<String, dynamic>>> getAcademyStudentsForSelection(
+    String academyId,
+  ) async {
+    final all = <Map<String, dynamic>>[];
+    var offset = 0;
+    const pageSize = 50;
+    while (true) {
+      final uri = Uri.parse('$baseUrl/users').replace(queryParameters: {
+        'academy_id': academyId,
+        'limit': '$pageSize',
+        'offset': '$offset',
+      });
+      final r = await _req(
+        http.get(uri, headers: await _headers(auth: true)),
+        timeout: _getTimeout,
+      );
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+      final page = (data as List<dynamic>).cast<Map<String, dynamic>>();
+      all.addAll(page);
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
 }

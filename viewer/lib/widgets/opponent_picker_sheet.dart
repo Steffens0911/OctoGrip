@@ -19,14 +19,35 @@ class OpponentPickerSheet extends StatefulWidget {
     this.allowSkip = false,
   });
 
+  /// Retorna o id do colega selecionado, '' para "sem oponente", ou null se cancelado.
   static Future<String?> show(
     BuildContext context, {
     required String academyId,
     required String currentUserId,
     String title = 'Em quem voce aplicou a tecnica?',
     bool allowSkip = false,
+  }) async {
+    final user = await showWithUser(
+      context,
+      academyId: academyId,
+      currentUserId: currentUserId,
+      title: title,
+      allowSkip: allowSkip,
+    );
+    if (user == null) return null;
+    return user.id; // id == '' significa "sem oponente" (allowSkip)
+  }
+
+  /// Como [show], mas retorna o [UserModel] completo (inclui nome).
+  /// Retorna null se cancelado. Para "sem oponente" (allowSkip), retorna UserModel com id == ''.
+  static Future<UserModel?> showWithUser(
+    BuildContext context, {
+    required String academyId,
+    required String currentUserId,
+    String title = 'Em quem voce aplicou a tecnica?',
+    bool allowSkip = false,
   }) {
-    return showModalBottomSheet<String>(
+    return showModalBottomSheet<UserModel>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -247,7 +268,7 @@ class _OpponentPickerSheetState extends State<OpponentPickerSheet> {
                         ),
                         title: Text(user.name ?? user.email),
                         subtitle: Text(_faixaLabel(user.graduation)),
-                        onTap: () => Navigator.pop(context, user.id),
+                        onTap: () => Navigator.pop(context, user),
                       );
                     },
                   ),
@@ -266,7 +287,10 @@ class _OpponentPickerSheetState extends State<OpponentPickerSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: FilledButton.tonal(
-                      onPressed: () => Navigator.pop(context, ''),
+                      onPressed: () => Navigator.pop(
+                        context,
+                        UserModel(id: '', email: '', name: 'Sem oponente'),
+                      ),
                       child: const Text('Sem oponente'),
                     ),
                   ),
