@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/photos/presentation/pages/photo_detail_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/student_photos_feed_screen.dart';
 import 'package:viewer/models/academy_photo.dart';
@@ -357,7 +358,7 @@ class _LikeRow extends StatelessWidget {
           IconButton(
             icon: Icon(
               photo.likedByMe ? Icons.favorite_rounded : Icons.favorite_border,
-              color: photo.likedByMe ? Colors.red : cs.onSurfaceVariant,
+              color: photo.likedByMe ? Colors.red : AppTheme.textSecondaryOf(context),
             ),
             onPressed: photo.likedByMe ? onUnlike : onLike,
             tooltip: photo.likedByMe ? 'Descurtir' : 'Curtir',
@@ -365,11 +366,11 @@ class _LikeRow extends StatelessWidget {
           if (photo.likesCount > 0)
             Text(
               '${photo.likesCount}',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondaryOf(context)),
             ),
           const SizedBox(width: 4),
           IconButton(
-            icon: Icon(Icons.chat_bubble_outline, size: 22, color: cs.onSurfaceVariant),
+            icon: Icon(Icons.chat_bubble_outline, size: 22, color: AppTheme.textSecondaryOf(context)),
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -389,7 +390,7 @@ class _LikeRow extends StatelessWidget {
           if (photo.commentsCount > 0)
             Text(
               '${photo.commentsCount}',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondaryOf(context)),
             ),
           const Spacer(),
           // Botão de compartilhar — aparece só para fotos prontas (com imagem)
