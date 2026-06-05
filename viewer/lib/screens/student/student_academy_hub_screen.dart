@@ -17,6 +17,7 @@ import 'package:viewer/screens/student/attendance_scan_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
 import 'package:viewer/screens/student/user_avatar_screen.dart';
+import 'package:viewer/screens/student/user_facial_photo_screen.dart';
 
 class StudentAcademyHubScreen extends StatefulWidget {
   const StudentAcademyHubScreen({super.key});
@@ -152,6 +153,15 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     });
   }
 
+  void _pushFacialPhotoScreen() {
+    Navigator.push<bool>(
+      context,
+      MaterialPageRoute<bool>(
+        builder: (context) => const UserFacialPhotoScreen(),
+      ),
+    );
+  }
+
   Widget _academyNavigationTile({
     required bool enabled,
     required IconData icon,
@@ -259,12 +269,30 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                       child: MemoCompactTileCard(
                         featured: false,
                         enabled: true,
-                        icon: Icons.face_retouching_natural_outlined,
+                        icon: Icons.person_outline,
                         title: 'Foto de perfil',
-                        subtitle: 'Usada na chamada por reconhecimento facial',
+                        subtitle: 'Visível para colegas da academia',
                         onTap: _pushUserAvatarScreen,
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: MemoCompactTileCard(
+                        featured: false,
+                        enabled: true,
+                        icon: Icons.face_retouching_natural_outlined,
+                        title: 'Foto facial (3x4)',
+                        subtitle: 'Privada — usada só no reconhecimento facial',
+                        onTap: _pushFacialPhotoScreen,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.s),
+                    const Expanded(child: SizedBox.shrink()),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s),

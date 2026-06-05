@@ -7,8 +7,10 @@ from fastapi import APIRouter
 
 from app.routes import (
     academies,
+    enrollment,
     academy_weekly_kits,
     admin,
+    manual_trophies,
     admin_audit,
     admin_backup,
     admin_global_partners,
@@ -34,6 +36,7 @@ from app.routes import (
     missions,
     notifications,
     partners,
+    photos,
     professors,
     reports,
     students,
@@ -86,3 +89,6 @@ api_router.include_router(me_push.router, prefix="/me", tags=["me"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(photos.router, prefix="/academies", tags=["photos"])
+api_router.include_router(manual_trophies.router, prefix="/manual-trophies", tags=["manual-trophies"])
+api_router.include_router(enrollment.router, tags=["enrollment"])

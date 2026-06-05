@@ -140,6 +140,7 @@ async def update_user(
         return None
     before = user_entity_snapshot_row(user)
     _old_frozen = user.account_frozen
+    _old_graduation = user.graduation
     if email is not None:
         normalized = email.strip().lower()
         if normalized != (user.email or "").lower():
@@ -225,6 +226,40 @@ async def update_user(
                 )
         except Exception:
             logger.exception("update_user: erro ao criar notificação in-app de freeze")
+
+    # Post automático de promoção de faixa no OctoPhotos (opt-out).
+    new_graduation = user.graduation
+    graduation_changed = (
+        graduation is not None
+        and new_graduation
+        and new_graduation != _old_graduation
+    )
+    if graduation_changed and user.academy_id:
+        try:
+            from app.services.academy_service import get_academy
+            from app.services.photos_service import create_system_post, invalidate_feed_cache
+
+            academy = await get_academy(db, user.academy_id)
+            if academy and getattr(academy, "octophotos_enabled", False):
+                _belt_labels = {
+                    "white": "Branca", "blue": "Azul", "purple": "Roxa",
+                    "brown": "Marrom", "black": "Preta",
+                }
+                belt_label = _belt_labels.get(new_graduation.lower(), new_graduation.capitalize())
+                user_name = (user.name or "Aluno").strip()
+                caption = f"{user_name} foi graduado para faixa {belt_label}! 🎉"
+                await create_system_post(
+                    db,
+                    academy_id=user.academy_id,
+                    author_id=user_id,
+                    system_post_type="belt_promotion",
+                    system_post_ref_id=user_id,
+                    caption=caption,
+                )
+                await db.commit()
+                await invalidate_feed_cache(user.academy_id)
+        except Exception:
+            logger.exception("update_user: erro ao criar post automático de faixa OctoPhotos")
 
     logger.info("update_user", extra={"user_id": str(user_id), "role": user.role})
     return user

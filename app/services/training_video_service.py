@@ -214,13 +214,11 @@ async def get_training_videos_for_user_today(
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
-    """Retorna vídeos ativos com status de conclusão diária para o usuário."""
+    """Retorna o vídeo do dia (rotação diária automática) com status de conclusão."""
     if today is None:
         today = today_in_app_tz()
 
-    safe_limit = clamp_list_limit(limit)
-    safe_offset = max(0, int(offset))
-
+    # Ignoramos limit/offset aqui: buscamos todos para fazer a rotação diária.
     # Vídeos globais (academy_id IS NULL) + vídeos locais da academia do usuário (se houver).
     base_query = select(TrainingVideo).where(TrainingVideo.is_active.is_(True))
     if user.academy_id is not None:
@@ -233,21 +231,33 @@ async def get_training_videos_for_user_today(
     else:
         base_query = base_query.where(TrainingVideo.academy_id.is_(None))
 
-    videos = (
+    all_videos = (
         (
             await db.execute(
                 base_query.order_by(
                     TrainingVideo.order_index.nulls_last(),
-                    TrainingVideo.created_at.desc(),
+                    TrainingVideo.created_at.asc(),
                 )
-                .offset(safe_offset)
-                .limit(safe_limit)
             )
         )
         .scalars()
         .all()
     )
-    if not videos:
+    if not all_videos:
+        return []
+
+    # Separa vídeos da academia do aluno dos globais.
+    local_videos = [v for v in all_videos if v.academy_id == user.academy_id] if user.academy_id else []
+    global_videos = [v for v in all_videos if v.academy_id is None]
+
+    # 1 vídeo por dia: local tem prioridade, global é fallback.
+    day_ordinal = today.toordinal()
+
+    if local_videos:
+        videos = [local_videos[day_ordinal % len(local_videos)]]
+    elif global_videos:
+        videos = [global_videos[day_ordinal % len(global_videos)]]
+    else:
         return []
 
     video_ids = [v.id for v in videos]

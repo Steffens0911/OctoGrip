@@ -28,6 +28,8 @@ class Academy {
   final bool loginNoticeActive;
   final bool faceRecognitionEnabled;
   final bool qrAttendanceEnabled;
+  final bool octophotosEnabled;
+  final int userPhotosQuota;
   final String? updatedAt;
 
   Academy({
@@ -58,6 +60,8 @@ class Academy {
     this.loginNoticeActive = false,
     this.faceRecognitionEnabled = false,
     this.qrAttendanceEnabled = true,
+    this.octophotosEnabled = false,
+    this.userPhotosQuota = 30,
     this.updatedAt,
   });
 
@@ -91,6 +95,8 @@ class Academy {
       faceRecognitionEnabled:
           json['face_recognition_enabled'] as bool? ?? false,
       qrAttendanceEnabled: json['qr_attendance_enabled'] as bool? ?? true,
+      octophotosEnabled: json['octophotos_enabled'] as bool? ?? false,
+      userPhotosQuota: json['user_photos_quota'] as int? ?? 30,
       updatedAt: json['updated_at'] as String?,
     );
   }
@@ -115,6 +121,8 @@ class Academy {
         'login_notice_active': loginNoticeActive,
         'face_recognition_enabled': faceRecognitionEnabled,
         'qr_attendance_enabled': qrAttendanceEnabled,
+        'octophotos_enabled': octophotosEnabled,
+        'user_photos_quota': userPhotosQuota,
         'updated_at': updatedAt,
       };
 }

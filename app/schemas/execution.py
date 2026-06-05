@@ -35,7 +35,7 @@ class ExecutionRead(BaseModel):
     user_id: UUID
     mission_id: UUID | None = None
     lesson_id: UUID | None = None
-    opponent_id: UUID
+    opponent_id: UUID | None = None
     usage_type: str
     status: str
     outcome: str | None = None

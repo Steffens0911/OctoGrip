@@ -1,4 +1,7 @@
 # build/web é copiado pelo Dockerfile após flutter build no CI
+# O !build/web garante inclusão mesmo que /build/ esteja no .gitignore
+!build/
+!build/web/
 .dart_tool/
 .git/
 *.iml

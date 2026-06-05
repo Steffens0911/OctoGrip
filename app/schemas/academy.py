@@ -47,6 +47,8 @@ class AcademyRead(BaseModel):
     login_notice_active: bool = False
     face_recognition_enabled: bool = False
     qr_attendance_enabled: bool = True
+    octophotos_enabled: bool = False
+    user_photos_quota: int = 30
     updated_at: datetime | None = None
 
     class Config:
@@ -88,6 +90,8 @@ class AcademyUpdate(BaseModel):
     login_notice_active: bool | None = None
     face_recognition_enabled: bool | None = None
     qr_attendance_enabled: bool | None = None
+    octophotos_enabled: bool | None = None
+    user_photos_quota: int | None = Field(None, ge=1, le=9999)
 
 
 class RankingEntry(BaseModel):

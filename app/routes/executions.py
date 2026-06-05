@@ -25,6 +25,7 @@ from app.schemas.execution import (
 from app.services.execution_service import (
     confirm_execution,
     count_pending_confirmations,
+    count_professor_review_executions,
     create_execution,
     list_my_executions,
     list_pending_confirmations,
@@ -153,6 +154,21 @@ async def execution_reject(
         reason=body.reason,
     )
     return ExecutionRejectResponse(id=execution.id, status=execution.status)
+
+
+@router.get("/professor_review/count")
+async def execution_professor_review_count(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """Conta execuções aguardando revisão do professor na academia do usuário logado."""
+    if current_user.role != "administrador" and not current_user.academy_id:
+        return {"count": 0}
+    academy_id = current_user.academy_id if current_user.role != "administrador" else None
+    if academy_id is None:
+        return {"count": 0}
+    count = await count_professor_review_executions(db, academy_id=academy_id)
+    return {"count": count}
 
 
 @router.get("/professor_review", response_model=list[ExecutionRead])

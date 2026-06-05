@@ -14,6 +14,7 @@ class UserRead(BaseModel):
     academy_id: UUID | None = None
     points_adjustment: int = 0
     avatar_url: str | None = None
+    facial_photo_url: str | None = None
     gallery_visible: bool = True
     account_frozen: bool = False
     account_freeze_reason: str | None = Field(

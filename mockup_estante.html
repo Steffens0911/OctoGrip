@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mockup — Estante de Troféus v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0a0a0a;
+  min-height: 100vh;
+  display: flex;
+  align-items: stretch;
+}
+
+/* ─── LAYOUT LADO A LADO ─── */
+.side { flex: 1; display: flex; flex-direction: column; }
+.side-label {
+  padding: 10px 0;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #555;
+  background: #080808;
+  border-bottom: 1px solid #1a1a1a;
+}
+.divider { width: 1px; background: #1a1a1a; }
+
+/* ─── ATUAL (esquerda) ─── */
+.current-screen {
+  flex: 1;
+  background: linear-gradient(180deg, #1e2030 0%, #161824 100%);
+  display: flex;
+  flex-direction: column;
+}
+.appbar-current {
+  padding: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #1e2030;
+}
+.appbar-current .back { color: #fff; font-size: 20px; }
+.appbar-current h2 { font-size: 15px; font-weight: 600; color: #fff; }
+.appbar-current p  { font-size: 11px; color: #666; }
+.filters-current {
+  padding: 8px 16px 10px;
+  display: flex; gap: 8px;
+  background: #1e2030;
+  border-bottom: 1px solid #252840;
+}
+.chip { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1.5px solid #333; color: #888; cursor: pointer; }
+.chip.on { background: #7c4dff22; border-color: #7c4dff; color: #b39ddb; }
+.grid-current {
+  flex: 1; display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 16px; gap: 8px;
+  align-content: start;
+}
+.slot-cur {
+  aspect-ratio: 1;
+  background: #1a1c2e;
+  border-radius: 10px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 5px; padding: 6px;
+}
+.slot-cur .ico { font-size: 22px; opacity: 0.2; }
+.slot-cur .ico.on { opacity: 1; }
+.slot-cur .lbl { font-size: 8px; color: rgba(255,255,255,0.25); text-align: center; line-height: 1.2; }
+.slot-cur .lbl.on { color: rgba(255,255,255,0.75); }
+
+/* ─── PROPOSTO (direita) ─── */
+.new-screen {
+  flex: 1;
+  background: #12100e;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Fundo com vinheta e luz quente vinda de cima */
+.new-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% -10%, rgba(180,110,40,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(30,18,8,0.0) 0%, rgba(0,0,0,0.55) 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.appbar-new {
+  position: relative; z-index: 1;
+  padding: 16px;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(20,14,8,0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.appbar-new .back { color: #c8873a; font-size: 20px; }
+.appbar-new h2 { font-size: 15px; font-weight: 600; color: #f0e0c8; }
+.appbar-new p  { font-size: 11px; color: #8a7060; }
+
+.filters-new {
+  position: relative; z-index: 1;
+  padding: 8px 16px 10px;
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(20,14,8,0.7);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.chip-new { padding: 5px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; border: 1.5px solid rgba(255,255,255,0.1); color: #7a6050; }
+.chip-new.on { background: rgba(200,135,58,0.15); border-color: #c8873a; color: #c8873a; }
+.counter { margin-left: auto; font-size: 11px; color: #6a5040; }
+.counter b { color: #c8873a; }
+
+/* Área da estante */
+.shelf-area {
+  flex: 1;
+  position: relative; z-index: 1;
+  padding: 20px 0 8px;
+  display: flex; flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
+  overflow: hidden;
+}
+
+/* Cada fileira */
+.row-wrap {
+  display: flex; flex-direction: column;
+  margin-bottom: 20px;
+}
+.slots-row {
+  display: flex;
+  justify-content: space-evenly;
+  padding: 0 12px 10px;
+  gap: 8px;
+}
+
+/* Tábua principal */
+.plank {
+  height: 18px;
+  margin: 0 8px;
+  border-radius: 2px 2px 0 0;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg,
+    #e8a84a 0%,
+    #c07830 15%,
+    #a86228 40%,
+    #8b4e1e 70%,
+    #7a3e14 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(255,200,100,0.15) inset,
+    0 5px 12px rgba(0,0,0,0.7),
+    0 2px 4px rgba(0,0,0,0.5);
+}
+/* fibra de madeira */
+.plank::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    88deg,
+    transparent 0px,
+    rgba(255,255,255,0.04) 1px,
+    transparent 3px,
+    rgba(0,0,0,0.07) 6px,
+    transparent 10px,
+    rgba(255,255,255,0.02) 13px,
+    transparent 16px
+  );
+}
+/* brilho no topo da tábua */
+.plank::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent 5%, rgba(255,220,140,0.35) 30%, rgba(255,220,140,0.5) 50%, rgba(255,220,140,0.35) 70%, transparent 95%);
+}
+/* sombra projetada pela tábua */
+.plank-shadow {
+  height: 10px;
+  margin: 0 16px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 70%, transparent 100%);
+  border-radius: 0 0 6px 6px;
+}
+
+/* ── SLOT VAZIO ── */
+.slot {
+  width: 64px;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+}
+.slot-box {
+  width: 60px; height: 60px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+.slot-box.empty {
+  background: linear-gradient(145deg, #0d0906 0%, #180e08 60%, #1f1208 100%);
+  border: 1px solid rgba(0,0,0,0.8);
+  box-shadow:
+    inset 0 2px 5px rgba(0,0,0,0.9),
+    inset 0 1px 2px rgba(0,0,0,0.6),
+    0 1px 0 rgba(255,255,255,0.03);
+}
+.slot-box.empty .ghost {
+  font-size: 22px;
+  opacity: 0.08;
+  filter: grayscale(1) brightness(0.5);
+}
+
+/* ── SLOT CONQUISTADO ── */
+.slot-box.gold {
+  background: radial-gradient(circle at 38% 32%, rgba(240,190,60,0.3) 0%, rgba(200,140,30,0.12) 55%, rgba(120,60,0,0.05) 100%);
+  border: 1px solid rgba(230,170,50,0.2);
+  box-shadow:
+    0 0 16px rgba(220,170,40,0.45),
+    0 0 32px rgba(200,130,20,0.2),
+    0 3px 10px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,220,100,0.15);
+}
+.slot-box.silver {
+  background: radial-gradient(circle at 38% 32%, rgba(180,190,200,0.22) 0%, rgba(130,140,155,0.1) 60%, transparent 100%);
+  border: 1px solid rgba(160,175,190,0.18);
+  box-shadow: 0 0 10px rgba(150,165,180,0.25), 0 3px 8px rgba(0,0,0,0.5);
+}
+.slot-box.bronze {
+  background: radial-gradient(circle at 38% 32%, rgba(180,100,40,0.28) 0%, rgba(140,70,20,0.12) 60%, transparent 100%);
+  border: 1px solid rgba(160,90,35,0.2);
+  box-shadow: 0 0 10px rgba(160,85,30,0.3), 0 3px 8px rgba(0,0,0,0.5);
+}
+.slot-box.medal-green {
+  background: radial-gradient(circle at 38% 32%, rgba(50,200,100,0.28) 0%, rgba(30,140,65,0.12) 60%, transparent 100%);
+  border: 1px solid rgba(40,180,85,0.2);
+  box-shadow: 0 0 14px rgba(40,190,90,0.4), 0 0 28px rgba(30,150,70,0.15), 0 3px 8px rgba(0,0,0,0.5);
+}
+
+.trophy-ico { font-size: 28px; line-height: 1; }
+
+/* Tier badge pequeno no canto */
+.tier-badge {
+  position: absolute;
+  bottom: 4px; right: 4px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; font-weight: 700;
+}
+.tier-badge.gold   { background: #D97706; color: #fff8e1; box-shadow: 0 0 6px rgba(217,119,6,0.7); }
+.tier-badge.silver { background: #6B7280; color: #f0f0f0; }
+.tier-badge.bronze { background: #92400E; color: #fde8d0; }
+.tier-badge.green  { background: #166534; color: #bbf7d0; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+
+.slot-lbl {
+  font-size: 8.5px; text-align: center; line-height: 1.25;
+  max-width: 64px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.slot-lbl.gold   { color: #d4a035; }
+.slot-lbl.silver { color: #9ca3af; }
+.slot-lbl.bronze { color: #b07040; }
+.slot-lbl.green  { color: #4ade80; }
+.slot-lbl.empty  { color: transparent; }
+
+</style>
+</head>
+<body>
+
+<!-- ESQUERDA: ATUAL -->
+<div class="side">
+  <div class="side-label">⬅ Atual</div>
+  <div class="current-screen">
+    <div class="appbar-current">
+      <span class="back">←</span>
+      <div><h2>Estante de troféus</h2><p>Henrique Garcia dos Santos</p></div>
+    </div>
+    <div class="filters-current">
+      <div class="chip on">✓ Todos</div>
+      <div class="chip">Medalhas</div>
+      <div class="chip">Troféus</div>
+    </div>
+    <div class="grid-current">
+      <div class="slot-cur"><span class="ico on">🏅</span><span class="lbl on">Medalha · Passador de meia…</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+      <div class="slot-cur"><span class="ico">🏆</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="divider"></div>
+
+<!-- DIREITA: PROPOSTO -->
+<div class="side">
+  <div class="side-label">Proposto ➡</div>
+  <div class="new-screen">
+    <div class="appbar-new">
+      <span class="back">←</span>
+      <div><h2>Estante de troféus</h2><p>Henrique Garcia dos Santos</p></div>
+    </div>
+    <div class="filters-new">
+      <div class="chip-new on">✓ Todos</div>
+      <div class="chip-new">Medalhas</div>
+      <div class="chip-new">Troféus</div>
+      <span class="counter"><b>4</b> / 20 conquistados</span>
+    </div>
+
+    <div class="shelf-area">
+
+      <!-- ROW 1 -->
+      <div class="row-wrap">
+        <div class="slots-row">
+          <div class="slot">
+            <div class="slot-box medal-green">
+              <span class="trophy-ico">🏅</span>
+              <div class="tier-badge green">★</div>
+            </div>
+            <div class="slot-lbl green">Medalha · Passador de meia guarda</div>
+          </div>
+          <div class="slot">
+            <div class="slot-box gold">
+              <span class="trophy-ico">🏆</span>
+              <div class="tier-badge gold">O</div>
+            </div>
+            <div class="slot-lbl gold">Troféu · Guard pass</div>
+          </div>
+          <div class="slot">
+            <div class="slot-box silver">
+              <span class="trophy-ico">🥈</span>
+              <div class="tier-badge silver">P</div>
+            </div>
+            <div class="slot-lbl silver">Troféu · Kimura</div>
+          </div>
+          <div class="slot">
+            <div class="slot-box bronze">
+              <span class="trophy-ico">🥉</span>
+              <div class="tier-badge bronze">B</div>
+            </div>
+            <div class="slot-lbl bronze">Troféu · Raspagem</div>
+          </div>
+          <div class="slot">
+            <div class="slot-box empty"><span class="ghost">🏆</span></div>
+            <div class="slot-lbl empty">-</div>
+          </div>
+        </div>
+        <div class="plank"></div>
+        <div class="plank-shadow"></div>
+      </div>
+
+      <!-- ROW 2 -->
+      <div class="row-wrap">
+        <div class="slots-row">
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏅</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏅</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+        </div>
+        <div class="plank"></div>
+        <div class="plank-shadow"></div>
+      </div>
+
+      <!-- ROW 3 -->
+      <div class="row-wrap">
+        <div class="slots-row">
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏅</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+        </div>
+        <div class="plank"></div>
+        <div class="plank-shadow"></div>
+      </div>
+
+      <!-- ROW 4 -->
+      <div class="row-wrap">
+        <div class="slots-row">
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏅</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏆</span></div><div class="slot-lbl empty">-</div></div>
+          <div class="slot"><div class="slot-box empty"><span class="ghost">🏅</span></div><div class="slot-lbl empty">-</div></div>
+        </div>
+        <div class="plank"></div>
+        <div class="plank-shadow"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

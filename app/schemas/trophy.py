@@ -131,7 +131,7 @@ class TrophyHomeSummaryItem(BaseModel):
     trophy_id: UUID
     name: str
     award_kind: str
-    tier: TrophyTier
+    tier: TrophyTier | None = None
 
 
 class AcademyRecentItem(BaseModel):
@@ -139,16 +139,16 @@ class AcademyRecentItem(BaseModel):
 
     user_id: UUID
     user_name: str
-    tier: TrophyTier
+    tier: TrophyTier | None = None
     trophy_name: str
     award_kind: str
-    earned_at: datetime
+    earned_at: datetime | None = None
 
 
 class AcademyUserEarnedItem(BaseModel):
     trophy_id: UUID
     name: str
-    tier: TrophyTier
+    tier: TrophyTier | None = None
     award_kind: str = "trophy"
 
 

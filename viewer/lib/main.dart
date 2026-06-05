@@ -20,6 +20,9 @@ import 'package:viewer/screens/student/student_academy_hub_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
+import 'package:viewer/features/photos/presentation/pages/photos_feed_screen.dart';
+import 'package:viewer/features/photos/presentation/pages/student_search_photos_page.dart';
+import 'package:viewer/screens/enrollment/public_registration_screen.dart';
 import 'package:viewer/screens/notifications_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -203,6 +206,14 @@ class AuthGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Detecta link de convite: /?register=TOKEN
+    if (kIsWeb) {
+      final token = Uri.base.queryParameters['register'];
+      if (token != null && token.isNotEmpty) {
+        return PublicRegistrationScreen(token: token);
+      }
+    }
+
     final auth = context.watch<AuthService>();
     if (auth.isLoggedIn) {
       return MainShell(
@@ -255,17 +266,30 @@ class _MainShellState extends State<MainShell> {
   int _unreadNotificationsCount = 0;
   Timer? _notifPollTimer;
 
+  /// Academia do usuário — carregada em background para verificar `octophotosEnabled`.
+  Academy? _academy;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AuthService().restoreImpersonation();
       _fetchUnreadCount();
+      _loadAcademy();
     });
     _notifPollTimer = Timer.periodic(
       const Duration(seconds: 30),
       (_) => _fetchUnreadCount(),
     );
+  }
+
+  Future<void> _loadAcademy() async {
+    final academyId = AuthService().currentUser?.academyId?.trim();
+    if (academyId == null || academyId.isEmpty) return;
+    try {
+      final academy = await ApiService().getAcademy(academyId);
+      if (mounted) setState(() => _academy = academy);
+    } catch (_) {}
   }
 
   @override
@@ -292,15 +316,31 @@ class _MainShellState extends State<MainShell> {
 
   List<String> _availableTabs(AuthService auth) {
     final role = (auth.currentUser?.role ?? 'aluno').trim().toLowerCase();
+    final hasPhotos = _academy?.octophotosEnabled == true;
     // Aba Admin só com papel **efetivo** administrador global (não basta ser admin real em «Atuar como» gerente/aluno).
     if (role == 'administrador') {
-      return ['Campo de treinamento', 'Central', 'Gestão', 'Admin'];
+      return [
+        'Campo de treinamento',
+        'Central',
+        if (hasPhotos) 'Fotos',
+        'Gestão',
+        'Admin',
+      ];
     }
     // Aluno não usa o painel da academia na navegação inferior.
     if (role == 'aluno') {
-      return ['Campo de treinamento', 'Central'];
+      return [
+        'Campo de treinamento',
+        'Central',
+        if (hasPhotos) 'Fotos',
+      ];
     }
-    return ['Campo de treinamento', 'Central', 'Gestão'];
+    return [
+      'Campo de treinamento',
+      'Central',
+      if (hasPhotos) 'Fotos',
+      'Gestão',
+    ];
   }
 
   Widget _missionsHome() {
@@ -324,9 +364,12 @@ class _MainShellState extends State<MainShell> {
 
   Widget _currentBody(AuthService auth, List<String> tabs) {
     final i = _safeTabIndex(tabs);
+    final academyId = auth.currentUser?.academyId ?? '';
     switch (tabs[i]) {
       case 'Central':
         return const StudentAcademyHubScreen();
+      case 'Fotos':
+        return PhotosFeedScreen(academyId: academyId);
       case 'Gestão':
         return const AcademyPanelScreen();
       case 'Admin':
@@ -400,8 +443,10 @@ class _MainShellState extends State<MainShell> {
             _inicioRefreshKey++;
             _pendingConfirmationsNavBadge = 0;
             _unreadNotificationsCount = 0;
+            _academy = null;
           });
           _fetchUnreadCount();
+          _loadAcademy();
         }
       });
     }
@@ -454,9 +499,25 @@ class _MainShellState extends State<MainShell> {
         // Último item da lista = extremo direito da tela → [Sair] fica na borda direita.
         // +/− antes do logout; em telas muito estreitas o [ClipRect] pode cortar pela esquerda do grupo.
         actions: [
-          if (auth.isRealUserAdmin)
+          if (tabs.isNotEmpty && tabs[tabIndex] == 'Fotos')
             IconButton(
               icon: const Icon(Icons.person_search_rounded),
+              tooltip: 'Buscar aluno',
+              onPressed: () {
+                final academyId =
+                    auth.currentUser?.academyId ?? '';
+                Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute(
+                    builder: (_) => StudentSearchPhotosPage(
+                      academyId: academyId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (auth.isRealUserAdmin)
+            IconButton(
+              icon: const Icon(Icons.manage_accounts_rounded),
               onPressed: _showImpersonateDialog,
               tooltip: 'Atuar como',
             ),
@@ -641,6 +702,14 @@ class _MainShellState extends State<MainShell> {
                     selected: tabIndex == tabs.indexOf('Central'),
                     onTap: () =>
                         setState(() => _selected = tabs.indexOf('Central')),
+                  ),
+                if (tabs.contains('Fotos'))
+                  _NavItem(
+                    icon: Icons.perm_media_rounded,
+                    label: 'Fotos',
+                    selected: tabIndex == tabs.indexOf('Fotos'),
+                    onTap: () =>
+                        setState(() => _selected = tabs.indexOf('Fotos')),
                   ),
                 if (tabs.contains('Gestão'))
                   _NavItem(

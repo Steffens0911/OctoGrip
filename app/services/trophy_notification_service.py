@@ -180,6 +180,31 @@ async def check_and_notify_trophy_earned(
         upgraded = previous_tier is not None
         await _upsert_earned(db, user_id, trophy.id, current_tier)
 
+        # Post automático no feed OctoPhotos (opt-out: criado imediatamente, aluno pode deletar).
+        try:
+            from app.services.academy_service import get_academy
+            from app.services.photos_service import create_system_post, invalidate_feed_cache
+
+            academy = await get_academy(db, user.academy_id)
+            if academy and getattr(academy, "octophotos_enabled", False):
+                _tier_labels = {"bronze": "Bronze 🥉", "silver": "Prata 🥈", "gold": "Ouro 🥇"}
+                _kind_labels = {"medal": "Medalha", "trophy": "Troféu"}
+                kind_label = _kind_labels.get(getattr(trophy, "award_kind", "trophy"), "Troféu")
+                tier_label = _tier_labels.get(current_tier, current_tier.capitalize())
+                caption = f"{kind_label} {tier_label}: {trophy.name}"
+                await create_system_post(
+                    db,
+                    academy_id=user.academy_id,
+                    author_id=user_id,
+                    system_post_type="trophy",
+                    system_post_ref_id=trophy.id,
+                    caption=caption,
+                )
+                await db.commit()
+                await invalidate_feed_cache(user.academy_id)
+        except Exception:
+            logger.exception("trophy_notification: erro ao criar post automático OctoPhotos")
+
         logger.info(
             "trophy_notification: conquista detectada",
             extra={

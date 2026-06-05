@@ -39,7 +39,9 @@ import 'package:viewer/widgets/student/home_loading_skeleton.dart';
 import 'package:viewer/widgets/account_frozen_banner.dart';
 import 'package:viewer/widgets/student/student_rules_sheet.dart';
 import 'package:viewer/widgets/student/student_stats_section.dart';
+import 'package:viewer/screens/student/user_avatar_screen.dart';
 import 'package:viewer/widgets/student/academy_partners_training_banner.dart';
+import 'package:viewer/widgets/student/training_field_tour.dart';
 
 /// Tela inicial da área do aluno: missões da semana e atalhos. Usuário logado via AuthService.
 class StudentHomeScreen extends StatefulWidget {
@@ -86,6 +88,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _loading = true;
   String? _error;
   String? _academyLogoUrl;
+  String? _academyName;
   bool _showTrophies = true;
   bool _showPartners = true;
   /// Aviso ao logar (dados da academia; modal uma vez por sessão).
@@ -149,6 +152,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
     }
   }
 
+  Future<void> _onAvatarTap() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const UserAvatarScreen()),
+    );
+    if (updated == true && mounted) {
+      await AuthService().refreshMe();
+      setState(() {
+        _selectedUser = AuthService().currentUser;
+      });
+    }
+  }
+
   void _notifyAccountFrozen() {
     if (!mounted) return;
     final r = AuthService().currentUser?.accountFreezeReason?.trim();
@@ -165,7 +181,18 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _load();
+    _load().then((_) => _maybeShowTour());
+  }
+
+  Future<void> _maybeShowTour() async {
+    if (!mounted) return;
+    final userId = AuthService().currentUser?.id;
+    if (userId == null) return;
+    final done = await trainingFieldTourDone(userId);
+    if (!mounted || done) return;
+    await markTrainingFieldTourDone(userId);
+    if (!mounted) return;
+    showTrainingFieldTour(context);
   }
 
   @override
@@ -440,6 +467,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       if (!mounted) return;
       setState(() {
         _academyLogoUrl = academy.logoUrl;
+        _academyName = academy.name;
         _showTrophies = academy.showTrophies;
         _showPartners = academy.showPartners;
         _loginNoticeTitle = academy.loginNoticeTitle;
@@ -491,6 +519,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
               _nextLevelThreshold ??
               kBaseLevelThreshold;
       _academyLogoUrl = logoUrl;
+      _academyName = academy?['name'] as String? ?? _academyName;
       _showTrophies = academy?['show_trophies'] as bool? ?? true;
       _showPartners = academy?['show_partners'] as bool? ?? true;
       _loginNoticeTitle = academy?['login_notice_title'] as String?;
@@ -849,23 +878,34 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (showHeaderSkeleton)
                     const HomeHeaderLoadingSkeleton()
                   else
-                    HeaderWidget(
+                    KeyedSubtree(
+                      key: tourKeyHeader,
+                      child: HeaderWidget(
                       userName: u?.name ?? u?.email ?? 'Perin',
                       userBelt: _faixaLabel(u?.graduation),
                       userLevel: _userLevel ?? 1,
                       currentXp: _userPoints ?? 0,
                       maxXp: _nextLevelThreshold ?? kBaseLevelThreshold,
+                      userAvatarUrl: u?.avatarUrl != null && u!.avatarUrl!.isNotEmpty
+                          ? (u.avatarUrl!.startsWith('/')
+                              ? '${_api.baseUrl}${u.avatarUrl}'
+                              : u.avatarUrl)
+                          : null,
                       academyLogoUrl: _academyLogoUrl != null &&
                               _academyLogoUrl!.isNotEmpty
                           ? (_academyLogoUrl!.startsWith('/')
                               ? '${_api.baseUrl}$_academyLogoUrl'
                               : _academyLogoUrl!)
                           : null,
+                      academyName: _academyName,
                       dailyVideoPoints: _dailyVideoPoints,
                       dailyVideoCompleted: _dailyVideoCompleted,
                       onDailyVideoTap:
                           frozenStudent ? _notifyAccountFrozen : _onDailyVideoTap,
                       onOpenRules: () => showStudentRulesSheet(context),
+                      onOpenTour: () => showTrainingFieldTour(context),
+                      onAvatarTap: frozenStudent ? null : _onAvatarTap,
+                    ),
                     ),
                   if (frozenStudent) ...[
                     const SizedBox(height: 10),
@@ -881,16 +921,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                   if (u != null)
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: StreakWidget(
-                        streakDays: u.loginStreakDays,
-                        onOpenPointsRules: () => showPointsRulesSheet(context),
+                      child: KeyedSubtree(
+                        key: tourKeyStreak,
+                        child: StreakWidget(
+                          streakDays: u.loginStreakDays,
+                          onOpenPointsRules: () => showPointsRulesSheet(context),
+                        ),
                       ),
                     ),
                   if (_trainingStats != null) ...[
                     const SizedBox(height: 14),
-                    const MemoSectionLabel('SUA JORNADA'),
-                    const SizedBox(height: 8),
-                    StudentStatsSection(stats: _trainingStats!),
+                    KeyedSubtree(
+                      key: tourKeyStats,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const MemoSectionLabel('SUA JORNADA'),
+                          const SizedBox(height: 8),
+                          StudentStatsSection(stats: _trainingStats!),
+                        ],
+                      ),
+                    ),
                   ],
                   if (_showPartners && _trainingPartnersFuture != null) ...[
                     const SizedBox(height: 10),
@@ -914,18 +965,26 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _buildCollectiveGoalCard(),
                     const SizedBox(height: 14),
                   ],
-                  if (showMissionSkeleton) ...[
-                    const HomeMissionSectionSkeleton(),
-                    const SizedBox(height: 14),
-                  ] else if (_missionWeek?.needsKitChoice == true &&
-                      _missionWeek!.availableKits.isNotEmpty) ...[
-                    _buildWeeklyKitChoiceSection(),
-                    const SizedBox(height: 14),
-                  ] else if (_missionWeek != null &&
-                      _missionWeek!.entries.any((e) => e.mission != null)) ...[
-                    _buildWeeklyMissionPathSection(),
-                    const SizedBox(height: 14),
-                  ],
+                  KeyedSubtree(
+                    key: tourKeyMissions,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showMissionSkeleton) ...[
+                          const HomeMissionSectionSkeleton(),
+                          const SizedBox(height: 14),
+                        ] else if (_missionWeek?.needsKitChoice == true &&
+                            _missionWeek!.availableKits.isNotEmpty) ...[
+                          _buildWeeklyKitChoiceSection(),
+                          const SizedBox(height: 14),
+                        ] else if (_missionWeek != null &&
+                            _missionWeek!.entries.any((e) => e.mission != null)) ...[
+                          _buildWeeklyMissionPathSection(),
+                          const SizedBox(height: 14),
+                        ],
+                      ],
+                    ),
+                  ),
                   if (u != null &&
                       (u.academyId == null || u.academyId!.isEmpty))
                     Container(
@@ -961,10 +1020,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     _buildMainAccordion(),
                     if (_showTrophies) ...[
                       const SizedBox(height: 16),
-                      _buildTrophiesHomeSection(),
+                      KeyedSubtree(
+                        key: tourKeyTrophies,
+                        child: _buildTrophiesHomeSection(),
+                      ),
                       const SizedBox(height: AppSpacing.l),
                     ],
-                    _buildConfirmationsAndRequestsSection(),
+                    KeyedSubtree(
+                      key: tourKeyConfirm,
+                      child: _buildConfirmationsAndRequestsSection(),
+                    ),
                   ],
                 ],
               ),
@@ -1181,7 +1246,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Turma da semana',
+          'Qual turma você vai treinar essa semana?',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 color: AppTheme.textPrimaryOf(context),
                 fontWeight: FontWeight.w700,
@@ -1189,7 +1254,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         ),
         const SizedBox(height: 6),
         Text(
-          'Escolha a turma que vai treinar mais vezes essa semana.',
+          'As posições desta turma serão liberadas para você treinar na semana. Você pode treinar eventualmente em outra turma, mas as missões seguem o conteúdo da turma escolhida.',
           style: TextStyle(fontSize: 12, color: AppTheme.textSecondaryOf(context)),
         ),
         if (_savingWeeklyTurmaChoice) ...[

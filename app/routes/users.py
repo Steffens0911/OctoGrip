@@ -58,6 +58,8 @@ _BASE_DIR: Final[Path] = Path(__file__).resolve().parent.parent.parent
 _MEDIA_ROOT: Final[Path] = _BASE_DIR / "app_media"
 _USER_AVATARS_DIR: Final[Path] = _MEDIA_ROOT / "user_avatars"
 _USER_AVATARS_DIR.mkdir(parents=True, exist_ok=True)
+_USER_FACIAL_DIR: Final[Path] = _MEDIA_ROOT / "user_facial_photos"
+_USER_FACIAL_DIR.mkdir(parents=True, exist_ok=True)
 
 
 async def _read_avatar_upload(file: UploadFile) -> tuple[bytes, str]:
@@ -108,7 +110,23 @@ async def _save_user_avatar_and_maybe_enqueue(
     target.avatar_url = f"/media/user_avatars/{filename}"
     await db.commit()
     await db.refresh(target)
-    if target.role == "aluno" and target.avatar_url:
+    return target
+
+
+async def _save_facial_photo_and_enqueue(
+    db: AsyncSession,
+    *,
+    target: User,
+    file: UploadFile,
+) -> User:
+    data, extension = await _read_avatar_upload(file)
+    filename = f"facial-{target.id}{extension}"
+    dest = _USER_FACIAL_DIR / filename
+    dest.write_bytes(data)
+    target.facial_photo_url = f"/media/user_facial_photos/{filename}"
+    await db.commit()
+    await db.refresh(target)
+    if target.role == "aluno":
         generate_student_embedding.delay(str(target.id))
     return target
 
@@ -139,6 +157,31 @@ async def me_weekly_kit_choice(
         iso_week_number=row.iso_week_number,
         academy_id=row.academy_id,
     )
+
+
+@router.post("/me/facial-photo", response_model=UserRead)
+async def me_upload_facial_photo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Foto 3x4 privada para reconhecimento facial. Não é exibida a outros usuários."""
+    target = await get_user_or_raise(db, current_user.id)
+    return await _save_facial_photo_and_enqueue(db, target=target, file=file)
+
+
+@router.post("/{user_id}/facial-photo", response_model=UserRead)
+async def user_upload_facial_photo(
+    user_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin_or_academy_access),
+):
+    """Admin/gestor faz upload da foto facial de um aluno."""
+    target = await get_user_or_raise(db, user_id)
+    if current_user.role != "administrador" and target.academy_id != current_user.academy_id:
+        raise ForbiddenError("Acesso negado.")
+    return await _save_facial_photo_and_enqueue(db, target=target, file=file)
 
 
 @router.post("/me/avatar", response_model=UserRead)
@@ -323,6 +366,9 @@ async def user_points(
         "level": level,
         "level_points": level_points,
         "next_level_threshold": next_threshold,
+        "graduation": user.graduation,
+        "avatar_url": user.avatar_url,
+        "name": user.name,
     }
 
 

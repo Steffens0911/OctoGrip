@@ -50,6 +50,9 @@ logs/
 # Frontend (build separado)
 viewer/
 
+# Mídia gerada em runtime (montada como volume)
+app_media/
+
 # OS
 .DS_Store
 Thumbs.db

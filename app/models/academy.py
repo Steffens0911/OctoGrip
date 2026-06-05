@@ -117,6 +117,18 @@ class Academy(Base, UUIDMixin):
         nullable=False,
         comment="Controle da academia: habilita chamada por QR; quando false, só presença manual.",
     )
+    octophotos_enabled: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Feature premium: habilita o feed de fotos OctoPhotos para a academia.",
+    )
+    user_photos_quota: Mapped[int] = mapped_column(
+        default=30,
+        server_default=text("30"),
+        nullable=False,
+        comment="Máximo de fotos por aluno no feed. Moderadores são isentos.",
+    )
 
     weekly_technique: Mapped[Technique | None] = relationship(
         "Technique",

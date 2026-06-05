@@ -79,7 +79,12 @@ class User(Base, UUIDMixin):
     avatar_url: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
-        comment="URL pública da foto do utilizador usada por módulos de reconhecimento facial.",
+        comment="URL pública da foto de perfil do utilizador (avatar visível para colegas).",
+    )
+    facial_photo_url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="URL privada da foto 3x4 usada exclusivamente pelo reconhecimento facial; não exposta a outros usuários.",
     )
 
     academy: Mapped[Academy | None] = relationship(

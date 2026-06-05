@@ -11,6 +11,8 @@ import httpx
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
 _FCM_SCOPE = "https://www.googleapis.com/auth/firebase.messaging"
@@ -53,6 +55,10 @@ async def send_fcm_data_message(
     Returns:
         (success, should_drop_token) — should_drop_token=True se o token for inválido.
     """
+    if not settings.PUSH_NOTIFICATIONS_ENABLED:
+        logger.info("Push suprimido (PUSH_NOTIFICATIONS_ENABLED=false): %s → %s…", title, device_token[:20])
+        return True, False
+
     try:
         bearer = access_token
         if not bearer:

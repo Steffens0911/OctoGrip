@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     # Firebase Cloud Messaging (notificações push; opcional)
     FIREBASE_PROJECT_ID: str | None = None
     FIREBASE_SERVICE_ACCOUNT_PATH: str | None = None
+    # Desabilite em dev para não disparar push reais usando o Firebase de produção.
+    PUSH_NOTIFICATIONS_ENABLED: bool = True
 
     # Reconhecimento facial (fila assíncrona)
     REDIS_URL: str = "redis://localhost:6379/0"

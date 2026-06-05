@@ -1,17 +1,22 @@
-# Estágio 1: Builder - instala dependências
+# Estágio 1: Builder - instala dependências já como usuário app (evita chown de 2GB no runtime)
 FROM python:3.12-slim-bookworm AS builder
+
+# Cria o mesmo usuário/grupo do runtime para o pip instalar no lugar certo
+RUN groupadd --gid 1000 app && \
+    useradd --uid 1000 --gid app --shell /bin/bash --create-home app
 
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PATH=/home/app/.local/bin:$PATH
 
 # Copiar apenas requirements para otimizar cache de layers
 COPY requirements.txt .
 
-# Atualizar pip e instalar dependências no diretório do usuário
+# Instala deps como usuário app → /home/app/.local (sem precisar de chown depois)
 RUN pip install --upgrade pip && \
-    pip install --user -r requirements.txt
+    pip install --user --no-warn-script-location -r requirements.txt
 
 # Estágio 2: Runtime - imagem final
 FROM python:3.12-slim-bookworm
@@ -44,9 +49,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get install -y --no-install-recommends postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar dependências do builder para o usuário app
-COPY --from=builder /root/.local /home/app/.local
-RUN chown -R app:app /home/app/.local
+# Copia deps já com ownership correto — sem chown necessário
+COPY --from=builder --chown=app:app /home/app/.local /home/app/.local
 
 # Copiar código (ownership para app) e garantir permissão de escrita em /app/app_media
 COPY --chown=app:app . .

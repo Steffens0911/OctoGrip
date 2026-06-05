@@ -34,6 +34,9 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- Cropper.js — necessário para image_cropper no Flutter Web -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+
   <title>OctoGrip</title>
   <link rel="manifest" href="manifest.json" crossorigin="anonymous">
 </head>
@@ -125,6 +128,8 @@
       }
     })();
   </script>
+  <!-- Cropper.js JS — deve vir antes do Flutter bootstrap -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
   <!-- defer: registo do service worker mais previsível que async (critério de instalação PWA no Chrome). -->
   <script src="flutter_bootstrap.js" defer></script>
 </body>

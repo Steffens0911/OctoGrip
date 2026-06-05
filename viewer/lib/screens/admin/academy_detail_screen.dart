@@ -72,6 +72,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _showGlobalSupporters = true;
   bool _faceRecognitionEnabled = false;
   bool _qrAttendanceEnabled = true;
+  bool _octophotosEnabled = false;
+  int _userPhotosQuota = 30;
+  late TextEditingController _quotaController;
   bool _savingAdminPersonalization = false;
 
   @override
@@ -87,6 +90,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _showGlobalSupporters = _academy.showGlobalSupporters;
     _faceRecognitionEnabled = _academy.faceRecognitionEnabled;
     _qrAttendanceEnabled = _academy.qrAttendanceEnabled;
+    _octophotosEnabled = _academy.octophotosEnabled;
+    _userPhotosQuota = _academy.userPhotosQuota;
+    _quotaController = TextEditingController(text: _userPhotosQuota.toString());
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
@@ -114,6 +120,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _showGlobalSupporters = fresh.showGlobalSupporters;
         _faceRecognitionEnabled = fresh.faceRecognitionEnabled;
         _qrAttendanceEnabled = fresh.qrAttendanceEnabled;
+        _octophotosEnabled = fresh.octophotosEnabled;
+        _userPhotosQuota = fresh.userPhotosQuota;
+        _quotaController.text = fresh.userPhotosQuota.toString();
       });
     } catch (_) {
       // Mantém os dados já carregados no detalhe caso o refresh falhe.
@@ -185,6 +194,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult1Controller.dispose();
     _mult2Controller.dispose();
     _mult3Controller.dispose();
+    _quotaController.dispose();
     super.dispose();
   }
 
@@ -291,11 +301,15 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     bool? showGlobalSupporters,
     bool? faceRecognitionEnabled,
     bool? qrAttendanceEnabled,
+    bool? octophotosEnabled,
+    int? userPhotosQuota,
   }) async {
     if (_savingAdminPersonalization) return;
     final previousShowGlobalSupporters = _showGlobalSupporters;
     final previousFaceRecognitionEnabled = _faceRecognitionEnabled;
     final previousQrAttendanceEnabled = _qrAttendanceEnabled;
+    final previousOctophotosEnabled = _octophotosEnabled;
+    final previousUserPhotosQuota = _userPhotosQuota;
     setState(() {
       _savingAdminPersonalization = true;
       if (showGlobalSupporters != null) {
@@ -307,6 +321,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
       if (qrAttendanceEnabled != null) {
         _qrAttendanceEnabled = qrAttendanceEnabled;
       }
+      if (octophotosEnabled != null) {
+        _octophotosEnabled = octophotosEnabled;
+      }
+      if (userPhotosQuota != null) {
+        _userPhotosQuota = userPhotosQuota;
+      }
     });
     try {
       final updated = await _api.updateAcademy(
@@ -314,6 +334,8 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         showGlobalSupporters: showGlobalSupporters,
         faceRecognitionEnabled: faceRecognitionEnabled,
         qrAttendanceEnabled: qrAttendanceEnabled,
+        octophotosEnabled: octophotosEnabled,
+        userPhotosQuota: userPhotosQuota,
       );
       if (!mounted) return;
       setState(() {
@@ -321,6 +343,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _showGlobalSupporters = updated.showGlobalSupporters;
         _faceRecognitionEnabled = updated.faceRecognitionEnabled;
         _qrAttendanceEnabled = updated.qrAttendanceEnabled;
+        _octophotosEnabled = updated.octophotosEnabled;
+        _userPhotosQuota = updated.userPhotosQuota;
+        _quotaController.text = updated.userPhotosQuota.toString();
         _savingAdminPersonalization = false;
       });
       widget.onUpdated();
@@ -335,6 +360,9 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _showGlobalSupporters = previousShowGlobalSupporters;
         _faceRecognitionEnabled = previousFaceRecognitionEnabled;
         _qrAttendanceEnabled = previousQrAttendanceEnabled;
+        _octophotosEnabled = previousOctophotosEnabled;
+        _userPhotosQuota = previousUserPhotosQuota;
+        _quotaController.text = previousUserPhotosQuota.toString();
         _savingAdminPersonalization = false;
       });
       AppFeedback.show(
@@ -710,6 +738,70 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                 );
                               },
                       ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text('Ativar OctoPhotos (feed de fotos)'),
+                        subtitle: const Text(
+                          'Habilita a aba de fotos da academia para todos os alunos.',
+                        ),
+                        value: _octophotosEnabled,
+                        onChanged: _savingAdminPersonalization
+                            ? null
+                            : (value) {
+                                _updateAdminPersonalization(
+                                  octophotosEnabled: value,
+                                );
+                              },
+                      ),
+                      if (_octophotosEnabled)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Limite de fotos por aluno',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    Text(
+                                      'Moderadores são isentos do limite.',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              SizedBox(
+                                width: 72,
+                                child: TextField(
+                                  controller: _quotaController,
+                                  enabled: !_savingAdminPersonalization,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  onSubmitted: (v) {
+                                    final n = int.tryParse(v);
+                                    if (n != null && n >= 1) {
+                                      _updateAdminPersonalization(userPhotosQuota: n);
+                                    } else {
+                                      _quotaController.text = _userPhotosQuota.toString();
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),

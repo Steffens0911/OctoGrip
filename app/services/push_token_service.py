@@ -70,6 +70,23 @@ async def list_all_fcm_tokens(db: AsyncSession) -> list[str]:
     return [row[0] for row in result.fetchall()]
 
 
+async def list_fcm_tokens_for_roles(
+    db: AsyncSession,
+    *,
+    academy_id: uuid.UUID,
+    roles: tuple[str, ...],
+) -> list[str]:
+    """Tokens FCM de utilizadores com role específico em uma academia."""
+    stmt = (
+        select(UserDeviceToken.fcm_token)
+        .join(User, User.id == UserDeviceToken.user_id)
+        .where(User.academy_id == academy_id, User.role.in_(roles))
+        .distinct()
+    )
+    result = await db.execute(stmt)
+    return [row[0] for row in result.fetchall()]
+
+
 async def list_fcm_tokens_for_user(db: AsyncSession, *, user_id: uuid.UUID) -> list[str]:
     """Tokens FCM do utilizador alvo (distintos)."""
     stmt = select(UserDeviceToken.fcm_token).where(UserDeviceToken.user_id == user_id).distinct()

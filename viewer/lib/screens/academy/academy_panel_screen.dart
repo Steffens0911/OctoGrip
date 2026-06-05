@@ -17,6 +17,8 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/app_navigation_tile.dart';
 import 'package:viewer/widgets/layout/memo_compact_tile_card.dart';
 import 'package:viewer/widgets/layout/memo_section_label.dart';
+import 'package:viewer/screens/enrollment/pending_enrollments_screen.dart';
+import 'package:viewer/screens/academy/manual_trophies_hub_screen.dart';
 import 'package:viewer/widgets/role_guard.dart';
 
 /// Painel da academia: lista academias; ao tocar abre o detalhe (tema, ranking, dificuldades, relatório).
@@ -32,6 +34,8 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
   List<Academy> _academies = [];
   bool _loading = true;
   String? _error;
+  int _pendingReviewCount = 0;
+  int _pendingEnrollmentCount = 0;
 
   @override
   void initState() {
@@ -44,11 +48,37 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
       _loading = true;
       _error = null;
     });
+
+    final auth = AuthService();
+
+    // Se estiver simulando como aluno, não há dados de gestão para carregar
+    if (auth.isStudent()) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
     try {
-      final list = await _api.getAcademies();
+      final academies = await _api.getAcademies();
+      int reviewCount = 0;
+      int pendingEnrollmentCount = 0;
+      if (auth.isProfessor() || auth.isManager()) {
+        try {
+          reviewCount = await _api.getProfessorReviewCount();
+        } catch (_) {}
+        // Contagem de solicitações de cadastro pendentes
+        final academyId = auth.currentUser?.academyId;
+        if (academyId != null) {
+          try {
+            final list = await _api.getPendingEnrollments(academyId);
+            pendingEnrollmentCount = list.length;
+          } catch (_) {}
+        }
+      }
       if (mounted) {
         setState(() {
-          _academies = list;
+          _academies = academies;
+          _pendingReviewCount = reviewCount;
+          _pendingEnrollmentCount = pendingEnrollmentCount;
           _loading = false;
         });
       }
@@ -109,12 +139,14 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
     required String title,
     required String subtitle,
     required VoidCallback onTap,
+    int badgeCount = 0,
   }) {
     final tile = AppNavigationTile(
       icon: icon,
       title: title,
       subtitle: subtitle,
       onTap: onTap,
+      badgeCount: badgeCount,
     );
     if (enabled) return tile;
     return Opacity(
@@ -183,9 +215,11 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(24),
                           child: Text(
-                            AuthService().isAdmin()
-                                ? 'Nenhuma academia cadastrada. Cadastre em Administração → Academias.'
-                                : 'Nenhuma academia vinculada ao seu usuário. Peça ao administrador para vincular sua conta a uma academia.',
+                            AuthService().isStudent()
+                                ? 'Gestão não disponível para alunos.\nSaia da simulação para acessar o painel.'
+                                : AuthService().isAdmin()
+                                    ? 'Nenhuma academia cadastrada. Cadastre em Administração → Academias.'
+                                    : 'Nenhuma academia vinculada ao seu usuário. Peça ao administrador para vincular sua conta a uma academia.',
                             textAlign: TextAlign.center,
                             style:
                                 const TextStyle(color: AppTheme.textSecondary),
@@ -294,6 +328,46 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                                 ),
                               ],
                             ),
+                            if ((AuthService().isProfessor() ||
+                                    AuthService().isManager()) &&
+                                resolvedAcademy != null) ...[
+                              const SizedBox(height: AppSpacing.s),
+                              _academyNavigationTile(
+                                enabled: true,
+                                icon: Icons.military_tech_rounded,
+                                title: 'Conquistas Manuais',
+                                subtitle:
+                                    'Troféus livres e medalhas de campeonato',
+                                onTap: () => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (context) =>
+                                        ManualTrophiesHubScreen(
+                                      academyId: resolvedAcademy.id,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s),
+                              _academyNavigationTile(
+                                enabled: true,
+                                icon: Icons.person_add_rounded,
+                                title: 'Cadastros de alunos',
+                                subtitle:
+                                    'QR de convite e aprovação de solicitações',
+                                badgeCount: _pendingEnrollmentCount,
+                                onTap: () => Navigator.push<void>(
+                                  context,
+                                  MaterialPageRoute<void>(
+                                    builder: (context) =>
+                                        PendingEnrollmentsScreen(
+                                      academyId: resolvedAcademy.id,
+                                      academyName: resolvedAcademy.name,
+                                    ),
+                                  ),
+                                ).then((_) => _load()),
+                              ),
+                            ],
                             const SizedBox(height: AppSpacing.m),
                             const MemoSectionLabel('DADOS'),
                             const SizedBox(height: AppSpacing.s),
@@ -334,13 +408,14 @@ class _AcademyPanelScreenState extends State<AcademyPanelScreen> {
                                 title: 'Revisão de indicações',
                                 subtitle:
                                     'Indicações não confirmadas pelo adversário em 4+ dias',
+                                badgeCount: _pendingReviewCount,
                                 onTap: () => Navigator.push<void>(
                                   context,
                                   MaterialPageRoute<void>(
                                     builder: (context) =>
                                         const ProfessorReviewScreen(),
                                   ),
-                                ),
+                                ).then((_) => _load()),
                               ),
                             ],
                             if (_showPushItem) ...[

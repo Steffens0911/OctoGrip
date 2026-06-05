@@ -372,12 +372,15 @@ def generate_student_embedding(self, student_id: str) -> None:
     uid = UUID(student_id)
     with SyncSessionLocal() as db:
         user = db.get(User, uid)
-        if not user or user.role != "aluno" or not user.academy_id or not user.avatar_url:
+        if not user or user.role != "aluno" or not user.academy_id:
+            return
+        photo_url = getattr(user, "facial_photo_url", None) or user.avatar_url
+        if not photo_url:
             return
 
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             tmp_path = tmp.name
-            tmp.write(_read_avatar_bytes(user.avatar_url))
+            tmp.write(_read_avatar_bytes(photo_url))
 
         resized_tmp_path: str | None = None
         try:

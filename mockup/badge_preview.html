@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    font-family: monospace;
+  }
+
+  .card {
+    background: #252535;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 520px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  .icon-wrap {
+    background: #1e3a2f;
+    border-radius: 10px;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .icon-wrap svg {
+    color: #4ade80;
+    width: 24px;
+    height: 24px;
+  }
+
+  .badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background: #ef4444;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    font-family: sans-serif;
+    border-radius: 999px;
+    min-width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 5px;
+    border: 2px solid #252535;
+  }
+
+  .text { flex: 1; }
+
+  .title {
+    color: #e2e8f0;
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 3px;
+  }
+
+  .subtitle {
+    color: #8892a4;
+    font-size: 13px;
+    font-family: sans-serif;
+  }
+
+  .arrow {
+    color: #4a5568;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12zM7 9h10v2H7zm0-3h10v2H7zm0 6h7v2H7z"/>
+      </svg>
+      <span class="badge">3</span>
+    </div>
+    <div class="text">
+      <div class="title">Revisão de indicações</div>
+      <div class="subtitle">Indicações não confirmadas pelo adversário em 4+ dias</div>
+    </div>
+    <span class="arrow">›</span>
+  </div>
+</body>
+</html>

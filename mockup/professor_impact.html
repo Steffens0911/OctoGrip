@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Impacto do Professor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: #0f0f1a;
+    border-radius: 44px;
+    border: 2px solid #2a2a3e;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.6);
+    position: relative;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 44px;
+    background: #0f0f1a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    flex-shrink: 0;
+  }
+  .status-bar .time { color: #fff; font-size: 15px; font-weight: 600; }
+  .status-bar .icons { display: flex; gap: 6px; align-items: center; }
+  .status-bar .icons span { color: #fff; font-size: 12px; }
+
+  /* Header */
+  .header {
+    background: #0f0f1a;
+    padding: 8px 20px 16px;
+    flex-shrink: 0;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+  .back-btn {
+    width: 36px; height: 36px;
+    background: #1e1e30;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 16px; cursor: pointer;
+  }
+  .header h1 {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .header .subtitle {
+    color: #6b7280;
+    font-size: 13px;
+    margin-left: 46px;
+  }
+
+  /* Week selector */
+  .week-selector {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 10px 20px;
+    background: #0f0f1a;
+    flex-shrink: 0;
+  }
+  .week-btn {
+    width: 32px; height: 32px;
+    background: #1e1e30;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #9ca3af; font-size: 14px; cursor: pointer;
+  }
+  .week-label {
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 160px;
+    text-align: center;
+  }
+
+  /* Scrollable content */
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 24px;
+    scrollbar-width: none;
+  }
+  .content::-webkit-scrollbar { display: none; }
+
+  /* Hero card */
+  .hero-card {
+    background: linear-gradient(135deg, #1a3a2a 0%, #0d2218 100%);
+    border: 1px solid #2d6a4f33;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    background: radial-gradient(circle, #52b788 0%, transparent 70%);
+    opacity: 0.15;
+  }
+  .hero-card .week-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #2d6a4f44;
+    color: #74c69d;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+  .hero-card .narrative {
+    color: #d1fae5;
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+  .hero-card .narrative strong {
+    color: #52b788;
+  }
+  .hero-stats {
+    display: flex;
+    gap: 12px;
+  }
+  .hero-stat {
+    flex: 1;
+    background: #0d2218aa;
+    border-radius: 12px;
+    padding: 12px;
+    text-align: center;
+  }
+  .hero-stat .value {
+    color: #52b788;
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .hero-stat .label {
+    color: #6b7280;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* Section title */
+  .section-title {
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 20px 0 10px;
+  }
+
+  /* Technique bars */
+  .technique-card {
+    background: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+  }
+  .technique-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .technique-name {
+    color: #e5e7eb;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .technique-pct {
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pct-high { color: #52b788; }
+  .pct-mid  { color: #fbbf24; }
+  .pct-low  { color: #f87171; }
+
+  .bar-track {
+    height: 6px;
+    background: #2a2a3e;
+    border-radius: 99px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 99px;
+    transition: width 0.8s ease;
+  }
+  .fill-high { background: linear-gradient(90deg, #2d6a4f, #52b788); }
+  .fill-mid  { background: linear-gradient(90deg, #92400e, #fbbf24); }
+  .fill-low  { background: linear-gradient(90deg, #7f1d1d, #f87171); }
+
+  .technique-meta {
+    margin-top: 6px;
+    color: #6b7280;
+    font-size: 11px;
+  }
+
+  /* At-risk students */
+  .risk-card {
+    background: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .risk-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #2a2a3e;
+  }
+  .risk-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .risk-icon.warning { background: #451a0322; color: #f97316; }
+  .risk-icon.alert   { background: #7f1d1d22; color: #f87171; }
+  .risk-icon.ok      { background: #14532d22; color: #4ade80; }
+
+  .risk-info { flex: 1; }
+  .risk-name { color: #e5e7eb; font-size: 14px; font-weight: 600; }
+  .risk-detail { color: #6b7280; font-size: 12px; margin-top: 2px; }
+  .risk-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+  }
+  .badge-warning { background: #451a0344; color: #f97316; }
+  .badge-alert   { background: #7f1d1d44; color: #f87171; }
+  .badge-ok      { background: #14532d44; color: #4ade80; }
+
+  /* Milestone card */
+  .milestone-card {
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f0f1a 100%);
+    border: 1px solid #312e8133;
+    border-radius: 20px;
+    padding: 20px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .milestone-icon {
+    width: 56px; height: 56px;
+    background: #312e8133;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    flex-shrink: 0;
+  }
+  .milestone-text .value {
+    color: #a5b4fc;
+    font-size: 24px;
+    font-weight: 800;
+  }
+  .milestone-text .label {
+    color: #6b7280;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+  .milestone-text .sub {
+    color: #4f46e5;
+    font-size: 12px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    height: 80px;
+    background: #0f0f1a;
+    border-top: 1px solid #1e1e30;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding-bottom: 16px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 10px; color: #4b5563; }
+  .nav-item.active .nav-icon { filter: none; }
+  .nav-item.active .nav-label { color: #52b788; }
+  .nav-dot {
+    width: 4px; height: 4px;
+    background: #52b788;
+    border-radius: 50%;
+    margin-top: -2px;
+  }
+</style>
+</head>
+<body>
+<div class="phone">
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="icons">
+      <span>●●●</span>
+      <span>WiFi</span>
+      <span>🔋</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-top">
+      <div class="back-btn">←</div>
+      <h1>Meu Impacto</h1>
+    </div>
+    <div class="subtitle">Prof. Rafael Moura · Kimura Academy</div>
+  </div>
+
+  <!-- Week Selector -->
+  <div class="week-selector">
+    <div class="week-btn">‹</div>
+    <div class="week-label">5–11 mai 2026</div>
+    <div class="week-btn">›</div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Hero narrative card -->
+    <div class="hero-card">
+      <div class="week-tag">✦ Semana encerrada</div>
+      <p class="narrative">
+        Essa semana você alcançou <strong>23 alunos</strong>.
+        <strong>14 deles</strong> completaram a missão de raspagem —
+        sua melhor taxa em 4 semanas.
+        <strong>3 alunos</strong> voltaram a treinar depois de mais de 2 semanas sumidos.
+      </p>
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="value">23</div>
+          <div class="label">alunos alcançados</div>
+        </div>
+        <div class="hero-stat">
+          <div class="value">61%</div>
+          <div class="label">taxa de conclusão</div>
+        </div>
+        <div class="hero-stat">
+          <div class="value">+8%</div>
+          <div class="label">vs semana anterior</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Techniques -->
+    <div class="section-title">Conclusão por técnica</div>
+
+    <div class="technique-card">
+      <div class="technique-header">
+        <span class="technique-name">Raspagem de joelho</span>
+        <span class="technique-pct pct-high">82%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill fill-high" style="width:82%"></div></div>
+      <div class="technique-meta">18 de 22 alunos · 3 missões criadas</div>
+    </div>
+
+    <div class="technique-card">
+      <div class="technique-header">
+        <span class="technique-name">Kimura do lado</span>
+        <span class="technique-pct pct-mid">55%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill fill-mid" style="width:55%"></div></div>
+      <div class="technique-meta">12 de 22 alunos · 2 missões criadas</div>
+    </div>
+
+    <div class="technique-card">
+      <div class="technique-header">
+        <span class="technique-name">Triângulo invertido</span>
+        <span class="technique-pct pct-low">27%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill fill-low" style="width:27%"></div></div>
+      <div class="technique-meta">6 de 22 alunos · 1 missão criada · técnica difícil?</div>
+    </div>
+
+    <!-- At-risk students -->
+    <div class="section-title">Alunos para dar atenção</div>
+
+    <div class="risk-card">
+      <div class="risk-header">
+        <div class="risk-icon alert">!</div>
+        <div class="risk-info">
+          <div class="risk-name">Lucas Ferreira</div>
+          <div class="risk-detail">Sem atividade há 18 dias</div>
+        </div>
+        <span class="risk-badge badge-alert">18 dias</span>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-header">
+        <div class="risk-icon warning">!</div>
+        <div class="risk-info">
+          <div class="risk-name">Ana Beatriz Costa</div>
+          <div class="risk-detail">Sem atividade há 9 dias</div>
+        </div>
+        <span class="risk-badge badge-warning">9 dias</span>
+      </div>
+    </div>
+
+    <div class="risk-card">
+      <div class="risk-header">
+        <div class="risk-icon warning">!</div>
+        <div class="risk-info">
+          <div class="risk-name">Diego Santos</div>
+          <div class="risk-detail">Sem atividade há 7 dias</div>
+        </div>
+        <span class="risk-badge badge-warning">7 dias</span>
+      </div>
+    </div>
+
+    <!-- Milestone -->
+    <div class="section-title">Sua trajetória</div>
+
+    <div class="milestone-card">
+      <div class="milestone-icon">🏆</div>
+      <div class="milestone-text">
+        <div class="value">312 missões</div>
+        <div class="label">completadas pelos seus alunos</div>
+        <div class="sub">↑ 47 criadas por você no total</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <div class="nav-item">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Início</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Missões</span>
+    </div>
+    <div class="nav-item active">
+      <span class="nav-icon">⚡</span>
+      <div class="nav-dot"></div>
+      <span class="nav-label" style="color:#52b788">Impacto</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">👥</span>
+      <span class="nav-label">Turma</span>
+    </div>
+    <div class="nav-item">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Config</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

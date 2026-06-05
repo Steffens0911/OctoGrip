@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mockup — Notificações In-App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #1a1a2e;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      gap: 40px;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 20px;
+      flex-wrap: wrap;
+    }
+
+    h2 {
+      color: #aaa;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+
+    /* ---- PHONE SHELL ---- */
+    .phone {
+      width: 360px;
+      background: #121212;
+      border-radius: 36px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+      border: 2px solid #333;
+    }
+
+    /* ---- APP BAR ---- */
+    .appbar {
+      background: #1E1E2E;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2a2a3e;
+    }
+    .appbar-title {
+      color: #fff;
+      font-size: 17px;
+      font-weight: 600;
+    }
+    .appbar-actions {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+    .icon-btn {
+      position: relative;
+      cursor: pointer;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-btn svg {
+      width: 22px;
+      height: 22px;
+      fill: #ccc;
+    }
+    .badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #e53935;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      border-radius: 10px;
+      min-width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 4px;
+      border: 2px solid #1E1E2E;
+    }
+    .badge.pulse {
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+
+    /* ---- SCREEN BODY ---- */
+    .screen-body {
+      background: #0f0f1a;
+      min-height: 520px;
+    }
+
+    /* ---- NOTIFICATION PANEL ---- */
+    .notif-panel {
+      background: #1E1E2E;
+    }
+    .notif-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px 8px;
+      border-bottom: 1px solid #2a2a3e;
+    }
+    .notif-header span {
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .mark-all {
+      color: #7c6af7;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .notif-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1a1a2e;
+      align-items: flex-start;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .notif-item:hover { background: #252540; }
+    .notif-item.unread {
+      background: #1f1f35;
+      border-left: 3px solid #7c6af7;
+    }
+    .notif-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 20px;
+    }
+    .notif-avatar.green  { background: #1b4332; }
+    .notif-avatar.blue   { background: #1a3a5c; }
+    .notif-avatar.gold   { background: #3d2b00; }
+    .notif-avatar.purple { background: #2d1b69; }
+    .notif-content { flex: 1; }
+    .notif-title {
+      color: #e0e0ff;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .notif-body {
+      color: #888;
+      font-size: 12px;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .notif-time {
+      color: #555;
+      font-size: 11px;
+      margin-top: 4px;
+    }
+    .notif-dot {
+      width: 8px;
+      height: 8px;
+      background: #7c6af7;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .empty-dot { width: 8px; height: 8px; flex-shrink: 0; }
+
+    /* ---- BOTTOM NAV ---- */
+    .bottom-nav {
+      background: #1E1E2E;
+      display: flex;
+      justify-content: space-around;
+      padding: 10px 0 14px;
+      border-top: 1px solid #2a2a3e;
+    }
+    .nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      position: relative;
+    }
+    .nav-item svg {
+      width: 24px;
+      height: 24px;
+      fill: #555;
+    }
+    .nav-item.active svg { fill: #7c6af7; }
+    .nav-item span {
+      font-size: 10px;
+      color: #555;
+    }
+    .nav-item.active span { color: #7c6af7; }
+    .nav-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background: #e53935;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      border-radius: 8px;
+      min-width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 3px;
+    }
+
+    /* ---- LABELS ---- */
+    .label-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      background: #252540;
+      border: 1px solid #3a3a5c;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: #bbb;
+    }
+    .chip.active {
+      background: #3a2f80;
+      border-color: #7c6af7;
+      color: #c5bbff;
+    }
+
+    /* ---- DETAIL VIEW ---- */
+    .notif-detail {
+      padding: 20px 16px;
+    }
+    .detail-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #1b4332;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      margin-bottom: 12px;
+    }
+    .detail-title {
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .detail-body {
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 12px;
+    }
+    .detail-time {
+      color: #555;
+      font-size: 12px;
+      margin-bottom: 20px;
+    }
+    .btn {
+      background: #7c6af7;
+      color: #fff;
+      border: none;
+      border-radius: 12px;
+      padding: 10px 20px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+
+    /* ---- ANNOTATION ---- */
+    .annotation {
+      color: #888;
+      font-size: 12px;
+      max-width: 360px;
+      line-height: 1.6;
+    }
+    .annotation strong { color: #c5bbff; }
+    .annotation ul { margin-left: 16px; margin-top: 6px; }
+    .annotation li { margin-bottom: 4px; }
+
+    .section { display: flex; flex-direction: column; align-items: center; }
+  </style>
+</head>
+<body>
+
+  <!-- TELA 1: ícone de carta na AppBar com badge -->
+  <div class="section">
+    <h2>1 — Ícone na AppBar</h2>
+    <div class="phone">
+      <div class="appbar">
+        <div class="appbar-title">Campo de Treino</div>
+        <div class="appbar-actions">
+          <!-- Ícone carta com badge -->
+          <div class="icon-btn">
+            <!-- Envelope icon -->
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/>
+            </svg>
+            <div class="badge pulse">5</div>
+          </div>
+          <!-- Logout icon -->
+          <div class="icon-btn">
+            <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="screen-body" style="display:flex;align-items:center;justify-content:center;color:#333;font-size:13px;">
+        conteúdo da tela atual
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3z"/></svg>
+          <span>Treino</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+          <span>Central</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation" style="margin-top:12px;">
+      <strong>Badge na AppBar</strong> — ícone de carta no canto superior direito com contagem de não lidas. Toque abre o painel.
+    </div>
+  </div>
+
+  <!-- TELA 2: Painel de notificações -->
+  <div class="section">
+    <h2>2 — Painel de Notificações</h2>
+    <div class="phone">
+      <div class="appbar">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <svg width="18" height="18" fill="#aaa" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          <span style="color:#fff;font-size:16px;font-weight:600;">Notificações</span>
+        </div>
+        <span class="mark-all">Marcar todas lidas</span>
+      </div>
+      <!-- filter chips -->
+      <div style="padding:10px 16px 0;background:#1E1E2E;border-bottom:1px solid #2a2a3e;">
+        <div class="label-row" style="margin-top:0;padding-bottom:10px;">
+          <div class="chip active">Todas</div>
+          <div class="chip">Missões</div>
+          <div class="chip">Troféus</div>
+          <div class="chip">Avisos</div>
+        </div>
+      </div>
+
+      <div class="notif-panel" style="overflow-y:auto;max-height:460px;">
+        <!-- unread -->
+        <div class="notif-item unread">
+          <div class="notif-avatar green">✅</div>
+          <div class="notif-content">
+            <div class="notif-title">Missão confirmada!</div>
+            <div class="notif-body">Prof. João confirmou sua missão de <strong style="color:#ccc">Raspagem 5x</strong></div>
+            <div class="notif-time">há 2 min</div>
+          </div>
+          <div class="notif-dot"></div>
+        </div>
+
+        <div class="notif-item unread">
+          <div class="notif-avatar gold">🏆</div>
+          <div class="notif-content">
+            <div class="notif-title">Novo troféu desbloqueado!</div>
+            <div class="notif-body">Você conquistou <strong style="color:#ccc">Iniciante de Ferro</strong> — 10 missões completas</div>
+            <div class="notif-time">há 15 min</div>
+          </div>
+          <div class="notif-dot"></div>
+        </div>
+
+        <div class="notif-item unread">
+          <div class="notif-avatar blue">📢</div>
+          <div class="notif-content">
+            <div class="notif-title">Aviso da academia</div>
+            <div class="notif-body">Treino de sábado cancelado por feriado municipal</div>
+            <div class="notif-time">há 1 h</div>
+          </div>
+          <div class="notif-dot"></div>
+        </div>
+
+        <!-- read -->
+        <div style="padding:8px 16px 4px;color:#555;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;">Anteriores</div>
+
+        <div class="notif-item">
+          <div class="notif-avatar purple">⭐</div>
+          <div class="notif-content">
+            <div class="notif-title">Você subiu de nível!</div>
+            <div class="notif-body">Parabéns, você é agora <strong style="color:#ccc">Nível 4 — Faixa Azul</strong></div>
+            <div class="notif-time">ontem</div>
+          </div>
+          <div class="empty-dot"></div>
+        </div>
+
+        <div class="notif-item">
+          <div class="notif-avatar green">✅</div>
+          <div class="notif-content">
+            <div class="notif-title">Missão confirmada!</div>
+            <div class="notif-body">Prof. João confirmou sua missão de <strong style="color:#ccc">Triângulo 3x</strong></div>
+            <div class="notif-time">ontem</div>
+          </div>
+          <div class="empty-dot"></div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3z"/></svg>
+          <span>Treino</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+          <span>Central</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation" style="margin-top:12px;">
+      <strong>Painel de notificações</strong> com filtros por tipo. Itens não lidos têm borda roxa e ponto indicador.
+    </div>
+  </div>
+
+  <!-- TELA 3: Detalhe de uma notificação -->
+  <div class="section">
+    <h2>3 — Detalhe (tap na notif)</h2>
+    <div class="phone">
+      <div class="appbar">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <svg width="18" height="18" fill="#aaa" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+          <span style="color:#fff;font-size:16px;font-weight:600;">Detalhe</span>
+        </div>
+      </div>
+      <div class="screen-body">
+        <div class="notif-detail">
+          <div class="detail-icon">✅</div>
+          <div class="detail-title">Missão confirmada!</div>
+          <div class="detail-time">22 mai 2026 · 10:42</div>
+          <div class="detail-body">
+            O professor <strong style="color:#ddd">João Silva</strong> confirmou sua missão:<br/><br/>
+            <strong style="color:#ddd">Raspagem 5x</strong> — técnica de Raspagem de Guarda<br/><br/>
+            Você ganhou <strong style="color:#f5c518">+50 pontos</strong> de experiência por esta missão.
+          </div>
+          <button class="btn">Ver missões</button>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active">
+          <svg viewBox="0 0 24 24"><path d="M12 3L2 12h3v8h6v-5h2v5h6v-8h3z"/></svg>
+          <span>Treino</span>
+        </div>
+        <div class="nav-item">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+          <span>Central</span>
+        </div>
+      </div>
+    </div>
+    <div class="annotation" style="margin-top:12px;">
+      <strong>Detalhe</strong> com contexto completo e botão de ação direto para a tela relacionada.
+    </div>
+  </div>
+
+  <!-- Plano técnico -->
+  <div style="width:100%;max-width:900px;background:#1E1E2E;border-radius:16px;padding:24px;margin-top:8px;color:#ccc;font-size:13px;line-height:1.8;">
+    <div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:16px;">Plano de implementação</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+      <div>
+        <div style="color:#7c6af7;font-weight:600;margin-bottom:8px;">Backend (FastAPI)</div>
+        <ul style="margin-left:16px;">
+          <li>Tabela <code style="color:#f5c518">notifications</code> (id, user_id, type, title, body, read, created_at)</li>
+          <li><code style="color:#f5c518">GET /notifications</code> — lista paginada do usuário</li>
+          <li><code style="color:#f5c518">GET /notifications/unread-count</code> — só o número</li>
+          <li><code style="color:#f5c518">POST /notifications/{id}/read</code> — marcar lida</li>
+          <li><code style="color:#f5c518">POST /notifications/read-all</code> — marcar todas lidas</li>
+          <li>Função utilitária <code style="color:#f5c518">create_notification()</code> chamada ao confirmar missão, desbloquear troféu, etc.</li>
+        </ul>
+      </div>
+      <div>
+        <div style="color:#7c6af7;font-weight:600;margin-bottom:8px;">Flutter (Viewer)</div>
+        <ul style="margin-left:16px;">
+          <li><code style="color:#f5c518">NotificationModel</code> — modelo de dados</li>
+          <li><code style="color:#f5c518">NotificationService</code> — fetch, mark read, polling</li>
+          <li>Ícone carta na AppBar do <code style="color:#f5c518">MainShell</code> com Badge (igual ao das missões)</li>
+          <li><code style="color:#f5c518">NotificationsScreen</code> — lista com filtros</li>
+          <li>Poll automático a cada 30s (ou via push já existente)</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:16px;background:#252540;border-radius:8px;padding:12px;color:#aaa;">
+      <strong style="color:#fff">Tipos de notificação gerados automaticamente:</strong> missão confirmada · troféu desbloqueado · aviso da academia · subiu de nível
+    </div>
+  </div>
+
+</body>
+</html>

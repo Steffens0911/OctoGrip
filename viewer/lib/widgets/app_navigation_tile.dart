@@ -10,6 +10,7 @@ class AppNavigationTile extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final bool showAlertBadge;
+  final int badgeCount;
 
   const AppNavigationTile({
     super.key,
@@ -18,6 +19,7 @@ class AppNavigationTile extends StatelessWidget {
     required this.subtitle,
     required this.onTap,
     this.showAlertBadge = false,
+    this.badgeCount = 0,
   });
 
   @override
@@ -44,14 +46,46 @@ class AppNavigationTile extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.1),
-                  borderRadius: AppRadius.tileRadius,
-                ),
-                child: Icon(icon, color: primary, size: 22),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: primary.withValues(alpha: 0.1),
+                      borderRadius: AppRadius.tileRadius,
+                    ),
+                    child: Icon(icon, color: primary, size: 22),
+                  ),
+                  if (badgeCount > 0)
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.error,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: AppTheme.surfaceOf(context),
+                            width: 2,
+                          ),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                        child: Text(
+                          badgeCount > 99 ? '99+' : '$badgeCount',
+                          style: TextStyle(
+                            color: colorScheme.onError,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'sans-serif',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: AppSpacing.m),
               Expanded(

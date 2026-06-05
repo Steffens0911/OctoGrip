@@ -14,6 +14,9 @@ from app.models.lesson import Lesson
 from app.models.lesson_progress import LessonProgress
 from app.models.mission import Mission
 from app.models.mission_usage import MissionUsage
+from app.models.academy_photo import AcademyPhoto, AcademyPhotoLike, AcademyPhotoRestriction
+from app.models.manual_trophy import AcademyChampionshipEvent, AcademyTrophyAward, AcademyTrophyTemplate
+from app.models.enrollment_invite import EnrollmentInvite, PendingEnrollment
 from app.models.notification import Notification
 from app.models.partner import Partner
 from app.models.professor import Professor
@@ -63,4 +66,12 @@ __all__ = [
     "FaceRecognitionJob",
     "UserTrophyEarned",
     "Notification",
+    "AcademyPhoto",
+    "AcademyPhotoLike",
+    "AcademyPhotoRestriction",
+    "AcademyTrophyTemplate",
+    "AcademyChampionshipEvent",
+    "AcademyTrophyAward",
+    "EnrollmentInvite",
+    "PendingEnrollment",
 ]

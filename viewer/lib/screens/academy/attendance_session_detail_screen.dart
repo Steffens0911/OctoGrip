@@ -123,7 +123,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
       try {
         final academyId = session.academyId;
         if (academyId != null && academyId.isNotEmpty) {
-          final academy = await _api.getAcademy(academyId);
+          final academy = await _api.getAcademyFresh(academyId);
           faceRecognitionEnabled = academy.faceRecognitionEnabled;
         }
       } catch (_) {}
@@ -394,7 +394,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
             spacing: 8,
             runSpacing: 8,
             children: [
-              if (!isClosed && _faceRecognitionEnabled)
+              if (_faceRecognitionEnabled)
                 FilledButton.icon(
                   onPressed: _busy ? null : _openFaceRecognitionFlow,
                   icon: const Icon(Icons.camera_alt_rounded),

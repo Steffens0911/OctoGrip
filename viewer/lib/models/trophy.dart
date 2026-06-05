@@ -144,13 +144,13 @@ class TrophyHomeSummaryItem {
   final String trophyId;
   final String name;
   final String awardKind;
-  final String tier;
+  final String? tier;
 
   TrophyHomeSummaryItem({
     required this.trophyId,
     required this.name,
     required this.awardKind,
-    required this.tier,
+    this.tier,
   });
 
   factory TrophyHomeSummaryItem.fromJson(Map<String, dynamic> json) =>
@@ -158,7 +158,7 @@ class TrophyHomeSummaryItem {
         trophyId: json['trophy_id'] as String,
         name: json['name'] as String,
         awardKind: json['award_kind'] as String? ?? 'trophy',
-        tier: json['tier'] as String,
+        tier: json['tier'] as String?,
       );
 
   String get emoji => TrophyWithEarned.tierEmoji(tier);
@@ -167,14 +167,14 @@ class TrophyHomeSummaryItem {
 class AcademyRecentItem {
   final String userId;
   final String userName;
-  final String tier;
+  final String? tier;
   final String trophyName;
   final String awardKind;
 
   AcademyRecentItem({
     required this.userId,
     required this.userName,
-    required this.tier,
+    this.tier,
     required this.trophyName,
     required this.awardKind,
   });
@@ -183,7 +183,7 @@ class AcademyRecentItem {
       AcademyRecentItem(
         userId: json['user_id'] as String,
         userName: json['user_name'] as String,
-        tier: json['tier'] as String,
+        tier: json['tier'] as String?,
         trophyName: json['trophy_name'] as String,
         awardKind: json['award_kind'] as String? ?? 'trophy',
       );
@@ -200,13 +200,13 @@ class AcademyRecentItem {
 class AcademyUserEarnedItem {
   final String trophyId;
   final String name;
-  final String tier;
+  final String? tier;
   final String awardKind;
 
   AcademyUserEarnedItem({
     required this.trophyId,
     required this.name,
-    required this.tier,
+    this.tier,
     required this.awardKind,
   });
 
@@ -214,7 +214,7 @@ class AcademyUserEarnedItem {
       AcademyUserEarnedItem(
         trophyId: json['trophy_id'] as String,
         name: json['name'] as String,
-        tier: json['tier'] as String,
+        tier: json['tier'] as String?,
         awardKind: json['award_kind'] as String? ?? 'trophy',
       );
 

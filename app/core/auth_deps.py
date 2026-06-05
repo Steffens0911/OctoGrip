@@ -79,6 +79,29 @@ async def get_current_user(
     return real_user
 
 
+async def get_real_user(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
+) -> User:
+    """Retorna sempre o usuário real do JWT, ignorando X-Impersonate-User.
+    Útil para checar o papel do admin em rotas onde a impersonation não deve
+    rebaixar permissões (ex.: atualizar configurações admin de academia)."""
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise AuthenticationError("Token de autenticação ausente ou inválido.")
+    user_id_str = decode_access_token(credentials.credentials)
+    if not user_id_str:
+        raise AuthenticationError("Token inválido ou expirado.")
+    try:
+        user_id = UUID(user_id_str)
+    except ValueError:
+        raise AuthenticationError("Token inválido.")
+    real_user = await get_user(db, user_id)
+    if not real_user:
+        raise AuthenticationError("Usuário não encontrado.")
+    return real_user
+
+
 async def require_aluno_not_frozen(
     current_user: User = Depends(get_current_user),
 ) -> User:

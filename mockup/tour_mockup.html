@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Octogrip — Tour Campo de Treinamento</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  /* ── Phone shell ── */
+  .phone {
+    width: 375px;
+    height: 780px;
+    background: #0f0f1a;
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 32px 80px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.08);
+  }
+
+  /* ── App UI (fundo real da tela) ── */
+  .app-screen {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    background: #0f0f1a;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+  }
+  .status-bar span { color: #fff; font-size: 12px; font-weight: 600; }
+
+  /* Scrollable content — tudo que o aluno vê */
+  .screen-content {
+    padding: 0 16px 100px;
+    overflow-y: auto;
+    height: calc(100% - 44px - 64px);
+  }
+
+  /* Header */
+  .header-block {
+    background: #1a1a2e;
+    border-radius: 16px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .header-name { color: #fff; font-size: 18px; font-weight: 800; }
+  .header-icons { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: #aaa; cursor: pointer;
+  }
+  .sub-text { color: #666; font-size: 11px; margin-bottom: 10px; }
+  .xp-bar-wrap { background: rgba(255,255,255,.07); border-radius: 6px; height: 6px; overflow: hidden; margin-bottom: 6px; }
+  .xp-bar { width: 62%; height: 100%; background: linear-gradient(90deg, #6c63ff, #a78bfa); border-radius: 6px; }
+  .xp-label { display: flex; justify-content: space-between; }
+  .xp-label span { color: #888; font-size: 10px; }
+  .avatar-row { display: flex; justify-content: center; margin-top: 10px; }
+  .avatar { width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg,#6c63ff,#a78bfa); }
+  .daily-badge {
+    margin-top: 10px;
+    background: rgba(108,99,255,.15);
+    border: 1px solid rgba(108,99,255,.4);
+    border-radius: 8px;
+    padding: 6px 10px;
+    text-align: center;
+    color: #a78bfa;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  /* Streak */
+  .streak-block {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    background: rgba(255,87,34,.08);
+    border: 1px solid rgba(255,87,34,.25);
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .streak-fire { font-size: 20px; }
+  .streak-text { color: #ff7043; font-size: 13px; font-weight: 700; }
+  .streak-sub  { color: #888; font-size: 11px; }
+
+  /* Stats */
+  .stats-block {
+    background: rgba(0,188,212,.06);
+    border: 1px solid rgba(0,188,212,.2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .stats-label { color: #888; font-size: 10px; letter-spacing: .8px; margin-bottom: 8px; }
+  .stats-row { display: flex; gap: 8px; }
+  .stat-chip {
+    flex: 1; background: rgba(255,255,255,.04);
+    border-radius: 8px; padding: 8px 6px; text-align: center;
+  }
+  .stat-num { color: #00bcd4; font-size: 18px; font-weight: 800; }
+  .stat-sub { color: #666; font-size: 10px; margin-top: 2px; }
+
+  /* Missions */
+  .missions-block {
+    background: rgba(76,175,80,.06);
+    border: 1px solid rgba(76,175,80,.2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .missions-label { color: #888; font-size: 10px; letter-spacing: .8px; margin-bottom: 10px; }
+  .mission-trail { display: flex; align-items: center; justify-content: center; gap: 0; }
+  .mission-dot {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .mission-dot.done { background: #4caf50; color: #fff; }
+  .mission-dot.active { background: #81c784; color: #fff; box-shadow: 0 0 0 3px rgba(76,175,80,.35); }
+  .mission-dot.locked { background: rgba(255,255,255,.08); color: #555; }
+  .mission-line { width: 18px; height: 3px; background: rgba(76,175,80,.3); flex-shrink: 0; }
+
+  /* Trophies */
+  .trophies-block {
+    background: rgba(255,193,7,.06);
+    border: 1px solid rgba(255,193,7,.2);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .trophies-label { color: #888; font-size: 10px; letter-spacing: .8px; margin-bottom: 8px; }
+  .trophy-row { display: flex; gap: 8px; }
+  .trophy-chip {
+    flex: 1; background: rgba(255,193,7,.1);
+    border: 1px solid rgba(255,193,7,.3);
+    border-radius: 8px; padding: 8px 4px; text-align: center;
+  }
+  .trophy-icon { font-size: 20px; }
+  .trophy-name { color: #ffd54f; font-size: 9px; margin-top: 3px; }
+
+  /* Confirmations */
+  .confirm-block {
+    background: rgba(156,39,176,.06);
+    border: 1px solid rgba(156,39,176,.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .confirm-label { color: #888; font-size: 10px; letter-spacing: .8px; margin-bottom: 8px; }
+  .confirm-row { display: flex; align-items: center; gap: 10px; }
+  .confirm-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg,#9c27b0,#ce93d8); flex-shrink: 0; }
+  .confirm-text { color: #ce93d8; font-size: 12px; font-weight: 600; }
+  .confirm-sub { color: #777; font-size: 10px; margin-top: 2px; }
+  .confirm-btn {
+    margin-left: auto;
+    background: rgba(156,39,176,.3);
+    border: 1px solid rgba(156,39,176,.5);
+    border-radius: 8px;
+    padding: 5px 10px;
+    color: #ce93d8;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* Bottom nav */
+  .bottom-nav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: #141424;
+    border-top: 1px solid rgba(255,255,255,.07);
+    display: flex; align-items: center;
+  }
+  .nav-item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+  }
+  .nav-icon { font-size: 20px; }
+  .nav-label { font-size: 10px; color: #666; }
+  .nav-item.active .nav-label { color: #6c63ff; }
+  .nav-item.active .nav-icon { filter: drop-shadow(0 0 4px #6c63ff); }
+
+  /* ══════════════════════════════════
+     TOUR OVERLAY
+  ══════════════════════════════════ */
+  .tour-overlay {
+    position: absolute; inset: 0;
+    z-index: 100;
+    pointer-events: none;
+  }
+  .tour-overlay.active { pointer-events: all; }
+
+  /* Máscara escura com recorte via clip-path */
+  .tour-mask {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,.78);
+    transition: all .35s ease;
+  }
+
+  /* Spotlight: anel colorido que "ilumina" o elemento */
+  .tour-spotlight {
+    position: absolute;
+    border-radius: 14px;
+    box-shadow: 0 0 0 9999px rgba(0,0,0,.78);
+    transition: all .35s cubic-bezier(.4,0,.2,1);
+    pointer-events: none;
+  }
+
+  /* Balão de texto */
+  .tour-bubble {
+    position: absolute;
+    background: #1e1e3a;
+    border: 1.5px solid;
+    border-radius: 16px;
+    padding: 14px 16px;
+    width: 300px;
+    left: 50%;
+    transform: translateX(-50%);
+    transition: all .35s cubic-bezier(.4,0,.2,1);
+    box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  }
+  .bubble-arrow {
+    position: absolute;
+    width: 14px; height: 8px;
+    left: 50%; transform: translateX(-50%);
+  }
+  .bubble-arrow.up    { top: -8px; }
+  .bubble-arrow.down  { bottom: -8px; transform: translateX(-50%) rotate(180deg); }
+  .tour-bubble h3 { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+  .tour-bubble p  { font-size: 13px; color: #aaa; line-height: 1.55; }
+
+  /* Rodapé do tour */
+  .tour-footer {
+    position: absolute; bottom: 72px; left: 0; right: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 0 24px;
+    transition: opacity .3s;
+  }
+  .tour-dots { display: flex; gap: 6px; }
+  .dot {
+    height: 7px; border-radius: 4px;
+    transition: all .25s ease;
+    background: rgba(255,255,255,.25);
+    width: 7px;
+  }
+  .dot.active { width: 20px; }
+  .tour-btn {
+    width: 100%;
+    padding: 13px;
+    border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700;
+    color: #fff; cursor: pointer;
+    transition: background .25s, transform .1s;
+  }
+  .tour-btn:active { transform: scale(.97); }
+  .tour-skip {
+    background: none; border: none;
+    color: rgba(255,255,255,.4);
+    font-size: 13px; cursor: pointer;
+    padding: 4px 8px;
+  }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="app-screen">
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span>9:41</span>
+      <span>●●●  WiFi  🔋</span>
+    </div>
+
+    <!-- Scrollable content -->
+    <div class="screen-content" id="screenContent">
+
+      <!-- SLIDE 0: Header -->
+      <div id="el-header" class="header-block">
+        <div class="header-row">
+          <span class="header-name">Olá, Pedro!</span>
+          <div class="header-icons">
+            <div class="icon-btn">?</div>
+            <div class="icon-btn">📋</div>
+          </div>
+        </div>
+        <div class="sub-text">Construa consistência e evolua sua técnica esta semana</div>
+        <div class="xp-bar-wrap"><div class="xp-bar"></div></div>
+        <div class="xp-label"><span>Nível 4 · 620 XP</span><span>800 XP</span></div>
+        <div class="avatar-row"><div class="avatar"></div></div>
+        <div class="daily-badge">+ 30 XP · Complete a tarefa diária</div>
+      </div>
+
+      <!-- SLIDE 1: Streak -->
+      <div id="el-streak" class="streak-block">
+        <span class="streak-fire">🔥</span>
+        <div>
+          <div class="streak-text">7 dias seguidos</div>
+          <div class="streak-sub">Bônus de presença ativo</div>
+        </div>
+      </div>
+
+      <!-- SLIDE 2: Stats -->
+      <div id="el-stats" class="stats-block">
+        <div class="stats-label">SUA JORNADA</div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="stat-num">34</div><div class="stat-sub">técnicas</div></div>
+          <div class="stat-chip"><div class="stat-num">12</div><div class="stat-sub">vídeos</div></div>
+          <div class="stat-chip"><div class="stat-num">8</div><div class="stat-sub">posições</div></div>
+        </div>
+      </div>
+
+      <!-- SLIDE 3: Missions -->
+      <div id="el-missions" class="missions-block">
+        <div class="missions-label">MISSÕES DA SEMANA</div>
+        <div class="mission-trail">
+          <div class="mission-dot done">✓</div>
+          <div class="mission-line"></div>
+          <div class="mission-dot active">2</div>
+          <div class="mission-line"></div>
+          <div class="mission-dot locked">3</div>
+          <div class="mission-line"></div>
+          <div class="mission-dot locked">4</div>
+          <div class="mission-line"></div>
+          <div class="mission-dot locked">5</div>
+        </div>
+      </div>
+
+      <!-- SLIDE 4: Trophies -->
+      <div id="el-trophies" class="trophies-block">
+        <div class="trophies-label">TROFÉUS</div>
+        <div class="trophy-row">
+          <div class="trophy-chip"><div class="trophy-icon">🥇</div><div class="trophy-name">Primeira exec.</div></div>
+          <div class="trophy-chip"><div class="trophy-icon">🔥</div><div class="trophy-name">7 dias seguidos</div></div>
+          <div class="trophy-chip" style="opacity:.35"><div class="trophy-icon">🏆</div><div class="trophy-name">Nível 5</div></div>
+        </div>
+      </div>
+
+      <!-- SLIDE 5: Confirmations -->
+      <div id="el-confirm" class="confirm-block">
+        <div class="confirm-label">CONFIRMAÇÕES E SOLICITAÇÕES</div>
+        <div class="confirm-row">
+          <div class="confirm-avatar"></div>
+          <div>
+            <div class="confirm-text">Lucas quer sua confirmação</div>
+            <div class="confirm-sub">Raspagem · há 2h</div>
+          </div>
+          <div class="confirm-btn">Confirmar</div>
+        </div>
+      </div>
+
+    </div><!-- /screen-content -->
+
+    <!-- Bottom nav -->
+    <div class="bottom-nav">
+      <div class="nav-item active"><span class="nav-icon">🏆</span><span class="nav-label">Campo</span></div>
+      <div class="nav-item"><span class="nav-icon">🏛️</span><span class="nav-label">Central</span></div>
+    </div>
+
+    <!-- ── TOUR OVERLAY ── -->
+    <div class="tour-overlay active" id="tourOverlay">
+
+      <div class="tour-spotlight" id="tourSpotlight"></div>
+
+      <div class="tour-bubble" id="tourBubble">
+        <svg class="bubble-arrow" id="bubbleArrow" viewBox="0 0 14 8">
+          <polygon points="7,0 14,8 0,8" id="arrowPoly"/>
+        </svg>
+        <h3 id="bubbleTitle"></h3>
+        <p  id="bubbleBody"></p>
+      </div>
+
+      <div class="tour-footer" id="tourFooter">
+        <div class="tour-dots" id="tourDots"></div>
+        <button class="tour-btn" id="tourBtn" onclick="nextSlide()">Próximo</button>
+        <button class="tour-skip" onclick="closeTour()">Pular tour</button>
+      </div>
+
+    </div>
+
+  </div><!-- /app-screen -->
+</div><!-- /phone -->
+
+<script>
+const SLIDES = [
+  {
+    el: 'el-header',
+    color: '#6c63ff',
+    title: 'Quanto você evoluiu hoje',
+    body: 'Seu nível e XP ficam aqui, sempre atualizados. A tarefa em vídeo no topo pontua uma vez por dia — não perca.',
+    bubblePos: 'below',
+  },
+  {
+    el: 'el-streak',
+    color: '#ff5722',
+    title: 'Não quebre a corrente',
+    body: 'Seu streak mostra quantos dias seguidos você está ativo. Bônus de pontos por não falhar — consistência é a chave.',
+    bubblePos: 'below',
+  },
+  {
+    el: 'el-stats',
+    color: '#00bcd4',
+    title: 'Quanto você já treinou',
+    body: 'Cada técnica confirmada aparece aqui. São os números que não mentem: frequência, estudos em vídeo e posições executadas.',
+    bubblePos: 'below',
+  },
+  {
+    el: 'el-missions',
+    color: '#4caf50',
+    title: 'As técnicas desta semana',
+    body: 'Cada bolinha da trilha é uma missão. Toque para ver o vídeo, praticá-la no treino e registrar sua execução. Conta XP também.',
+    bubblePos: 'below',
+  },
+  {
+    el: 'el-trophies',
+    color: '#ffc107',
+    title: 'Marcos da sua jornada',
+    body: 'Cada troféu representa uma conquista real no tatame. Complete missões, suba de nível e veja a prateleira crescer.',
+    bubblePos: 'below',
+  },
+  {
+    el: 'el-confirm',
+    color: '#9c27b0',
+    title: 'O ciclo fecha aqui',
+    body: 'Registrou uma técnica? Aguarde a confirmação do colega. Foi indicado como parceiro? Confirme a execução dele.',
+    bubblePos: 'above',
+  },
+];
+
+let current = 0;
+
+const overlay    = document.getElementById('tourOverlay');
+const spotlight  = document.getElementById('tourSpotlight');
+const bubble     = document.getElementById('tourBubble');
+const bubbleArrow= document.getElementById('bubbleArrow');
+const arrowPoly  = document.getElementById('arrowPoly');
+const btnNext    = document.getElementById('tourBtn');
+const dotsWrap   = document.getElementById('tourDots');
+const footer     = document.getElementById('tourFooter');
+
+// Build dots
+SLIDES.forEach((_, i) => {
+  const d = document.createElement('div');
+  d.className = 'dot' + (i === 0 ? ' active' : '');
+  d.id = 'dot-' + i;
+  dotsWrap.appendChild(d);
+});
+
+function getElRect(id) {
+  const phone   = document.querySelector('.phone');
+  const content = document.getElementById('screenContent');
+  const el      = document.getElementById(id);
+
+  const phoneR   = phone.getBoundingClientRect();
+  const elR      = el.getBoundingClientRect();
+
+  return {
+    top:    elR.top    - phoneR.top,
+    left:   elR.left   - phoneR.left,
+    width:  elR.width,
+    height: elR.height,
+  };
+}
+
+function scrollToEl(id) {
+  const el = document.getElementById(id);
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function showSlide(idx) {
+  const s = SLIDES[idx];
+
+  // Scroll element into view
+  scrollToEl(s.el);
+
+  // Wait for scroll then position
+  setTimeout(() => {
+    const r = getElRect(s.el);
+    const pad = 6;
+
+    // Spotlight
+    spotlight.style.top    = (r.top  - pad) + 'px';
+    spotlight.style.left   = (r.left - pad) + 'px';
+    spotlight.style.width  = (r.width  + pad*2) + 'px';
+    spotlight.style.height = (r.height + pad*2) + 'px';
+    spotlight.style.borderColor = s.color;
+    spotlight.style.boxShadow = `0 0 0 9999px rgba(0,0,0,.80), 0 0 0 2px ${s.color}`;
+
+    // Bubble color
+    bubble.style.borderColor = s.color;
+    document.getElementById('bubbleTitle').style.color = s.color;
+    document.getElementById('bubbleTitle').textContent = s.title;
+    document.getElementById('bubbleBody').textContent  = s.body;
+
+    // Arrow fill
+    arrowPoly.setAttribute('fill', s.color);
+
+    // Bubble position
+    const bubbleH = 120;
+    const gap     = 14;
+    const phoneW  = 375;
+
+    if (s.bubblePos === 'below') {
+      const top = r.top + r.height + pad + gap;
+      bubble.style.top    = top + 'px';
+      bubble.style.bottom = 'auto';
+      // Arrow above bubble
+      bubbleArrow.className = 'bubble-arrow up';
+      bubbleArrow.style.top    = '-8px';
+      bubbleArrow.style.bottom = 'auto';
+      arrowPoly.setAttribute('points', '7,0 14,8 0,8');
+    } else {
+      const bottom = (780 - (r.top - pad - gap - bubbleH));
+      bubble.style.bottom = bottom + 'px';
+      bubble.style.top    = 'auto';
+      // Arrow below bubble
+      bubbleArrow.className = 'bubble-arrow down';
+      bubbleArrow.style.bottom = '-8px';
+      bubbleArrow.style.top    = 'auto';
+      arrowPoly.setAttribute('points', '7,8 14,0 0,0');
+    }
+
+    // Button color
+    btnNext.style.background = s.color;
+    btnNext.textContent = idx === SLIDES.length - 1 ? 'Entendido!' : 'Próximo';
+
+    // Dots
+    SLIDES.forEach((_, i) => {
+      const d = document.getElementById('dot-' + i);
+      d.className = 'dot' + (i === idx ? ' active' : '');
+      d.style.background = i === idx ? s.color : 'rgba(255,255,255,.25)';
+    });
+
+  }, 160);
+}
+
+function nextSlide() {
+  if (current < SLIDES.length - 1) {
+    current++;
+    showSlide(current);
+  } else {
+    closeTour();
+  }
+}
+
+function closeTour() {
+  overlay.style.opacity = '0';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.transition = 'opacity .3s';
+}
+
+// Start
+showSlide(0);
+</script>
+</body>
+</html>

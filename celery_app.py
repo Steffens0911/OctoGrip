@@ -10,7 +10,7 @@ celery_app = Celery(
     "octogrip",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.face_recognition_tasks", "app.tasks.execution_tasks"],
+    include=["app.tasks.face_recognition_tasks", "app.tasks.execution_tasks", "app.tasks.photo_tasks", "app.tasks.at_risk_tasks", "app.tasks.streak_tasks"],
 )
 
 celery_app.conf.update(
@@ -40,6 +40,22 @@ celery_app.conf.update(
         "escalate-pending-executions-to-professor": {
             "task": "app.tasks.execution_tasks.escalate_pending_executions_to_professor",
             "schedule": crontab(hour=4, minute=0),
+        },
+        "notify-professor-pending-reviews": {
+            "task": "app.tasks.execution_tasks.notify_professor_pending_reviews",
+            "schedule": crontab(hour=8, minute=0),
+        },
+        "streak-at-risk-push": {
+            "task": "app.tasks.streak_tasks.send_streak_at_risk_push",
+            "schedule": crontab(hour=23, minute=0),  # 20h Brasília (UTC-3)
+        },
+        "weekly-at-risk-alert": {
+            "task": "app.tasks.at_risk_tasks.send_weekly_at_risk_alert",
+            "schedule": crontab(day_of_week=1, hour=12, minute=0),  # segunda 09h Brasília (UTC-3)
+        },
+        "expire-photo-restrictions": {
+            "task": "app.tasks.photo_tasks.expire_photo_restrictions",
+            "schedule": crontab(minute="*/30"),
         },
     },
 )

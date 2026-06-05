@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import TechniqueExecution, User
 from app.services.fcm_service import fetch_fcm_access_token, send_fcm_data_message
+from app.services.notification_service import create_notification
 from app.services.push_token_service import list_fcm_tokens_for_user
 
 logger = logging.getLogger(__name__)
@@ -72,7 +73,7 @@ async def notify_opponent_of_indication(
     db: AsyncSession,
     execution: TechniqueExecution,
 ) -> None:
-    """Push para o adversário quando um aluno indica uma posição para ele confirmar."""
+    """Push + in-app para o adversário quando um aluno indica uma posição para ele confirmar."""
     if not execution.opponent_id:
         return
     executor_name = _user_first_name(execution.user)
@@ -81,12 +82,21 @@ async def notify_opponent_of_indication(
     if tech:
         body = f'{executor_name} indicou "{tech}" para você confirmar'
 
+    title = "Nova indicação de posição 🥋"
     await _push(
         db,
         to_user_id=execution.opponent_id,
-        title="Nova indicação de posição 🥋",
+        title=title,
         body=body,
         data={"type": "execution_indicated", "execution_id": str(execution.id)},
+    )
+    await create_notification(
+        db,
+        user_id=execution.opponent_id,
+        type="execution_indicated",
+        title=title,
+        body=body,
+        data={"execution_id": str(execution.id)},
     )
     logger.info(
         "execution_notification: indicação enviada ao adversário",
@@ -107,12 +117,21 @@ async def notify_executor_of_confirmation(
     if tech:
         body = f'{opponent_name} confirmou sua indicação de "{tech}"'
 
+    title = "Indicação confirmada! ✅"
     await _push(
         db,
         to_user_id=execution.user_id,
-        title="Indicação confirmada! ✅",
+        title=title,
         body=body,
         data={"type": "execution_confirmed", "execution_id": str(execution.id)},
+    )
+    await create_notification(
+        db,
+        user_id=execution.user_id,
+        type="execution_confirmed",
+        title=title,
+        body=body,
+        data={"execution_id": str(execution.id)},
     )
     logger.info(
         "execution_notification: confirmação enviada ao executor",
@@ -149,6 +168,14 @@ async def notify_executor_of_professor_review(
         title=title,
         body=body,
         data={"type": notification_type, "execution_id": str(execution.id)},
+    )
+    await create_notification(
+        db,
+        user_id=execution.user_id,
+        type=notification_type,
+        title=title,
+        body=body,
+        data={"execution_id": str(execution.id)},
     )
     logger.info(
         "execution_notification: revisão do professor enviada ao executor",

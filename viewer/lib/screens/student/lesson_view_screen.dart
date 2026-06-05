@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import 'package:viewer/app_theme.dart';
+import 'package:viewer/models/user.dart';
 import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/gamification/animated_button.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
+import 'package:viewer/widgets/execution_confirm_sheet.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
 import 'package:viewer/widgets/youtube_player_embed.dart';
 
@@ -97,10 +99,12 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               ? 'before_training'
               : usageTypeUi;
       // Regra global: nenhuma conclusão sem adversário.
-      final opponentId = await _showOpponentDialog(academyId, allowSkip: false);
+      final opponent = await _showOpponentDialogWithUser(academyId);
       if (!mounted) return;
-      if (opponentId == null || opponentId.isEmpty) return;
-      await _completeMissionWithOpponent(d.missionId!, usageType, opponentId);
+      if (opponent == null || opponent.id.isEmpty) return;
+      final confirmed = await _showExecutionConfirm(opponent.name ?? opponent.email);
+      if (!mounted || !confirmed) return;
+      await _completeMissionWithOpponent(d.missionId!, usageType, opponent.id);
     } else if (d.lessonId != null) {
       final usageTypeUi = await _showUsageTypeDialog();
       if (usageTypeUi == null || !mounted) return;
@@ -110,33 +114,41 @@ class _LessonViewScreenState extends State<LessonViewScreen> {
               ? 'before_training'
               : usageTypeUi;
       // Regra global: nenhuma conclusão sem adversário.
-      final opponentId = await _showOpponentDialog(academyId, allowSkip: false);
+      final opponent = await _showOpponentDialogWithUser(academyId);
       if (!mounted) return;
-      if (opponentId == null || opponentId.isEmpty) return;
-      await _completeLessonWithOpponent(d.lessonId!, usageType, opponentId);
+      if (opponent == null || opponent.id.isEmpty) return;
+      final confirmed = await _showExecutionConfirm(opponent.name ?? opponent.email);
+      if (!mounted || !confirmed) return;
+      await _completeLessonWithOpponent(d.lessonId!, usageType, opponent.id);
     } else {
       setState(() => _error = 'Nada a concluir');
       return;
     }
   }
 
-  Future<String?> _showOpponentDialog(
-    String academyId, {
-    bool allowSkip = true,
-  }) async {
-    // No web, iframe do YouTube pode capturar eventos mesmo com bottom sheet por cima.
-    // Desabilitamos input do iframe enquanto o sheet estiver aberto.
+  Future<UserModel?> _showOpponentDialogWithUser(String academyId) async {
     setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: false);
     try {
-      return await OpponentPickerSheet.show(
+      return await OpponentPickerSheet.showWithUser(
         context,
         academyId: academyId,
         currentUserId: widget.data.userId,
-        allowSkip: allowSkip,
+        allowSkip: false,
       );
     } finally {
       setYoutubeEmbedPointerEventsFromUrl(videoUrl: widget.data.videoUrl, enabled: true);
     }
+  }
+
+  Future<bool> _showExecutionConfirm(String opponentName) {
+    final d = widget.data;
+    final techniqueName =
+        d.techniqueName ?? d.positionName ?? d.title;
+    return ExecutionConfirmSheet.show(
+      context,
+      techniqueName: techniqueName,
+      opponentName: opponentName,
+    );
   }
 
   Future<void> _completeLessonWithOpponent(

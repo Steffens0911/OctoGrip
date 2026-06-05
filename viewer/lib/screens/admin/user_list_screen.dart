@@ -11,6 +11,7 @@ import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/screens/admin/user_form_screen.dart';
 import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
+import 'package:viewer/features/photos/presentation/pages/student_photos_feed_screen.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_list_scaffold.dart';
@@ -603,6 +604,24 @@ class _UserListScreenState extends State<UserListScreen> {
                                                             ),
                                                           ),
                                                         ),
+                                                        Builder(builder: (ctx) {
+                                                          final academyId = u.academyId ?? _academyIdForQuery() ?? '';
+                                                          if (academyId.isEmpty) return const SizedBox.shrink();
+                                                          return IconButton(
+                                                            icon: const Icon(Icons.photo_library_outlined),
+                                                            tooltip: 'Ver fotos no feed',
+                                                            onPressed: () => Navigator.push(
+                                                              ctx,
+                                                              MaterialPageRoute(
+                                                                builder: (_) => StudentPhotosFeedPage(
+                                                                  academyId: academyId,
+                                                                  studentId: u.id,
+                                                                  studentName: u.name ?? u.email,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          );
+                                                        }),
                                                         if (AuthService().canEditResources()) ...[
                                                           IconButton(icon: const Icon(Icons.edit, color: AppTheme.primary), onPressed: () => _openForm(u)),
                                                           IconButton(icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error), onPressed: () => _delete(u)),

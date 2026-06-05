@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:viewer/core/leveling.dart';
 import 'package:viewer/design/app_tokens.dart';
@@ -12,11 +13,15 @@ class HeaderWidget extends StatelessWidget {
     this.userLevel = 1,
     this.currentXp = 0,
     this.maxXp = kBaseLevelThreshold,
+    this.userAvatarUrl,
     this.academyLogoUrl,
+    this.academyName,
     this.dailyVideoPoints = 30,
     this.dailyVideoCompleted = false,
     this.onDailyVideoTap,
     this.onOpenRules,
+    this.onOpenTour,
+    this.onAvatarTap,
   });
 
   final String userName;
@@ -24,14 +29,22 @@ class HeaderWidget extends StatelessWidget {
   final int userLevel;
   final int currentXp;
   final int maxXp;
-  /// URL do brasão da academia (exibido no círculo central).
+  /// URL da foto de perfil do aluno (exibida no círculo central).
+  final String? userAvatarUrl;
+  /// URL do brasão da academia (mantido para uso futuro / admin).
   final String? academyLogoUrl;
+  /// Nome da academia exibido abaixo da faixa.
+  final String? academyName;
   /// Pontos do vídeo diário que pontua; exibido no badge.
   final int dailyVideoPoints;
   /// Se true, badge mostra "Tarefa concluída · Ver de novo" (ainda clicável para assistir sem pontuar).
   final bool dailyVideoCompleted;
   final VoidCallback? onDailyVideoTap;
   final VoidCallback? onOpenRules;
+  /// Abre o tour de primeiro acesso do Campo de Treinamento.
+  final VoidCallback? onOpenTour;
+  /// Chamado ao tocar na foto de perfil para permitir troca.
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -65,6 +78,13 @@ class HeaderWidget extends StatelessWidget {
                       ),
                 ),
               ),
+              if (onOpenTour != null)
+                IconButton(
+                  onPressed: onOpenTour,
+                  icon: const Icon(Icons.help_outline_rounded, size: 20),
+                  color: FantasyTheme.textSecondaryOf(context),
+                  tooltip: 'Como funciona',
+                ),
               if (onOpenRules != null)
                 TextButton.icon(
                   onPressed: onOpenRules,
@@ -138,26 +158,54 @@ class HeaderWidget extends StatelessWidget {
           ],
           AppSpacing.verticalM,
           Semantics(
-            label: 'Brasão da academia',
+            label: 'Foto de perfil — toque para alterar',
+            button: true,
             child: Center(
-              child: CircleAvatar(
-              radius: 44,
-              backgroundColor: FantasyTheme.accentOf(context),
-              child: CircleAvatar(
-                radius: 41,
-                backgroundColor: FantasyTheme.insetSurfaceOf(context),
-                backgroundImage: academyLogoUrl != null &&
-                        academyLogoUrl!.isNotEmpty
-                    ? NetworkImage(academyLogoUrl!)
-                    : null,
-                child: academyLogoUrl == null || academyLogoUrl!.isEmpty
-                    ? Icon(
-                        Icons.shield_outlined,
-                        size: 40,
-                        color: FantasyTheme.textSecondaryOf(context),
-                      )
-                    : null,
-              ),
+              child: GestureDetector(
+                onTap: onAvatarTap,
+                child: Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    CircleAvatar(
+                      radius: 44,
+                      backgroundColor: FantasyTheme.accentOf(context),
+                      child: CircleAvatar(
+                        radius: 41,
+                        backgroundColor: FantasyTheme.insetSurfaceOf(context),
+                        child: userAvatarUrl != null && userAvatarUrl!.isNotEmpty
+                            ? ClipOval(
+                                child: CachedNetworkImage(
+                                  imageUrl: userAvatarUrl!,
+                                  width: 82,
+                                  height: 82,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => const Icon(Icons.person, size: 40),
+                                  errorWidget: (_, __, ___) =>
+                                      const Icon(Icons.person, size: 40),
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 40,
+                                color: FantasyTheme.textSecondaryOf(context),
+                              ),
+                      ),
+                    ),
+                    if (onAvatarTap != null)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: FantasyTheme.accentOf(context),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: FantasyTheme.insetSurfaceOf(context),
+                            width: 2,
+                          ),
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -170,6 +218,16 @@ class HeaderWidget extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
           ),
+          if (academyName != null && academyName!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              academyName!,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: FantasyTheme.textSecondaryOf(context),
+                  ),
+            ),
+          ],
           AppSpacing.verticalS,
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24),

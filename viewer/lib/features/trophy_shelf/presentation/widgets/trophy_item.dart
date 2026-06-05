@@ -90,14 +90,8 @@ class _TrophyItemState extends State<TrophyItem>
     if (isMedal) {
       return Icons.military_tech;
     }
-    switch (tier) {
-      case 'gold':
-      case 'silver':
-      case 'bronze':
-        return Icons.emoji_events;
-      default:
-        return Icons.workspace_premium_outlined;
-    }
+    // Always use filled icon — locked items show it at low opacity (silhouette)
+    return Icons.emoji_events;
   }
 
   @override

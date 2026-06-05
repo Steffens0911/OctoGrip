@@ -611,6 +611,20 @@ async def reject_execution(
     return execution
 
 
+async def count_professor_review_executions(db: AsyncSession, academy_id: UUID) -> int:
+    """Conta execuções aguardando revisão do professor em uma academia."""
+    result = await db.execute(
+        select(func.count())
+        .select_from(TechniqueExecution)
+        .join(User, TechniqueExecution.user_id == User.id)
+        .where(
+            TechniqueExecution.status == "pending_professor_review",
+            User.academy_id == academy_id,
+        )
+    )
+    return result.scalar_one()
+
+
 async def list_professor_review_executions(
     db: AsyncSession,
     academy_id: UUID,

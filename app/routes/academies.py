@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import settings
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, get_real_user
 from app.core.cache import app_cache
 from app.core.exceptions import AcademyNotFoundError, AppError, ForbiddenError
 from app.core.list_pagination import MAX_LIST_LIMIT
@@ -178,6 +178,8 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         login_notice_active=a.login_notice_active,
         face_recognition_enabled=a.face_recognition_enabled,
         qr_attendance_enabled=a.qr_attendance_enabled,
+        octophotos_enabled=a.octophotos_enabled,
+        user_photos_quota=a.user_photos_quota,
         updated_at=getattr(a, "updated_at", None),
     )
 
@@ -330,16 +332,21 @@ async def academy_update(
     body: AcademyUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin_or_academy_access),
+    real_user: User = Depends(get_real_user),
 ):
     """Atualiza academia. Admin ou gestor/professor da própria academia.
     Gestores e professores podem atualizar a própria academia (incl. schedule_image_url, logo_url);
-    exige current_user.academy_id == academy_id."""
+    exige current_user.academy_id == academy_id.
+    Campos admin-only (ex.: octophotos_enabled) são protegidos pelo papel do usuário real
+    (não do impersonado) para que admins em modo simulação consigam editá-los."""
     verify_academy_access(current_user, str(academy_id))
     updates = body.model_dump(exclude_unset=True)
-    if current_user.role != "administrador":
+    if real_user.role != "administrador":
         updates.pop("face_recognition_enabled", None)
         updates.pop("show_global_supporters", None)
         updates.pop("qr_attendance_enabled", None)
+        updates.pop("octophotos_enabled", None)
+        updates.pop("user_photos_quota", None)
     academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()

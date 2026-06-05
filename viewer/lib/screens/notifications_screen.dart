@@ -18,8 +18,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   static const _filters = ['Todas', 'Missões', 'Troféus', 'Vídeos', 'Avisos', 'Conta'];
 
   static const _typeToCategory = {
+    'execution_indicated': 'Missões',
     'execution_confirmed': 'Missões',
     'execution_rejected': 'Missões',
+    'execution_professor_approved': 'Missões',
+    'execution_professor_rejected': 'Missões',
     'trophy_earned': 'Troféus',
     'trophy_social': 'Troféus',
     'trophy_new': 'Troféus',

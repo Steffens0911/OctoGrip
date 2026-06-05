@@ -7,6 +7,9 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/models/face_recognition.dart';
+import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
+import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/attendance_live_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -43,6 +46,9 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _busy = false;
   bool _startingSession = false;
   bool _qrAttendanceEnabled = true;
+  bool _faceRecognitionEnabled = false;
+  String? _faceJobId;
+  bool _checkingFaceJob = false;
   String? _error;
 
   Timer? _refreshTimer;
@@ -255,19 +261,22 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       _error = null;
     });
     try {
+      if (widget.sessionId != null) {
+        await _loadExistingSession(widget.sessionId!);
+        return;
+      }
+
       final academyId = AuthService().currentUser?.academyId;
       if (academyId != null && academyId.isNotEmpty) {
         try {
           final academy = await _api.getAcademy(academyId);
           if (mounted) {
-            setState(() => _qrAttendanceEnabled = academy.qrAttendanceEnabled);
+            setState(() {
+              _qrAttendanceEnabled = academy.qrAttendanceEnabled;
+              _faceRecognitionEnabled = academy.faceRecognitionEnabled;
+            });
           }
         } catch (_) {}
-      }
-
-      if (widget.sessionId != null) {
-        await _loadExistingSession(widget.sessionId!);
-        return;
       }
 
       if (mounted) setState(() => _loading = false);
@@ -292,6 +301,23 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         _records = (recs.toList()..sort((a, b) => b.checkedInAt.compareTo(a.checkedInAt)));
         _loading = false;
       });
+      // Carrega flags da academia da sessão (pode diferir da academia do usuário logado).
+      final sessionAcademyId = session.academyId;
+      if (sessionAcademyId != null && sessionAcademyId.isNotEmpty) {
+        try {
+          final academy = await _api.getAcademyFresh(sessionAcademyId);
+          if (mounted) {
+            setState(() {
+              _qrAttendanceEnabled = academy.qrAttendanceEnabled;
+              _faceRecognitionEnabled = academy.faceRecognitionEnabled;
+            });
+          }
+        } catch (e) {
+          debugPrint('[AttendanceSession] getAcademyFresh($sessionAcademyId) erro: $e');
+        }
+      } else {
+        debugPrint('[AttendanceSession] session.academyId é null/vazio');
+      }
       await _hydrateUsersForRecords(recs);
       if (!mounted) return;
       if (isActive) {
@@ -533,6 +559,49 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     }
   }
 
+  // ── Reconhecimento facial ──────────────────────────────────
+
+  Future<void> _openFaceRecognitionFlow() async {
+    final session = _session;
+    if (session == null || _busy) return;
+    final result = await Navigator.of(context).push<FaceRecognitionSubmitResponse>(
+      MaterialPageRoute(
+        builder: (_) => FaceRecognitionCheckinScreen(sessionId: session.id),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _faceJobId = result.jobId);
+    AppFeedback.show(
+      context,
+      message: 'Foto enviada. Abra o resultado quando o processamento terminar.',
+      type: AppFeedbackType.success,
+    );
+  }
+
+  Future<void> _checkFaceRecognitionJob() async {
+    final session = _session;
+    final jobId = _faceJobId;
+    if (session == null || jobId == null || _checkingFaceJob) return;
+    setState(() => _checkingFaceJob = true);
+    try {
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReviewFaceResultsScreen(
+            sessionId: session.id,
+            jobId: jobId,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (saved == true) {
+        setState(() => _faceJobId = null);
+        await _refreshSession();
+      }
+    } finally {
+      if (mounted) setState(() => _checkingFaceJob = false);
+    }
+  }
+
   // ── Build ──────────────────────────────────────────────────
 
   @override
@@ -616,12 +685,39 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          if (!isClosed)
-            OutlinedButton.icon(
+          if (_faceRecognitionEnabled || _faceJobId != null)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (_faceRecognitionEnabled)
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _openFaceRecognitionFlow,
+                    icon: const Icon(Icons.camera_alt_rounded),
+                    label: const Text('Chamada por foto'),
+                  ),
+                if (_faceJobId != null)
+                  OutlinedButton.icon(
+                    onPressed: _checkingFaceJob ? null : _checkFaceRecognitionJob,
+                    icon: _checkingFaceJob
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.checklist_rounded),
+                    label: const Text('Ver resultado da foto'),
+                  ),
+              ],
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: OutlinedButton.icon(
               onPressed: _busy ? null : _addStudentDialog,
               icon: const Icon(Icons.person_add_rounded, size: 18),
               label: const Text('Adicionar aluno'),
             ),
+          ),
           const SizedBox(height: 8),
           Text(
             'Presentes: ${s.presentCount}',

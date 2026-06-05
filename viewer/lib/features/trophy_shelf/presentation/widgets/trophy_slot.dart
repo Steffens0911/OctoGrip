@@ -92,10 +92,31 @@ class _TrophySlotState extends State<TrophySlot> {
   }
 
   Widget _emptySlot() {
-    return Icon(
-      Icons.workspace_premium_outlined,
-      size: widget.size * 0.4,
-      color: Colors.white24,
+    final slotInner = widget.size * 0.85;
+    return Container(
+      width: slotInner,
+      height: slotInner,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFF0E0604), Color(0xFF1A0C08)],
+        ),
+        border: Border.all(color: Colors.black38, width: 1),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x55000000),
+            blurRadius: 3,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Icon(
+        Icons.emoji_events,
+        size: slotInner * 0.45,
+        color: Colors.white.withValues(alpha: 0.10),
+      ),
     );
   }
 }
