@@ -1,0 +1,14 @@
+# Força LF em todos os arquivos de texto para evitar diferenças de line endings no CI
+* text=auto eol=lf
+
+# Binários — sem conversão
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary
