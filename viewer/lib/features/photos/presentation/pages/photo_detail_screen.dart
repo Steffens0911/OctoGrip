@@ -36,8 +36,6 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   bool _sending = false;
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final _transformController = TransformationController();
-  TapDownDetails? _doubleTapDetails;
 
   @override
   void initState() {
@@ -50,19 +48,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
-    _transformController.dispose();
     super.dispose();
-  }
-
-  void _handleDoubleTap() {
-    if (_transformController.value != Matrix4.identity()) {
-      _transformController.value = Matrix4.identity();
-      return;
-    }
-    final pos = _doubleTapDetails!.localPosition;
-    _transformController.value = Matrix4.identity()
-      ..translate(-pos.dx * 1.5, -pos.dy * 1.5)
-      ..scale(2.5);
   }
 
   Future<void> _loadComments() async {
@@ -172,26 +158,22 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
             child: ListView(
               controller: _scrollController,
               children: [
-                // Foto
+                // Foto com pinch-to-zoom; um dedo rola a tela normalmente
                 if (imageUrl.isNotEmpty)
-                  GestureDetector(
-                    onDoubleTapDown: (d) => _doubleTapDetails = d,
-                    onDoubleTap: _handleDoubleTap,
-                    child: InteractiveViewer(
-                      transformationController: _transformController,
-                      minScale: 1.0,
-                      maxScale: 5.0,
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        fit: BoxFit.contain,
-                        placeholder: (_, __) => const SizedBox(
-                          height: 240,
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                        errorWidget: (_, __, ___) => const SizedBox(
-                          height: 240,
-                          child: Center(child: Icon(Icons.broken_image_outlined)),
-                        ),
+                  InteractiveViewer(
+                    panEnabled: false,
+                    minScale: 1.0,
+                    maxScale: 5.0,
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.contain,
+                      placeholder: (_, __) => const SizedBox(
+                        height: 240,
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      errorWidget: (_, __, ___) => const SizedBox(
+                        height: 240,
+                        child: Center(child: Icon(Icons.broken_image_outlined)),
                       ),
                     ),
                   ),
