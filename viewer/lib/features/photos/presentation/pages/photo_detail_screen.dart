@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'package:viewer/features/photos/presentation/pages/student_photos_feed_screen.dart';
 import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -46,6 +48,9 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   String _currentMentionQuery = '';
   Timer? _mentionDebounce;
 
+  // Regex para detectar @menção parcial enquanto digita (não seguido de [)
+  static final _partialMentionRe = RegExp(r'@(?!\[)([A-Za-zÀ-ÿ0-9 ]*)$');
+
   @override
   void initState() {
     super.initState();
@@ -66,26 +71,33 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
 
   void _onTextChanged() {
     final text = _controller.text;
-
-    // Não depende do cursor (baseOffset retorna -1 no Flutter Web/mobile
-    // durante composição IME). Busca @menção a partir do fim do texto.
-    final match = RegExp(r'@([A-Za-zÀ-ÿ0-9_]*)$').firstMatch(text);
+    final match = _partialMentionRe.firstMatch(text);
 
     if (match != null) {
-      final query = match.group(1) ?? '';
+      final raw = match.group(1) ?? '';
+      // Espaço no fim = usuário terminou de digitar sem selecionar
+      if (raw.endsWith(' ') && raw.trim().isNotEmpty) {
+        _hideSuggestions();
+        return;
+      }
+      final query = raw.trim();
       if (query != _currentMentionQuery) {
         _currentMentionQuery = query;
         _scheduleFetch(query);
       }
       if (!_showSuggestions) setState(() => _showSuggestions = true);
     } else {
-      if (_showSuggestions || _mentionSuggestions.isNotEmpty) {
-        setState(() {
-          _showSuggestions = false;
-          _mentionSuggestions = [];
-          _currentMentionQuery = '';
-        });
-      }
+      _hideSuggestions();
+    }
+  }
+
+  void _hideSuggestions() {
+    if (_showSuggestions || _mentionSuggestions.isNotEmpty) {
+      setState(() {
+        _showSuggestions = false;
+        _mentionSuggestions = [];
+        _currentMentionQuery = '';
+      });
     }
   }
 
@@ -100,21 +112,22 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     });
   }
 
+  /// Insere @[Nome Completo|uuid] no lugar do @parcial digitado.
   void _insertMention(Map<String, dynamic> user) {
-    final name = ((user['name'] as String?) ?? '').split(' ').first;
+    final name = (user['name'] as String?) ?? '';
+    final id = (user['id'] as String?) ?? '';
     final text = _controller.text;
-    final cursor = _controller.selection.baseOffset.clamp(0, text.length);
-    final before = text.substring(0, cursor);
-    final after = text.substring(cursor);
+    // Substitui o @parcial no final pelo token com UUID embutido
     final replaced =
-        before.replaceAll(RegExp(r'@[A-Za-zÀ-ÿ0-9_]*$'), '@$name ');
+        text.replaceAll(_partialMentionRe, '@[$name|$id] ');
     _controller.value = TextEditingValue(
-      text: replaced + after,
+      text: replaced,
       selection: TextSelection.collapsed(offset: replaced.length),
     );
     setState(() {
       _showSuggestions = false;
       _mentionSuggestions = [];
+      _currentMentionQuery = '';
     });
   }
 
@@ -295,13 +308,13 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Center(
                       child: Text('Nenhum comentário ainda.',
-                          style:
-                              TextStyle(color: cs.onSurfaceVariant)),
+                          style: TextStyle(color: cs.onSurfaceVariant)),
                     ),
                   )
                 else
                   ..._comments.map((c) => _CommentTile(
                         comment: c,
+                        academyId: widget.academyId,
                         canDelete: _canDeleteComment(c),
                         onDelete: () => _deleteComment(c),
                       )),
@@ -350,8 +363,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                           height: 40,
                           child: Padding(
                             padding: EdgeInsets.all(8),
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         )
                       : IconButton.filled(
@@ -385,7 +397,7 @@ class _MentionSuggestionList extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      constraints: const BoxConstraints(maxHeight: 160),
+      constraints: const BoxConstraints(maxHeight: 180),
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         border: Border(top: BorderSide(color: cs.outlineVariant)),
@@ -397,28 +409,33 @@ class _MentionSuggestionList extends StatelessWidget {
         itemBuilder: (_, i) {
           final s = suggestions[i];
           final name = (s['name'] as String?) ?? '';
+          final initials = name.trim().isNotEmpty
+              ? name.trim().split(' ').map((w) => w[0]).take(2).join()
+              : '?';
           return ListTile(
             dense: true,
             leading: CircleAvatar(
               radius: 16,
               backgroundColor: cs.primaryContainer,
               child: Text(
-                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                initials.toUpperCase(),
                 style: TextStyle(
                     color: cs.onPrimaryContainer,
                     fontWeight: FontWeight.bold,
-                    fontSize: 13),
+                    fontSize: 11),
               ),
             ),
             title: Text(
-              '@${name.split(' ').first}',
+              name,
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: cs.primary),
+                  color: cs.onSurface),
             ),
-            subtitle: Text(name,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            trailing: Text(
+              '@${name.split(' ').first}',
+              style: TextStyle(fontSize: 12, color: cs.primary),
+            ),
             onTap: () => onSelect(s),
           );
         },
@@ -428,41 +445,81 @@ class _MentionSuggestionList extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Tile de comentário com highlight de @menções
+// Tile de comentário com @menções clicáveis
 // ---------------------------------------------------------------------------
 
 class _CommentTile extends StatelessWidget {
   const _CommentTile({
     required this.comment,
+    required this.academyId,
     required this.canDelete,
     required this.onDelete,
   });
 
   final PhotoComment comment;
+  final String academyId;
   final bool canDelete;
   final VoidCallback onDelete;
 
-  static final _mentionRe = RegExp(r'@([A-Za-zÀ-ÿ0-9_]+)');
+  // Novo formato: @[Nome Completo|uuid]
+  static final _mentionTagRe =
+      RegExp(r'@\[([^\|]+)\|([a-f0-9\-]{36})\]');
+  // Legado: @Palavra
+  static final _mentionWordRe = RegExp(r'@([A-Za-zÀ-ÿ0-9_]+)');
+  // Combinado — testa novo formato primeiro
+  static final _anyMentionRe =
+      RegExp(r'@\[([^\|]+)\|([a-f0-9\-]{36})\]|@([A-Za-zÀ-ÿ0-9_]+)');
+
+  void _openProfile(BuildContext context, String userId, String name) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => StudentPhotosFeedScreen(
+          academyId: academyId,
+          studentId: userId,
+          studentName: name,
+        ),
+      ),
+    );
+  }
 
   Widget _buildBody(BuildContext context, String body) {
     final cs = Theme.of(context).colorScheme;
     final base = DefaultTextStyle.of(context).style.copyWith(fontSize: 14);
-    final spans = <TextSpan>[];
+    final spans = <InlineSpan>[];
     int last = 0;
-    for (final m in _mentionRe.allMatches(body)) {
+
+    for (final m in _anyMentionRe.allMatches(body)) {
       if (m.start > last) {
         spans.add(TextSpan(text: body.substring(last, m.start)));
       }
-      spans.add(TextSpan(
-        text: m.group(0),
-        style: TextStyle(
-            color: cs.primary, fontWeight: FontWeight.w600),
-      ));
+
+      final isNewFormat = m.group(1) != null; // @[Nome|uuid]
+      if (isNewFormat) {
+        final name = m.group(1)!;
+        final userId = m.group(2)!;
+        spans.add(TextSpan(
+          text: '@$name',
+          style: TextStyle(
+              color: cs.primary, fontWeight: FontWeight.w600),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () => _openProfile(context, userId, name),
+        ));
+      } else {
+        // Legado: não clicável
+        spans.add(TextSpan(
+          text: m.group(0),
+          style: TextStyle(
+              color: cs.primary, fontWeight: FontWeight.w600),
+        ));
+      }
       last = m.end;
     }
+
     if (last < body.length) {
       spans.add(TextSpan(text: body.substring(last)));
     }
+
     return RichText(
       text: TextSpan(style: base, children: spans),
     );
@@ -514,8 +571,7 @@ class _CommentTile extends StatelessWidget {
           ),
           if (canDelete)
             IconButton(
-              icon:
-                  Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
+              icon: Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
               onPressed: onDelete,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),

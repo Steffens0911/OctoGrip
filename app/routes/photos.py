@@ -33,6 +33,7 @@ from app.services.photos_service import (
     create_photo,
     create_restriction,
     delete_comment,
+    extract_mention_ids,
     extract_mentions,
     get_academy_photo,
     get_active_restriction,
@@ -401,7 +402,7 @@ async def mention_suggestions(
 
     stmt = _select(_User).where(_User.academy_id == academy_id).order_by(_User.name).limit(10)
     if q.strip():
-        stmt = stmt.where(_func.lower(_User.name).like(f"{q.lower()}%"))
+        stmt = stmt.where(_func.lower(_User.name).like(f"%{q.lower()}%"))
     result = await db.execute(stmt)
     users = result.scalars().all()
     return [MentionSuggestion(id=u.id, name=u.name or "", avatar_url=u.avatar_url) for u in users]
@@ -475,20 +476,27 @@ async def add_comment(
         )
 
     # Notifica usuários @mencionados no comentário
-    mentioned_names = extract_mentions(body.body)
-    if mentioned_names:
-        mention_ids = await resolve_mention_user_ids(
-            db, academy_id=academy_id, names=mentioned_names, exclude_ids=already_notified
+    # 1) Novo formato @[Nome|uuid] — extrai UUIDs diretamente
+    mention_ids: list[uuid.UUID] = [
+        uid for uid in extract_mention_ids(body.body) if uid not in already_notified
+    ]
+    # 2) Formato legado @Palavra — resolve por nome (fallback)
+    legacy_names = extract_mentions(body.body)
+    if legacy_names:
+        legacy_ids = await resolve_mention_user_ids(
+            db, academy_id=academy_id, names=legacy_names, exclude_ids=already_notified
         )
-        for uid in mention_ids:
-            await create_notification(
-                db,
-                user_id=uid,
-                type="photo_mention",
-                title=f"{current_user.name} te marcou em um comentário",
-                body=body.body[:120],
-                data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
-            )
+        mention_ids.extend(uid for uid in legacy_ids if uid not in already_notified)
+    for uid in mention_ids:
+        already_notified.add(uid)
+        await create_notification(
+            db,
+            user_id=uid,
+            type="photo_mention",
+            title=f"{current_user.name} te marcou em um comentário",
+            body=body.body[:120],
+            data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
+        )
 
     return CommentRead(
         id=comment.id,

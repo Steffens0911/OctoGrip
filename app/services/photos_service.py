@@ -327,12 +327,28 @@ async def delete_comment(
 
 # --- Menções ---
 
-_MENTION_RE = re.compile(r"@([A-Za-zÀ-ÿ0-9_]+)", re.UNICODE)
+# Novo formato: @[Nome Completo|uuid]
+_MENTION_TAG_RE = re.compile(r"@\[([^\|]+)\|([a-f0-9\-]{36})\]", re.UNICODE)
+# Formato legado: @Palavra (sem UUID)
+_MENTION_WORD_RE = re.compile(r"@([A-Za-zÀ-ÿ0-9_]+)", re.UNICODE)
+
+
+def extract_mention_ids(body: str) -> list[uuid.UUID]:
+    """Extrai UUIDs de menções no formato @[Nome|uuid] (novo formato)."""
+    ids = []
+    for m in _MENTION_TAG_RE.finditer(body):
+        try:
+            ids.append(uuid.UUID(m.group(2)))
+        except ValueError:
+            pass
+    return ids
 
 
 def extract_mentions(body: str) -> list[str]:
-    """Extrai tokens de @menção de um comentário (lower-case, sem duplicatas)."""
-    return list({m.lower() for m in _MENTION_RE.findall(body)})
+    """Extrai tokens de @menção legados (lower-case, sem duplicatas). Ignora @[Nome|uuid]."""
+    # Remove tags no novo formato antes de buscar tokens simples
+    cleaned = _MENTION_TAG_RE.sub("", body)
+    return list({m.lower() for m in _MENTION_WORD_RE.findall(cleaned)})
 
 
 async def resolve_mention_user_ids(
