@@ -75,9 +75,9 @@ class PostCard extends StatelessWidget {
                 ),
               ),
               child: _PhotoBody(
-                  absoluteUrl: _absoluteUrl(photo.thumbnailUrl).isNotEmpty
-                      ? _absoluteUrl(photo.thumbnailUrl)
-                      : _absoluteUrl(photo.imageUrl)),
+                  absoluteUrl: _absoluteUrl(photo.imageUrl).isNotEmpty
+                      ? _absoluteUrl(photo.imageUrl)
+                      : _absoluteUrl(photo.thumbnailUrl)),
             ),
           if (photo.caption != null && photo.caption!.trim().isNotEmpty)
             Padding(
