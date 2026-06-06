@@ -408,31 +408,6 @@ async def mention_suggestions(
 
 
 # ---------------------------------------------------------------------------
-# Post por ID
-# ---------------------------------------------------------------------------
-
-
-@router.get("/{academy_id}/photos/{photo_id}", response_model=PhotoRead)
-async def get_photo_by_id(
-    academy_id: uuid.UUID,
-    photo_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Retorna um post específico (usado para navegação por notificação)."""
-    await _require_octophotos(academy_id, db)
-    if not _is_academy_member(current_user, academy_id) and not _is_moderator(current_user):
-        raise ForbiddenError("Acesso restrito a membros da academia.")
-
-    photo = await get_academy_photo(db, photo_id)
-    if not photo or photo.academy_id != academy_id:
-        raise NotFoundError("Post não encontrado.")
-
-    liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=[photo.id])
-    return _photo_to_read(photo, liked_ids)
-
-
-# ---------------------------------------------------------------------------
 # Comentários
 # ---------------------------------------------------------------------------
 
@@ -665,3 +640,29 @@ async def update_restriction(
         active=restriction.active,
         created_at=restriction.created_at,
     )
+
+
+# ---------------------------------------------------------------------------
+# Post por ID — deve vir DEPOIS das rotas com segmentos fixos (/restrictions,
+# /mention-suggestions) para o FastAPI não capturar "restrictions" como UUID.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{academy_id}/photos/{photo_id}", response_model=PhotoRead)
+async def get_photo_by_id(
+    academy_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna um post específico (usado para navegação por notificação)."""
+    await _require_octophotos(academy_id, db)
+    if not _is_academy_member(current_user, academy_id) and not _is_moderator(current_user):
+        raise ForbiddenError("Acesso restrito a membros da academia.")
+
+    photo = await get_academy_photo(db, photo_id)
+    if not photo or photo.academy_id != academy_id:
+        raise NotFoundError("Post não encontrado.")
+
+    liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=[photo.id])
+    return _photo_to_read(photo, liked_ids)
