@@ -474,7 +474,7 @@ class _CommentTile extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => StudentPhotosFeedScreen(
+        builder: (_) => StudentPhotosFeedPage(
           academyId: academyId,
           studentId: userId,
           studentName: name,
