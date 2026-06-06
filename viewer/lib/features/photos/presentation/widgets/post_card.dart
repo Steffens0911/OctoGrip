@@ -46,7 +46,6 @@ class PostCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -74,7 +73,7 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
               ),
-              child: _PhotoBody(
+              child: _ZoomablePhotoBody(
                   absoluteUrl: _absoluteUrl(photo.imageUrl).isNotEmpty
                       ? _absoluteUrl(photo.imageUrl)
                       : _absoluteUrl(photo.thumbnailUrl)),
@@ -225,14 +224,52 @@ class _PostHeader extends StatelessWidget {
   }
 }
 
-class _PhotoBody extends StatelessWidget {
-  const _PhotoBody({required this.absoluteUrl});
+class _ZoomablePhotoBody extends StatefulWidget {
+  const _ZoomablePhotoBody({required this.absoluteUrl});
 
   final String absoluteUrl;
 
   @override
+  State<_ZoomablePhotoBody> createState() => _ZoomablePhotoBodyState();
+}
+
+class _ZoomablePhotoBodyState extends State<_ZoomablePhotoBody>
+    with SingleTickerProviderStateMixin {
+  final _transformController = TransformationController();
+  late final AnimationController _animController;
+  Animation<Matrix4>? _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..addListener(() {
+        if (_animation != null) {
+          _transformController.value = _animation!.value;
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _transformController.dispose();
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _onInteractionEnd(ScaleEndDetails _) {
+    _animation = Matrix4Tween(
+      begin: _transformController.value,
+      end: Matrix4.identity(),
+    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    _animController.forward(from: 0);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (absoluteUrl.isEmpty) {
+    if (widget.absoluteUrl.isEmpty) {
       return Container(
         height: 200,
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -260,16 +297,24 @@ class _PhotoBody extends StatelessWidget {
     }
     return AspectRatio(
       aspectRatio: 4 / 3,
-      child: CachedNetworkImage(
-        imageUrl: absoluteUrl,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => Container(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
-          child: const Center(child: CircularProgressIndicator()),
-        ),
-        errorWidget: (_, __, ___) => Container(
-          color: Theme.of(context).colorScheme.errorContainer,
-          child: const Center(child: Icon(Icons.broken_image_outlined)),
+      child: InteractiveViewer(
+        transformationController: _transformController,
+        panEnabled: false,
+        minScale: 1.0,
+        maxScale: 5.0,
+        clipBehavior: Clip.none,
+        onInteractionEnd: _onInteractionEnd,
+        child: CachedNetworkImage(
+          imageUrl: widget.absoluteUrl,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          errorWidget: (_, __, ___) => Container(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: const Center(child: Icon(Icons.broken_image_outlined)),
+          ),
         ),
       ),
     );
