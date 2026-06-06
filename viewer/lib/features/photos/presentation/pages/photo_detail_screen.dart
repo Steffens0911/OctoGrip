@@ -47,6 +47,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   bool _showSuggestions = false;
   String _currentMentionQuery = '';
   Timer? _mentionDebounce;
+  // Mapa nome completo → uuid, preenchido ao selecionar do autocomplete
+  final Map<String, String> _mentionMap = {};
 
   // Regex para detectar @menção parcial enquanto digita (não seguido de [)
   static final _partialMentionRe = RegExp(r'@(?!\[)([A-Za-zÀ-ÿ0-9 ]*)$');
@@ -112,14 +114,18 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     });
   }
 
-  /// Insere @[Nome Completo|uuid] no lugar do @parcial digitado.
+  /// Insere @Nome visualmente; guarda nome→uuid no mapa interno.
+  /// O UUID só é embutido no corpo ao enviar o comentário.
   void _insertMention(Map<String, dynamic> user) {
     final name = (user['name'] as String?) ?? '';
     final id = (user['id'] as String?) ?? '';
+
+    // Salva o mapeamento para uso no envio
+    if (name.isNotEmpty && id.isNotEmpty) _mentionMap[name] = id;
+
+    // Insere apenas o nome visível no campo (sem UUID)
     final text = _controller.text;
-    // Substitui o @parcial no final pelo token com UUID embutido
-    final replaced =
-        text.replaceAll(_partialMentionRe, '@[$name|$id] ');
+    final replaced = text.replaceAll(_partialMentionRe, '@$name ');
     _controller.value = TextEditingValue(
       text: replaced,
       selection: TextSelection.collapsed(offset: replaced.length),
@@ -129,6 +135,15 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
       _mentionSuggestions = [];
       _currentMentionQuery = '';
     });
+  }
+
+  /// Converte @Nome para @[Nome|uuid] antes de enviar à API.
+  String _encodeBody(String text) {
+    String result = text;
+    _mentionMap.forEach((name, uuid) {
+      result = result.replaceAll('@$name', '@[$name|$uuid]');
+    });
+    return result;
   }
 
   Future<void> _loadComments() async {
@@ -148,9 +163,12 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
+      // Converte @Nome → @[Nome|uuid] antes de enviar
+      final encoded = _encodeBody(text);
       final comment =
-          await ApiService().addComment(widget.academyId, _photo.id, text);
+          await ApiService().addComment(widget.academyId, _photo.id, encoded);
       _controller.clear();
+      _mentionMap.clear();
       if (mounted) {
         setState(() {
           _comments.add(comment);
