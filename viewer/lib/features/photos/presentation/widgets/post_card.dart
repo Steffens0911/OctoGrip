@@ -58,7 +58,10 @@ class PostCard extends StatelessWidget {
           if (photo.isSystemPost)
             _SystemPostBody(photo: photo, cs: cs, tt: tt)
           else
-            GestureDetector(
+            _ZoomablePhotoBody(
+              absoluteUrl: _absoluteUrl(photo.imageUrl).isNotEmpty
+                  ? _absoluteUrl(photo.imageUrl)
+                  : _absoluteUrl(photo.thumbnailUrl),
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -73,10 +76,6 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
               ),
-              child: _ZoomablePhotoBody(
-                  absoluteUrl: _absoluteUrl(photo.imageUrl).isNotEmpty
-                      ? _absoluteUrl(photo.imageUrl)
-                      : _absoluteUrl(photo.thumbnailUrl)),
             ),
           if (photo.caption != null && photo.caption!.trim().isNotEmpty)
             Padding(
@@ -225,9 +224,10 @@ class _PostHeader extends StatelessWidget {
 }
 
 class _ZoomablePhotoBody extends StatefulWidget {
-  const _ZoomablePhotoBody({required this.absoluteUrl});
+  const _ZoomablePhotoBody({required this.absoluteUrl, this.onTap});
 
   final String absoluteUrl;
+  final VoidCallback? onTap;
 
   @override
   State<_ZoomablePhotoBody> createState() => _ZoomablePhotoBodyState();
@@ -297,23 +297,26 @@ class _ZoomablePhotoBodyState extends State<_ZoomablePhotoBody>
     }
     return AspectRatio(
       aspectRatio: 4 / 3,
-      child: InteractiveViewer(
-        transformationController: _transformController,
-        panEnabled: false,
-        minScale: 1.0,
-        maxScale: 5.0,
-        clipBehavior: Clip.none,
-        onInteractionEnd: _onInteractionEnd,
-        child: CachedNetworkImage(
-          imageUrl: widget.absoluteUrl,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-          errorWidget: (_, __, ___) => Container(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: const Center(child: Icon(Icons.broken_image_outlined)),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: InteractiveViewer(
+          transformationController: _transformController,
+          panEnabled: false,
+          minScale: 1.0,
+          maxScale: 5.0,
+          clipBehavior: Clip.none,
+          onInteractionEnd: _onInteractionEnd,
+          child: CachedNetworkImage(
+            imageUrl: widget.absoluteUrl,
+            fit: BoxFit.cover,
+            placeholder: (_, __) => Container(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: const Center(child: CircularProgressIndicator()),
+            ),
+            errorWidget: (_, __, ___) => Container(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: const Center(child: Icon(Icons.broken_image_outlined)),
+            ),
           ),
         ),
       ),
