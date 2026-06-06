@@ -235,9 +235,12 @@ class _ZoomablePhotoBody extends StatefulWidget {
 
 class _ZoomablePhotoBodyState extends State<_ZoomablePhotoBody>
     with SingleTickerProviderStateMixin {
-  final _transformController = TransformationController();
+  final _key = GlobalKey();
+  OverlayEntry? _overlay;
   late final AnimationController _animController;
-  Animation<Matrix4>? _animation;
+
+  double _scale = 1.0;
+  Rect _photoRect = Rect.zero;
 
   @override
   void initState() {
@@ -245,26 +248,71 @@ class _ZoomablePhotoBodyState extends State<_ZoomablePhotoBody>
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 200),
-    )..addListener(() {
-        if (_animation != null) {
-          _transformController.value = _animation!.value;
-        }
-      });
+    );
   }
 
   @override
   void dispose() {
-    _transformController.dispose();
+    _overlay?.remove();
+    _overlay = null;
     _animController.dispose();
     super.dispose();
   }
 
-  void _onInteractionEnd(ScaleEndDetails _) {
-    _animation = Matrix4Tween(
-      begin: _transformController.value,
-      end: Matrix4.identity(),
-    ).animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
-    _animController.forward(from: 0);
+  Rect _getPhotoRect() {
+    final box = _key.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return Rect.zero;
+    return box.localToGlobal(Offset.zero) & box.size;
+  }
+
+  void _onScaleStart(ScaleStartDetails details) {
+    if (details.pointerCount < 2) return;
+    if (_overlay != null) return;
+    _photoRect = _getPhotoRect();
+    _scale = 1.0;
+    _overlay = OverlayEntry(builder: (_) => _buildOverlay());
+    Overlay.of(context).insert(_overlay!);
+  }
+
+  void _onScaleUpdate(ScaleUpdateDetails details) {
+    if (_overlay == null) return;
+    _scale = details.scale.clamp(1.0, 5.0);
+    _overlay!.markNeedsBuild();
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    if (_overlay == null) return;
+    final startScale = _scale;
+    final anim = Tween<double>(begin: startScale, end: 1.0)
+        .animate(CurvedAnimation(parent: _animController, curve: Curves.easeOut));
+    void listener() {
+      _scale = anim.value;
+      _overlay?.markNeedsBuild();
+    }
+    anim.addListener(listener);
+    _animController.forward(from: 0).then((_) {
+      anim.removeListener(listener);
+      _overlay?.remove();
+      _overlay = null;
+    });
+  }
+
+  Widget _buildOverlay() {
+    return Positioned(
+      left: _photoRect.left,
+      top: _photoRect.top,
+      width: _photoRect.width,
+      height: _photoRect.height,
+      child: IgnorePointer(
+        child: Transform.scale(
+          scale: _scale,
+          child: CachedNetworkImage(
+            imageUrl: widget.absoluteUrl,
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -296,27 +344,23 @@ class _ZoomablePhotoBodyState extends State<_ZoomablePhotoBody>
       );
     }
     return AspectRatio(
+      key: _key,
       aspectRatio: 4 / 3,
       child: GestureDetector(
         onTap: widget.onTap,
-        child: InteractiveViewer(
-          transformationController: _transformController,
-          panEnabled: false,
-          minScale: 1.0,
-          maxScale: 5.0,
-          clipBehavior: Clip.none,
-          onInteractionEnd: _onInteractionEnd,
-          child: CachedNetworkImage(
-            imageUrl: widget.absoluteUrl,
-            fit: BoxFit.cover,
-            placeholder: (_, __) => Container(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
-            errorWidget: (_, __, ___) => Container(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: const Center(child: Icon(Icons.broken_image_outlined)),
-            ),
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        onScaleEnd: _onScaleEnd,
+        child: CachedNetworkImage(
+          imageUrl: widget.absoluteUrl,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+          errorWidget: (_, __, ___) => Container(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: const Center(child: Icon(Icons.broken_image_outlined)),
           ),
         ),
       ),
