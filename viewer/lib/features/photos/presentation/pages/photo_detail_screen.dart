@@ -66,11 +66,10 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
 
   void _onTextChanged() {
     final text = _controller.text;
-    final cursor = _controller.selection.baseOffset;
-    if (cursor < 0) return;
 
-    final beforeCursor = text.substring(0, cursor);
-    final match = RegExp(r'@([A-Za-zÀ-ÿ0-9_]*)$').firstMatch(beforeCursor);
+    // Não depende do cursor (baseOffset retorna -1 no Flutter Web/mobile
+    // durante composição IME). Busca @menção a partir do fim do texto.
+    final match = RegExp(r'@([A-Za-zÀ-ÿ0-9_]*)$').firstMatch(text);
 
     if (match != null) {
       final query = match.group(1) ?? '';
@@ -84,6 +83,7 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
         setState(() {
           _showSuggestions = false;
           _mentionSuggestions = [];
+          _currentMentionQuery = '';
         });
       }
     }
