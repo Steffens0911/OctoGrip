@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 
@@ -322,6 +323,49 @@ async def delete_comment(
         .values(comments_count=AcademyPhoto.comments_count - 1)
     )
     return True
+
+
+# --- Menções ---
+
+_MENTION_RE = re.compile(r"@([A-Za-zÀ-ÿ0-9_]+)", re.UNICODE)
+
+
+def extract_mentions(body: str) -> list[str]:
+    """Extrai tokens de @menção de um comentário (lower-case, sem duplicatas)."""
+    return list({m.lower() for m in _MENTION_RE.findall(body)})
+
+
+async def resolve_mention_user_ids(
+    db: AsyncSession,
+    *,
+    academy_id: uuid.UUID,
+    names: list[str],
+    exclude_ids: set[uuid.UUID] | None = None,
+) -> list[uuid.UUID]:
+    """Resolve nomes mencionados para IDs de usuários da academia.
+
+    Faz match pelo primeiro nome (palavra) do campo name, case-insensitive.
+    """
+    if not names:
+        return []
+    from sqlalchemy import func as _func
+    from sqlalchemy import or_
+
+    from app.models.user import User
+
+    conditions = [_func.lower(User.name).like(f"{name}%") for name in names]
+    stmt = select(User).where(User.academy_id == academy_id, or_(*conditions))
+    if exclude_ids:
+        stmt = stmt.where(User.id.notin_(exclude_ids))
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    names_set = set(names)
+    matched: list[uuid.UUID] = []
+    for u in users:
+        first = (u.name or "").lower().split()[0] if u.name else ""
+        if first in names_set:
+            matched.append(u.id)
+    return matched
 
 
 # --- Restrições ---

@@ -20,6 +20,7 @@ import 'package:viewer/screens/student/student_academy_hub_screen.dart';
 import 'package:viewer/screens/student/student_home_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/config/feature_flags.dart';
+import 'package:viewer/features/photos/presentation/pages/photo_from_notification_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/photos_feed_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/student_search_photos_page.dart';
 import 'package:viewer/screens/enrollment/public_registration_screen.dart';
@@ -82,18 +83,37 @@ class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     PushNotificationService.setNotificationOpenHandler((data) {
-      if (data['type'] != 'face_recognition_complete') return;
-      final jobId = data['job_id'];
-      final sessionId = data['session_id'];
-      if (jobId == null || sessionId == null) return;
-      appNavigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => ReviewFaceResultsScreen(
-            sessionId: sessionId,
-            jobId: jobId,
+      final type = data['type'];
+
+      if (type == 'face_recognition_complete') {
+        final jobId = data['job_id'];
+        final sessionId = data['session_id'];
+        if (jobId == null || sessionId == null) return;
+        appNavigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => ReviewFaceResultsScreen(
+              sessionId: sessionId,
+              jobId: jobId,
+            ),
           ),
-        ),
-      );
+        );
+        return;
+      }
+
+      if (type == 'photo_comment' || type == 'photo_mention') {
+        final photoId = data['photo_id'];
+        final academyId = data['academy_id'];
+        if (photoId == null || academyId == null) return;
+        appNavigatorKey.currentState?.push(
+          MaterialPageRoute(
+            builder: (_) => PhotoFromNotificationScreen(
+              academyId: academyId,
+              photoId: photoId,
+            ),
+          ),
+        );
+        return;
+      }
     });
     ThemeService.load().then((mode) {
       if (mounted) setState(() => _themeMode = mode);

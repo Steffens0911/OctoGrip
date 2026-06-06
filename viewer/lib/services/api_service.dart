@@ -3679,6 +3679,36 @@ class ApiService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getMentionSuggestions(
+      String academyId, String q) async {
+    final r = await _req(http.get(
+      Uri.parse(
+          '$baseUrl/academies/$academyId/photos/mention-suggestions?q=${Uri.encodeQueryComponent(q)}'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data! as List<dynamic>)
+        .map((e) => e as Map<String, dynamic>)
+        .toList();
+  }
+
+  Future<AcademyPhoto?> getPhotoById(
+      String academyId, String photoId) async {
+    try {
+      final r = await _req(http.get(
+        Uri.parse('$baseUrl/academies/$academyId/photos/$photoId'),
+        headers: await _headers(auth: true),
+      ));
+      if (r.statusCode == 404) return null;
+      final data = await _decodeResponse(r);
+      _throwIfNotOk(r, data);
+      return AcademyPhoto.fromJson(data! as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ---------- Enrollment Invite ----------
 
   Future<Map<String, dynamic>> getEnrollmentInvite(String academyId) async {

@@ -18,6 +18,7 @@ from app.models import User
 from app.schemas.photos import (
     CommentCreate,
     CommentRead,
+    MentionSuggestion,
     PhotoFeedPage,
     PhotoRead,
     RestrictionCreate,
@@ -25,12 +26,14 @@ from app.schemas.photos import (
     RestrictionRead,
 )
 from app.services.academy_service import get_academy as _get_academy
+from app.services.notification_service import create_notification
 from app.services.photos_service import (
     count_user_photos,
     create_comment,
     create_photo,
     create_restriction,
     delete_comment,
+    extract_mentions,
     get_academy_photo,
     get_active_restriction,
     get_liked_photo_ids,
@@ -40,6 +43,7 @@ from app.services.photos_service import (
     list_photos_feed_cached,
     list_restrictions,
     patch_restriction,
+    resolve_mention_user_ids,
     soft_delete_photo,
     unlike_photo,
 )
@@ -374,6 +378,61 @@ def _compose_watermark(image_path: str, academy_name: str) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# Sugestões de @menção
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{academy_id}/photos/mention-suggestions", response_model=list[MentionSuggestion])
+async def mention_suggestions(
+    academy_id: uuid.UUID,
+    q: str = Query("", max_length=50),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna membros da academia cujo nome começa com q (autocomplete de @menções)."""
+    await _require_octophotos(academy_id, db)
+    if not _is_academy_member(current_user, academy_id) and not _is_moderator(current_user):
+        raise ForbiddenError("Acesso restrito a membros da academia.")
+
+    from sqlalchemy import func as _func
+    from sqlalchemy import select as _select
+
+    from app.models.user import User as _User
+
+    stmt = _select(_User).where(_User.academy_id == academy_id).order_by(_User.name).limit(10)
+    if q.strip():
+        stmt = stmt.where(_func.lower(_User.name).like(f"{q.lower()}%"))
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    return [MentionSuggestion(id=u.id, name=u.name or "", avatar_url=u.avatar_url) for u in users]
+
+
+# ---------------------------------------------------------------------------
+# Post por ID
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{academy_id}/photos/{photo_id}", response_model=PhotoRead)
+async def get_photo_by_id(
+    academy_id: uuid.UUID,
+    photo_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retorna um post específico (usado para navegação por notificação)."""
+    await _require_octophotos(academy_id, db)
+    if not _is_academy_member(current_user, academy_id) and not _is_moderator(current_user):
+        raise ForbiddenError("Acesso restrito a membros da academia.")
+
+    photo = await get_academy_photo(db, photo_id)
+    if not photo or photo.academy_id != academy_id:
+        raise NotFoundError("Post não encontrado.")
+
+    liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=[photo.id])
+    return _photo_to_read(photo, liked_ids)
+
+
+# ---------------------------------------------------------------------------
 # Comentários
 # ---------------------------------------------------------------------------
 
@@ -426,6 +485,36 @@ async def add_comment(
     await db.commit()
     await db.refresh(comment)
     await invalidate_feed_cache(academy_id)
+
+    # Notifica o dono da foto (se não for quem comentou)
+    already_notified: set[uuid.UUID] = {current_user.id}
+    if photo.author_id != current_user.id:
+        already_notified.add(photo.author_id)
+        await create_notification(
+            db,
+            user_id=photo.author_id,
+            type="photo_comment",
+            title=f"{current_user.name} comentou sua foto",
+            body=body.body[:120],
+            data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
+        )
+
+    # Notifica usuários @mencionados no comentário
+    mentioned_names = extract_mentions(body.body)
+    if mentioned_names:
+        mention_ids = await resolve_mention_user_ids(
+            db, academy_id=academy_id, names=mentioned_names, exclude_ids=already_notified
+        )
+        for uid in mention_ids:
+            await create_notification(
+                db,
+                user_id=uid,
+                type="photo_mention",
+                title=f"{current_user.name} te marcou em um comentário",
+                body=body.body[:120],
+                data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
+            )
+
     return CommentRead(
         id=comment.id,
         photo_id=comment.photo_id,

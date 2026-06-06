@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:viewer/features/photos/presentation/pages/photo_from_notification_screen.dart';
 import 'package:viewer/models/notification_model.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -15,7 +16,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   String? _error;
   String _filter = 'Todas';
 
-  static const _filters = ['Todas', 'Missões', 'Troféus', 'Vídeos', 'Avisos', 'Conta'];
+  static const _filters = ['Todas', 'Missões', 'Troféus', 'Vídeos', 'Fotos', 'Avisos', 'Conta'];
 
   static const _typeToCategory = {
     'execution_indicated': 'Missões',
@@ -27,6 +28,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     'trophy_social': 'Troféus',
     'trophy_new': 'Troféus',
     'video_new': 'Vídeos',
+    'photo_comment': 'Fotos',
+    'photo_mention': 'Fotos',
     'announcement_academy': 'Avisos',
     'announcement_global': 'Avisos',
     'account_frozen': 'Conta',
@@ -67,6 +70,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         if (idx != -1) _all[idx] = n.copyWith(read: true);
       });
     } catch (_) {}
+  }
+
+  void _navigateFromNotif(NotificationModel n) {
+    if (n.type != 'photo_comment' && n.type != 'photo_mention') return;
+    final data = n.data;
+    if (data == null) return;
+    final photoId = data['photo_id'] as String?;
+    final academyId = data['academy_id'] as String?;
+    if (photoId == null || academyId == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhotoFromNotificationScreen(
+          academyId: academyId,
+          photoId: photoId,
+        ),
+      ),
+    );
   }
 
   Future<void> _deleteNotification(NotificationModel n) async {
@@ -145,7 +166,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               itemCount: filtered.length,
                               itemBuilder: (_, i) => _NotifTile(
                                 notif: filtered[i],
-                                onTap: () => _markRead(filtered[i]),
+                                onTap: () {
+                                  _markRead(filtered[i]);
+                                  _navigateFromNotif(filtered[i]);
+                                },
                                 onDelete: () => _deleteNotification(filtered[i]),
                               ),
                             ),
@@ -221,6 +245,8 @@ class _NotifTileState extends State<_NotifTile> {
     'trophy_social': ('🏅', Color(0xFF6A1B9A)),
     'trophy_new': ('🆕', Color(0xFF1565C0)),
     'video_new': ('🎬', Color(0xFF0277BD)),
+    'photo_comment': ('💬', Color(0xFF0288D1)),
+    'photo_mention': ('📸', Color(0xFF00897B)),
     'announcement_academy': ('📢', Color(0xFFE65100)),
     'announcement_global': ('📣', Color(0xFFB71C1C)),
     'account_frozen': ('🔒', Color(0xFFC62828)),

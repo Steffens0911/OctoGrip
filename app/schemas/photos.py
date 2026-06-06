@@ -89,3 +89,11 @@ class RestrictionPatch(BaseModel):
     active: bool | None = None
     reason: str | None = Field(None, max_length=500)
     expires_at: datetime | None = None
+
+
+class MentionSuggestion(BaseModel):
+    id: uuid.UUID
+    name: str
+    avatar_url: str | None = None
+
+    model_config = {"from_attributes": True}

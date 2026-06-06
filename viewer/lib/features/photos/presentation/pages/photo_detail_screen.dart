@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -36,19 +38,84 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   bool _sending = false;
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode();
+
+  // Mention autocomplete state
+  List<Map<String, dynamic>> _mentionSuggestions = [];
+  bool _showSuggestions = false;
+  String _currentMentionQuery = '';
+  Timer? _mentionDebounce;
 
   @override
   void initState() {
     super.initState();
     _photo = widget.photo;
+    _controller.addListener(_onTextChanged);
     _loadComments();
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
+    _mentionDebounce?.cancel();
     super.dispose();
+  }
+
+  void _onTextChanged() {
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset;
+    if (cursor < 0) return;
+
+    final beforeCursor = text.substring(0, cursor);
+    final match = RegExp(r'@([A-Za-zÀ-ÿ0-9_]*)$').firstMatch(beforeCursor);
+
+    if (match != null) {
+      final query = match.group(1) ?? '';
+      if (query != _currentMentionQuery) {
+        _currentMentionQuery = query;
+        _scheduleFetch(query);
+      }
+      if (!_showSuggestions) setState(() => _showSuggestions = true);
+    } else {
+      if (_showSuggestions || _mentionSuggestions.isNotEmpty) {
+        setState(() {
+          _showSuggestions = false;
+          _mentionSuggestions = [];
+        });
+      }
+    }
+  }
+
+  void _scheduleFetch(String query) {
+    _mentionDebounce?.cancel();
+    _mentionDebounce = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final suggestions =
+            await ApiService().getMentionSuggestions(widget.academyId, query);
+        if (mounted) setState(() => _mentionSuggestions = suggestions);
+      } catch (_) {}
+    });
+  }
+
+  void _insertMention(Map<String, dynamic> user) {
+    final name = ((user['name'] as String?) ?? '').split(' ').first;
+    final text = _controller.text;
+    final cursor = _controller.selection.baseOffset.clamp(0, text.length);
+    final before = text.substring(0, cursor);
+    final after = text.substring(cursor);
+    final replaced =
+        before.replaceAll(RegExp(r'@[A-Za-zÀ-ÿ0-9_]*$'), '@$name ');
+    _controller.value = TextEditingValue(
+      text: replaced + after,
+      selection: TextSelection.collapsed(offset: replaced.length),
+    );
+    setState(() {
+      _showSuggestions = false;
+      _mentionSuggestions = [];
+    });
   }
 
   Future<void> _loadComments() async {
@@ -75,6 +142,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
         setState(() {
           _comments.add(comment);
           _photo = _photo.copyWith(commentsCount: _photo.commentsCount + 1);
+          _showSuggestions = false;
+          _mentionSuggestions = [];
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_scrollController.hasClients) {
@@ -158,7 +227,6 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
             child: ListView(
               controller: _scrollController,
               children: [
-                // Foto com pinch-to-zoom; um dedo rola a tela normalmente
                 if (imageUrl.isNotEmpty)
                   InteractiveViewer(
                     panEnabled: false,
@@ -178,16 +246,14 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     ),
                   ),
 
-                // Caption
                 if (_photo.caption != null &&
                     _photo.caption!.trim().isNotEmpty)
                   Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
                     child: Text(_photo.caption!, style: tt.bodyMedium),
                   ),
 
-                // Curtidas
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Row(
@@ -199,15 +265,13 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                               : Icons.favorite_border,
                           color: _photo.likedByMe ? Colors.red : null,
                         ),
-                        onPressed: _photo.likedByMe
-                            ? widget.onUnlike
-                            : widget.onLike,
+                        onPressed:
+                            _photo.likedByMe ? widget.onUnlike : widget.onLike,
                       ),
                       if (_photo.likesCount > 0)
                         Text('${_photo.likesCount}',
                             style: TextStyle(
-                                fontSize: 13,
-                                color: cs.onSurfaceVariant)),
+                                fontSize: 13, color: cs.onSurfaceVariant)),
                       const SizedBox(width: 12),
                       Icon(Icons.chat_bubble_outline,
                           size: 20, color: cs.onSurfaceVariant),
@@ -221,7 +285,6 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
 
                 const Divider(height: 1),
 
-                // Comentários
                 if (_loadingComments)
                   const Padding(
                     padding: EdgeInsets.all(24),
@@ -232,7 +295,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Center(
                       child: Text('Nenhum comentário ainda.',
-                          style: TextStyle(color: cs.onSurfaceVariant)),
+                          style:
+                              TextStyle(color: cs.onSurfaceVariant)),
                     ),
                   )
                 else
@@ -245,16 +309,25 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
             ),
           ),
 
+          // Sugestões de @menção
+          if (_showSuggestions && _mentionSuggestions.isNotEmpty)
+            _MentionSuggestionList(
+              suggestions: _mentionSuggestions,
+              onSelect: _insertMention,
+            ),
+
           // Input de comentário
           const Divider(height: 1),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
                     child: TextField(
                       controller: _controller,
+                      focusNode: _focusNode,
                       maxLength: 500,
                       maxLines: null,
                       textCapitalization: TextCapitalization.sentences,
@@ -277,7 +350,8 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                           height: 40,
                           child: Padding(
                             padding: EdgeInsets.all(8),
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
                           ),
                         )
                       : IconButton.filled(
@@ -294,6 +368,69 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Lista de sugestões de @menção
+// ---------------------------------------------------------------------------
+
+class _MentionSuggestionList extends StatelessWidget {
+  const _MentionSuggestionList({
+    required this.suggestions,
+    required this.onSelect,
+  });
+
+  final List<Map<String, dynamic>> suggestions;
+  final void Function(Map<String, dynamic>) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 160),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+      ),
+      child: ListView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: suggestions.length,
+        itemBuilder: (_, i) {
+          final s = suggestions[i];
+          final name = (s['name'] as String?) ?? '';
+          return ListTile(
+            dense: true,
+            leading: CircleAvatar(
+              radius: 16,
+              backgroundColor: cs.primaryContainer,
+              child: Text(
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13),
+              ),
+            ),
+            title: Text(
+              '@${name.split(' ').first}',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: cs.primary),
+            ),
+            subtitle: Text(name,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            onTap: () => onSelect(s),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tile de comentário com highlight de @menções
+// ---------------------------------------------------------------------------
+
 class _CommentTile extends StatelessWidget {
   const _CommentTile({
     required this.comment,
@@ -304,6 +441,32 @@ class _CommentTile extends StatelessWidget {
   final PhotoComment comment;
   final bool canDelete;
   final VoidCallback onDelete;
+
+  static final _mentionRe = RegExp(r'@([A-Za-zÀ-ÿ0-9_]+)');
+
+  Widget _buildBody(BuildContext context, String body) {
+    final cs = Theme.of(context).colorScheme;
+    final base = DefaultTextStyle.of(context).style.copyWith(fontSize: 14);
+    final spans = <TextSpan>[];
+    int last = 0;
+    for (final m in _mentionRe.allMatches(body)) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: body.substring(last, m.start)));
+      }
+      spans.add(TextSpan(
+        text: m.group(0),
+        style: TextStyle(
+            color: cs.primary, fontWeight: FontWeight.w600),
+      ));
+      last = m.end;
+    }
+    if (last < body.length) {
+      spans.add(TextSpan(text: body.substring(last)));
+    }
+    return RichText(
+      text: TextSpan(style: base, children: spans),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,14 +508,14 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(comment.body,
-                    style: const TextStyle(fontSize: 14)),
+                _buildBody(context, comment.body),
               ],
             ),
           ),
           if (canDelete)
             IconButton(
-              icon: Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
+              icon:
+                  Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),
               onPressed: onDelete,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
