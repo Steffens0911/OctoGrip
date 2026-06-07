@@ -35,7 +35,6 @@ from app.services.photos_service import (
     delete_comment,
     extract_mention_ids,
     extract_mentions,
-    strip_mention_tags,
     get_academy_photo,
     get_active_restriction,
     get_liked_photo_ids,
@@ -47,6 +46,7 @@ from app.services.photos_service import (
     patch_restriction,
     resolve_mention_user_ids,
     soft_delete_photo,
+    strip_mention_tags,
     unlike_photo,
 )
 
