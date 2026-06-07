@@ -477,9 +477,7 @@ async def add_comment(
 
     # Notifica usuários @mencionados no comentário
     # 1) Novo formato @[Nome|uuid] — extrai UUIDs diretamente
-    mention_ids: list[uuid.UUID] = [
-        uid for uid in extract_mention_ids(body.body) if uid not in already_notified
-    ]
+    mention_ids: list[uuid.UUID] = [uid for uid in extract_mention_ids(body.body) if uid not in already_notified]
     # 2) Formato legado @Palavra — resolve por nome (fallback)
     legacy_names = extract_mentions(body.body)
     if legacy_names:
