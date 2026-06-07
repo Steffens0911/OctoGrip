@@ -351,6 +351,11 @@ def extract_mentions(body: str) -> list[str]:
     return list({m.lower() for m in _MENTION_WORD_RE.findall(cleaned)})
 
 
+def strip_mention_tags(body: str) -> str:
+    """Converte @[Nome|uuid] → @Nome para exibição em notificações."""
+    return _MENTION_TAG_RE.sub(lambda m: f"@{m.group(1)}", body)
+
+
 async def resolve_mention_user_ids(
     db: AsyncSession,
     *,

@@ -35,6 +35,7 @@ from app.services.photos_service import (
     delete_comment,
     extract_mention_ids,
     extract_mentions,
+    strip_mention_tags,
     get_academy_photo,
     get_active_restriction,
     get_liked_photo_ids,
@@ -471,7 +472,7 @@ async def add_comment(
             user_id=photo.author_id,
             type="photo_comment",
             title=f"{current_user.name} comentou sua foto",
-            body=body.body[:120],
+            body=strip_mention_tags(body.body)[:120],
             data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
         )
 
@@ -485,6 +486,7 @@ async def add_comment(
             db, academy_id=academy_id, names=legacy_names, exclude_ids=already_notified
         )
         mention_ids.extend(uid for uid in legacy_ids if uid not in already_notified)
+    clean_body = strip_mention_tags(body.body)
     for uid in mention_ids:
         already_notified.add(uid)
         await create_notification(
@@ -492,7 +494,7 @@ async def add_comment(
             user_id=uid,
             type="photo_mention",
             title=f"{current_user.name} te marcou em um comentário",
-            body=body.body[:120],
+            body=clean_body[:120],
             data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
         )
 
