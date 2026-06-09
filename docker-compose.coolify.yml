@@ -77,6 +77,10 @@ services:
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@octogrip.com.br}
+      APP_BASE_URL: ${APP_BASE_URL:-https://octogrip.com.br}
+      PASSWORD_RESET_EXPIRE_MINUTES: ${PASSWORD_RESET_EXPIRE_MINUTES:-60}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
