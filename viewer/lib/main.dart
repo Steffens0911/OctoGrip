@@ -23,6 +23,7 @@ import 'package:viewer/config/feature_flags.dart';
 import 'package:viewer/features/photos/presentation/pages/photo_from_notification_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/photos_feed_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/student_search_photos_page.dart';
+import 'package:viewer/screens/auth/reset_password_screen.dart';
 import 'package:viewer/screens/enrollment/public_registration_screen.dart';
 import 'package:viewer/screens/notifications_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -228,9 +229,14 @@ class AuthGate extends StatelessWidget {
   Widget build(BuildContext context) {
     // Detecta link de convite: /?register=TOKEN
     if (kIsWeb) {
-      final token = Uri.base.queryParameters['register'];
-      if (token != null && token.isNotEmpty) {
-        return PublicRegistrationScreen(token: token);
+      final register = Uri.base.queryParameters['register'];
+      if (register != null && register.isNotEmpty) {
+        return PublicRegistrationScreen(token: register);
+      }
+      // Detecta link de reset de senha: /reset-password?token=TOKEN
+      final resetToken = Uri.base.queryParameters['token'];
+      if (resetToken != null && resetToken.isNotEmpty) {
+        return ResetPasswordScreen(token: resetToken);
       }
     }
 

@@ -76,6 +76,13 @@ class Settings(BaseSettings):
     # Desabilite em dev para não disparar push reais usando o Firebase de produção.
     PUSH_NOTIFICATIONS_ENABLED: bool = True
 
+    # Recuperação de senha por e-mail (Resend)
+    RESEND_API_KEY: str | None = None
+    RESEND_FROM_EMAIL: str = "noreply@octogrip.app"
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 60
+    # URL base do app (Flutter Web ou landing page) onde o link de reset aponta
+    APP_BASE_URL: str = "http://localhost:8000"
+
     # Reconhecimento facial (fila assíncrona)
     REDIS_URL: str = "redis://localhost:6379/0"
     FACE_JOBS_DIR: str = "/tmp/face_jobs"

@@ -221,6 +221,28 @@ class ApiService {
     return map['streak_bonus_points'] as int? ?? 0;
   }
 
+  /// Solicita link de recuperação de senha. Sempre retorna 200 (anti-enumeração).
+  Future<void> forgotPassword(String email) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/auth/forgot-password'),
+      headers: await _jsonHeaders(),
+      body: jsonEncode({'email': email}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data, true);
+  }
+
+  /// Redefine a senha usando o token recebido por e-mail.
+  Future<void> resetPassword(String token, String newPassword) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/auth/reset-password'),
+      headers: await _jsonHeaders(),
+      body: jsonEncode({'token': token, 'new_password': newPassword}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data, true);
+  }
+
   /// Retorna o usuário logado (requer token).
   Future<UserModel> getAuthMe([String? token]) async {
     final h = token != null

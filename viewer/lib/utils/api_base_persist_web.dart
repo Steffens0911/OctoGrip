@@ -10,3 +10,10 @@ void persistApiBaseAndReload(String base) {
     html.window.location.reload();
   } catch (_) {}
 }
+
+/// Redireciona para a raiz do app (remove query params da URL).
+void redirectToRoot() {
+  try {
+    html.window.location.assign('/');
+  } catch (_) {}
+}

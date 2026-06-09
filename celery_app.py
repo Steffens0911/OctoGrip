@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import worker_process_init
@@ -10,7 +12,14 @@ celery_app = Celery(
     "octogrip",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.face_recognition_tasks", "app.tasks.execution_tasks", "app.tasks.photo_tasks", "app.tasks.at_risk_tasks", "app.tasks.streak_tasks"],
+    include=[
+        "app.tasks.face_recognition_tasks",
+        "app.tasks.execution_tasks",
+        "app.tasks.photo_tasks",
+        "app.tasks.at_risk_tasks",
+        "app.tasks.streak_tasks",
+        "app.tasks.manual_trophy_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -21,13 +30,17 @@ celery_app.conf.update(
     task_soft_time_limit=90,
     task_track_started=True,
     broker_connection_retry_on_startup=True,
-    # Prefork com concurrency>1 duplica TensorFlow/DeepFace por processo → OOM (SIGKILL) em VPS ~1 GiB.
-    # O compose usa --pool=solo (um processo); mantemos 1 aqui para ambientes sem esse flag.
     worker_concurrency=1,
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     result_expires=3600,
     timezone="UTC",
+    # face_recognition_tasks → fila "face" (worker solo, carrega TensorFlow).
+    # Tudo mais → fila "default" (worker prefork leve, sem modelo na RAM).
+    task_routes={
+        "app.tasks.face_recognition_tasks.*": {"queue": "face"},
+        "app.tasks.*": {"queue": "default"},
+    },
     beat_schedule={
         "face-recognition-cleanup-daily": {
             "task": "app.tasks.face_recognition_tasks.cleanup_face_recognition_temp_data",
@@ -63,7 +76,9 @@ celery_app.conf.update(
 
 @worker_process_init.connect
 def preload_facenet512_model(**_: object) -> None:
-    """Pré-carrega o modelo no processo worker para reduzir cold start da primeira task."""
+    """Pré-carrega o modelo apenas no worker da fila 'face' (FACE_WORKER=1)."""
+    if not os.environ.get("FACE_WORKER"):
+        return
     try:
         from app.face_model import get_model
 

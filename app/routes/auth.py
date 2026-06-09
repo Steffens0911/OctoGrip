@@ -1,8 +1,9 @@
 """Autenticação: login e token JWT com account lockout."""
 
 import logging
+import secrets
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, Request
 from sqlalchemy import select
@@ -14,12 +15,21 @@ from app.core.auth_deps import get_current_user
 from app.core.exceptions import AppError
 from app.core.metrics import security_events_total
 from app.core.rate_limit import limiter
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, hash_password, verify_password
 from app.database import get_db
 from app.models import User
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user_login_day import UserLoginDay
-from app.schemas.auth import DailyCheckinResponse, LoginRequest, TokenResponse
+from app.schemas.auth import (
+    DailyCheckinResponse,
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    ResetPasswordRequest,
+    TokenResponse,
+)
 from app.schemas.user import MeUpdate, UserRead
+from app.services.email_service import send_password_reset_email
 from app.services.leveling_service import refresh_user_level
 from app.services.login_streak_service import (
     apply_login_streak_bonus,
@@ -188,3 +198,90 @@ async def daily_checkin(
         streak_bonus_points=streak_bonus_points,
         already_checked_in=already_checked_in,
     )
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit("5/hour")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Solicita redefinição de senha. Envia e-mail com link de reset.
+
+    Sempre retorna 200 mesmo quando o e-mail não existe (evita enumeração de usuários).
+    """
+    _MSG = "Se esse e-mail estiver cadastrado, você receberá um link de redefinição em breve."
+
+    user = await get_user_by_email(db, body.email)
+    if not user:
+        logger.info("forgot_password: e-mail não encontrado", extra={"email": body.email})
+        return MessageResponse(message=_MSG)
+
+    # Invalida tokens anteriores não usados
+    existing_tokens = (
+        await db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.user_id == user.id,
+                PasswordResetToken.used_at.is_(None),
+            )
+        )
+    ).scalars().all()
+    for t in existing_tokens:
+        await db.delete(t)
+
+    token_value = secrets.token_urlsafe(32)
+    now = datetime.now(UTC)
+    reset_token = PasswordResetToken(
+        user_id=user.id,
+        token=token_value,
+        expires_at=now + timedelta(minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES),
+        created_at=now,
+    )
+    db.add(reset_token)
+    await db.commit()
+
+    reset_url = f"{settings.APP_BASE_URL}/reset-password?token={token_value}"
+
+    try:
+        await send_password_reset_email(to_email=user.email, reset_url=reset_url)
+    except Exception:
+        logger.exception("Falha ao enviar e-mail de reset", extra={"user_id": str(user.id)})
+        # Não expõe o erro ao cliente — mesmo comportamento da resposta padrão
+
+    return MessageResponse(message=_MSG)
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("10/hour")
+async def reset_password(
+    request: Request,
+    body: ResetPasswordRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """Redefine a senha usando o token recebido por e-mail."""
+    now = datetime.now(UTC)
+
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == body.token)
+    )
+    reset_token = result.scalar_one_or_none()
+
+    if not reset_token:
+        raise AppError("Token inválido ou expirado.", status_code=400)
+    if reset_token.used_at is not None:
+        raise AppError("Token já utilizado.", status_code=400)
+    if reset_token.expires_at < now:
+        raise AppError("Token expirado. Solicite um novo link de redefinição.", status_code=400)
+
+    # Busca o usuário e atualiza a senha
+    user = await db.get(User, reset_token.user_id)
+    if not user:
+        raise AppError("Token inválido.", status_code=400)
+
+    user.password_hash = await hash_password(body.new_password)
+    reset_token.used_at = now
+    await db.commit()
+
+    logger.info("Senha redefinida com sucesso", extra={"user_id": str(user.id)})
+    return MessageResponse(message="Senha redefinida com sucesso. Faça login com a nova senha.")

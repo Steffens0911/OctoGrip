@@ -6,6 +6,7 @@ import 'package:viewer/config.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/network_diagnostics_service.dart';
+import 'package:viewer/screens/auth/forgot_password_screen.dart';
 import 'package:viewer/screens/debug/network_diagnostics_screen.dart';
 import 'package:viewer/utils/api_base_persist.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -270,6 +271,31 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                         enabled: !_loading && kApiBaseUrl.isNotEmpty,
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: kApiBaseUrl.isEmpty
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const ForgotPasswordScreen(),
+                                    ),
+                                  ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 4),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                            'Esqueci a senha',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textMutedOf(context),
+                            ),
+                          ),
+                        ),
                       ),
                       if (_error != null) ...[
                         const SizedBox(height: 16),

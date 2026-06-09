@@ -95,12 +95,12 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
 
-  celery-worker:
+  celery-worker-face:
     image: ghcr.io/steffens0911/octogrip-api:latest
     pull_policy: always
-    container_name: jjb_celery_worker
+    container_name: jjb_celery_worker_face
     restart: unless-stopped
-    command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1
+    command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1 -Q face --hostname=worker-face@%h
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
@@ -111,6 +111,7 @@ services:
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}
+      FACE_WORKER: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -121,6 +122,32 @@ services:
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
     mem_limit: 2g
     mem_reservation: 768m
+
+  celery-worker-default:
+    image: ghcr.io/steffens0911/octogrip-api:latest
+    pull_policy: always
+    container_name: jjb_celery_worker_default
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info --pool=prefork --concurrency=2 -Q default --hostname=worker-default@%h
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com valor forte}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_media:/app/app_media
+      - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
+    mem_limit: 512m
+    mem_reservation: 256m
 
   celery-beat:
     image: ghcr.io/steffens0911/octogrip-api:latest

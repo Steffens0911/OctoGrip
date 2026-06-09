@@ -10,6 +10,7 @@ from app.models.audit_log import AuditLog
 from app.models.base import UUIDMixin
 from app.models.collective_goal import CollectiveGoal
 from app.models.enrollment_invite import EnrollmentInvite, PendingEnrollment
+from app.models.password_reset_token import PasswordResetToken
 from app.models.face_recognition_job import FaceRecognitionJob
 from app.models.global_partner import GlobalPartner
 from app.models.lesson import Lesson
@@ -74,4 +75,5 @@ __all__ = [
     "AcademyTrophyAward",
     "EnrollmentInvite",
     "PendingEnrollment",
+    "PasswordResetToken",
 ]

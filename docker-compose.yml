@@ -73,6 +73,10 @@ services:
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@octogrip.app}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      PASSWORD_RESET_EXPIRE_MINUTES: ${PASSWORD_RESET_EXPIRE_MINUTES:-60}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()"]
       interval: 30s
@@ -92,12 +96,12 @@ services:
     mem_limit: 512m
     mem_reservation: 256m
 
-  celery-worker:
+  celery-worker-face:
     build: .
-    container_name: jjb_celery_worker
+    container_name: jjb_celery_worker_face
     restart: unless-stopped
-    # Pool solo: uma cópia do modelo na RAM; prefork+TensorFlow estoura mem_limit típico (SIGKILL nos ForkPoolWorker).
-    command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1
+    # Pool solo obrigatório: TensorFlow/DeepFace com prefork causa OOM (SIGKILL) em VPS com pouca RAM.
+    command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1 -Q face --hostname=worker-face@%h
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
@@ -108,6 +112,7 @@ services:
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      FACE_WORKER: "1"
     depends_on:
       postgres:
         condition: service_healthy
@@ -119,6 +124,32 @@ services:
       - ./secrets:/app/secrets:ro
     mem_limit: 2g
     mem_reservation: 768m
+
+  celery-worker-default:
+    build: .
+    container_name: jjb_celery_worker_default
+    restart: unless-stopped
+    # Fila leve: notificações, streak, alertas, fotos — sem TensorFlow na RAM.
+    command: celery -A celery_app worker --loglevel=info --pool=prefork --concurrency=2 -Q default --hostname=worker-default@%h
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PGSSLMODE: ${PGSSLMODE:-disable}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:-dev_local_only}@postgres:5432/${POSTGRES_DB:-jjb_db}
+      JWT_SECRET: ${JWT_SECRET:-dev-local-only-nao-usar-em-producao}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - api_media:/app/app_media
+      - ./secrets:/app/secrets:ro
+    mem_limit: 512m
+    mem_reservation: 256m
 
   celery-beat:
     build: .
