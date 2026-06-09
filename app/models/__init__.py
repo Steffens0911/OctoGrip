@@ -10,7 +10,6 @@ from app.models.audit_log import AuditLog
 from app.models.base import UUIDMixin
 from app.models.collective_goal import CollectiveGoal
 from app.models.enrollment_invite import EnrollmentInvite, PendingEnrollment
-from app.models.password_reset_token import PasswordResetToken
 from app.models.face_recognition_job import FaceRecognitionJob
 from app.models.global_partner import GlobalPartner
 from app.models.lesson import Lesson
@@ -20,6 +19,7 @@ from app.models.mission import Mission
 from app.models.mission_usage import MissionUsage
 from app.models.notification import Notification
 from app.models.partner import Partner
+from app.models.password_reset_token import PasswordResetToken
 from app.models.professor import Professor
 from app.models.soft_delete import SoftDeleteMixin
 from app.models.student_face_embedding import StudentFaceEmbedding
