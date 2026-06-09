@@ -220,13 +220,17 @@ async def forgot_password(
 
     # Invalida tokens anteriores não usados
     existing_tokens = (
-        await db.execute(
-            select(PasswordResetToken).where(
-                PasswordResetToken.user_id == user.id,
-                PasswordResetToken.used_at.is_(None),
+        (
+            await db.execute(
+                select(PasswordResetToken).where(
+                    PasswordResetToken.user_id == user.id,
+                    PasswordResetToken.used_at.is_(None),
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for t in existing_tokens:
         await db.delete(t)
 
@@ -262,9 +266,7 @@ async def reset_password(
     """Redefine a senha usando o token recebido por e-mail."""
     now = datetime.now(UTC)
 
-    result = await db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token == body.token)
-    )
+    result = await db.execute(select(PasswordResetToken).where(PasswordResetToken.token == body.token))
     reset_token = result.scalar_one_or_none()
 
     if not reset_token:
