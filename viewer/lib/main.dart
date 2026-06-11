@@ -280,7 +280,7 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _selected = 0;
   int _inicioRefreshKey = 0;
   String? _lastEffectiveUserId;
@@ -298,15 +298,34 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       AuthService().restoreImpersonation();
       _fetchUnreadCount();
       _loadAcademy();
     });
+    _startNotifPolling();
+  }
+
+  /// Polling do badge de notificações: pausado em background, religa no resume.
+  void _startNotifPolling() {
+    _notifPollTimer?.cancel();
     _notifPollTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 60),
       (_) => _fetchUnreadCount(),
     );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchUnreadCount();
+      _startNotifPolling();
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _notifPollTimer?.cancel();
+      _notifPollTimer = null;
+    }
   }
 
   Future<void> _loadAcademy() async {
@@ -320,6 +339,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _notifPollTimer?.cancel();
     super.dispose();
   }

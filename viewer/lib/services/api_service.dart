@@ -125,9 +125,13 @@ class ApiService {
   void invalidateCache([String? prefix]) {
     if (prefix == null || prefix.isEmpty) {
       _getCache.clear();
+      _usersAllCache.clear();
       return;
     }
     _getCache.removeWhere((k, _) => k.startsWith(prefix));
+    if (prefix.startsWith('GET:$baseUrl/users')) {
+      _usersAllCache.clear();
+    }
   }
 
   void _invalidateHomeHeaderCache() {
@@ -947,9 +951,20 @@ class ApiService {
     };
   }
 
+  /// Cache da lista completa (o diálogo "Atuar como" reabre com frequência e
+  /// cada chamada são 1+ requests de 50 em 50). Limpo em [invalidateCache].
+  final Map<String, ({List<UserModel> users, int expiresAtMs})> _usersAllCache =
+      {};
+
   /// Acumula todas as páginas de utilizadores (50 por pedido).
   Future<List<UserModel>> getUsersAll(
       {String? academyId, bool asRealUser = false}) async {
+    final cacheKey = 'usersAll:${academyId ?? ''}:$asRealUser';
+    final cached = _usersAllCache[cacheKey];
+    if (cached != null &&
+        DateTime.now().millisecondsSinceEpoch < cached.expiresAtMs) {
+      return cached.users;
+    }
     const page = 50;
     final all = <UserModel>[];
     var offset = 0;
@@ -964,6 +979,11 @@ class ApiService {
       if (batch.length < page) break;
       offset += page;
     }
+    _usersAllCache[cacheKey] = (
+      users: all,
+      expiresAtMs:
+          DateTime.now().millisecondsSinceEpoch + (_cacheTtlMedium * 1000),
+    );
     return all;
   }
 
