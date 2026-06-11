@@ -32,9 +32,10 @@ class Settings(BaseSettings):
     # configurado em app.main. Em produção, defina origens explícitas aqui (ex.: URLs do frontend).
     CORS_ORIGINS: list[str] = []
 
-    # Banco - pool
-    DB_POOL_SIZE: int = 8
-    DB_MAX_OVERFLOW: int = 4
+    # Banco - pool (POR WORKER uvicorn: 4 workers × (12+6) = 72 conexões máx.,
+    # folga p/ Celery e psql dentro de max_connections=100 do Postgres)
+    DB_POOL_SIZE: int = 12
+    DB_MAX_OVERFLOW: int = 6
 
     # Seed automático no startup
     SEED_ON_STARTUP: bool = False
