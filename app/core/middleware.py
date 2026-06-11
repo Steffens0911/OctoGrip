@@ -222,7 +222,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
 
         path = request.url.path
-        if request.method == "GET" and any(path.startswith(p) for p in self._CACHEABLE_PREFIXES):
+        if request.method == "GET" and path.startswith("/media/"):
+            if path.startswith("/media/photos/"):
+                # Fotos do feed têm nome único por post ({photo_id}_full/thumb.jpg):
+                # conteúdo imutável, o browser pode guardar por 1 ano.
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                # Avatares/logos REUSAM o mesmo nome de arquivo ao trocar — cache
+                # curto + revalidação por ETag (StaticFiles envia ETag/Last-Modified).
+                response.headers["Cache-Control"] = "public, max-age=300, stale-while-revalidate=600"
+        elif request.method == "GET" and any(path.startswith(p) for p in self._CACHEABLE_PREFIXES):
             response.headers["Cache-Control"] = "private, max-age=60"
         else:
             response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
