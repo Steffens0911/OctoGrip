@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import io
 import uuid
 from pathlib import Path
@@ -341,7 +342,8 @@ async def export_photo(
     if not image_path.exists():
         raise NotFoundError("Arquivo de imagem não encontrado.")
 
-    output = _compose_watermark(str(image_path), academy_name)
+    # PIL é síncrono e CPU-bound: roda fora do event loop para não travar outras requests.
+    output = await asyncio.to_thread(_compose_watermark, str(image_path), academy_name)
     return StreamingResponse(io.BytesIO(output), media_type="image/jpeg")
 
 

@@ -1,5 +1,6 @@
 """CRUD de usuários. Admin: todos; professor/gerente: própria academia; aluno/outros: só colegas da própria academia."""
 
+import asyncio
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Final
@@ -106,7 +107,7 @@ async def _save_user_avatar_and_maybe_enqueue(
     data, extension = await _read_avatar_upload(file)
     filename = f"user-{target.id}{extension}"
     dest = _USER_AVATARS_DIR / filename
-    dest.write_bytes(data)
+    await asyncio.to_thread(dest.write_bytes, data)
     target.avatar_url = f"/media/user_avatars/{filename}"
     await db.commit()
     await db.refresh(target)
@@ -122,7 +123,7 @@ async def _save_facial_photo_and_enqueue(
     data, extension = await _read_avatar_upload(file)
     filename = f"facial-{target.id}{extension}"
     dest = _USER_FACIAL_DIR / filename
-    dest.write_bytes(data)
+    await asyncio.to_thread(dest.write_bytes, data)
     target.facial_photo_url = f"/media/user_facial_photos/{filename}"
     await db.commit()
     await db.refresh(target)
