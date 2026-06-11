@@ -92,18 +92,54 @@ class PhotosFeedNotifier
     _startPollingIfNeeded();
   }
 
-  // ─── Polling silencioso ───────────────────────────────────────────────────
+  // ─── Polling silencioso (backoff 4s→8s→16s; desiste após N polls sem mudança) ──
+
+  static const int _pollingBaseIntervalSec = 4;
+  static const int _pollingMaxIntervalSec = 16;
+  static const int _pollingMaxIdleTicks = 20;
+
+  int _pollingIntervalSec = _pollingBaseIntervalSec;
+  int _pollingIdleTicks = 0;
 
   void _startPollingIfNeeded() {
     if (_pollingTimer?.isActive == true) return; // já rodando
     if (!_hasPendingPhotos) return;
+    _pollingIntervalSec = _pollingBaseIntervalSec;
+    _pollingIdleTicks = 0;
+    _scheduleNextPoll();
+  }
 
-    _pollingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!_hasPendingPhotos) {
-        _stopPolling();
-        return;
+  void _scheduleNextPoll() {
+    _pollingTimer = Timer(Duration(seconds: _pollingIntervalSec), () async {
+      try {
+        if (!_hasPendingPhotos) {
+          _stopPolling();
+          return;
+        }
+        final changed = await _silentRefreshPending();
+        if (changed) {
+          _pollingIntervalSec = _pollingBaseIntervalSec;
+          _pollingIdleTicks = 0;
+        } else {
+          _pollingIdleTicks++;
+          if (_pollingIdleTicks >= _pollingMaxIdleTicks) {
+            // Processamento provavelmente travou no backend; um refresh
+            // manual (pull-to-refresh) religa o polling.
+            _log.fine('Polling encerrado após $_pollingIdleTicks tentativas');
+            _stopPolling();
+            return;
+          }
+          _pollingIntervalSec = (_pollingIntervalSec * 2)
+              .clamp(_pollingBaseIntervalSec, _pollingMaxIntervalSec);
+        }
+        if (_hasPendingPhotos) {
+          _scheduleNextPoll();
+        } else {
+          _stopPolling();
+        }
+      } catch (_) {
+        // Provider pode ter sido descartado durante o await; nada a fazer.
       }
-      _silentRefreshPending();
     });
   }
 
@@ -114,7 +150,8 @@ class PhotosFeedNotifier
 
   /// Busca o feed e atualiza silenciosamente apenas os itens cujo status mudou.
   /// Não altera flags de loading para não mostrar nenhum indicador ao usuário.
-  Future<void> _silentRefreshPending() async {
+  /// Retorna true se algum status mudou (usado para resetar o backoff).
+  Future<bool> _silentRefreshPending() async {
     try {
       final api = ref.read(apiServiceProvider);
       final page = await api.getPhotosFeed(state.academyId);
@@ -135,11 +172,10 @@ class PhotosFeedNotifier
         state = state.copyWith(items: updated);
         _log.fine('Fotos pendentes atualizadas silenciosamente');
       }
-
-      // Para o timer se não restam pendentes após a atualização
-      if (!_hasPendingPhotos) _stopPolling();
+      return changed;
     } catch (e) {
       _log.fine('silentRefreshPending ignorado: $e');
+      return false;
     }
   }
 
