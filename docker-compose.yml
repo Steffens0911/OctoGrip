@@ -20,6 +20,7 @@ services:
       -c checkpoint_completion_target=0.9
       -c wal_buffers=16MB
       -c synchronous_commit=off
+      -c random_page_cost=1.1
     ports:
       - "5432:5432"
     volumes:
