@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.app_time import calendar_date_in_app_tz, today_in_app_tz, utc_now
+from app.core.cache import app_cache
 from app.models import User
 from app.models.user_login_day import UserLoginDay
 from app.schemas.user import UserRead
@@ -20,6 +21,15 @@ logger = logging.getLogger(__name__)
 
 # Limite de dias distintos a carregar (performance).
 _MAX_DISTINCT_DAYS = 400
+
+# Cache do streak: a chave inclui o dia de referência (fuso do app), então a
+# virada da meia-noite invalida naturalmente; o login do dia atualiza o valor.
+_LOGIN_STREAK_TTL_SEC = 6 * 3600
+_LOGIN_STREAK_PREFIX = "login_streak:"
+
+
+def _login_streak_cache_key(user_id: uuid.UUID, day: date) -> str:
+    return f"{_LOGIN_STREAK_PREFIX}{user_id}:{day.isoformat()}"
 
 
 def login_streak_from_distinct_days(
@@ -100,6 +110,8 @@ async def apply_login_streak_bonus(
                 "bonus_points": bonus,
             },
         )
+    # Atualiza (em vez de só invalidar) o cache usado por /auth/me.
+    await app_cache.set(_login_streak_cache_key(user.id, day), streak_after, ttl=_LOGIN_STREAK_TTL_SEC)
     return bonus
 
 
@@ -129,5 +141,13 @@ async def compute_login_streak_days(
 
 
 async def user_read_with_login_streak(db: AsyncSession, user: User) -> UserRead:
-    streak = await compute_login_streak_days(db, user.id)
+    """Monta o UserRead com o streak cacheado — /auth/me é chamado no boot do app."""
+    today = today_in_app_tz()
+    cache_key = _login_streak_cache_key(user.id, today)
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        streak = int(cached)
+    else:
+        streak = await compute_login_streak_days(db, user.id, reference_day=today)
+        await app_cache.set(cache_key, streak, ttl=_LOGIN_STREAK_TTL_SEC)
     return UserRead.model_validate(user).model_copy(update={"login_streak_days": streak})
