@@ -58,11 +58,16 @@ class ApiException implements Exception {
 }
 
 /// Cache in-memory com TTL para reduzir requisições repetidas (troca de telas, abas).
+///
+/// Stale-while-revalidate: até [staleAtMs] serve direto; entre [staleAtMs] e
+/// [expiresAtMs] serve o cache imediatamente e revalida em background — telas
+/// nunca voltam a mostrar spinner se já têm dado conhecido.
 class _CacheEntry {
   final String body;
   final int statusCode;
+  final int staleAtMs;
   final int expiresAtMs;
-  _CacheEntry(this.body, this.statusCode, this.expiresAtMs);
+  _CacheEntry(this.body, this.statusCode, this.staleAtMs, this.expiresAtMs);
 }
 
 class ApiService {
@@ -88,23 +93,32 @@ class ApiService {
 
   String _cacheKey(String method, Uri uri) => '$method:${uri.toString()}';
 
-  String? _getCached(String key, int ttlSeconds) {
+  /// Janela máxima do stale-while-revalidate: depois do TTL "fresco" o dado
+  /// ainda é servido (com revalidação em background) por até este tempo.
+  static const int _cacheHardTtlSeconds = 600;
+
+  _CacheEntry? _validEntry(String key) {
     final entry = _getCache[key];
     if (entry == null) return null;
     if (DateTime.now().millisecondsSinceEpoch > entry.expiresAtMs) {
       _getCache.remove(key);
       return null;
     }
-    return entry.statusCode >= 200 && entry.statusCode < 300
-        ? entry.body
-        : null;
+    return entry;
   }
 
   void _setCache(String key, String body, int statusCode, int ttlSeconds) {
     if (statusCode < 200 || statusCode >= 300) return;
-    final expiresAtMs =
-        DateTime.now().millisecondsSinceEpoch + (ttlSeconds * 1000);
-    _getCache[key] = _CacheEntry(body, statusCode, expiresAtMs);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final hardTtl = ttlSeconds > _cacheHardTtlSeconds
+        ? ttlSeconds
+        : _cacheHardTtlSeconds;
+    _getCache[key] = _CacheEntry(
+      body,
+      statusCode,
+      nowMs + (ttlSeconds * 1000),
+      nowMs + (hardTtl * 1000),
+    );
   }
 
   /// Invalida cache por prefixo (ex: "GET:$baseUrl/academies") ou todo o cache.
@@ -137,24 +151,48 @@ class ApiService {
         },
       );
 
-  /// GET com cache. [ttlSeconds] 0 = sem cache. Retorna body (string); em cache hit não chama a rede.
+  /// Deduplica GETs simultâneos ao mesmo endpoint e as revalidações em background.
+  final Map<String, Future<http.Response>> _inFlightGets = {};
+
+  /// GET com cache. [ttlSeconds] 0 = sem cache. Dentro do TTL serve direto;
+  /// entre o TTL e [_cacheHardTtlSeconds] serve o cache imediatamente e
+  /// revalida em background (stale-while-revalidate).
   Future<http.Response> _getWithCache(Uri uri, int ttlSeconds) async {
     final key = _cacheKey('GET', uri);
     if (ttlSeconds > 0) {
-      final cached = _getCached(key, ttlSeconds);
-      if (cached != null) {
-        return http.Response(cached, 200,
+      final entry = _validEntry(key);
+      if (entry != null && entry.statusCode >= 200 && entry.statusCode < 300) {
+        if (DateTime.now().millisecondsSinceEpoch > entry.staleAtMs) {
+          unawaited(
+            _fetchAndCache(uri, key, ttlSeconds).then((_) {}, onError: (_) {}),
+          );
+        }
+        return http.Response(entry.body, 200,
             headers: {'content-type': 'application/json'});
       }
     }
-    final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
-      timeout: _getTimeout,
-    );
-    if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
-      _setCache(key, r.body, r.statusCode, ttlSeconds);
-    }
-    return r;
+    return _fetchAndCache(uri, key, ttlSeconds);
+  }
+
+  Future<http.Response> _fetchAndCache(Uri uri, String key, int ttlSeconds) {
+    final inFlight = _inFlightGets[key];
+    if (inFlight != null) return inFlight;
+    final future = () async {
+      try {
+        final r = await _req(
+          http.get(uri, headers: await _headers(auth: true)),
+          timeout: _getTimeout,
+        );
+        if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
+          _setCache(key, r.body, r.statusCode, ttlSeconds);
+        }
+        return r;
+      } finally {
+        _inFlightGets.remove(key);
+      }
+    }();
+    _inFlightGets[key] = future;
+    return future;
   }
 
   /// Garante que o token foi carregado do storage (importante no web após refresh).
