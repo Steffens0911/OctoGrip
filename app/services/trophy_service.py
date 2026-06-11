@@ -4,11 +4,12 @@ import logging
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, literal, select, union_all
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.app_time import today_in_app_tz
+from app.core.cache import app_cache
 from app.core.exceptions import AcademyNotFoundError, AppError, TechniqueNotFoundError, TrophyNotFoundError
 from app.core.graduation import meets_minimum_graduation
 from app.core.list_pagination import clamp_list_limit
@@ -587,6 +588,21 @@ async def list_user_trophies_with_earned(
     return result
 
 
+_TROPHY_HOME_TTL_SEC = 120
+_TROPHY_HOME_PREFIX = "trophy_home:a:"
+
+
+async def invalidate_trophy_home_cache(academy_id: UUID | None) -> None:
+    """Invalida o resumo da home de troféus para todos os alunos da academia.
+
+    O bloco academy_recent é compartilhado por toda a academia, então qualquer
+    conquista (automática ou manual) invalida o prefixo inteiro de uma vez.
+    """
+    if academy_id is None:
+        return
+    await app_cache.bump_prefix_version(f"{_TROPHY_HOME_PREFIX}{academy_id}:")
+
+
 async def get_trophy_home_summary(
     db: AsyncSession,
     user_id: UUID,
@@ -596,140 +612,140 @@ async def get_trophy_home_summary(
     Retorna resumo para os cards da home:
     - my_earned_count: total de troféus/medalhas conquistados pelo usuário (automáticos + manuais)
     - my_recent: últimos 3 conquistados pelo próprio usuário
-    - academy_recent: últimas 7 conquistas de colegas da academia (ordenadas por earned_at)
+    - academy_recent: últimas 10 conquistas de colegas da academia (ordenadas por earned_at)
+
+    Endpoint de boot do app: consolidado em 3 queries (era 6) + cache versionado
+    por academia (TTL 120s).
     """
     from app.models.manual_trophy import AcademyTrophyAward, AcademyTrophyTemplate
     from app.models.user_trophy_earned import UserTrophyEarned
 
-    # Total e recentes do próprio usuário — automáticos
-    auto_count: int = (await db.scalar(select(func.count()).where(UserTrophyEarned.user_id == user_id))) or 0
+    cache_key = await app_cache.versioned_key(f"{_TROPHY_HOME_PREFIX}{academy_id}:", str(user_id))
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
-    auto_recent_rows = (
-        await db.execute(
-            select(UserTrophyEarned, Trophy)
-            .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
-            .where(
-                UserTrophyEarned.user_id == user_id,
-                Trophy.deleted_at.is_(None),
-            )
-            .order_by(UserTrophyEarned.earned_at.desc())
-            .limit(3)
+    manual_award_kind = case(
+        (AcademyTrophyTemplate.trophy_type == "championship", literal("medal")),
+        else_=literal("trophy"),
+    )
+
+    # ── Totais do usuário (automáticos + manuais) em uma única ida ao banco ──
+    auto_count_sq = (
+        select(func.count())
+        .select_from(UserTrophyEarned)
+        .where(UserTrophyEarned.user_id == user_id)
+        .scalar_subquery()
+    )
+    manual_count_sq = (
+        select(func.count())
+        .select_from(AcademyTrophyAward)
+        .where(AcademyTrophyAward.user_id == user_id)
+        .scalar_subquery()
+    )
+    counts_row = (await db.execute(select(auto_count_sq, manual_count_sq))).one()
+    my_earned_count = int(counts_row[0] or 0) + int(counts_row[1] or 0)
+
+    # ── Meus 3 mais recentes: UNION ALL (automáticos + manuais) com LIMIT no banco ──
+    my_auto = (
+        select(
+            UserTrophyEarned.trophy_id.label("trophy_id"),
+            Trophy.name.label("name"),
+            Trophy.award_kind.label("award_kind"),
+            UserTrophyEarned.tier.label("tier"),
+            UserTrophyEarned.earned_at.label("earned_at"),
         )
-    ).all()
-
-    # Total e recentes do próprio usuário — manuais
-    manual_count: int = (
-        await db.scalar(
-            select(func.count())
-            .select_from(AcademyTrophyAward)
-            .where(
-                AcademyTrophyAward.user_id == user_id,
-            )
+        .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
+        .where(
+            UserTrophyEarned.user_id == user_id,
+            Trophy.deleted_at.is_(None),
         )
-    ) or 0
-
-    manual_recent_rows = (
-        await db.execute(
-            select(AcademyTrophyAward, AcademyTrophyTemplate)
-            .join(AcademyTrophyTemplate, AcademyTrophyTemplate.id == AcademyTrophyAward.template_id)
-            .where(
-                AcademyTrophyAward.user_id == user_id,
-                AcademyTrophyTemplate.deleted_at.is_(None),
-            )
-            .order_by(AcademyTrophyAward.awarded_at.desc())
-            .limit(3)
+    )
+    my_manual = (
+        select(
+            AcademyTrophyAward.id.label("trophy_id"),
+            AcademyTrophyTemplate.name.label("name"),
+            manual_award_kind.label("award_kind"),
+            AcademyTrophyAward.medal_type.label("tier"),
+            AcademyTrophyAward.awarded_at.label("earned_at"),
         )
-    ).all()
-
-    my_earned_count = auto_count + manual_count
-
-    auto_recent = [
+        .join(AcademyTrophyTemplate, AcademyTrophyTemplate.id == AcademyTrophyAward.template_id)
+        .where(
+            AcademyTrophyAward.user_id == user_id,
+            AcademyTrophyTemplate.deleted_at.is_(None),
+        )
+    )
+    my_union = union_all(my_auto, my_manual).subquery()
+    my_rows = (await db.execute(select(my_union).order_by(my_union.c.earned_at.desc()).limit(3))).all()
+    my_recent = [
         {
-            "trophy_id": str(row.UserTrophyEarned.trophy_id),
-            "name": row.Trophy.name,
-            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
-            "tier": row.UserTrophyEarned.tier,
-            "earned_at": row.UserTrophyEarned.earned_at.isoformat(),
+            "trophy_id": str(row.trophy_id),
+            "name": row.name,
+            "award_kind": row.award_kind or "trophy",
+            "tier": row.tier,
         }
-        for row in auto_recent_rows
-    ]
-    manual_recent = [
-        {
-            "trophy_id": str(row.AcademyTrophyAward.id),
-            "name": row.AcademyTrophyTemplate.name,
-            "award_kind": "medal" if row.AcademyTrophyTemplate.trophy_type == "championship" else "trophy",
-            "tier": row.AcademyTrophyAward.medal_type,
-            "earned_at": row.AcademyTrophyAward.awarded_at.isoformat(),
-        }
-        for row in manual_recent_rows
-    ]
-
-    # Une e pega os 3 mais recentes
-    all_recent = sorted(auto_recent + manual_recent, key=lambda x: x["earned_at"], reverse=True)
-    my_recent = [{k: v for k, v in item.items() if k != "earned_at"} for item in all_recent[:3]]
-
-    # Conquistas recentes da academia — automáticos
-    auto_academy_rows = (
-        await db.execute(
-            select(UserTrophyEarned, User, Trophy)
-            .join(User, User.id == UserTrophyEarned.user_id)
-            .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
-            .where(
-                User.academy_id == academy_id,
-                Trophy.deleted_at.is_(None),
-            )
-            .order_by(UserTrophyEarned.earned_at.desc())
-            .limit(10)
-        )
-    ).all()
-
-    # Conquistas recentes da academia — manuais
-    manual_academy_rows = (
-        await db.execute(
-            select(AcademyTrophyAward, User, AcademyTrophyTemplate)
-            .join(User, User.id == AcademyTrophyAward.user_id)
-            .join(AcademyTrophyTemplate, AcademyTrophyTemplate.id == AcademyTrophyAward.template_id)
-            .where(
-                User.academy_id == academy_id,
-                AcademyTrophyTemplate.deleted_at.is_(None),
-            )
-            .order_by(AcademyTrophyAward.awarded_at.desc())
-            .limit(10)
-        )
-    ).all()
-
-    auto_academy = [
-        {
-            "user_id": str(row.User.id),
-            "user_name": (row.User.name or row.User.email or "Aluno").strip(),
-            "tier": row.UserTrophyEarned.tier,
-            "trophy_name": row.Trophy.name,
-            "award_kind": getattr(row.Trophy, "award_kind", "trophy"),
-            "earned_at": row.UserTrophyEarned.earned_at.isoformat(),
-        }
-        for row in auto_academy_rows
-    ]
-    manual_academy = [
-        {
-            "user_id": str(row.User.id),
-            "user_name": (row.User.name or row.User.email or "Aluno").strip(),
-            "tier": row.AcademyTrophyAward.medal_type,
-            "trophy_name": row.AcademyTrophyTemplate.name,
-            "award_kind": "medal" if row.AcademyTrophyTemplate.trophy_type == "championship" else "trophy",
-            "earned_at": row.AcademyTrophyAward.awarded_at.isoformat(),
-        }
-        for row in manual_academy_rows
+        for row in my_rows
     ]
 
-    academy_recent = sorted(auto_academy + manual_academy, key=lambda x: x["earned_at"], reverse=True)[:10]
-    for item in academy_recent:
-        del item["earned_at"]
+    # ── Últimas 10 conquistas da academia: UNION ALL com LIMIT no banco ──
+    academy_auto = (
+        select(
+            User.id.label("user_id"),
+            User.name.label("user_name"),
+            User.email.label("user_email"),
+            UserTrophyEarned.tier.label("tier"),
+            Trophy.name.label("trophy_name"),
+            Trophy.award_kind.label("award_kind"),
+            UserTrophyEarned.earned_at.label("earned_at"),
+        )
+        .select_from(UserTrophyEarned)
+        .join(User, User.id == UserTrophyEarned.user_id)
+        .join(Trophy, Trophy.id == UserTrophyEarned.trophy_id)
+        .where(
+            User.academy_id == academy_id,
+            Trophy.deleted_at.is_(None),
+        )
+    )
+    academy_manual = (
+        select(
+            User.id.label("user_id"),
+            User.name.label("user_name"),
+            User.email.label("user_email"),
+            AcademyTrophyAward.medal_type.label("tier"),
+            AcademyTrophyTemplate.name.label("trophy_name"),
+            manual_award_kind.label("award_kind"),
+            AcademyTrophyAward.awarded_at.label("earned_at"),
+        )
+        .select_from(AcademyTrophyAward)
+        .join(User, User.id == AcademyTrophyAward.user_id)
+        .join(AcademyTrophyTemplate, AcademyTrophyTemplate.id == AcademyTrophyAward.template_id)
+        .where(
+            User.academy_id == academy_id,
+            AcademyTrophyTemplate.deleted_at.is_(None),
+        )
+    )
+    academy_union = union_all(academy_auto, academy_manual).subquery()
+    academy_rows = (
+        await db.execute(select(academy_union).order_by(academy_union.c.earned_at.desc()).limit(10))
+    ).all()
+    academy_recent = [
+        {
+            "user_id": str(row.user_id),
+            "user_name": (row.user_name or row.user_email or "Aluno").strip(),
+            "tier": row.tier,
+            "trophy_name": row.trophy_name,
+            "award_kind": row.award_kind or "trophy",
+        }
+        for row in academy_rows
+    ]
 
-    return {
+    summary = {
         "my_earned_count": my_earned_count,
         "my_recent": my_recent,
         "academy_recent": academy_recent,
     }
+    await app_cache.set(cache_key, summary, ttl=_TROPHY_HOME_TTL_SEC)
+    return summary
 
 
 async def list_academy_earned_by_user(

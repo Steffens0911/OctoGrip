@@ -180,6 +180,10 @@ async def check_and_notify_trophy_earned(
         upgraded = previous_tier is not None
         await _upsert_earned(db, user_id, trophy.id, current_tier)
 
+        from app.services.trophy_service import invalidate_trophy_home_cache
+
+        await invalidate_trophy_home_cache(user.academy_id)
+
         # Post automático no feed OctoPhotos (opt-out: criado imediatamente, aluno pode deletar).
         try:
             from app.services.academy_service import get_academy

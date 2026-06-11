@@ -343,6 +343,10 @@ async def award_trophy(
     )
     await db.commit()
     await db.refresh(award)
+
+    from app.services.trophy_service import invalidate_trophy_home_cache
+
+    await invalidate_trophy_home_cache(template.academy_id)
     logger.info(
         "award_trophy",
         extra={"award_id": str(award.id), "template_id": str(template_id), "user_id": str(user_id)},
@@ -367,6 +371,9 @@ async def revoke_award(
     award = (await db.execute(select(AcademyTrophyAward).where(AcademyTrophyAward.id == award_id))).scalar_one_or_none()
     if not award:
         raise AppError("Concessão não encontrada.", status_code=404)
+    template_academy_id: UUID | None = await db.scalar(
+        select(AcademyTrophyTemplate.academy_id).where(AcademyTrophyTemplate.id == award.template_id)
+    )
     before = entity_snapshot_row(award)
     await db.delete(award)
     await write_audit_log(
@@ -379,6 +386,10 @@ async def revoke_award(
         user_id=audit_user_id,
     )
     await db.commit()
+
+    from app.services.trophy_service import invalidate_trophy_home_cache
+
+    await invalidate_trophy_home_cache(template_academy_id)
     logger.info("revoke_award", extra={"award_id": str(award_id)})
 
 
