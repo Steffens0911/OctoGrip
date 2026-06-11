@@ -247,12 +247,27 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _celebrateMissionId = null;
       });
     }
-    try {
-      await AuthService().refreshMe();
-    } catch (_) {
-      // Mantém dados em cache se a API falhar (ex.: offline).
+    // Usa o usuário já em memória para renderizar de imediato; o refreshMe
+    // corre em paralelo com os demais carregamentos (dentro do Future.wait).
+    // Só sem usuário conhecido (primeiro acesso) é preciso esperar a rede.
+    var currentUser = AuthService().currentUser;
+    Future<void>? refreshMeFuture;
+    if (currentUser == null) {
+      try {
+        await AuthService().refreshMe();
+      } catch (_) {
+        // Mantém dados em cache se a API falhar (ex.: offline).
+      }
+      currentUser = AuthService().currentUser;
+    } else {
+      refreshMeFuture = () async {
+        try {
+          await AuthService().refreshMe();
+        } catch (_) {
+          // Mantém dados em cache se a API falhar (ex.: offline).
+        }
+      }();
     }
-    final currentUser = AuthService().currentUser;
     if (!mounted) return;
     setState(() {
       _selectedUser = currentUser;
@@ -304,6 +319,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       MissionWeek? weekForSnapshot;
 
       await Future.wait([
+        if (refreshMeFuture != null) refreshMeFuture,
         _loadHeaderStatsWith().then((m) {
           headerMap = m;
         }),
@@ -339,6 +355,19 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         unawaited(_loadDailyVideo());
         unawaited(_loadTrainingStats());
         unawaited(_runPostLoadNudges());
+
+        // refreshMe correu em paralelo: se academia/graduação mudou (raro),
+        // refaz os carregamentos que dependem delas.
+        final refreshed = AuthService().currentUser;
+        if (refreshed != null &&
+            (refreshed.academyId != currentUser.academyId ||
+                refreshed.graduation != currentUser.graduation)) {
+          setState(() {
+            _setupTrainingPartnersFuture(refreshed.academyId);
+            _setupTrophySummaryFuture(refreshed.academyId);
+          });
+          unawaited(_load(silent: true));
+        }
       }
     } catch (e) {
       if (mounted) {
