@@ -28,6 +28,7 @@ from app.models import (
     User,
 )
 from app.services.academy_service import invalidate_academy_analytics_cache
+from app.services.training_stats_cache import invalidate_training_stats_cache
 
 logger = logging.getLogger(__name__)
 
@@ -525,6 +526,7 @@ async def confirm_execution(
 
     executor_user = await db.get(User, execution.user_id)
     await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
+    await invalidate_training_stats_cache(execution.user_id)
 
     # Notifica o executor que sua indicação foi confirmada (fire-and-forget).
     try:
@@ -722,6 +724,7 @@ async def professor_review_execution(
 
         executor_user = await db.get(User, execution.user_id)
         await invalidate_academy_analytics_cache(executor_user.academy_id if executor_user else None)
+        await invalidate_training_stats_cache(execution.user_id)
 
         try:
             from app.services.trophy_notification_service import check_and_notify_trophy_earned

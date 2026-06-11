@@ -51,6 +51,10 @@ async def invalidate_attendance_stats_cache(
         await app_cache.bump_prefix_version(f"{_STATS_DETAIL_PREFIX}{academy_id}:")
     if user_id is not None:
         await app_cache.bump_prefix_version(f"{_STATS_ME_PREFIX}{user_id}:")
+        # Check-in altera workouts/dias sem treinar em /me/training_stats.
+        from app.services.training_stats_cache import invalidate_training_stats_cache
+
+        await invalidate_training_stats_cache(user_id)
 
 
 async def create_attendance_session(

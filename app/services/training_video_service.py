@@ -346,6 +346,10 @@ async def complete_training_video_for_user(
     points_total = await total_points_for_user(db, user.id)
     await refresh_user_level(db, user.id, total_points=points_total)
 
+    from app.services.training_stats_cache import invalidate_training_stats_cache
+
+    await invalidate_training_stats_cache(user.id)
+
     logger.info(
         "complete_training_video_for_user",
         extra={

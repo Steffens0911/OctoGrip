@@ -11,10 +11,15 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
+from app.core.cache import app_cache
 from app.database import get_db
 from app.models import AttendanceRecord, AttendanceSession, User
 from app.models.technique_execution import TechniqueExecution
 from app.models.training_video import TrainingVideoDailyView
+from app.services.training_stats_cache import (
+    TRAINING_STATS_TTL_SEC,
+    training_stats_cache_key,
+)
 
 router = APIRouter()
 
@@ -38,12 +43,21 @@ async def my_training_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Estatísticas de treino do aluno: presenças nas chamadas e posições confirmadas."""
+    """Estatísticas de treino do aluno: presenças nas chamadas e posições confirmadas.
+
+    Consolidado em até 4 idas ao banco (era ~14) + cache Redis curto, pois é um
+    dos endpoints chamados no boot do app.
+    """
+    cache_key = training_stats_cache_key(current_user.id)
+    cached = await app_cache.get(cache_key)
+    if cached is not None:
+        return TrainingStatsRead(**cached)
+
     now = datetime.now(UTC)
     cutoff = now - timedelta(days=30)
 
-    # ── Treinos: presenças registradas via chamada nos últimos 30 dias ──
-    result_workouts = await db.execute(
+    # ── Métricas do próprio aluno: 5 contagens em uma única ida ao banco ──
+    workouts_30d_sq = (
         select(func.count(AttendanceRecord.id))
         .select_from(AttendanceRecord)
         .join(AttendanceSession, AttendanceSession.id == AttendanceRecord.session_id)
@@ -51,17 +65,56 @@ async def my_training_stats(
             AttendanceRecord.user_id == current_user.id,
             AttendanceRecord.checked_in_at >= cutoff,
         )
+        .scalar_subquery()
     )
-    workouts_last_30_days: int = result_workouts.scalar_one()
+    last_checkin_sq = (
+        select(func.max(AttendanceRecord.checked_in_at))
+        .where(AttendanceRecord.user_id == current_user.id)
+        .scalar_subquery()
+    )
+    positions_30d_sq = (
+        select(func.count(TechniqueExecution.id))
+        .where(
+            TechniqueExecution.user_id == current_user.id,
+            TechniqueExecution.status == "confirmed",
+            TechniqueExecution.created_at >= cutoff,
+        )
+        .scalar_subquery()
+    )
+    positions_total_sq = (
+        select(func.count(TechniqueExecution.id))
+        .where(
+            TechniqueExecution.user_id == current_user.id,
+            TechniqueExecution.status == "confirmed",
+        )
+        .scalar_subquery()
+    )
+    videos_30d_sq = (
+        select(func.count(TrainingVideoDailyView.id))
+        .where(
+            TrainingVideoDailyView.user_id == current_user.id,
+            TrainingVideoDailyView.completed_at >= cutoff,
+        )
+        .scalar_subquery()
+    )
+    me_row = (
+        await db.execute(
+            select(
+                workouts_30d_sq,
+                last_checkin_sq,
+                positions_30d_sq,
+                positions_total_sq,
+                videos_30d_sq,
+            )
+        )
+    ).one()
+    workouts_last_30_days: int = me_row[0]
+    last_at: datetime | None = me_row[1]
+    positions_last_30_days: int = me_row[2]
+    positions_total: int = me_row[3]
+    videos_last_30_days: int = me_row[4]
 
     # ── Dias sem treinar: desde o último check-in na chamada ──
-    result_last = await db.execute(
-        select(func.max(AttendanceRecord.checked_in_at)).where(
-            AttendanceRecord.user_id == current_user.id,
-        )
-    )
-    last_at: datetime | None = result_last.scalar_one()
-
     if last_at is None:
         days_since: int | None = None
     else:
@@ -71,26 +124,15 @@ async def my_training_stats(
         last_app = last_at.astimezone(_APP_TZ).date()
         days_since = (today_app - last_app).days
 
-    # ── Posições: execuções confirmadas pelo adversário ──
-    base_confirmed = select(TechniqueExecution).where(
-        TechniqueExecution.user_id == current_user.id,
-        TechniqueExecution.status == "confirmed",
-    )
-
-    result_month = await db.execute(
-        select(func.count()).select_from(base_confirmed.where(TechniqueExecution.created_at >= cutoff).subquery())
-    )
-    positions_last_30_days: int = result_month.scalar_one()
-
-    result_total = await db.execute(select(func.count()).select_from(base_confirmed.subquery()))
-    positions_total: int = result_total.scalar_one()
-
-    # ── Média dos top 10 alunos da mesma academia (treinos nos últimos 30 dias) ──
     avg_top10_workouts: float | None = None
     avg_top10_positions: float | None = None
+    ranking: int | None = None
+    total_students: int | None = None
+    avg_top10_videos: float | None = None
+    ranking_videos: int | None = None
 
     if current_user.academy_id is not None:
-        # Top 10 em presenças (chamada) nos últimos 30 dias
+        # ── Treinos: média dos top 10 da academia nos últimos 30 dias ──
         per_student_workouts = (
             select(
                 AttendanceRecord.user_id,
@@ -114,86 +156,68 @@ async def my_training_stats(
         if raw is not None:
             avg_top10_workouts = round(float(raw), 1)
 
-        # Top 10 em posições confirmadas nos últimos 30 dias
+        # ── Posições: média top 10 (30d), ranking por total e nº de alunos em 1 query ──
         per_student_positions = (
             select(
-                TechniqueExecution.user_id,
-                func.count(TechniqueExecution.id).label("cnt"),
+                TechniqueExecution.user_id.label("user_id"),
+                func.count(TechniqueExecution.id)
+                .filter(TechniqueExecution.created_at >= cutoff)
+                .label("cnt_30d"),
+                func.count(TechniqueExecution.id).label("cnt_total"),
             )
             .join(User, User.id == TechniqueExecution.user_id)
             .where(
                 User.academy_id == current_user.academy_id,
-                TechniqueExecution.status == "confirmed",
-                TechniqueExecution.created_at >= cutoff,
                 User.role == "aluno",
+                TechniqueExecution.status == "confirmed",
             )
             .group_by(TechniqueExecution.user_id)
-            .order_by(func.count(TechniqueExecution.id).desc())
+            .cte("per_student_positions")
+        )
+        # row_number (e não rank): preserva o desempate posicional do enumerate antigo.
+        positions_ranked = select(
+            per_student_positions.c.user_id,
+            func.row_number()
+            .over(order_by=per_student_positions.c.cnt_total.desc())
+            .label("rn"),
+        ).cte("positions_ranked")
+        # Top 10 apenas entre quem tem execução nos 30 dias (semântica original).
+        top10_positions = (
+            select(per_student_positions.c.cnt_30d.label("cnt"))
+            .where(per_student_positions.c.cnt_30d > 0)
+            .order_by(per_student_positions.c.cnt_30d.desc())
             .limit(10)
             .subquery()
         )
-        r2 = await db.execute(select(func.avg(per_student_positions.c.cnt)))
-        raw2 = r2.scalar_one()
-        if raw2 is not None:
-            avg_top10_positions = round(float(raw2), 1)
-
-        # Ranking do aluno por posições totais na academia
-        all_students = (
-            select(
-                TechniqueExecution.user_id,
-                func.count(TechniqueExecution.id).label("cnt"),
+        positions_row = (
+            await db.execute(
+                select(
+                    select(func.avg(top10_positions.c.cnt)).scalar_subquery(),
+                    select(positions_ranked.c.rn)
+                    .where(positions_ranked.c.user_id == current_user.id)
+                    .scalar_subquery(),
+                    select(func.count()).select_from(positions_ranked).scalar_subquery(),
+                    select(func.count(User.id))
+                    .where(
+                        User.academy_id == current_user.academy_id,
+                        User.role == "aluno",
+                    )
+                    .scalar_subquery(),
+                )
             )
-            .join(User, User.id == TechniqueExecution.user_id)
-            .where(
-                User.academy_id == current_user.academy_id,
-                TechniqueExecution.status == "confirmed",
-                User.role == "aluno",
-            )
-            .group_by(TechniqueExecution.user_id)
-            .order_by(func.count(TechniqueExecution.id).desc())
-            .subquery()
-        )
-        result_ranking = await db.execute(select(all_students))
-        rows = result_ranking.fetchall()
-        ranking: int | None = None
+        ).one()
+        raw_avg_positions, user_rank, ranked_count, students_count = positions_row
+        if raw_avg_positions is not None:
+            avg_top10_positions = round(float(raw_avg_positions), 1)
+        total_students = students_count or None
+        if ranked_count:
+            # Aluno sem posições confirmadas: último lugar.
+            ranking = int(user_rank) if user_rank is not None else int(ranked_count) + 1
 
-        # Total real de alunos da academia (independente de terem posições)
-        result_total_students = await db.execute(
-            select(func.count(User.id)).where(
-                User.academy_id == current_user.academy_id,
-                User.role == "aluno",
-            )
-        )
-        total_students: int | None = result_total_students.scalar_one() or None
-
-        if rows:
-            for pos, row in enumerate(rows, start=1):
-                if row.user_id == current_user.id:
-                    ranking = pos
-                    break
-            if ranking is None:
-                # Aluno sem posições confirmadas: último lugar
-                ranking = len(rows) + 1
-
-    else:
-        ranking = None
-        total_students = None
-
-    # ── Vídeos diários assistidos nos últimos 30 dias ──
-    result_videos = await db.execute(
-        select(func.count(TrainingVideoDailyView.id)).where(
-            TrainingVideoDailyView.user_id == current_user.id,
-            TrainingVideoDailyView.completed_at >= cutoff,
-        )
-    )
-    videos_last_30_days: int = result_videos.scalar_one()
-
-    avg_top10_videos: float | None = None
-    ranking_videos: int | None = None
-    if current_user.academy_id is not None:
+        # ── Vídeos: média top 10 e ranking nos últimos 30 dias em 1 query ──
         per_student_videos = (
             select(
-                TrainingVideoDailyView.user_id,
+                TrainingVideoDailyView.user_id.label("user_id"),
                 func.count(TrainingVideoDailyView.id).label("cnt"),
             )
             .join(User, User.id == TrainingVideoDailyView.user_id)
@@ -203,42 +227,36 @@ async def my_training_stats(
                 TrainingVideoDailyView.completed_at >= cutoff,
             )
             .group_by(TrainingVideoDailyView.user_id)
-            .order_by(func.count(TrainingVideoDailyView.id).desc())
+            .cte("per_student_videos")
+        )
+        videos_ranked = select(
+            per_student_videos.c.user_id,
+            func.row_number().over(order_by=per_student_videos.c.cnt.desc()).label("rn"),
+        ).cte("videos_ranked")
+        top10_videos = (
+            select(per_student_videos.c.cnt.label("cnt"))
+            .order_by(per_student_videos.c.cnt.desc())
             .limit(10)
             .subquery()
         )
-        r3 = await db.execute(select(func.avg(per_student_videos.c.cnt)))
-        raw3 = r3.scalar_one()
-        if raw3 is not None:
-            avg_top10_videos = round(float(raw3), 1)
-
-        # Ranking do aluno por vídeos assistidos nos últimos 30 dias
-        all_students_videos = (
-            select(
-                TrainingVideoDailyView.user_id,
-                func.count(TrainingVideoDailyView.id).label("cnt"),
+        videos_row = (
+            await db.execute(
+                select(
+                    select(func.avg(top10_videos.c.cnt)).scalar_subquery(),
+                    select(videos_ranked.c.rn)
+                    .where(videos_ranked.c.user_id == current_user.id)
+                    .scalar_subquery(),
+                    select(func.count()).select_from(videos_ranked).scalar_subquery(),
+                )
             )
-            .join(User, User.id == TrainingVideoDailyView.user_id)
-            .where(
-                User.academy_id == current_user.academy_id,
-                User.role == "aluno",
-                TrainingVideoDailyView.completed_at >= cutoff,
-            )
-            .group_by(TrainingVideoDailyView.user_id)
-            .order_by(func.count(TrainingVideoDailyView.id).desc())
-            .subquery()
-        )
-        result_ranking_videos = await db.execute(select(all_students_videos))
-        video_rows = result_ranking_videos.fetchall()
-        for pos, row in enumerate(video_rows, start=1):
-            if row.user_id == current_user.id:
-                ranking_videos = pos
-                break
-        if ranking_videos is None:
-            # Aluno sem vídeos assistidos: último entre quem assistiu + 1
-            ranking_videos = len(video_rows) + 1
+        ).one()
+        raw_avg_videos, video_rank, videos_count = videos_row
+        if raw_avg_videos is not None:
+            avg_top10_videos = round(float(raw_avg_videos), 1)
+        # Aluno sem vídeos assistidos: último entre quem assistiu + 1.
+        ranking_videos = int(video_rank) if video_rank is not None else int(videos_count) + 1
 
-    return TrainingStatsRead(
+    stats = TrainingStatsRead(
         workouts_last_30_days=workouts_last_30_days,
         days_since_last_workout=days_since,
         positions_last_30_days=positions_last_30_days,
@@ -251,3 +269,5 @@ async def my_training_stats(
         avg_top10_videos_last_30_days=avg_top10_videos,
         ranking_videos_last_30_days=ranking_videos,
     )
+    await app_cache.set(cache_key, stats.model_dump(), ttl=TRAINING_STATS_TTL_SEC)
+    return stats
