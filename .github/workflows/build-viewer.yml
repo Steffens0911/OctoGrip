@@ -53,6 +53,7 @@ jobs:
           flutter build web --release \
             --no-pub \
             --no-wasm-dry-run \
+            --tree-shake-icons \
             --dart-define-from-file=tool/dart_define_web.json
 
       - name: Log in to GitHub Container Registry

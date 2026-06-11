@@ -113,8 +113,8 @@ Isso sobe seis containers:
 > No setup local, faça o build antes de subir:
 > ```bash
 > cd viewer
-> flutter.bat build web --release   # Windows
-> flutter build web --release       # Linux/Mac
+> flutter.bat build web --release --tree-shake-icons   # Windows
+> flutter build web --release --tree-shake-icons       # Linux/Mac
 > cd ..
 > docker compose up -d --build viewer
 > ```
@@ -453,8 +453,8 @@ docker compose exec api alembic upgrade head
 
 ```bash
 cd viewer
-flutter.bat build web --release   # Windows
-flutter build web --release       # Linux/Mac
+flutter.bat build web --release --tree-shake-icons   # Windows
+flutter build web --release --tree-shake-icons       # Linux/Mac
 cd ..
 docker compose up -d --build viewer
 ```
