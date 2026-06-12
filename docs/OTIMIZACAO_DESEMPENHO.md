@@ -51,6 +51,38 @@ infra) apontou quatro causas principais:
 > Os percentuais por cenário são estimativas de engenharia; as medições de
 > tamanho/queries são reais. O número exato de latência depende da rede e do VPS.
 
+### 2.1 Medições reais de latência (stack no Docker)
+
+Medido na stack rodando localmente, **de dentro da rede do Docker** (api →
+`localhost:8000`) para eliminar o overhead de host→container do Docker Desktop no
+Windows (WSL2/NAT) — overhead que **não existe em produção** (no VPS Linux o nginx
+e a api ficam colocados). Usuário de teste: aluna com 34 execuções e 24 presenças;
+buffers do Postgres aquecidos.
+
+| Endpoint | Cache MISS (query completa) | Cache HIT | Ganho |
+|---|---|---|---|
+| `/me/training_stats` | 263 ms | **24 ms** | **11×** |
+| `/trophies/me/home-summary` | 62 ms | **17 ms** | **4×** |
+| `/auth/me` | 15 ms | 17 ms | ~1× ¹ |
+
+¹ `/auth/me` já era rápido; o cache do streak não muda o tempo, mas **elimina uma
+query** (`login_days LIMIT 400`) — alivia o banco no boot, quando todos os alunos
+chamam ao mesmo tempo.
+
+Com cache **totalmente frio** (buffers do Postgres também frios, só no 1º acesso
+após restart), `/me/training_stats` mediu **1037 ms → 19 ms (53×)**.
+
+**Provas coletadas no teste:**
+- Cache populando: chave `app_cache:login_streak:<uid>:<dia>` criada após as chamadas.
+- Índice 083 em uso: `EXPLAIN` mostra `Bitmap Index Scan on
+  ix_technique_executions_user_confirmed_created`.
+- Todos os endpoints retornaram HTTP 200 com token real.
+
+> Como o TTL é curto (90s), na prática quase todo acesso de aluno pega cache
+> quente — é o que faz a home "abrir na hora". Medições do **host Windows** dão
+> piso de ~230 ms e picos de vários segundos por causa da rede do Docker Desktop;
+> não refletem o servidor e foram descartadas.
+
 ---
 
 ## 3. Backend (FastAPI + SQLAlchemy + Redis)
