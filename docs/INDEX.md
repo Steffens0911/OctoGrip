@@ -58,6 +58,8 @@
 | [RESUMO_EXECUTIVO.md](RESUMO_EXECUTIVO.md) | Resumo visual rápido do status do projeto (score 8.0/10) |
 | [CHECKLIST_DEPLOY.md](CHECKLIST_DEPLOY.md) | Checklist prático para usar antes do deploy em produção |
 | [BOAS_PRATICAS.md](BOAS_PRATICAS.md) | Análise de padrões do framework, tipagem e linter/formatter |
+| [OTIMIZACAO_DESEMPENHO.md](OTIMIZACAO_DESEMPENHO.md) | Pacote de otimizações de performance (backend, frontend, infra) — boot, caches, gzip, índices |
+| [DB_PERFORMANCE_HOTPATHS.md](DB_PERFORMANCE_HOTPATHS.md) | Caminhos quentes do banco e índices de performance |
 | [FORMATACAO.md](FORMATACAO.md) | Guia de uso do Ruff para formatação e lint |
 | [SECURITY.md](SECURITY.md) | Políticas de segurança e práticas recomendadas |
 
