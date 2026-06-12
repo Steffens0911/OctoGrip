@@ -35,13 +35,18 @@ htmlcov
 .nox
 tests/
 
-# IDE e Cursor
+# IDE, Cursor e Claude (transcripts/plans — ~340MB, inflava o contexto de build)
 .vscode/
 .idea/
 .cursor/
+.claude/
 *.swp
 *.swo
 *.sublime-*
+
+# Segredos (nunca devem ser copiados para a imagem)
+secrets/
+*.sql
 
 # Logs
 *.log
