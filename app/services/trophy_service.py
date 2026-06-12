@@ -632,10 +632,7 @@ async def get_trophy_home_summary(
 
     # ── Totais do usuário (automáticos + manuais) em uma única ida ao banco ──
     auto_count_sq = (
-        select(func.count())
-        .select_from(UserTrophyEarned)
-        .where(UserTrophyEarned.user_id == user_id)
-        .scalar_subquery()
+        select(func.count()).select_from(UserTrophyEarned).where(UserTrophyEarned.user_id == user_id).scalar_subquery()
     )
     manual_count_sq = (
         select(func.count())
@@ -725,9 +722,7 @@ async def get_trophy_home_summary(
         )
     )
     academy_union = union_all(academy_auto, academy_manual).subquery()
-    academy_rows = (
-        await db.execute(select(academy_union).order_by(academy_union.c.earned_at.desc()).limit(10))
-    ).all()
+    academy_rows = (await db.execute(select(academy_union).order_by(academy_union.c.earned_at.desc()).limit(10))).all()
     academy_recent = [
         {
             "user_id": str(row.user_id),

@@ -160,9 +160,7 @@ async def my_training_stats(
         per_student_positions = (
             select(
                 TechniqueExecution.user_id.label("user_id"),
-                func.count(TechniqueExecution.id)
-                .filter(TechniqueExecution.created_at >= cutoff)
-                .label("cnt_30d"),
+                func.count(TechniqueExecution.id).filter(TechniqueExecution.created_at >= cutoff).label("cnt_30d"),
                 func.count(TechniqueExecution.id).label("cnt_total"),
             )
             .join(User, User.id == TechniqueExecution.user_id)
@@ -177,9 +175,7 @@ async def my_training_stats(
         # row_number (e não rank): preserva o desempate posicional do enumerate antigo.
         positions_ranked = select(
             per_student_positions.c.user_id,
-            func.row_number()
-            .over(order_by=per_student_positions.c.cnt_total.desc())
-            .label("rn"),
+            func.row_number().over(order_by=per_student_positions.c.cnt_total.desc()).label("rn"),
         ).cte("positions_ranked")
         # Top 10 apenas entre quem tem execução nos 30 dias (semântica original).
         top10_positions = (
@@ -234,18 +230,13 @@ async def my_training_stats(
             func.row_number().over(order_by=per_student_videos.c.cnt.desc()).label("rn"),
         ).cte("videos_ranked")
         top10_videos = (
-            select(per_student_videos.c.cnt.label("cnt"))
-            .order_by(per_student_videos.c.cnt.desc())
-            .limit(10)
-            .subquery()
+            select(per_student_videos.c.cnt.label("cnt")).order_by(per_student_videos.c.cnt.desc()).limit(10).subquery()
         )
         videos_row = (
             await db.execute(
                 select(
                     select(func.avg(top10_videos.c.cnt)).scalar_subquery(),
-                    select(videos_ranked.c.rn)
-                    .where(videos_ranked.c.user_id == current_user.id)
-                    .scalar_subquery(),
+                    select(videos_ranked.c.rn).where(videos_ranked.c.user_id == current_user.id).scalar_subquery(),
                     select(func.count()).select_from(videos_ranked).scalar_subquery(),
                 )
             )
