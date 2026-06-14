@@ -12,6 +12,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/branding/app_brand.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/user.dart';
+import 'package:viewer/widgets/consent_gate.dart';
 import 'package:viewer/widgets/game_background.dart';
 import 'package:viewer/screens/academy/academy_panel_screen.dart';
 import 'package:viewer/screens/admin/admin_section_screen.dart';
@@ -242,15 +243,17 @@ class AuthGate extends StatelessWidget {
 
     final auth = context.watch<AuthService>();
     if (auth.isLoggedIn) {
-      return MainShell(
-        onThemeToggle: onThemeToggle,
-        onFontToggle: onFontToggle,
-        textScale: textScale,
-        onTextScaleIncrease: onTextScaleIncrease,
-        onTextScaleDecrease: onTextScaleDecrease,
-        onLogout: () async {
-          await auth.logout();
-        },
+      return ConsentGate(
+        child: MainShell(
+          onThemeToggle: onThemeToggle,
+          onFontToggle: onFontToggle,
+          textScale: textScale,
+          onTextScaleIncrease: onTextScaleIncrease,
+          onTextScaleDecrease: onTextScaleDecrease,
+          onLogout: () async {
+            await auth.logout();
+          },
+        ),
       );
     }
     return const LoginScreen();
