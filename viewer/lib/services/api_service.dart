@@ -3885,6 +3885,75 @@ class ApiService {
   }
 
   // -------------------------------------------------------------------------
+  // Privacidade / LGPD (direitos do titular)
+  // -------------------------------------------------------------------------
+
+  /// URL pública (HTML) de um documento legal: 'privacy' | 'terms' | 'biometric'.
+  String legalDocumentViewUrl(String slug) => '$baseUrl/legal/$slug/view';
+
+  /// Estado vigente dos consentimentos do utilizador autenticado.
+  Future<List<Map<String, dynamic>>> getMyConsents() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/me/consents'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    final map = data! as Map<String, dynamic>;
+    return (map['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  /// Registra a concessão (ou revogação) de um consentimento.
+  Future<void> recordConsent({
+    required String consentType,
+    bool granted = true,
+    String? documentVersion,
+  }) async {
+    final r = await _req(http.post(
+      Uri.parse('$baseUrl/me/consents'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({
+        'consent_type': consentType,
+        'granted': granted,
+        if (documentVersion != null) 'document_version': documentVersion,
+      }),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Revoga o consentimento biométrico e apaga embedding + foto facial.
+  Future<void> revokeBiometricConsent() async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/me/consents/biometric'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Baixa uma cópia dos dados pessoais do titular (direito de acesso/portabilidade).
+  Future<Map<String, dynamic>> exportMyData() async {
+    final r = await _req(http.get(
+      Uri.parse('$baseUrl/me/data-export'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data! as Map<String, dynamic>;
+  }
+
+  /// Solicita a eliminação (anonimização) da conta do titular. Irreversível.
+  Future<void> deleteMyAccount() async {
+    final r = await _req(http.delete(
+      Uri.parse('$baseUrl/me/account'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  // -------------------------------------------------------------------------
   // Troféus Manuais
   // -------------------------------------------------------------------------
 

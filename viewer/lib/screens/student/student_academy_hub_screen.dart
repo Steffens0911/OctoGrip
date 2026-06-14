@@ -16,6 +16,7 @@ import 'package:viewer/screens/student/attendance_ranking_screen.dart';
 import 'package:viewer/screens/student/attendance_scan_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/partners_screen.dart';
+import 'package:viewer/screens/student/privacy_data_screen.dart';
 import 'package:viewer/screens/student/user_avatar_screen.dart';
 import 'package:viewer/screens/student/user_facial_photo_screen.dart';
 
@@ -162,6 +163,15 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
     );
   }
 
+  void _pushPrivacyScreen() {
+    Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (context) => const PrivacyDataScreen(),
+      ),
+    );
+  }
+
   Widget _academyNavigationTile({
     required bool enabled,
     required IconData icon,
@@ -292,7 +302,16 @@ class _StudentAcademyHubScreenState extends State<StudentAcademyHubScreen> {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.s),
-                    const Expanded(child: SizedBox.shrink()),
+                    Expanded(
+                      child: MemoCompactTileCard(
+                        featured: false,
+                        enabled: true,
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacidade e meus dados',
+                        subtitle: 'Consentimentos, baixar dados e excluir conta',
+                        onTap: _pushPrivacyScreen,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s),

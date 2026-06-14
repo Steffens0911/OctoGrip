@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:viewer/branding/app_brand.dart';
 import 'package:viewer/services/api_service.dart';
@@ -48,6 +49,7 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
   bool _success = false;
   bool _showPassword = false;
   bool _showConfirm = false;
+  bool _acceptTerms = false;
   String? _error;
 
   @override
@@ -75,8 +77,21 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
     }
   }
 
+  Future<void> _openLegal(String slug) async {
+    final uri = Uri.parse(_api.legalDocumentViewUrl(slug));
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) setState(() => _error = userFacingMessage(e));
+    }
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_acceptTerms) {
+      setState(() => _error = 'É preciso aceitar os Termos de Uso e a Política de Privacidade.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -300,6 +315,52 @@ class _PublicRegistrationScreenState extends State<PublicRegistrationScreen> {
               },
             ),
             const SizedBox(height: 8),
+
+            const SizedBox(height: 8),
+
+            // Consentimento LGPD — aceite obrigatório de termos e privacidade.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Checkbox(
+                  value: _acceptTerms,
+                  onChanged: (v) => setState(() => _acceptTerms = v ?? false),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text('Li e aceito os ', style: tt.bodySmall),
+                        InkWell(
+                          onTap: () => _openLegal('terms'),
+                          child: Text(
+                            'Termos de Uso',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        Text(' e a ', style: tt.bodySmall),
+                        InkWell(
+                          onTap: () => _openLegal('privacy'),
+                          child: Text(
+                            'Política de Privacidade',
+                            style: tt.bodySmall?.copyWith(
+                              color: cs.primary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                        Text('.', style: tt.bodySmall),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
 
             if (_error != null) ...[
               const SizedBox(height: 8),

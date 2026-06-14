@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -24,6 +25,68 @@ class _UserFacialPhotoScreenState extends State<UserFacialPhotoScreen> {
   XFile? _photo;
   Uint8List? _photoBytes;
   bool _sending = false;
+
+  // Gate de consentimento biométrico (LGPD).
+  bool _consentLoading = true;
+  bool _hasConsent = false;
+  bool _recordingConsent = false;
+  String? _consentError;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConsent();
+  }
+
+  Future<void> _loadConsent() async {
+    setState(() {
+      _consentLoading = true;
+      _consentError = null;
+    });
+    try {
+      final items = await _api.getMyConsents();
+      final biometric = items.firstWhere(
+        (c) => c['consent_type'] == 'biometric',
+        orElse: () => const {'granted': false},
+      );
+      if (!mounted) return;
+      setState(() {
+        _hasConsent = biometric['granted'] == true;
+        _consentLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _consentError = userFacingMessage(e);
+        _consentLoading = false;
+      });
+    }
+  }
+
+  Future<void> _acceptConsent() async {
+    setState(() => _recordingConsent = true);
+    try {
+      await _api.recordConsent(consentType: 'biometric');
+      if (!mounted) return;
+      setState(() {
+        _hasConsent = true;
+        _recordingConsent = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _recordingConsent = false);
+      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+    }
+  }
+
+  Future<void> _openBiometricNotice() async {
+    final uri = Uri.parse(_api.legalDocumentViewUrl('biometric'));
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+    }
+  }
 
   Future<void> _pickFromCamera() async {
     try {
@@ -93,6 +156,17 @@ class _UserFacialPhotoScreenState extends State<UserFacialPhotoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_consentLoading || _consentError != null || !_hasConsent) {
+      return Scaffold(
+        appBar: const AppStandardAppBar(title: 'Foto de reconhecimento facial'),
+        body: _consentLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _consentError != null
+                ? _buildConsentError()
+                : _buildConsentGate(context),
+      );
+    }
+
     final hasFacialPhoto =
         AuthService().currentUser?.facialPhotoUrl != null &&
             AuthService().currentUser!.facialPhotoUrl!.isNotEmpty;
@@ -201,6 +275,69 @@ class _UserFacialPhotoScreenState extends State<UserFacialPhotoScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildConsentError() => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_consentError ?? 'Erro ao carregar.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _loadConsent, child: const Text('Tentar novamente')),
+            ],
+          ),
+        ),
+      );
+
+  Widget _buildConsentGate(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Icon(Icons.face_retouching_natural_outlined, size: 56, color: cs.primary),
+        const SizedBox(height: 16),
+        Text(
+          'Consentimento para reconhecimento facial',
+          style: Theme.of(context).textTheme.titleLarge,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          'Para usar o reconhecimento facial na chamada, precisamos do seu consentimento '
+          'para tratar seu dado biométrico (foto facial). Esse dado é usado '
+          'exclusivamente para registrar sua presença e nunca é compartilhado para outros fins.',
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'O uso é opcional: você pode registrar presença por QR Code e revogar este '
+          'consentimento a qualquer momento, apagando seus dados biométricos.',
+        ),
+        const SizedBox(height: 16),
+        TextButton.icon(
+          onPressed: _openBiometricNotice,
+          icon: const Icon(Icons.open_in_new, size: 18),
+          label: const Text('Ler o aviso completo de biometria'),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _recordingConsent ? null : _acceptConsent,
+          child: _recordingConsent
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Aceitar e continuar'),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton(
+          onPressed: _recordingConsent ? null : () => Navigator.pop(context),
+          child: const Text('Prefiro usar QR Code'),
+        ),
+      ],
     );
   }
 }
