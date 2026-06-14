@@ -16,7 +16,7 @@ from starlette.staticfiles import StaticFiles
 
 from app.config import settings
 from app.core.cors_policy import CORS_ORIGIN_REGEX, is_allowed_cors_origin, merge_json_response_headers
-from app.core.error_tracking import init_sentry
+from app.core.error_tracking import capture_exception, init_sentry
 from app.core.exceptions import AppError, AuthenticationError
 from app.core.logging_config import setup_logging
 from app.core.metrics import http_errors_total
@@ -225,6 +225,9 @@ def register_exception_handlers(application: FastAPI) -> None:
             status_code=500,
             error_type=error_type,
         ).inc()
+
+        # Enviar para Sentry antes de logar (o catch-all impede propagação ao middleware do Sentry)
+        capture_exception(exc)
 
         # Logar com contexto completo
         logger.exception(

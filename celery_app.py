@@ -75,6 +75,13 @@ celery_app.conf.update(
 
 
 @worker_process_init.connect
+def _init_sentry_in_worker(**_: object) -> None:
+    """Inicializa Sentry em cada processo worker para capturar exceções de tasks."""
+    from app.core.error_tracking import init_sentry
+    init_sentry(settings.SENTRY_DSN)
+
+
+@worker_process_init.connect
 def preload_facenet512_model(**_: object) -> None:
     """Pré-carrega o modelo apenas no worker da fila 'face' (FACE_WORKER=1)."""
     if not os.environ.get("FACE_WORKER"):

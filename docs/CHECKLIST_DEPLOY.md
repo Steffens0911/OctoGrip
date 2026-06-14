@@ -36,7 +36,9 @@ Use este checklist antes de fazer deploy em produção. Marque cada item conform
 - [ ] `LOG_LEVEL=INFO` ou `WARNING` em produção
 - [ ] `LOG_FORMAT=json` configurado (facilita parsing)
 - [ ] `SEED_ON_STARTUP=false` em produção
-- [ ] `SENTRY_DSN` configurado (se usar Sentry)
+- [ ] `SENTRY_DSN` configurado (obrigatório em produção — criar projeto em sentry.io e copiar DSN)
+- [ ] `APP_VERSION` configurado (tag da release, ex.: `0.2.0`; aparece nos eventos do Sentry)
+- [ ] Regra de alerta por e-mail criada no painel do Sentry (Issues → Alerts → new issue / issue frequency)
 - [ ] `ENABLE_METRICS=true`
 
 ### Infraestrutura

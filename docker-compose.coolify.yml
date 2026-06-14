@@ -74,6 +74,8 @@ services:
       ACCOUNT_LOCKOUT_MINUTES: ${ACCOUNT_LOCKOUT_MINUTES:-15}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-12}
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-6}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -112,6 +114,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com valor forte}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -140,6 +144,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com valor forte}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-/app/secrets/firebase-service-account.json}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -165,6 +171,8 @@ services:
       PGSSLMODE: ${PGSSLMODE:-disable}
       DATABASE_URL: postgresql://${POSTGRES_USER:-jjb}:${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jjb_db}
       JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET com valor forte}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/app/app_media/face_jobs}

@@ -25,3 +25,4 @@ tf-keras
 opencv-python-headless
 numpy
 pillow
+sentry-sdk[fastapi]>=2.0,<3
