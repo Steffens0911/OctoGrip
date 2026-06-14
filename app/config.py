@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     FACE_JOBS_DIR: str = "/tmp/face_jobs"
     FACE_MAX_IMAGE_SIDE: int = 1280
 
+    # LGPD / Privacidade
+    # Versão vigente de cada documento legal. Quando o texto muda de forma relevante,
+    # incremente a versão (ex.: nova data): consentimentos com versão anterior passam a
+    # constar como "desatualizados" e o app deve pedir novo aceite.
+    LEGAL_TERMS_VERSION: str = "2026-06-13"
+    LEGAL_PRIVACY_VERSION: str = "2026-06-13"
+    LEGAL_BIOMETRIC_VERSION: str = "2026-06-13"
+    # Contato do Encarregado de Dados (DPO) exibido nos documentos e no canal de direitos do titular.
+    DPO_CONTACT_EMAIL: str = "privacidade@octogrip.com.br"
+
     @field_validator("QR_SECRET")
     @classmethod
     def validate_qr_secret(cls, v: str) -> str:

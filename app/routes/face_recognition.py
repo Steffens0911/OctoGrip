@@ -37,6 +37,7 @@ from app.schemas.face_recognition import (
     FaceRecognitionSubmitResponse,
 )
 from app.services.attendance_realtime import attendance_manager
+from app.services.consent_service import has_active_biometric_consent
 from app.tasks.face_recognition_tasks import generate_student_embedding, process_face_recognition
 
 router = APIRouter()
@@ -308,6 +309,13 @@ async def face_generate_embedding(
     )
     if not student.avatar_url:
         raise AppError("Aluno sem avatar_url cadastrado.", status_code=400)
+
+    # LGPD: dado biométrico exige consentimento específico e vigente do próprio aluno.
+    if not await has_active_biometric_consent(db, student.id):
+        raise ForbiddenError(
+            "Aluno não autorizou o uso de reconhecimento facial. "
+            "É necessário o consentimento biométrico do aluno antes de gerar o embedding."
+        )
 
     generate_student_embedding.delay(str(student.id))
     return {"status": "queued", "student_id": str(student.id)}

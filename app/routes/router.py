@@ -20,11 +20,13 @@ from app.routes import (
     executions,
     face_recognition,
     health,
+    legal,
     lesson_complete,
     lessons,
     manual_trophies,
     marketplace_items,
     me_marketplace,
+    me_privacy,
     me_professor_impact,
     me_push,
     me_training_stats,
@@ -86,6 +88,8 @@ api_router.include_router(me_training_stats.router, prefix="/me", tags=["me"])
 api_router.include_router(me_training_videos.router, prefix="/me", tags=["me"])
 api_router.include_router(me_marketplace.router, prefix="/me", tags=["me"])
 api_router.include_router(me_push.router, prefix="/me", tags=["me"])
+api_router.include_router(me_privacy.router, prefix="/me", tags=["me-privacy"])
+api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
 api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])

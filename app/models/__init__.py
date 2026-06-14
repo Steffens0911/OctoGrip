@@ -29,6 +29,7 @@ from app.models.training_feedback import TrainingFeedback
 from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 from app.models.trophy import Trophy
 from app.models.user import User
+from app.models.user_consent import UserConsent
 from app.models.user_device_token import UserDeviceToken
 from app.models.user_login_day import UserLoginDay
 from app.models.user_trophy_earned import UserTrophyEarned
@@ -42,6 +43,7 @@ __all__ = [
     "Academy",
     "Professor",
     "User",
+    "UserConsent",
     "UserLoginDay",
     "Technique",
     "Lesson",
