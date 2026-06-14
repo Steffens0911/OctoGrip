@@ -139,6 +139,11 @@ Antes esses pontos bloqueavam o worker inteiro durante o processamento.
 `app/config.py` — `DB_POOL_SIZE=12`, `DB_MAX_OVERFLOW=6` (era 8/4). Com 4 workers
 uvicorn: 4 × 18 = 72 conexões máx., com folga dentro de `max_connections=100`.
 
+> **Atenção:** os composes sobrescreviam o default via env
+> (`DB_POOL_SIZE: ${DB_POOL_SIZE:-8}`). Foi necessário alinhar o fallback para
+> `:-12`/`:-6` em `docker-compose.yml` e `docker-compose.coolify.yml` — senão o env
+> do container vence o `config.py` e o pool fica 8/4 mesmo em produção.
+
 ### 3.7 Cache-Control em `/media`
 `app/core/middleware.py` (`SecurityHeadersMiddleware`) — antes forçava
 `no-store` em toda mídia. Agora:
@@ -213,7 +218,10 @@ uvicorn: 4 × 18 = 72 conexões máx., com folga dentro de `max_connections=100`
 
 ### 5.3 Postgres
 `docker-compose.yml` e `docker-compose.coolify.yml` — `random_page_cost=1.1`
-(SSD: o planner passa a preferir index scans). Aplica no restart do container.
+(SSD: o planner passa a preferir index scans). Como é mudança no `command` do
+serviço, **o Coolify recria o container do Postgres no deploy do stack** e aplica
+sozinho — não precisa de restart manual (confirmado em prod com `SHOW
+random_page_cost;` → `1.1`).
 
 ### 5.4 Contexto de build Docker
 `.dockerignore` — exclui `.claude/` (~340 MB de transcripts/plans que inflavam o
@@ -258,23 +266,35 @@ curl -s http://localhost:8001/health
 
 ## 7. Checklist de deploy (produção)
 
-1. `git push` → CI do viewer builda com as flags novas (aguardar ✅).
-2. Aplicar a **migration 083** no banco de produção.
-3. **Redeploy da API** no Coolify (pega pool, caches Redis e headers de mídia).
-4. **Restart do container do Postgres** no Coolify (para o `random_page_cost`).
+1. `git push` → CI roda `test` + `lint` (ruff `check` **e** `format --check`) e
+   builda o viewer (aguardar ✅ nos 3 jobs).
+2. Aplicar a **migration 083** no banco de produção (idempotente — `IF NOT
+   EXISTS`; o runner de migrations no deploy também a executa sem conflito).
+3. **Redeploy do stack** no Coolify — recria api (pool, caches, headers de mídia,
+   gzip), viewer (gzip/cache de assets) e, por ser compose único, o **Postgres**
+   (aplica o `random_page_cost`) e os **Celery workers**.
+4. Validar: `SHOW random_page_cost;` (= 1.1) e `EXPLAIN` confirmando o índice 083.
 
 > Build do Flutter, `docker build` e deploy no Coolify são sempre etapas manuais
-> — não automatizar.
+> — não automatizar. Domínios de produção: API em `api.octogrip.com.br`, viewer em
+> `octogrip.com.br`.
 
 ---
 
 ## 8. Verificação realizada
 
-- ✅ **289 testes** do backend passando (`pytest`); `flutter analyze` sem
-  erros/warnings novos.
+Local:
+- ✅ **291 testes** do backend passando, 19 skipped (`pytest` em container Linux);
+  `ruff check` + `ruff format --check` limpos.
 - ✅ Semântica antiga × nova de `training_stats` e `trophy_home` comparada em SQL
   no banco real — idêntica, incluindo casos de borda.
-- ✅ Índice 083 aplicado e confirmado em uso via `EXPLAIN`.
-- ✅ Smoke test dos endpoints otimizados ponta a ponta com dados reais.
-- ✅ gzip (−72%), tree-shake (−98%) e cache de assets confirmados via curl no
-  container do viewer.
+- ✅ Índice 083 aplicado e confirmado em uso via `EXPLAIN` (bitmap index scan).
+- ✅ Cache miss × hit medido: `training_stats` 263→24ms (11×), `trophy_home`
+  62→17ms (4×). Os 3 hooks de invalidação verificados no código.
+- ✅ Fluxo logado no navegador real: home renderiza com dados, navegação entre
+  abas instantânea (SWR), zero exceção de JS.
+
+Produção (validado em `octogrip.com.br` / `api.octogrip.com.br`):
+- ✅ Viewer: `main.dart.js` `content-encoding: gzip` (1.516 KB vs 5.367 KB, −72%);
+  `canvaskit.wasm` com `Cache-Control: public, max-age=86400`.
+- ✅ API: `/health` 200, gzip ativo; índice 083 aplicado; `random_page_cost = 1.1`.
