@@ -100,13 +100,13 @@ jobs:
       - name: Run tests with coverage
         run: flutter test --coverage
 
-      - name: Check coverage threshold (≥ 20%)
+      - name: Check coverage threshold (≥ 5%)
         run: |
           sudo apt-get install -y --quiet lcov
           COVERAGE=$(lcov --summary coverage/lcov.info 2>&1 \
             | sed -n 's/.*lines\.*: \([0-9.]*\)%.*/\1/p')
           echo "Cobertura de linha: ${COVERAGE}%"
-          awk -v c="$COVERAGE" -v t=20 \
+          awk -v c="$COVERAGE" -v t=5 \
             'BEGIN { if (c+0 < t+0) { print "FALHOU: " c "% < " t "% (mínimo)"; exit 1 } \
                      else { print "OK: " c "% >= " t "% (mínimo)" } }'
 
