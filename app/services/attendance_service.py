@@ -631,7 +631,8 @@ async def stats_student_detail(
         f"{student_id}:{df.isoformat()}:{dt.isoformat()}:{records_limit}",
     )
     _detail_cached = await app_cache.get(_detail_cache_key)
-    if _detail_cached is not None:
+    # NamedTuple serializa como lista no Redis (json.dumps); ignorar entradas inválidas.
+    if isinstance(_detail_cached, AttendanceStudentDetailResult):
         return _detail_cached
 
     total_n = (
@@ -1269,7 +1270,8 @@ async def stats_me(
         f"{df.isoformat()}:{dt.isoformat()}:{lim}:{off}",
     )
     _me_cached = await app_cache.get(_me_cache_key)
-    if _me_cached is not None:
+    # NamedTuple serializa como lista no Redis (json.dumps); ignorar entradas inválidas.
+    if isinstance(_me_cached, AttendanceMyStatsData):
         return _me_cached
 
     span_days = (dt - df).days
