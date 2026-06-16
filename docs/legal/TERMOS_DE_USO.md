@@ -2,17 +2,12 @@
 
 **Versão 2026-06-13**
 
-> ⚠️ **RASCUNHO — REVISÃO JURÍDICA OBRIGATÓRIA.** Documento técnico inicial, **não é
-> aconselhamento jurídico**. Revise com um(a) advogado(a) e preencha os campos entre
-> «colchetes» antes de publicar.
-
 Estes Termos regem o uso do aplicativo **Octogrip**, plataforma de gamificação para o
 ensino de jiu-jitsu. Ao criar uma conta ou usar o app, você concorda com estes Termos.
 
 ## 1. Definições
 
 - **Plataforma / Octogrip:** o aplicativo e os serviços associados.
-- **Operador:** «Razão social», CNPJ «00.000.000/0001-00».
 - **Academia:** estabelecimento contratante que disponibiliza o app aos seus alunos.
 - **Usuário:** aluno, professor, gestor ou administrador que acessa a plataforma.
 
@@ -40,12 +35,12 @@ monetário e podem ser ajustados pela academia ou pelo Octogrip em caso de erro 
 ## 5. Reconhecimento facial
 
 O uso de reconhecimento facial para registro de presença é **opcional** e depende de
-consentimento específico, regido pelo [Aviso de Tratamento de Dado Biométrico](AVISO_BIOMETRIA.md)
-e pela [Política de Privacidade](POLITICA_PRIVACIDADE.md). É sempre possível usar QR Code.
+consentimento específico, regido pelo [Aviso de Tratamento de Dado Biométrico](/legal/biometric/view)
+e pela [Política de Privacidade](/legal/privacy/view). É sempre possível usar QR Code.
 
 ## 6. Privacidade
 
-O tratamento de dados pessoais é descrito na [Política de Privacidade](POLITICA_PRIVACIDADE.md),
+O tratamento de dados pessoais é descrito na [Política de Privacidade](/legal/privacy/view),
 parte integrante destes Termos.
 
 ## 7. Propriedade intelectual
@@ -67,7 +62,7 @@ A academia pode suspender o acesso em caso de violação destes Termos.
 ## 10. Foro e legislação
 
 Estes Termos são regidos pelas leis do Brasil. Fica eleito o foro da comarca de
-«cidade/UF», salvo disposição legal em contrário.
+Passo Fundo/RS, salvo disposição legal em contrário.
 
 ## 11. Contato
 

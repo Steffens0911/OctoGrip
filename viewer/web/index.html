@@ -177,28 +177,13 @@
   </script>
   <!-- Recuperação de tela em branco ao voltar de segundo plano.
        Flutter Web usa CanvasKit (WebGL). O browser pode descartar o contexto
-       quando a aba fica inativa por muito tempo — tela fica em branco ao voltar.
-       Solução: ausência curta → resize para forçar repaint; longa → recarrega.  -->
+       quando a aba fica inativa — tela fica em branco ao voltar.
+       Solução: verifica se contexto WebGL foi perdido; recarrega só se necessário. -->
   <script>
     (function () {
-      var _hiddenSince = null;
-      var SHORT_MS = 30 * 1000; // 30 s — só resize
-
       document.addEventListener('visibilitychange', function () {
-        if (document.hidden) {
-          _hiddenSince = Date.now();
-          return;
-        }
-        var absent = _hiddenSince !== null ? Date.now() - _hiddenSince : 0;
-        _hiddenSince = null;
-
-        if (absent > SHORT_MS) {
-          // Ausência longa: contexto WebGL provavelmente perdido — recarrega.
-          window.location.reload();
-          return;
-        }
-
-        // Ausência curta: tenta repaint; se canvas sem contexto, recarrega.
+        if (document.hidden) return;
+        // Verifica contexto WebGL após retornar ao primeiro plano.
         setTimeout(function () {
           var canvas = document.querySelector('canvas');
           if (!canvas) { window.location.reload(); return; }

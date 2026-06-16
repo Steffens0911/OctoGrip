@@ -26,6 +26,7 @@ agent-transcripts/
 # Documentação
 *.md
 docs/
+!docs/legal/
 
 # Testes e cobertura
 .pytest_cache

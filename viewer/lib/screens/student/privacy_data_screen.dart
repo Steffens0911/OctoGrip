@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:viewer/screens/student/user_facial_photo_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
@@ -77,6 +78,41 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
       }
     } catch (e) {
       if (mounted) AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+    }
+  }
+
+  Future<void> _grantBiometric() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ativar reconhecimento facial'),
+        content: const Text(
+          'Sua foto facial será usada exclusivamente para registrar presença nas aulas. '
+          'O uso é opcional e você pode revogar este consentimento a qualquer momento, '
+          'apagando todos os seus dados biométricos.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ativar')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await _api.recordConsent(consentType: 'biometric');
+      if (!mounted) return;
+      setState(() => _busy = false);
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const UserFacialPhotoScreen()),
+      );
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -240,14 +276,21 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
               onTap: _busy ? null : _revokeBiometric,
             ),
           )
-        else
-          const Card(
+        else ...[
+          Card(
             child: ListTile(
-              leading: Icon(Icons.info_outline),
-              title: Text('Reconhecimento facial não ativado'),
-              subtitle: Text('Você registra presença por QR Code.'),
+              leading: const Icon(Icons.info_outline),
+              title: const Text('Reconhecimento facial não ativado'),
+              subtitle: const Text('Você registra presença por QR Code.'),
             ),
           ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _busy ? null : _grantBiometric,
+            icon: const Icon(Icons.face_retouching_natural_outlined),
+            label: const Text('Ativar reconhecimento facial'),
+          ),
+        ],
         const SizedBox(height: 24),
 
         Text('Meus dados', style: Theme.of(context).textTheme.titleMedium),

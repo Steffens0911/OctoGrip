@@ -32,6 +32,7 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/daily_checkin_service.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
+import 'package:viewer/utils/tab_store.dart';
 import 'package:viewer/widgets/pwa_install_banner.dart';
 
 void main() async {
@@ -165,8 +166,10 @@ class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
   }
 
   /// Detecta retorno ao primeiro plano e dispara check-in diário silencioso.
+  /// No web o check-in já é disparado no main() ao carregar a página.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (kIsWeb) return;
     if (state == AppLifecycleState.resumed) {
       unawaited(DailyCheckinService.instance.maybeCheckin());
     }
@@ -287,6 +290,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   int _selected = 0;
   int _inicioRefreshKey = 0;
   String? _lastEffectiveUserId;
+  DateTime? _lastResumeAt;
+  String? _savedTabName;
 
   /// Último contador vindo da [StudentHomeScreen] (badge na aba Campo de treinamento).
   int _pendingConfirmationsNavBadge = 0;
@@ -302,12 +307,22 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _savedTabName = loadTab();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _applyRestoredTab();
       AuthService().restoreImpersonation();
       _fetchUnreadCount();
       _loadAcademy();
     });
     _startNotifPolling();
+  }
+
+  void _applyRestoredTab() {
+    if (!mounted || _savedTabName == null) return;
+    final tabs = _availableTabs(AuthService());
+    final idx = tabs.indexOf(_savedTabName!);
+    _savedTabName = null;
+    if (idx > 0) setState(() => _selected = idx);
   }
 
   /// Polling do badge de notificações: pausado em background, religa no resume.
@@ -322,7 +337,17 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _fetchUnreadCount();
+      // No web não busca contagem imediatamente ao voltar de outra aba;
+      // o polling periódico (60 s) mantém o badge atualizado sem causar rebuild visível.
+      if (!kIsWeb) {
+        final now = DateTime.now();
+        final shouldRefresh = _lastResumeAt == null ||
+            now.difference(_lastResumeAt!) >= const Duration(minutes: 2);
+        if (shouldRefresh) {
+          _lastResumeAt = now;
+          _fetchUnreadCount();
+        }
+      }
       _startNotifPolling();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -739,42 +764,53 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
                     badgeCount: _pendingConfirmationsNavBadge > 0
                         ? _pendingConfirmationsNavBadge
                         : null,
-                    onTap: () => setState(() {
-                      _selected = tabs.indexOf('Campo de treinamento');
-                      _inicioRefreshKey++;
-                    }),
+                    onTap: () {
+                      setState(() {
+                        _selected = tabs.indexOf('Campo de treinamento');
+                        _inicioRefreshKey++;
+                      });
+                      saveTab('Campo de treinamento');
+                    },
                   ),
                 if (tabs.contains('Central'))
                   _NavItem(
                     icon: Icons.dashboard_rounded,
                     label: 'Central',
                     selected: tabIndex == tabs.indexOf('Central'),
-                    onTap: () =>
-                        setState(() => _selected = tabs.indexOf('Central')),
+                    onTap: () {
+                      setState(() => _selected = tabs.indexOf('Central'));
+                      saveTab('Central');
+                    },
                   ),
                 if (tabs.contains('Fotos'))
                   _NavItem(
                     icon: Icons.camera_alt_rounded,
                     label: 'Fotos',
                     selected: tabIndex == tabs.indexOf('Fotos'),
-                    onTap: () =>
-                        setState(() => _selected = tabs.indexOf('Fotos')),
+                    onTap: () {
+                      setState(() => _selected = tabs.indexOf('Fotos'));
+                      saveTab('Fotos');
+                    },
                   ),
                 if (tabs.contains('Gestão'))
                   _NavItem(
                     icon: Icons.business_center,
                     label: 'Gestão',
                     selected: tabIndex == tabs.indexOf('Gestão'),
-                    onTap: () =>
-                        setState(() => _selected = tabs.indexOf('Gestão')),
+                    onTap: () {
+                      setState(() => _selected = tabs.indexOf('Gestão'));
+                      saveTab('Gestão');
+                    },
                   ),
                 if (tabs.contains('Admin'))
                   _NavItem(
                     icon: Icons.settings_rounded,
                     label: 'Admin',
                     selected: tabIndex == tabs.indexOf('Admin'),
-                    onTap: () =>
-                        setState(() => _selected = tabs.indexOf('Admin')),
+                    onTap: () {
+                      setState(() => _selected = tabs.indexOf('Admin'));
+                      saveTab('Admin');
+                    },
                   ),
               ],
             ),

@@ -94,6 +94,7 @@ services:
       - face_jobs:/tmp/face_jobs
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
+      - ./docs/legal:/app/docs/legal:ro
     mem_limit: 512m
     mem_reservation: 256m
 
@@ -125,6 +126,8 @@ services:
       - ./secrets:/app/secrets:ro
     mem_limit: 2g
     mem_reservation: 768m
+    healthcheck:
+      disable: true
 
   celery-worker-default:
     build: .
@@ -151,6 +154,8 @@ services:
       - ./secrets:/app/secrets:ro
     mem_limit: 512m
     mem_reservation: 256m
+    healthcheck:
+      disable: true
 
   celery-beat:
     build: .
@@ -170,6 +175,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      disable: true
 
   viewer:
     build:

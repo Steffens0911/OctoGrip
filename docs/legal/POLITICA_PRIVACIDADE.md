@@ -2,10 +2,6 @@
 
 **Versão 2026-06-13**
 
-> ⚠️ **RASCUNHO — REVISÃO JURÍDICA OBRIGATÓRIA.** Este documento foi redigido como
-> ponto de partida técnico e **não constitui aconselhamento jurídico**. Antes de
-> publicar, submeta-o à revisão de um(a) advogado(a), preencha os campos entre
-> «colchetes» e confirme a base legal de cada tratamento.
 
 Esta Política descreve como o **Octogrip** ("nós", "plataforma") coleta, usa, armazena
 e protege os dados pessoais de alunos, professores e gestores de academias de
@@ -13,7 +9,6 @@ jiu-jitsu que utilizam o aplicativo. Está alinhada à **Lei nº 13.709/2018 (LG
 
 ## 1. Quem é o controlador dos dados
 
-- **Operador da plataforma:** «Razão social», CNPJ «00.000.000/0001-00», «endereço».
 - **Academia contratante:** cada academia que utiliza o Octogrip é controladora dos
   dados dos seus próprios alunos. O Octogrip atua como **operador** ao tratar esses
   dados em nome da academia, conforme contrato.
@@ -31,7 +26,7 @@ jiu-jitsu que utilizam o aplicativo. Está alinhada à **Lei nº 13.709/2018 (LG
 | Técnicos | Endereço IP e User-Agent no aceite de termos | Comprovação de consentimento |
 
 O tratamento de **dado biométrico** é detalhado no [Aviso de Tratamento de Dado
-Biométrico](AVISO_BIOMETRIA.md) e depende de **consentimento específico e destacado**.
+Biométrico](/legal/biometric/view) e depende de **consentimento específico e destacado**.
 
 ## 3. Bases legais (LGPD, art. 7º e 11)
 

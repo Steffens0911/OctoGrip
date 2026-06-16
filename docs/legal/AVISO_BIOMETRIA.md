@@ -2,10 +2,6 @@
 
 **Versão 2026-06-13**
 
-> ⚠️ **RASCUNHO — REVISÃO JURÍDICA OBRIGATÓRIA.** Este aviso é a base do consentimento
-> específico para biometria. **Não é aconselhamento jurídico.** Revise com um(a)
-> advogado(a) antes de publicar.
-
 Este aviso explica, de forma clara e destacada, como o **Octogrip** trata seu **dado
 biométrico facial**. O dado biométrico é classificado como **dado pessoal sensível** pela
 LGPD (Lei nº 13.709/2018, art. 5º, II) e seu tratamento exige **consentimento específico
@@ -46,7 +42,7 @@ Apenas enquanto este consentimento estiver vigente.
 
 ## Seus direitos
 
-Conforme a [Política de Privacidade](POLITICA_PRIVACIDADE.md), você pode acessar, corrigir,
+Conforme a [Política de Privacidade](/legal/privacy/view), você pode acessar, corrigir,
 revogar consentimento e solicitar a eliminação dos seus dados. Contato do Encarregado de
 Dados: **privacidade@octogrip.com.br**.
 

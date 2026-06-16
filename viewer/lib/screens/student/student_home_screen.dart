@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -87,6 +88,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   bool _dailyVideoCompleted = false;
   bool _loading = true;
   String? _error;
+  DateTime? _lastResumeAt;
   String? _academyLogoUrl;
   String? _academyName;
   bool _showTrophies = true;
@@ -219,10 +221,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // No web, troca de aba do browser não deve recarregar dados;
+    // o carregamento ocorre no initState e ao tocar na aba novamente.
+    if (kIsWeb) return;
     if (state == AppLifecycleState.resumed && _selectedUser != null) {
+      final now = DateTime.now();
+      if (_lastResumeAt != null &&
+          now.difference(_lastResumeAt!) < const Duration(minutes: 2)) return;
+      _lastResumeAt = now;
       final currentUser = _selectedUser!;
       final level = _levelFromGraduation(currentUser.graduation);
-      // Agrupar carregamentos para evitar múltiplos setState (inclui quadro de horários)
       Future.wait([
         _loadMissionWeekWith(currentUser.academyId, level),
         _loadHeaderStatsWith(),
