@@ -79,6 +79,12 @@ class ApiService {
   static const _timeout = Duration(seconds: 30);
   static const _getTimeout = Duration(seconds: 15);
 
+  /// Cliente HTTP — substituível em testes via [setHttpClientForTesting].
+  http.Client _client = http.Client();
+
+  @visibleForTesting
+  void setHttpClientForTesting(http.Client client) => _client = client;
+
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort =
       45; // mission_today, week, pending count (pull-to-refresh pode servir cache válido)
@@ -184,7 +190,7 @@ class ApiService {
     final future = () async {
       try {
         final r = await _req(
-          http.get(uri, headers: await _headers(auth: true)),
+          _client.get(uri, headers: await _headers(auth: true)),
           timeout: _getTimeout,
         );
         if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
@@ -231,7 +237,7 @@ class ApiService {
     String email,
     String password,
   ) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/auth/login'),
       headers: await _jsonHeaders(),
       body: jsonEncode({'email': email, 'password': password}),
@@ -251,7 +257,7 @@ class ApiService {
   /// Check-in diário silencioso. Retorna pontos de streak concedidos (0 se nenhum).
   /// Idempotente — pode ser chamado várias vezes no mesmo dia sem efeito colateral.
   Future<int> postDailyCheckin() async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/auth/daily-checkin'),
       headers: await _jsonHeaders(auth: true),
     ));
@@ -265,7 +271,7 @@ class ApiService {
 
   /// Solicita link de recuperação de senha. Sempre retorna 200 (anti-enumeração).
   Future<void> forgotPassword(String email) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/auth/forgot-password'),
       headers: await _jsonHeaders(),
       body: jsonEncode({'email': email}),
@@ -276,7 +282,7 @@ class ApiService {
 
   /// Redefine a senha usando o token recebido por e-mail.
   Future<void> resetPassword(String token, String newPassword) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/auth/reset-password'),
       headers: await _jsonHeaders(),
       body: jsonEncode({'token': token, 'new_password': newPassword}),
@@ -290,7 +296,7 @@ class ApiService {
     final h = token != null
         ? <String, String>{'Authorization': 'Bearer $token'}
         : await _jsonHeaders(auth: true);
-    final r = await _req(http.get(Uri.parse('$baseUrl/auth/me'), headers: h));
+    final r = await _req(_client.get(Uri.parse('$baseUrl/auth/me'), headers: h));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UserModel.fromJson(data! as Map<String, dynamic>);
@@ -299,7 +305,7 @@ class ApiService {
   /// [GET /auth/me] **sem** `X-Impersonate-User`: conta que assina o JWT (admin real durante «Atuar como»).
   Future<UserModel> getAuthMeAsRealUser() async {
     final h = await _jsonHeaders(auth: true, realUserOnly: true);
-    final r = await _req(http.get(Uri.parse('$baseUrl/auth/me'), headers: h));
+    final r = await _req(_client.get(Uri.parse('$baseUrl/auth/me'), headers: h));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return UserModel.fromJson(data! as Map<String, dynamic>);
@@ -307,7 +313,7 @@ class ApiService {
 
   /// Atualiza preferência "galeria visível para outros" do usuário autenticado.
   Future<UserModel> patchMeGalleryVisible(bool visible) async {
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/auth/me'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'gallery_visible': visible}),
@@ -320,7 +326,7 @@ class ApiService {
 
   /// Registra token FCM para o usuário autenticado (Android/iOS).
   Future<void> registerMyPushToken(String token, String platform) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/me/push_token'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'token': token, 'platform': platform}),
@@ -334,7 +340,7 @@ class ApiService {
   /// disparar novo logout — o chamador (PushNotificationService.unregister)
   /// já faz parte do fluxo de logout e captura erros silenciosamente.
   Future<void> deleteAllMyPushTokens() async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/me/push_tokens'),
       headers: await _headers(auth: true),
     ));
@@ -349,7 +355,7 @@ class ApiService {
     required String title,
     required String body,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/push_notification'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'title': title, 'body': body}),
@@ -375,7 +381,7 @@ class ApiService {
     required String title,
     required String body,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/admin/push_broadcast'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'title': title, 'body': body}),
@@ -516,7 +522,7 @@ class ApiService {
   Future<List<Academy>> getAcademies({bool asRealUser = false}) async {
     final uri = Uri.parse('$baseUrl/academies');
     final r = asRealUser
-        ? await _req(http.get(uri,
+        ? await _req(_client.get(uri,
             headers: await _headers(auth: true, realUserOnly: true)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
@@ -539,7 +545,7 @@ class ApiService {
   /// (evita brasão vazio quando o usuário em cache ficou desatualizado).
   Future<Academy> getAcademyFresh(String id) async {
     Future<Academy> fetchOnce(String academyId) async {
-      final r = await _req(http.get(
+      final r = await _req(_client.get(
         Uri.parse('$baseUrl/academies/$academyId'),
         headers: await _headers(auth: true),
       ));
@@ -580,7 +586,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/academies/schedule_display_url').replace(
       queryParameters: {'url': scheduleUrl},
     );
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
@@ -621,7 +627,7 @@ class ApiService {
   }
 
   Future<Academy> createAcademy({required String name, String? slug}) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'name': name, 'slug': slug}),
@@ -633,7 +639,7 @@ class ApiService {
   }
 
   Future<Academy> updateAcademyTheme(String id, String? weeklyTheme) async {
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/academies/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'weekly_theme': weeklyTheme}),
@@ -724,7 +730,7 @@ class ApiService {
         contentType: contentType,
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -756,7 +762,7 @@ class ApiService {
         contentType: contentType,
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -787,7 +793,7 @@ class ApiService {
         ),
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -844,7 +850,7 @@ class ApiService {
       body['user_photos_quota'] = userPhotosQuota;
     }
     if (body.isEmpty) return getAcademy(id);
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/academies/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -875,7 +881,7 @@ class ApiService {
       'login_notice_url': norm(loginNoticeUrl),
       'login_notice_active': loginNoticeActive,
     };
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/academies/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -888,7 +894,7 @@ class ApiService {
   }
 
   Future<void> deleteAcademy(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/academies/$id'),
+    final r = await _req(_client.delete(Uri.parse('$baseUrl/academies/$id'),
         headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -918,7 +924,7 @@ class ApiService {
       uri = uri.replace(queryParameters: queryParams);
     }
     final r = (asRealUser || search != null || graduation != null)
-        ? await _req(http.get(uri,
+        ? await _req(_client.get(uri,
             headers: await _headers(auth: true, realUserOnly: asRealUser)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
@@ -941,7 +947,7 @@ class ApiService {
     };
     if (academyId != null && academyId.isNotEmpty) params['academy_id'] = academyId;
     final uri = Uri.parse('$baseUrl/users/academy-stats').replace(queryParameters: params);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = data is List ? data : <dynamic>[];
@@ -995,7 +1001,7 @@ class ApiService {
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (expiresInMinutes != null) body['expires_in_minutes'] = expiresInMinutes;
-    final r = await _req(http.post(uri,
+    final r = await _req(_client.post(uri,
         headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1006,7 +1012,7 @@ class ApiService {
   Future<AttendanceSessionModel> getAttendanceSession(String sessionId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId');
     // Sem cache: estado da chamada deve refletir presença em tempo real.
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return AttendanceSessionModel.fromJson(data! as Map<String, dynamic>);
@@ -1020,7 +1026,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records')
         .replace(queryParameters: {'limit': '$limit', 'offset': '$offset'});
     // Sem cache: lista precisa atualizar assim que o aluno confirma presença.
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
@@ -1064,7 +1070,7 @@ class ApiService {
     if (dateTo != null) qp['date_to'] = dateTo.toUtc().toIso8601String();
     final uri =
         Uri.parse('$baseUrl/attendance/sessions').replace(queryParameters: qp);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = (data as List<dynamic>? ?? const []);
@@ -1077,7 +1083,7 @@ class ApiService {
   Future<AttendanceRecordModel> addAttendanceRecord(
       String sessionId, String userId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       uri,
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'user_id': userId}),
@@ -1104,12 +1110,12 @@ class ApiService {
     try {
       r = asRealUser
           ? await _req(
-              http.get(uri,
+              _client.get(uri,
                   headers: await _headers(auth: true, realUserOnly: true)),
               timeout: _getTimeout,
             )
           : await _req(
-              http.get(uri, headers: await _headers(auth: true)),
+              _client.get(uri, headers: await _headers(auth: true)),
               timeout: _getTimeout,
             );
     } on ApiException catch (e) {
@@ -1158,7 +1164,7 @@ class ApiService {
     if (studentIds.isEmpty) return [];
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/records');
     final payload = await _encodeJsonPayload({'student_ids': studentIds});
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       uri,
       headers: await _jsonHeaders(auth: true),
       body: payload,
@@ -1194,7 +1200,7 @@ class ApiService {
         contentType: media,
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -1205,7 +1211,7 @@ class ApiService {
   Future<FaceRecognitionJobStatusModel> getFaceRecognitionJob(
       String jobId) async {
     final uri = Uri.parse('$baseUrl/face-recognition/job/$jobId');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return FaceRecognitionJobStatusModel.fromJson(
@@ -1218,7 +1224,7 @@ class ApiService {
     required List<String> confirmedStudentIds,
   }) async {
     final uri = Uri.parse('$baseUrl/face-recognition/confirm');
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       uri,
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
@@ -1236,7 +1242,7 @@ class ApiService {
   Future<void> generateFaceEmbedding(String studentId) async {
     final uri =
         Uri.parse('$baseUrl/face-recognition/generate-embedding/$studentId');
-    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.post(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
   }
 
@@ -1246,7 +1252,7 @@ class ApiService {
         ? Uri.parse('$baseUrl/face-recognition/embedding-status')
             .replace(queryParameters: {'academy_id': academyId})
         : Uri.parse('$baseUrl/face-recognition/embedding-status');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return FaceRecognitionEmbeddingStatusModel.fromJson(
@@ -1256,7 +1262,7 @@ class ApiService {
   /// Remove um registo de presença (correção).
   Future<void> deleteAttendanceRecord(String recordId) async {
     final uri = Uri.parse('$baseUrl/attendance/records/$recordId');
-    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     _invalidateAttendanceCache();
   }
@@ -1440,7 +1446,7 @@ class ApiService {
       {int ttlSeconds = 60}) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/qr')
         .replace(queryParameters: {'ttl_seconds': '$ttlSeconds'});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return QrTokenModel.fromJson(data! as Map<String, dynamic>);
@@ -1448,7 +1454,7 @@ class ApiService {
 
   Future<AttendanceRecordModel> scanAttendance(String token) async {
     final uri = Uri.parse('$baseUrl/attendance/scan');
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       uri,
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'token': token}),
@@ -1462,7 +1468,7 @@ class ApiService {
   Future<AttendanceSessionModel> closeAttendanceSession(
       String sessionId) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/close');
-    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.post(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     _invalidateAttendanceCache();
@@ -1490,7 +1496,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getUserPoints(String userId) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$userId/points'),
+    final r = await _req(_client.get(Uri.parse('$baseUrl/users/$userId/points'),
         headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1499,7 +1505,7 @@ class ApiService {
 
   /// Pontos de todos os usuários da academia em uma requisição (evita N+1 na tela de pontos).
   Future<Map<String, int>> getAcademyUserPoints(String academyId) async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/academies/$academyId/user_points'),
       headers: await _headers(auth: true),
     ));
@@ -1517,7 +1523,7 @@ class ApiService {
           'limit': limit.toString(),
           'offset': offset.toString(),
         });
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return data! as Map<String, dynamic>;
@@ -1525,7 +1531,7 @@ class ApiService {
 
   /// Galeria de troféus do usuário (troféus da academia com tier conquistado).
   Future<List<TrophyWithEarned>> getTrophiesForUser(String userId) async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/trophies/user/$userId'),
       headers: await _headers(auth: true),
     ));
@@ -1539,7 +1545,7 @@ class ApiService {
 
   /// Troféus conquistados por cada usuário da academia (uma query só).
   Future<Map<String, List<AcademyUserEarnedItem>>> getAcademyEarned(String academyId) async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/trophies/academy-earned?academy_id=$academyId'),
       headers: await _headers(auth: true),
     ));
@@ -1556,7 +1562,7 @@ class ApiService {
 
   /// Resumo dos cards de troféus da home: conquistas recentes do usuário e feed da academia.
   Future<TrophyHomeSummary> getTrophyHomeSummary() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/trophies/me/home-summary'),
       headers: await _headers(auth: true),
     ));
@@ -1582,7 +1588,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/trophies').replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -1622,7 +1628,7 @@ class ApiService {
       body['min_graduation_to_unlock'] = minGraduationToUnlock;
     if (maxCountPerOpponent != null)
       body['max_count_per_opponent'] = maxCountPerOpponent;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/trophies'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -1668,7 +1674,7 @@ class ApiService {
     if (setMaxCountPerOpponent) {
       body['max_count_per_opponent'] = maxCountPerOpponent;
     }
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/trophies/${Uri.encodeComponent(trophyId)}'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -1681,7 +1687,7 @@ class ApiService {
 
   /// Remove troféu (soft delete no servidor).
   Future<void> deleteTrophy(String trophyId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/trophies/${Uri.encodeComponent(trophyId)}'),
       headers: await _headers(auth: true),
     ));
@@ -1710,7 +1716,7 @@ class ApiService {
     final uri =
         Uri.parse('$baseUrl/partners').replace(queryParameters: queryParams);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -1752,7 +1758,7 @@ class ApiService {
     if (buttonLabel != null && buttonLabel.isNotEmpty)
       body['button_label'] = buttonLabel;
     body['highlight_on_login'] = highlightOnLogin;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/partners'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -1783,7 +1789,7 @@ class ApiService {
     if (highlightOnLogin != null) body['highlight_on_login'] = highlightOnLogin;
     final uri = Uri.parse('$baseUrl/partners/$partnerId')
         .replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.put(uri,
+    final r = await _req(_client.put(uri,
         headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1795,7 +1801,7 @@ class ApiService {
   Future<void> deletePartner(String partnerId, String academyId) async {
     final uri = Uri.parse('$baseUrl/partners/$partnerId')
         .replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/partners');
   }
@@ -1804,7 +1810,7 @@ class ApiService {
   Future<List<GlobalPartner>> getGlobalPartnersAdmin() async {
     final uri = Uri.parse('$baseUrl/admin/global_partners');
     final r = await _req(
-        http.get(uri, headers: await _headers(auth: true, realUserOnly: true)));
+        _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -1838,7 +1844,7 @@ class ApiService {
     if (buttonLabel != null && buttonLabel.isNotEmpty)
       body['button_label'] = buttonLabel;
     if (featuredOrder != null) body['featured_order'] = featuredOrder;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/admin/global_partners'),
       headers: await _jsonHeaders(auth: true, realUserOnly: true),
       body: jsonEncode(body),
@@ -1870,7 +1876,7 @@ class ApiService {
     if (buttonLabel != null) body['button_label'] = buttonLabel;
     if (featuredOrder != null) body['featured_order'] = featuredOrder;
     if (isActive != null) body['is_active'] = isActive;
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       Uri.parse('$baseUrl/admin/global_partners/$id'),
       headers: await _jsonHeaders(auth: true, realUserOnly: true),
       body: jsonEncode(body),
@@ -1883,7 +1889,7 @@ class ApiService {
 
   /// Remove parceiro global (somente admin global).
   Future<void> deleteGlobalPartner(String id) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/admin/global_partners/$id'),
       headers: await _headers(auth: true, realUserOnly: true),
     ));
@@ -1892,7 +1898,7 @@ class ApiService {
   }
 
   Future<UserModel> getUser(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/users/$id'),
+    final r = await _req(_client.get(Uri.parse('$baseUrl/users/$id'),
         headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -1915,7 +1921,7 @@ class ApiService {
     if (graduation != null) body['graduation'] = graduation;
     if (role != null) body['role'] = role;
     if (password != null && password.isNotEmpty) body['password'] = password;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/users'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -1954,7 +1960,7 @@ class ApiService {
       body['account_frozen'] = accountFrozen ?? false;
       body['account_freeze_reason'] = accountFreezeReason;
     }
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/users/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -1983,7 +1989,7 @@ class ApiService {
             _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -2010,7 +2016,7 @@ class ApiService {
             _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -2036,7 +2042,7 @@ class ApiService {
             _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
       ),
     );
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -2049,7 +2055,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/users/$id').replace(
       queryParameters: {'confirm_email': confirmEmail},
     );
-    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     // Limpar cache de listagem de usuários após exclusão.
     invalidateCache('GET:$baseUrl/users');
@@ -2060,7 +2066,7 @@ class ApiService {
       String executionId) async {
     final uri =
         Uri.parse('$baseUrl/admin/executions/$executionId/revert_confirmation');
-    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.post(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/users');
@@ -2070,7 +2076,7 @@ class ApiService {
   /// Administrador: remove um registo de conclusão de missão (`POST /admin/mission_usages/{id}/void`).
   Future<Map<String, dynamic>> adminVoidMissionUsage(String usageId) async {
     final uri = Uri.parse('$baseUrl/admin/mission_usages/$usageId/void');
-    final r = await _req(http.post(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.post(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/users');
@@ -2090,7 +2096,7 @@ class ApiService {
         ? Uri.parse('$baseUrl/lessons').replace(queryParameters: queryParams)
         : Uri.parse('$baseUrl/lessons');
     final r = search != null && search.isNotEmpty
-        ? await _req(http.get(uri, headers: await _headers(auth: true)))
+        ? await _req(_client.get(uri, headers: await _headers(auth: true)))
         : await _getWithCache(uri, _cacheTtlMedium);
     final decoded = jsonDecode(r.body);
     _throwIfNotOk(r, decoded is Map ? decoded : null);
@@ -2099,7 +2105,7 @@ class ApiService {
   }
 
   Future<Lesson> getLesson(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/lessons/$id'),
+    final r = await _req(_client.get(Uri.parse('$baseUrl/lessons/$id'),
         headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2122,7 +2128,7 @@ class ApiService {
       'order_index': orderIndex,
     };
     if (slug != null && slug.trim().isNotEmpty) body['slug'] = slug.trim();
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/lessons'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2149,7 +2155,7 @@ class ApiService {
     if (videoUrl != null) body['video_url'] = videoUrl;
     if (content != null) body['content'] = content;
     if (orderIndex != null) body['order_index'] = orderIndex;
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       Uri.parse('$baseUrl/lessons/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2160,7 +2166,7 @@ class ApiService {
   }
 
   Future<void> deleteLesson(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/lessons/$id'),
+    final r = await _req(_client.delete(Uri.parse('$baseUrl/lessons/$id'),
         headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/lessons');
@@ -2185,7 +2191,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/techniques').replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -2199,7 +2205,7 @@ class ApiService {
   Future<Technique> getTechnique(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques/$id')
         .replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return Technique.fromJson(data! as Map<String, dynamic>);
@@ -2221,7 +2227,7 @@ class ApiService {
     if (videoUrl != null && videoUrl.trim().isNotEmpty) {
       body['video_url'] = videoUrl.trim();
     }
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/techniques'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2249,7 +2255,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/techniques/$id')
         .replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       uri,
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2263,7 +2269,7 @@ class ApiService {
   Future<void> deleteTechnique(String id, {required String academyId}) async {
     final uri = Uri.parse('$baseUrl/techniques/$id')
         .replace(queryParameters: {'academy_id': academyId});
-    final r = await _req(http.delete(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.delete(uri, headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/techniques');
   }
@@ -2275,7 +2281,7 @@ class ApiService {
       'offset': '$offset',
     });
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -2285,7 +2291,7 @@ class ApiService {
   }
 
   Future<Mission> getMission(String id) async {
-    final r = await _req(http.get(Uri.parse('$baseUrl/missions/$id'),
+    final r = await _req(_client.get(Uri.parse('$baseUrl/missions/$id'),
         headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2301,7 +2307,7 @@ class ApiService {
     String? academyId,
     int multiplier = minRewardPoints,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/missions'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
@@ -2338,7 +2344,7 @@ class ApiService {
     if (theme != null) body['theme'] = theme;
     if (academyId != null) body['academy_id'] = academyId;
     if (multiplier != null) body['multiplier'] = multiplier;
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/missions/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2350,7 +2356,7 @@ class ApiService {
   }
 
   Future<void> deleteMission(String id) async {
-    final r = await _req(http.delete(Uri.parse('$baseUrl/missions/$id'),
+    final r = await _req(_client.delete(Uri.parse('$baseUrl/missions/$id'),
         headers: await _headers(auth: true)));
     _throwIfNotOk(r, await _decodeResponse(r));
     invalidateCache('GET:$baseUrl/missions');
@@ -2398,7 +2404,7 @@ class ApiService {
       'kit_id': kitId,
       if (referenceDate != null) 'reference_date': referenceDate,
     };
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       Uri.parse('$baseUrl/users/me/weekly-kit-choice'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2410,7 +2416,7 @@ class ApiService {
 
   Future<List<WeeklyKitRead>> getWeeklyKits(String academyId) async {
     final uri = Uri.parse('$baseUrl/academies/$academyId/weekly-kits');
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final list = data as List<dynamic>;
@@ -2430,7 +2436,7 @@ class ApiService {
       'sort_order': sortOrder,
       if (items != null) 'items': items,
     };
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/weekly-kits'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2453,7 +2459,7 @@ class ApiService {
       if (sortOrder != null) 'sort_order': sortOrder,
       if (items != null) 'items': items,
     };
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/academies/$academyId/weekly-kits/$kitId'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2465,7 +2471,7 @@ class ApiService {
   }
 
   Future<void> deleteWeeklyKit(String academyId, String kitId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/academies/$academyId/weekly-kits/$kitId'),
       headers: await _headers(auth: true),
     ));
@@ -2478,7 +2484,7 @@ class ApiService {
   Future<bool> getLessonCompleteStatus({required String lessonId}) async {
     final uri = Uri.parse('$baseUrl/lesson_complete/status')
         .replace(queryParameters: {'lesson_id': lessonId});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
@@ -2488,7 +2494,7 @@ class ApiService {
   /// Corpo da resposta inclui `points_awarded` (pontos creditados nesta conclusão).
   Future<Map<String, dynamic>> postLessonComplete(
       {required String lessonId}) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/lesson_complete'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'lesson_id': lessonId}),
@@ -2507,7 +2513,7 @@ class ApiService {
     required String missionId,
     String usageType = 'after_training',
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/mission_complete'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'mission_id': missionId, 'usage_type': usageType}),
@@ -2538,7 +2544,7 @@ class ApiService {
     if (lessonId != null) body['lesson_id'] = lessonId;
     if (techniqueId != null) body['technique_id'] = techniqueId;
     if (academyId != null) body['academy_id'] = academyId;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/executions'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2575,7 +2581,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getPendingConfirmations() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/executions/pending_confirmations'),
       headers: await _headers(auth: true),
     ));
@@ -2589,7 +2595,7 @@ class ApiService {
     required String executionId,
     required String outcome,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/executions/$executionId/confirm'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'outcome': outcome}),
@@ -2606,7 +2612,7 @@ class ApiService {
   }) async {
     final body = <String, dynamic>{};
     if (reason != null && reason.isNotEmpty) body['reason'] = reason;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/executions/$executionId/reject'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2618,7 +2624,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getProfessorReviewExecutions() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/executions/professor_review'),
       headers: await _headers(auth: true),
     ));
@@ -2632,7 +2638,7 @@ class ApiService {
     required String executionId,
     required String outcome,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/executions/$executionId/professor_review'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'outcome': outcome}),
@@ -2644,7 +2650,7 @@ class ApiService {
   }
 
   Future<List<Map<String, dynamic>>> getMyExecutions() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/executions/my_executions'),
       headers: await _headers(auth: true),
     ));
@@ -2663,7 +2669,7 @@ class ApiService {
       'limit': limit.toString(),
       'offset': offset.toString(),
     });
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final map = data! as Map<String, dynamic>;
@@ -2693,7 +2699,7 @@ class ApiService {
     final body = <String, dynamic>{};
     if (observation != null && observation.isNotEmpty)
       body['observation'] = observation;
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/training_feedback'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -2703,7 +2709,7 @@ class ApiService {
 
   /// Métricas globais (admin/supervisor). Exige JWT; [realUserOnly] evita 403 em «Atuar como» aluno.
   Future<UsageMetrics> getMetricsUsage() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/metrics/usage'),
       headers: await _headers(auth: true, realUserOnly: true),
     ));
@@ -2716,7 +2722,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/metrics/usage/by_academy')
         .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2732,7 +2738,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/me/professor-impact')
         .replace(queryParameters: params.isEmpty ? null : params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2751,7 +2757,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/engagement')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2770,7 +2776,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/active_students')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2799,7 +2805,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/weekly_panel_logins')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2815,7 +2821,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/technique_execution_summary')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2833,7 +2839,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/students_attention')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2855,7 +2861,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/reports/mission_completion')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2882,7 +2888,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/academies/$academyId/ranking')
         .replace(queryParameters: qp);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     if (r.statusCode == 404) return {};
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2908,7 +2914,7 @@ class ApiService {
   }) async {
     final uri = Uri.parse('$baseUrl/academies/$academyId/difficulties')
         .replace(queryParameters: {'limit': limit.toString()});
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     if (r.statusCode == 404) return {};
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -2925,7 +2931,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> resetAcademyMissions(String academyId) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/reset_missions'),
       headers: await _jsonHeaders(auth: true),
     ));
@@ -2937,7 +2943,7 @@ class ApiService {
   /// Reinicia escolha de turma e progresso na semana ISO atual (calendário horário de Brasília); pontos preservados.
   Future<Map<String, dynamic>> resetAcademyWeeklyTurmasWeek(
       String academyId) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/reset_weekly_turmas_week'),
       headers: await _jsonHeaders(auth: true),
     ));
@@ -2966,7 +2972,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/academies/$academyId/report/weekly')
         .replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     if (r.statusCode == 404) return null;
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -3002,7 +3008,7 @@ class ApiService {
         weeklyMultiplier3 <= maxRewardPoints) {
       body['weekly_multiplier_3'] = weeklyMultiplier3;
     }
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/academies/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3029,7 +3035,7 @@ class ApiService {
     }
     final uri = Uri.parse('$baseUrl/professors').replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3039,7 +3045,7 @@ class ApiService {
   }
 
   Future<Professor> getProfessor(String id) async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/professors/$id'),
       headers: await _headers(auth: true),
     ));
@@ -3058,7 +3064,7 @@ class ApiService {
       'email': email,
       if (academyId != null) 'academy_id': academyId,
     };
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/professors'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3079,7 +3085,7 @@ class ApiService {
     if (name != null) body['name'] = name;
     if (email != null) body['email'] = email;
     if (academyId != null) body['academy_id'] = academyId;
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/professors/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3091,7 +3097,7 @@ class ApiService {
   }
 
   Future<void> deleteProfessor(String id) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/professors/$id'),
       headers: await _headers(auth: true),
     ));
@@ -3131,7 +3137,7 @@ class ApiService {
       queryParameters: {'offset': '$offset', 'limit': '$limit'},
     );
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
     );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
@@ -3148,7 +3154,7 @@ class ApiService {
   ) async {
     final uri =
         Uri.parse('$baseUrl/me/training_videos/$trainingVideoId/complete');
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       uri,
       headers: await _jsonHeaders(auth: true),
     ));
@@ -3170,7 +3176,7 @@ class ApiService {
       'offset': '$offset',
     });
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3201,7 +3207,7 @@ class ApiService {
     if (pd != null && pd.isNotEmpty) {
       body['position_description'] = pd;
     }
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/training_videos'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3232,7 +3238,7 @@ class ApiService {
     }
     final pd = positionDescription.trim();
     body['position_description'] = pd.isEmpty ? null : pd;
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       Uri.parse('$baseUrl/training_videos/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3244,7 +3250,7 @@ class ApiService {
 
   /// Remove vídeo da tarefa diária (admin/professor).
   Future<void> deleteTrainingVideo(String id) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/training_videos/$id'),
       headers: await _headers(auth: true),
     ));
@@ -3261,7 +3267,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/me/marketplace_items').replace(
       queryParameters: {'offset': '$offset', 'limit': '$limit'},
     );
-    final r = await _req(http.get(uri, headers: await _headers(auth: true)));
+    final r = await _req(_client.get(uri, headers: await _headers(auth: true)));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     final raw = data is List ? data : <dynamic>[];
@@ -3281,7 +3287,7 @@ class ApiService {
       'offset': '$offset',
     });
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3332,7 +3338,7 @@ class ApiService {
     if (academyId != null && academyId.isNotEmpty) {
       body['academy_id'] = academyId;
     }
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/marketplace_items'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3371,7 +3377,7 @@ class ApiService {
       body['image_url'] = null;
     }
     body['sort_order'] = sortOrder;
-    final r = await _req(http.put(
+    final r = await _req(_client.put(
       Uri.parse('$baseUrl/marketplace_items/$id'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -3382,7 +3388,7 @@ class ApiService {
   }
 
   Future<void> deleteMarketplaceItem(String id) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/marketplace_items/$id'),
       headers: await _headers(auth: true),
     ));
@@ -3458,7 +3464,7 @@ class ApiService {
         path: filePath,
         filename: filename,
       );
-      final streamed = await request.send();
+      final streamed = await _client.send(request);
       final response = await http.Response.fromStream(streamed);
       if (response.statusCode >= 200 && response.statusCode < 300) {
         invalidateCache();
@@ -3529,7 +3535,7 @@ class ApiService {
       if (unreadOnly) 'unread_only': 'true',
     });
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3540,7 +3546,7 @@ class ApiService {
 
   Future<int> getUnreadNotificationsCount() async {
     final r = await _req(
-      http.get(
+      _client.get(
         Uri.parse('$baseUrl/notifications/unread-count'),
         headers: await _headers(auth: true),
       ),
@@ -3553,7 +3559,7 @@ class ApiService {
   }
 
   Future<void> markNotificationRead(String notificationId) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/notifications/$notificationId/read'),
       headers: await _headers(auth: true),
     ));
@@ -3564,7 +3570,7 @@ class ApiService {
   }
 
   Future<void> markAllNotificationsRead() async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/notifications/read-all'),
       headers: await _headers(auth: true),
     ));
@@ -3575,7 +3581,7 @@ class ApiService {
   }
 
   Future<void> deleteNotification(String notificationId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/notifications/$notificationId'),
       headers: await _headers(auth: true),
     ));
@@ -3625,7 +3631,7 @@ class ApiService {
     if (caption != null && caption.isNotEmpty) {
       request.fields['caption'] = caption;
     }
-    final streamed = await request.send();
+    final streamed = await _client.send(request);
     final response = await http.Response.fromStream(streamed);
     final data = await _decodeResponse(response);
     _throwIfNotOk(response, data);
@@ -3633,7 +3639,7 @@ class ApiService {
   }
 
   Future<void> likePhoto(String academyId, String photoId) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/like'),
       headers: await _headers(auth: true),
     ));
@@ -3644,7 +3650,7 @@ class ApiService {
   }
 
   Future<void> unlikePhoto(String academyId, String photoId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/like'),
       headers: await _headers(auth: true),
     ));
@@ -3655,7 +3661,7 @@ class ApiService {
   }
 
   Future<void> deletePhoto(String academyId, String photoId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/academies/$academyId/photos/$photoId'),
       headers: await _headers(auth: true),
     ));
@@ -3684,7 +3690,7 @@ class ApiService {
     String? reason,
     DateTime? expiresAt,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/photos/restrictions'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
@@ -3709,7 +3715,7 @@ class ApiService {
     if (active != null) body['active'] = active;
     if (reason != null) body['reason'] = reason;
     if (expiresAt != null) body['expires_at'] = expiresAt.toIso8601String();
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse(
           '$baseUrl/academies/$academyId/photos/restrictions/$restrictionId'),
       headers: await _jsonHeaders(auth: true),
@@ -3736,7 +3742,7 @@ class ApiService {
 
   Future<PhotoComment> addComment(
       String academyId, String photoId, String body) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/comments'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({'body': body}),
@@ -3748,7 +3754,7 @@ class ApiService {
 
   Future<void> deleteComment(
       String academyId, String photoId, String commentId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse(
           '$baseUrl/academies/$academyId/photos/$photoId/comments/$commentId'),
       headers: await _headers(auth: true),
@@ -3761,7 +3767,7 @@ class ApiService {
 
   Future<List<Map<String, dynamic>>> getMentionSuggestions(
       String academyId, String q) async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse(
           '$baseUrl/academies/$academyId/photos/mention-suggestions?q=${Uri.encodeQueryComponent(q)}'),
       headers: await _headers(auth: true),
@@ -3776,7 +3782,7 @@ class ApiService {
   Future<AcademyPhoto?> getPhotoById(
       String academyId, String photoId) async {
     try {
-      final r = await _req(http.get(
+      final r = await _req(_client.get(
         Uri.parse('$baseUrl/academies/$academyId/photos/$photoId'),
         headers: await _headers(auth: true),
       ));
@@ -3793,7 +3799,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> getEnrollmentInvite(String academyId) async {
     final r = await _req(
-      http.get(
+      _client.get(
         Uri.parse('$baseUrl/academies/$academyId/enrollment-invite'),
         headers: await _headers(auth: true),
       ),
@@ -3803,7 +3809,7 @@ class ApiService {
 
   Future<Map<String, dynamic>> rotateEnrollmentInvite(String academyId) async {
     final r = await _req(
-      http.post(
+      _client.post(
         Uri.parse('$baseUrl/academies/$academyId/enrollment-invite/rotate'),
         headers: await _jsonHeaders(auth: true),
         body: '{}',
@@ -3817,7 +3823,7 @@ class ApiService {
     String status = 'pending',
   }) async {
     final r = await _req(
-      http.get(
+      _client.get(
         Uri.parse(
             '$baseUrl/academies/$academyId/pending-enrollments?status=$status'),
         headers: await _headers(auth: true),
@@ -3834,7 +3840,7 @@ class ApiService {
     String? rejectionReason,
   }) async {
     final r = await _req(
-      http.post(
+      _client.post(
         Uri.parse(
             '$baseUrl/academies/$academyId/pending-enrollments/$enrollmentId/decide'),
         headers: await _jsonHeaders(auth: true),
@@ -3850,7 +3856,7 @@ class ApiService {
   /// Público — sem autenticação.
   Future<Map<String, dynamic>> getInvitePublicInfo(String token) async {
     final r = await _req(
-      http.get(Uri.parse('$baseUrl/register/$token')),
+      _client.get(Uri.parse('$baseUrl/register/$token')),
     );
     return await _decodeResponse(r);
   }
@@ -3866,7 +3872,7 @@ class ApiService {
     String? graduation,
   }) async {
     final r = await _req(
-      http.post(
+      _client.post(
         Uri.parse('$baseUrl/register/$token'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -3893,7 +3899,7 @@ class ApiService {
 
   /// Estado vigente dos consentimentos do utilizador autenticado.
   Future<List<Map<String, dynamic>>> getMyConsents() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/me/consents'),
       headers: await _headers(auth: true),
     ));
@@ -3909,7 +3915,7 @@ class ApiService {
     bool granted = true,
     String? documentVersion,
   }) async {
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/me/consents'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode({
@@ -3924,7 +3930,7 @@ class ApiService {
 
   /// Revoga o consentimento biométrico e apaga embedding + foto facial.
   Future<void> revokeBiometricConsent() async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/me/consents/biometric'),
       headers: await _headers(auth: true),
     ));
@@ -3934,7 +3940,7 @@ class ApiService {
 
   /// Baixa uma cópia dos dados pessoais do titular (direito de acesso/portabilidade).
   Future<Map<String, dynamic>> exportMyData() async {
-    final r = await _req(http.get(
+    final r = await _req(_client.get(
       Uri.parse('$baseUrl/me/data-export'),
       headers: await _headers(auth: true),
     ));
@@ -3945,7 +3951,7 @@ class ApiService {
 
   /// Solicita a eliminação (anonimização) da conta do titular. Irreversível.
   Future<void> deleteMyAccount() async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/me/account'),
       headers: await _headers(auth: true),
     ));
@@ -3967,7 +3973,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/manual-trophies/templates')
         .replace(queryParameters: params);
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3992,7 +3998,7 @@ class ApiService {
       if (icon != null && icon.isNotEmpty) 'icon': icon,
       if (color != null && color.isNotEmpty) 'color': color,
     };
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/manual-trophies/templates'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -4016,7 +4022,7 @@ class ApiService {
     if (description != null) body['description'] = description.isEmpty ? null : description;
     if (icon != null) body['icon'] = icon.isEmpty ? null : icon;
     if (color != null) body['color'] = color.isEmpty ? null : color;
-    final r = await _req(http.patch(
+    final r = await _req(_client.patch(
       Uri.parse('$baseUrl/manual-trophies/templates/${Uri.encodeComponent(templateId)}'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -4029,7 +4035,7 @@ class ApiService {
 
   /// Remove template (soft delete).
   Future<void> deleteManualTrophyTemplate(String templateId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/manual-trophies/templates/${Uri.encodeComponent(templateId)}'),
       headers: await _headers(auth: true),
     ));
@@ -4045,7 +4051,7 @@ class ApiService {
     final uri = Uri.parse('$baseUrl/manual-trophies/championships')
         .replace(queryParameters: {'academy_id': academyId});
     final r = await _req(
-      http.get(uri, headers: await _headers(auth: true)),
+      _client.get(uri, headers: await _headers(auth: true)),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -4066,7 +4072,7 @@ class ApiService {
       'event_date': eventDate,
       if (location != null && location.isNotEmpty) 'location': location,
     };
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/manual-trophies/championships'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -4079,7 +4085,7 @@ class ApiService {
 
   /// Remove campeonato (soft delete).
   Future<void> deleteChampionshipEvent(String eventId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/manual-trophies/championships/${Uri.encodeComponent(eventId)}'),
       headers: await _headers(auth: true),
     ));
@@ -4105,7 +4111,7 @@ class ApiService {
       if (medalType != null) 'medal_type': medalType,
       if (note != null && note.isNotEmpty) 'note': note,
     };
-    final r = await _req(http.post(
+    final r = await _req(_client.post(
       Uri.parse('$baseUrl/manual-trophies/awards'),
       headers: await _jsonHeaders(auth: true),
       body: jsonEncode(body),
@@ -4117,7 +4123,7 @@ class ApiService {
 
   /// Remove concessão de troféu.
   Future<void> revokeManualTrophyAward(String awardId) async {
-    final r = await _req(http.delete(
+    final r = await _req(_client.delete(
       Uri.parse('$baseUrl/manual-trophies/awards/${Uri.encodeComponent(awardId)}'),
       headers: await _headers(auth: true),
     ));
@@ -4130,7 +4136,7 @@ class ApiService {
   /// Concessões de um aluno agrupadas por tipo.
   Future<Map<String, dynamic>> getUserManualTrophyAwards(String userId) async {
     final r = await _req(
-      http.get(
+      _client.get(
         Uri.parse('$baseUrl/manual-trophies/awards/user/${Uri.encodeComponent(userId)}'),
         headers: await _headers(auth: true),
       ),
@@ -4155,7 +4161,7 @@ class ApiService {
         'offset': '$offset',
       });
       final r = await _req(
-        http.get(uri, headers: await _headers(auth: true)),
+        _client.get(uri, headers: await _headers(auth: true)),
         timeout: _getTimeout,
       );
       final data = await _decodeResponse(r);

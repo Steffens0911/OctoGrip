@@ -79,6 +79,45 @@ jobs:
       - name: Format check with ruff
         run: ruff format --check app/ tests/
 
+  flutter-test:
+    name: Flutter — unit & widget tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: viewer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      - name: Check coverage threshold (≥ 20%)
+        run: |
+          sudo apt-get install -y --quiet lcov
+          COVERAGE=$(lcov --summary coverage/lcov.info 2>&1 \
+            | sed -n 's/.*lines\.*: \([0-9.]*\)%.*/\1/p')
+          echo "Cobertura de linha: ${COVERAGE}%"
+          awk -v c="$COVERAGE" -v t=20 \
+            'BEGIN { if (c+0 < t+0) { print "FALHOU: " c "% < " t "% (mínimo)"; exit 1 } \
+                     else { print "OK: " c "% >= " t "% (mínimo)" } }'
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-coverage
+          path: viewer/coverage/lcov.info
+          retention-days: 30
+
   docker:
     runs-on: ubuntu-latest
     needs: [test, lint]

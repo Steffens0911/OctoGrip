@@ -59,6 +59,20 @@ class AuthService extends ChangeNotifier {
     _loginNoticeShown = true;
   }
 
+  @visibleForTesting
+  void setForTesting({
+    String? token,
+    UserModel? user,
+    String? impersonatedUserId,
+    UserModel? effectiveUser,
+  }) {
+    _token = token;
+    _currentUser = user;
+    _impersonatedUserId = impersonatedUserId;
+    _effectiveUser = effectiveUser;
+    notifyListeners();
+  }
+
   Future<void> _loadFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString(_keyToken);
