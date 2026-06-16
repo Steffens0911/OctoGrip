@@ -10,19 +10,21 @@ logger = logging.getLogger(__name__)
 _sentry_initialized = False
 
 # Chaves sensíveis que nunca devem ir para o Sentry (LGPD: auth + biometria)
-_SCRUB_KEYS = frozenset({
-    "authorization",
-    "password",
-    "token",
-    "secret",
-    "cookie",
-    "embedding",
-    "face_embedding",
-    "image_data",
-    "biometric",
-    "jwt",
-    "x-api-key",
-})
+_SCRUB_KEYS = frozenset(
+    {
+        "authorization",
+        "password",
+        "token",
+        "secret",
+        "cookie",
+        "embedding",
+        "face_embedding",
+        "image_data",
+        "biometric",
+        "jwt",
+        "x-api-key",
+    }
+)
 
 
 def _scrub_dict(data: dict) -> dict:
@@ -66,6 +68,7 @@ def capture_exception(exc: BaseException) -> None:
         return
     try:
         import sentry_sdk
+
         sentry_sdk.capture_exception(exc)
     except Exception:
         pass
