@@ -32,6 +32,7 @@ def marketplace_item_admin_read_from_orm(
         whatsapp_url=url,
         sort_order=item.sort_order,
         is_active=item.is_active,
+        whatsapp_clicks=item.whatsapp_clicks,
     )
 
 
@@ -66,6 +67,7 @@ class MarketplaceItemAdminRead(BaseModel):
     whatsapp_url: str | None
     sort_order: int | None
     is_active: bool
+    whatsapp_clicks: int = 0
 
     model_config = ConfigDict(from_attributes=False)
 

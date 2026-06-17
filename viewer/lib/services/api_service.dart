@@ -3396,6 +3396,45 @@ class ApiService {
     invalidateCache('GET:$baseUrl/marketplace_items');
   }
 
+  /// Faz upload de imagem para anúncio e retorna a URL `/media/marketplace/...`.
+  Future<String> uploadMarketplaceImage({
+    required Uint8List bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final safeFilename =
+        filename.trim().isEmpty ? 'product.jpg' : filename.trim();
+    final uri = Uri.parse('$baseUrl/marketplace_items/upload_image');
+    final request = http.MultipartRequest('POST', uri);
+    request.headers.addAll(await _headers(auth: true));
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: safeFilename,
+        contentType:
+            _mediaTypeFromContentTypeOrFilename(contentType, safeFilename, bytes),
+      ),
+    );
+    final streamed = await _client.send(request);
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return (data as Map<String, dynamic>)['image_url'] as String;
+  }
+
+  /// Registra clique no botão "Chamar no WhatsApp" de um anúncio.
+  Future<void> recordMarketplaceWhatsappClick(String itemId) async {
+    try {
+      await _req(_client.post(
+        Uri.parse('$baseUrl/me/marketplace_items/$itemId/whatsapp_click'),
+        headers: await _headers(auth: true),
+      ));
+    } catch (_) {
+      // Melhor esforço — não bloqueia a abertura do WhatsApp
+    }
+  }
+
   static const _backupDownloadTimeout = Duration(minutes: 10);
 
   /// Alinhar com BACKUP_PSQL_RESTORE_TIMEOUT_SEC (até 2h) + upload de ZIP grande.

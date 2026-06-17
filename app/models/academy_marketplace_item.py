@@ -36,6 +36,7 @@ class AcademyMarketplaceItem(Base, UUIDMixin):
     )
     sort_order: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    whatsapp_clicks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_by_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

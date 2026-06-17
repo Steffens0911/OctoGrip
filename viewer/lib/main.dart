@@ -540,7 +540,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Sair do app?'),
-            content: const Text('Deseja fechar o FlowRoll?'),
+            content: const Text('Deseja fechar o Octogrip?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),

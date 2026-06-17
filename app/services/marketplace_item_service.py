@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.list_pagination import clamp_list_limit
@@ -186,6 +186,16 @@ async def delete_marketplace_item(
     await db.commit()
     logger.info("delete_marketplace_item", extra={"item_id": str(item_id)})
     return True
+
+
+async def increment_whatsapp_click(db: AsyncSession, item_id: UUID) -> None:
+    """Incrementa o contador de cliques no WhatsApp do anúncio."""
+    await db.execute(
+        update(AcademyMarketplaceItem)
+        .where(AcademyMarketplaceItem.id == item_id)
+        .values(whatsapp_clicks=AcademyMarketplaceItem.whatsapp_clicks + 1)
+    )
+    await db.commit()
 
 
 async def list_marketplace_items_for_user(

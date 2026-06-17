@@ -14,6 +14,7 @@ class MarketplaceItem {
   final String? whatsappNumber;
   final int? sortOrder;
   final bool isActive;
+  final int whatsappClicks;
 
   const MarketplaceItem({
     required this.id,
@@ -29,6 +30,7 @@ class MarketplaceItem {
     this.whatsappNumber,
     this.sortOrder,
     this.isActive = true,
+    this.whatsappClicks = 0,
   });
 
   factory MarketplaceItem.fromStudentJson(Map<String, dynamic> json) {
@@ -58,6 +60,7 @@ class MarketplaceItem {
       whatsappNumber: json['whatsapp_number'] as String?,
       sortOrder: json['sort_order'] as int?,
       isActive: json['is_active'] as bool? ?? true,
+      whatsappClicks: json['whatsapp_clicks'] as int? ?? 0,
     );
   }
 }
