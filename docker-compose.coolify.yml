@@ -109,7 +109,7 @@ services:
     restart: unless-stopped
     command: celery -A celery_app worker --loglevel=info --pool=solo --concurrency=1 -Q face --hostname=worker-face@%h
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'celery' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 30s
       timeout: 10s
       start_period: 40s
@@ -145,7 +145,7 @@ services:
     restart: unless-stopped
     command: celery -A celery_app worker --loglevel=info --pool=prefork --concurrency=2 -Q default --hostname=worker-default@%h
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'celery' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 30s
       timeout: 10s
       start_period: 40s
@@ -179,7 +179,7 @@ services:
     restart: unless-stopped
     command: celery -A celery_app beat --loglevel=info --schedule=/app/app_media/celerybeat-schedule
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'celery' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "kill -0 1"]
       interval: 30s
       timeout: 10s
       start_period: 40s
