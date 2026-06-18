@@ -37,7 +37,7 @@ async def test_no_notification_on_recalc_or_drop(db: AsyncSession, aluno_user):
     """Recalcular para um nível igual/menor (ex.: estorno de pontos) não notifica."""
     # Sobe para o nível 3 e limpa as notificações geradas.
     await refresh_user_level(db, aluno_user.id, total_points=110)
-    assert (await _level_up_notifs(db, aluno_user.id))  # subiu, gerou notificação
+    assert await _level_up_notifs(db, aluno_user.id)  # subiu, gerou notificação
 
     before = len(await _level_up_notifs(db, aluno_user.id))
 
