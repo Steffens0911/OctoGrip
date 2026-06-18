@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/marketplace_item.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
@@ -18,6 +22,7 @@ class MarketplaceFormScreen extends StatefulWidget {
 
 class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
   final _api = ApiService();
+  final _picker = ImagePicker();
   final _titleCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
@@ -29,29 +34,32 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
   bool _saving = false;
   String? _error;
 
+  /// URL da imagem atual (já salva no servidor ou recém-enviada).
+  String? _imageUrl;
+  /// Bytes da imagem selecionada localmente (ainda não enviada).
+  Uint8List? _pendingImageBytes;
+  String? _pendingImageName;
+  bool _uploadingImage = false;
+
   @override
   void initState() {
     super.initState();
     final it = widget.item;
     if (it != null) {
       _titleCtrl.text = it.title;
-      if (it.description != null) {
-        _descCtrl.text = it.description!;
-      }
-      _priceCtrl.text = (it.priceCents / 100).toStringAsFixed(2).replaceAll('.', ',');
+      if (it.description != null) _descCtrl.text = it.description!;
+      _priceCtrl.text =
+          (it.priceCents / 100).toStringAsFixed(2).replaceAll('.', ',');
       if (it.whatsappDdd != null && it.whatsappDdd!.isNotEmpty) {
         _dddCtrl.text = it.whatsappDdd!;
       }
       if (it.whatsappNumber != null && it.whatsappNumber!.isNotEmpty) {
         _phoneLocalCtrl.text = it.whatsappNumber!;
       }
-      if (it.sortOrder != null) {
-        _sortCtrl.text = it.sortOrder.toString();
-      }
+      if (it.sortOrder != null) _sortCtrl.text = it.sortOrder.toString();
       _isActive = it.isActive;
-      if (it.academyId != null) {
-        _academyIdCtrl.text = it.academyId!;
-      }
+      if (it.academyId != null) _academyIdCtrl.text = it.academyId!;
+      _imageUrl = it.imageUrl;
     }
   }
 
@@ -65,6 +73,29 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
     _sortCtrl.dispose();
     _academyIdCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picked = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 90,
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    setState(() {
+      _pendingImageBytes = bytes;
+      _pendingImageName = picked.name;
+    });
+  }
+
+  void _removeImage() {
+    setState(() {
+      _pendingImageBytes = null;
+      _pendingImageName = null;
+      _imageUrl = null;
+    });
   }
 
   int? _parsePriceCents() {
@@ -89,7 +120,8 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
     final isAdmin = AuthService().isAdmin();
     final academyIdField = _academyIdCtrl.text.trim();
     if (widget.item == null && isAdmin && academyIdField.isEmpty) {
-      setState(() => _error = 'Administrador deve informar o ID da academia (UUID).');
+      setState(
+          () => _error = 'Administrador deve informar o ID da academia (UUID).');
       return;
     }
 
@@ -97,6 +129,32 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
       _saving = true;
       _error = null;
     });
+
+    // Upload da imagem pendente antes de salvar o anúncio
+    String? finalImageUrl = _imageUrl;
+    if (_pendingImageBytes != null) {
+      setState(() => _uploadingImage = true);
+      try {
+        finalImageUrl = await _api.uploadMarketplaceImage(
+          bytes: _pendingImageBytes!,
+          filename: _pendingImageName ?? 'product.jpg',
+        );
+        setState(() {
+          _imageUrl = finalImageUrl;
+          _pendingImageBytes = null;
+          _pendingImageName = null;
+          _uploadingImage = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _saving = false;
+          _uploadingImage = false;
+          _error = 'Falha ao enviar imagem: ${userFacingMessage(e)}';
+        });
+        return;
+      }
+    }
 
     final desc = _descCtrl.text.trim();
     final sort = int.tryParse(_sortCtrl.text.trim());
@@ -109,11 +167,13 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
           title: title,
           description: desc.isEmpty ? null : desc,
           priceCents: cents,
+          imageUrl: finalImageUrl,
           whatsappDdd: ddd.isEmpty ? null : ddd,
           whatsappNumber: local.isEmpty ? null : local,
           sortOrder: sort,
           isActive: _isActive,
-          academyId: isAdmin && academyIdField.isNotEmpty ? academyIdField : null,
+          academyId:
+              isAdmin && academyIdField.isNotEmpty ? academyIdField : null,
         );
       } else {
         await _api.updateMarketplaceItem(
@@ -121,6 +181,7 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
           title: title,
           description: desc.isEmpty ? null : desc,
           priceCents: cents,
+          imageUrl: finalImageUrl,
           whatsappDdd: ddd.isEmpty ? null : ddd,
           whatsappNumber: local.isEmpty ? null : local,
           sortOrder: sort,
@@ -141,6 +202,61 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
         _error = userFacingMessage(e);
       });
     }
+  }
+
+  Widget _buildImagePicker(BuildContext context) {
+    final serverBase = _api.baseUrl;
+
+    // Preview: imagem selecionada localmente
+    if (_pendingImageBytes != null) {
+      return _ImagePreviewBox(
+        onRemove: _saving ? null : _removeImage,
+        onReplace: _saving ? null : _pickImage,
+        child: Image.memory(_pendingImageBytes!, fit: BoxFit.cover),
+      );
+    }
+
+    // Preview: imagem já salva no servidor
+    if (_imageUrl != null && _imageUrl!.isNotEmpty) {
+      final resolved = _imageUrl!.startsWith('/')
+          ? '$serverBase${_imageUrl!}'
+          : _imageUrl!;
+      return _ImagePreviewBox(
+        onRemove: _saving ? null : _removeImage,
+        onReplace: _saving ? null : _pickImage,
+        child: Image.network(resolved, fit: BoxFit.cover),
+      );
+    }
+
+    // Placeholder — toca para selecionar
+    return GestureDetector(
+      onTap: _saving ? null : _pickImage,
+      child: Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add_photo_alternate_outlined,
+                size: 40, color: AppTheme.primary),
+            const SizedBox(height: 8),
+            Text(
+              'Adicionar foto do produto',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppTheme.primary,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -175,6 +291,23 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
               ),
               const SizedBox(height: 12),
             ],
+            // Imagem do produto
+            Text(
+              'Foto do produto',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            if (_uploadingImage)
+              Container(
+                height: 160,
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(),
+              )
+            else
+              _buildImagePicker(context),
+            const SizedBox(height: 16),
             TextField(
               controller: _titleCtrl,
               decoration: const InputDecoration(labelText: 'Título'),
@@ -190,7 +323,8 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _priceCtrl,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Preço (R\$)',
                 hintText: '199,90',
@@ -255,7 +389,8 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
             SwitchListTile(
               title: const Text('Ativo (visível para alunos)'),
               value: _isActive,
-              onChanged: _saving ? null : (v) => setState(() => _isActive = v),
+              onChanged:
+                  _saving ? null : (v) => setState(() => _isActive = v),
             ),
             const SizedBox(height: 24),
             FilledButton(
@@ -269,6 +404,73 @@ class _MarketplaceFormScreenState extends State<MarketplaceFormScreen> {
                   : const Text('Salvar'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagePreviewBox extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onRemove;
+  final VoidCallback? onReplace;
+
+  const _ImagePreviewBox({
+    required this.child,
+    this.onRemove,
+    this.onReplace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: child,
+          ),
+        ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Row(
+            children: [
+              _iconBtn(
+                icon: Icons.edit,
+                tooltip: 'Trocar foto',
+                onTap: onReplace,
+              ),
+              const SizedBox(width: 4),
+              _iconBtn(
+                icon: Icons.delete_outline,
+                tooltip: 'Remover foto',
+                onTap: onRemove,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _iconBtn({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Icon(icon, color: Colors.white, size: 18),
         ),
       ),
     );

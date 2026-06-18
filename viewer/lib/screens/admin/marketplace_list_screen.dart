@@ -261,7 +261,7 @@ class _MarketplaceListScreenState extends State<MarketplaceListScreen> {
                                       ),
                                     ),
                                     subtitle: Text(
-                                      '${_priceShort(it)} · $scope',
+                                      '${_priceShort(it)} · $scope${it.whatsappClicks > 0 ? ' · ${it.whatsappClicks} clique${it.whatsappClicks > 1 ? 's' : ''} WhatsApp' : ''}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodySmall

@@ -19,8 +19,10 @@ class MarketplaceScreen extends StatefulWidget {
 
 class _MarketplaceScreenState extends State<MarketplaceScreen> {
   final _api = ApiService();
+  final _searchCtrl = TextEditingController();
   static const int _pageSize = 20;
   List<MarketplaceItem> _items = [];
+  List<MarketplaceItem> _filtered = [];
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -31,6 +33,25 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _applyFilter() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? _items
+          : _items
+              .where((it) =>
+                  it.title.toLowerCase().contains(q) ||
+                  (it.description?.toLowerCase().contains(q) ?? false))
+              .toList();
+    });
   }
 
   Future<void> _load({bool reset = true}) async {
@@ -61,6 +82,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         _offset += list.length;
         _hasMore = list.length == _pageSize;
       });
+      _applyFilter();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -77,14 +99,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   static String _priceLabel(MarketplaceItem it) {
     final v = it.priceCents / 100.0;
     if ((it.currency).toUpperCase() == 'BRL') {
-      return NumberFormat.currency(locale: 'pt_BR', symbol: r'R$')
-          .format(v);
+      return NumberFormat.currency(locale: 'pt_BR', symbol: r'R$').format(v);
     }
     return '${it.currency} ${v.toStringAsFixed(2)}';
   }
 
-  Future<void> _openWhatsApp(String url) async {
-    final uri = Uri.tryParse(url.trim());
+  Future<void> _openWhatsApp(MarketplaceItem it) async {
+    final wa = it.whatsappUrl;
+    if (wa == null || wa.isEmpty) return;
+    _api.recordMarketplaceWhatsappClick(it.id);
+    final uri = Uri.tryParse(wa.trim());
     if (uri == null) return;
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -122,52 +146,81 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       ),
                     ],
                   )
-                : ListView.builder(
-                    padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    itemCount: _items.isEmpty
-                        ? 1
-                        : _items.length + (_hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (_items.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 48),
-                          child: Text(
-                            'Nenhum produto anunciado no momento.',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyLarge
-                                ?.copyWith(
-                                  color: AppTheme.textSecondaryOf(context),
+                : Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: TextField(
+                          controller: _searchCtrl,
+                          decoration: InputDecoration(
+                            hintText: 'Buscar produto...',
+                            prefixIcon: const Icon(Icons.search),
+                            isDense: true,
+                            suffixIcon: _searchCtrl.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear),
+                                    onPressed: () {
+                                      _searchCtrl.clear();
+                                      _applyFilter();
+                                    },
+                                  )
+                                : null,
+                          ),
+                          onChanged: (_) => _applyFilter(),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: EdgeInsets.all(AppTheme.screenPadding(context)),
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          itemCount: _filtered.isEmpty
+                              ? 1
+                              : _filtered.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (_filtered.isEmpty) {
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 48),
+                                child: Text(
+                                  _searchCtrl.text.isNotEmpty
+                                      ? 'Nenhum produto encontrado.'
+                                      : 'Nenhum produto anunciado no momento.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.copyWith(
+                                        color: AppTheme.textSecondaryOf(context),
+                                      ),
                                 ),
-                          ),
-                        );
-                      }
-                      if (index >= _items.length) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Center(
-                            child: _loadingMore
-                                ? const CircularProgressIndicator()
-                                : OutlinedButton.icon(
-                                    onPressed: () => _load(reset: false),
-                                    icon: const Icon(Icons.expand_more),
-                                    label: const Text('Ver mais produtos'),
-                                  ),
-                          ),
-                        );
-                      }
-                      final it = _items[index];
-                      final wa = it.whatsappUrl;
-                      return _ItemCard(
-                        item: it,
-                        priceLabel: _priceLabel(it),
-                        onWhatsApp: wa != null && wa.isNotEmpty
-                            ? () => _openWhatsApp(wa)
-                            : null,
-                      );
-                    },
+                              );
+                            }
+                            if (index >= _filtered.length) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Center(
+                                  child: _loadingMore
+                                      ? const CircularProgressIndicator()
+                                      : OutlinedButton.icon(
+                                          onPressed: () => _load(reset: false),
+                                          icon: const Icon(Icons.expand_more),
+                                          label: const Text('Ver mais produtos'),
+                                        ),
+                                ),
+                              );
+                            }
+                            final it = _filtered[index];
+                            return _ItemCard(
+                              item: it,
+                              priceLabel: _priceLabel(it),
+                              onWhatsApp: it.whatsappUrl != null &&
+                                      it.whatsappUrl!.isNotEmpty
+                                  ? () => _openWhatsApp(it)
+                                  : null,
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
       ),
     );

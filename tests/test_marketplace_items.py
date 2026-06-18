@@ -225,6 +225,107 @@ async def test_professor_cannot_edit_other_academy_item(
 
 
 @pytest.mark.asyncio
+async def test_upload_image_returns_url(
+    client: AsyncClient,
+    academy,
+    professor_headers: dict,
+):
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (200, 200), color=(100, 150, 200)).save(buf, format="JPEG")
+    buf.seek(0)
+
+    r = await client.post(
+        "/marketplace_items/upload_image",
+        headers=professor_headers,
+        files={"file": ("product.jpg", buf.read(), "image/jpeg")},
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert "image_url" in data
+    assert data["image_url"].startswith("/media/marketplace/")
+    assert data["image_url"].endswith(".jpg")
+
+
+@pytest.mark.asyncio
+async def test_upload_image_invalid_type_rejected(
+    client: AsyncClient,
+    academy,
+    professor_headers: dict,
+):
+    r = await client.post(
+        "/marketplace_items/upload_image",
+        headers=professor_headers,
+        files={"file": ("doc.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    assert r.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_upload_image_url_used_in_item(
+    client: AsyncClient,
+    academy,
+    professor_headers: dict,
+    aluno_headers: dict,
+):
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (100, 100), color=(0, 0, 0)).save(buf, format="PNG")
+    buf.seek(0)
+
+    r_up = await client.post(
+        "/marketplace_items/upload_image",
+        headers=professor_headers,
+        files={"file": ("img.png", buf.read(), "image/png")},
+    )
+    assert r_up.status_code == 200, r_up.text
+    image_url = r_up.json()["image_url"]
+
+    r_item = await client.post(
+        "/marketplace_items",
+        headers=professor_headers,
+        json=_item_json(image_url=image_url),
+    )
+    assert r_item.status_code == 201, r_item.text
+    assert r_item.json()["image_url"] == image_url
+
+    r_me = await client.get("/me/marketplace_items", headers=aluno_headers)
+    assert r_me.status_code == 200
+    assert r_me.json()[0]["image_url"] == image_url
+
+
+@pytest.mark.asyncio
+async def test_whatsapp_click_increments_counter(
+    client: AsyncClient,
+    academy,
+    professor_headers: dict,
+    aluno_headers: dict,
+):
+    r = await client.post("/marketplace_items", headers=professor_headers, json=_item_json())
+    assert r.status_code == 201, r.text
+    item_id = r.json()["id"]
+    assert r.json()["whatsapp_clicks"] == 0
+
+    r_click = await client.post(
+        f"/me/marketplace_items/{item_id}/whatsapp_click",
+        headers=aluno_headers,
+    )
+    assert r_click.status_code == 204
+
+    r_list = await client.get("/marketplace_items", headers=professor_headers)
+    assert r_list.status_code == 200
+    item = next((i for i in r_list.json() if i["id"] == item_id), None)
+    assert item is not None
+    assert item["whatsapp_clicks"] == 1
+
+
+@pytest.mark.asyncio
 async def test_admin_create_requires_academy_id(
     client: AsyncClient,
     academy,

@@ -32,6 +32,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     'photo_mention': 'Fotos',
     'announcement_academy': 'Avisos',
     'announcement_global': 'Avisos',
+    'academy_push': 'Avisos',
     'account_frozen': 'Conta',
     'account_unfrozen': 'Conta',
   };
@@ -249,6 +250,7 @@ class _NotifTileState extends State<_NotifTile> {
     'photo_mention': ('📸', Color(0xFF00897B)),
     'announcement_academy': ('📢', Color(0xFFE65100)),
     'announcement_global': ('📣', Color(0xFFB71C1C)),
+    'academy_push': ('🛍️', Color(0xFF2E7D32)),
     'account_frozen': ('🔒', Color(0xFFC62828)),
     'account_unfrozen': ('🔓', Color(0xFF2E7D32)),
   };
