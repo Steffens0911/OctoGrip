@@ -38,11 +38,23 @@ async def refresh_user_level(
     if not user:
         raise UserNotFoundError("Usuário não encontrado.")
 
+    previous_level = user.reward_level
+
     if user.reward_level != level or user.reward_level_points != level_points:
         user.reward_level = level
         user.reward_level_points = level_points
         await db.commit()
         await db.refresh(user)
+
+    # Notifica apenas em subida de nível (nunca em recálculo/queda); fire-and-forget
+    # para não interromper a pontuação caso a notificação/push falhe.
+    if level > previous_level:
+        try:
+            from app.services.level_up_notification_service import notify_level_up
+
+            await notify_level_up(db, user_id=user_id, new_level=level)
+        except Exception:
+            logger.exception("refresh_user_level: erro ao notificar subida de nível")
 
     logger.debug(
         "refresh_user_level",
