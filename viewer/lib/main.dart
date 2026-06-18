@@ -27,6 +27,7 @@ import 'package:viewer/features/photos/presentation/pages/student_search_photos_
 import 'package:viewer/screens/auth/reset_password_screen.dart';
 import 'package:viewer/screens/enrollment/public_registration_screen.dart';
 import 'package:viewer/screens/notifications_screen.dart';
+import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/daily_checkin_service.dart';
@@ -114,6 +115,13 @@ class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
               photoId: photoId,
             ),
           ),
+        );
+        return;
+      }
+
+      if (type == 'marketplace_new_item') {
+        appNavigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
         );
         return;
       }

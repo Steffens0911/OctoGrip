@@ -81,6 +81,7 @@ async def _send_new_item_push(academy_id: UUID, item_title: str) -> None:
                         title="Novo produto na loja",
                         body=item_title,
                         access_token=access_token,
+                        data={"type": "marketplace_new_item"},
                     )
                 except Exception:
                     continue

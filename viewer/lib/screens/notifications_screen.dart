@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:viewer/features/photos/presentation/pages/photo_from_notification_screen.dart';
 import 'package:viewer/models/notification_model.dart';
+import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/services/api_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
@@ -74,6 +75,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _navigateFromNotif(NotificationModel n) {
+    if (n.type == 'academy_push') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
+      );
+      return;
+    }
     if (n.type != 'photo_comment' && n.type != 'photo_mention') return;
     final data = n.data;
     if (data == null) return;
