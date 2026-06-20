@@ -24,7 +24,16 @@ _STAFF_ROLES = ("professor", "gerente_academia")
 @celery_app.task(bind=True, max_retries=1, time_limit=180)
 def send_weekly_at_risk_alert(self) -> None:
     """Envia push semanal para professores/gestores com contagem de alunos sem presença há 7+ dias."""
-    asyncio.run(_run())
+
+    async def _wrapper() -> None:
+        from app.database import async_engine
+
+        try:
+            await _run()
+        finally:
+            await async_engine.dispose()
+
+    asyncio.run(_wrapper())
 
 
 async def _run() -> None:

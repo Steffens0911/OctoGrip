@@ -14,7 +14,16 @@ logger = logging.getLogger(__name__)
 @celery_app.task(bind=True, max_retries=1, time_limit=120)
 def notify_manual_trophy_awarded(self, award_id: str) -> None:
     """Envia notificações in-app e push para concessão de troféu manual."""
-    asyncio.run(_run(UUID(award_id)))
+
+    async def _wrapper() -> None:
+        from app.database import async_engine
+
+        try:
+            await _run(UUID(award_id))
+        finally:
+            await async_engine.dispose()
+
+    asyncio.run(_wrapper())
 
 
 async def _run(award_id: UUID) -> None:

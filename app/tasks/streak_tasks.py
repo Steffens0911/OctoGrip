@@ -16,7 +16,16 @@ _NOTIF_TYPE = "streak_at_risk"
 @celery_app.task(bind=True, max_retries=1, time_limit=180)
 def send_streak_at_risk_push(self) -> None:
     """Envia push para alunos com streak ativo que ainda não logaram hoje."""
-    asyncio.run(_run())
+
+    async def _wrapper() -> None:
+        from app.database import async_engine
+
+        try:
+            await _run()
+        finally:
+            await async_engine.dispose()
+
+    asyncio.run(_wrapper())
 
 
 async def _run() -> None:
