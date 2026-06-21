@@ -47,5 +47,21 @@ void main() {
       final bonus = await DailyCheckinService.instance.maybeCheckin();
       expect(bonus, 0);
     });
+
+    test('retorna 0 quando já fez check-in hoje', () async {
+      final today = DateTime.now();
+      final todayStr = '${today.year.toString().padLeft(4, '0')}-'
+          '${today.month.toString().padLeft(2, '0')}-'
+          '${today.day.toString().padLeft(2, '0')}';
+
+      SharedPreferences.setMockInitialValues({
+        'daily_checkin_last_date': todayStr,
+        'auth_token': 'tok',
+      });
+
+      // Com a data de hoje já gravada, retorna 0 sem chamar HTTP
+      final bonus = await DailyCheckinService.instance.maybeCheckin();
+      expect(bonus, 0);
+    });
   });
 }
