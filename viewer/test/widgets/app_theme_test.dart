@@ -107,5 +107,80 @@ void main() {
       );
       expect(captured!.a, greaterThan(0));
     });
+
+    testWidgets('surfaceOf retorna cor não-transparente', (tester) async {
+      Color? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              captured = AppTheme.surfaceOf(ctx);
+              return const Placeholder();
+            },
+          ),
+        ),
+      );
+      expect(captured!.a, greaterThan(0));
+    });
+
+    testWidgets('textPrimaryOf retorna cor não-transparente', (tester) async {
+      Color? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              captured = AppTheme.textPrimaryOf(ctx);
+              return const Placeholder();
+            },
+          ),
+        ),
+      );
+      expect(captured!.a, greaterThan(0));
+    });
+
+    testWidgets('textSecondaryOf retorna cor não-transparente', (tester) async {
+      Color? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              captured = AppTheme.textSecondaryOf(ctx);
+              return const Placeholder();
+            },
+          ),
+        ),
+      );
+      expect(captured!.a, greaterThan(0));
+    });
+
+    testWidgets('textMutedOf retorna cor não-transparente', (tester) async {
+      Color? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              captured = AppTheme.textMutedOf(ctx);
+              return const Placeholder();
+            },
+          ),
+        ),
+      );
+      expect(captured!.a, greaterThan(0));
+    });
+
+    testWidgets('borderOf retorna cor não-transparente', (tester) async {
+      Color? captured;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (ctx) {
+              captured = AppTheme.borderOf(ctx);
+              return const Placeholder();
+            },
+          ),
+        ),
+      );
+      expect(captured!.a, greaterThan(0));
+    });
   });
 }
