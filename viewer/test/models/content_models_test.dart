@@ -167,5 +167,28 @@ void main() {
       expect(p.highlightOnLogin, isFalse);
       expect(p.url, isNull);
     });
+
+    test('toJson serializa todos os campos corretamente', () {
+      final p = Partner(
+        id: 'p3',
+        academyId: 'ac1',
+        name: 'Parceiro Completo',
+        description: 'Desc',
+        url: 'https://loja.com',
+        logoUrl: 'https://example.com/logo.png',
+        buttonLabel: 'Visitar',
+        highlightOnLogin: true,
+      );
+
+      final json = p.toJson();
+      expect(json['id'], 'p3');
+      expect(json['academy_id'], 'ac1');
+      expect(json['name'], 'Parceiro Completo');
+      expect(json['description'], 'Desc');
+      expect(json['url'], 'https://loja.com');
+      expect(json['logo_url'], 'https://example.com/logo.png');
+      expect(json['button_label'], 'Visitar');
+      expect(json['highlight_on_login'], isTrue);
+    });
   });
 }
