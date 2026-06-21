@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:viewer/app_theme.dart';
 import 'package:viewer/widgets/app_list_scaffold.dart';
 import 'package:viewer/widgets/game_background.dart';
 
@@ -78,6 +79,42 @@ void main() {
 
       expect(find.byType(GameBackground), findsOneWidget);
       expect(find.text('Conteúdo do jogo'), findsOneWidget);
+    });
+
+    testWidgets('renderiza com estilo game em modo claro', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData.light().copyWith(
+          extensions: const [AppThemeStyleExtension(isGameStyle: true)],
+        ),
+        home: const Scaffold(body: GameBackground(child: Text('Jogo claro'))),
+      ));
+      await tester.pump();
+
+      expect(find.byType(GameBackground), findsOneWidget);
+    });
+
+    testWidgets('renderiza com estilo game em modo escuro (gradiente)', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData.dark().copyWith(
+          extensions: const [AppThemeStyleExtension(isGameStyle: true)],
+        ),
+        home: const Scaffold(body: GameBackground(child: Text('Jogo escuro'))),
+      ));
+      await tester.pump();
+
+      expect(find.byType(GameBackground), findsOneWidget);
+    });
+
+    testWidgets('renderiza com estilo memo', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        theme: ThemeData.light().copyWith(
+          extensions: const [AppThemeStyleExtension(isGameStyle: false, isMemoStyle: true)],
+        ),
+        home: const Scaffold(body: GameBackground(child: Text('Memo'))),
+      ));
+      await tester.pump();
+
+      expect(find.byType(GameBackground), findsOneWidget);
     });
   });
 }
