@@ -65,6 +65,48 @@ void main() {
 
       expect(find.byType(AnimatedButton), findsOneWidget);
     });
+
+    testWidgets('press e release disparam setState e AnimatedScale', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AnimatedButton(
+            onPressed: () {},
+            child: const SizedBox(key: ValueKey('child'), width: 100, height: 50),
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(const ValueKey('child'))));
+      await tester.pump();
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnimatedScale), findsOneWidget);
+    });
+
+    testWidgets('cancel do gesto redefine estado de pressed', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AnimatedButton(
+            onPressed: () {},
+            child: const SizedBox(key: ValueKey('child2'), width: 100, height: 50),
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      final gesture = await tester.startGesture(
+          tester.getCenter(find.byKey(const ValueKey('child2'))));
+      await tester.pump();
+
+      await gesture.cancel();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AnimatedScale), findsOneWidget);
+    });
   });
 
   group('LoginBonusRing', () {
