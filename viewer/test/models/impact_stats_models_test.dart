@@ -3,7 +3,8 @@ import 'package:viewer/models/manual_trophy.dart';
 import 'package:viewer/models/professor_impact.dart';
 import 'package:viewer/models/user_academy_stats.dart';
 
-// Testes unitários para TrophyTemplate, ProfessorImpact e UserAcademyStats.
+// Testes unitários para TrophyTemplate, ChampionshipEvent, TrophyAward,
+// UserTrophyAwardsResponse, ProfessorImpact e UserAcademyStats.
 
 void main() {
   group('TrophyTemplate.fromJson', () {
@@ -104,6 +105,93 @@ void main() {
       });
 
       expect(s.daysSinceLastWorkout, isNull);
+    });
+  });
+
+  group('ChampionshipEvent.fromJson', () {
+    test('desserializa todos os campos', () {
+      final e = ChampionshipEvent.fromJson({
+        'id': 'ev1',
+        'academy_id': 'ac1',
+        'name': 'Copa Regional',
+        'location': 'São Paulo',
+        'event_date': '2024-08-15',
+        'created_at': '2024-06-01T00:00:00Z',
+      });
+
+      expect(e.id, 'ev1');
+      expect(e.name, 'Copa Regional');
+      expect(e.location, 'São Paulo');
+      expect(e.eventDate, '2024-08-15');
+    });
+
+    test('location pode ser nulo', () {
+      final e = ChampionshipEvent.fromJson({
+        'id': 'ev2',
+        'academy_id': 'ac1',
+        'name': 'Campeonato',
+        'event_date': '2024-09-01',
+      });
+
+      expect(e.location, isNull);
+    });
+  });
+
+  group('TrophyAward.fromJson', () {
+    test('desserializa todos os campos', () {
+      final a = TrophyAward.fromJson({
+        'id': 'aw1',
+        'template_id': 'tmpl1',
+        'template_name': 'Ouro',
+        'trophy_type': 'championship',
+        'user_id': 'u1',
+        'awarded_at': '2024-08-15T10:00:00Z',
+        'championship_event_name': 'Copa Regional',
+        'medal_type': 'gold',
+        'note': 'Campeão absoluto',
+      });
+
+      expect(a.id, 'aw1');
+      expect(a.templateName, 'Ouro');
+      expect(a.trophyType, 'championship');
+      expect(a.medalType, 'gold');
+      expect(a.note, 'Campeão absoluto');
+    });
+
+    test('usa defaults quando campos opcionais ausentes', () {
+      final a = TrophyAward.fromJson({
+        'id': 'aw2',
+        'template_id': 'tmpl1',
+        'template_name': 'Custom',
+        'user_id': 'u2',
+        'awarded_at': '2024-06-01T00:00:00Z',
+      });
+
+      expect(a.trophyType, 'custom');
+      expect(a.medalType, isNull);
+      expect(a.note, isNull);
+    });
+  });
+
+  group('UserTrophyAwardsResponse.fromJson', () {
+    Map<String, dynamic> _award(String id) => {
+          'id': id,
+          'template_id': 'tmpl1',
+          'template_name': 'Ouro',
+          'user_id': 'u1',
+          'awarded_at': '2024-08-15T10:00:00Z',
+        };
+
+    test('desserializa com listas de troféus', () {
+      final r = UserTrophyAwardsResponse.fromJson({
+        'user_id': 'u1',
+        'championship_awards': [_award('aw1')],
+        'custom_awards': [_award('aw2'), _award('aw3')],
+      });
+
+      expect(r.userId, 'u1');
+      expect(r.championshipAwards.length, 1);
+      expect(r.customAwards.length, 2);
     });
   });
 }
