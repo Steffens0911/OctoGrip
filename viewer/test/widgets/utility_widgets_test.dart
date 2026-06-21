@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:viewer/widgets/app_error_message.dart';
+import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/widgets/bottom_navigation_widget.dart';
 import 'package:viewer/widgets/schedule_card.dart';
@@ -18,6 +19,92 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+  });
+
+  group('AppFeedback.show', () {
+    testWidgets('exibe SnackBar de sucesso com mensagem', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => AppFeedback.show(
+                ctx,
+                message: 'Salvo com sucesso!',
+                type: AppFeedbackType.success,
+              ),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Abrir'));
+      await tester.pump();
+
+      expect(find.text('Salvo com sucesso!'), findsOneWidget);
+    });
+
+    testWidgets('exibe SnackBar de erro', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => AppFeedback.show(
+                ctx,
+                message: 'Ocorreu um erro!',
+                type: AppFeedbackType.error,
+              ),
+              child: const Text('Erro'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Erro'));
+      await tester.pump();
+
+      expect(find.text('Ocorreu um erro!'), findsOneWidget);
+    });
+
+    testWidgets('exibe SnackBar de warning', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => AppFeedback.show(
+                ctx,
+                message: 'Atenção!',
+                type: AppFeedbackType.warning,
+              ),
+              child: const Text('Aviso'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Aviso'));
+      await tester.pump();
+
+      expect(find.text('Atenção!'), findsOneWidget);
+    });
+
+    testWidgets('exibe SnackBar de info', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(
+          builder: (ctx) => Scaffold(
+            body: ElevatedButton(
+              onPressed: () => AppFeedback.show(
+                ctx,
+                message: 'Informação',
+                type: AppFeedbackType.info,
+              ),
+              child: const Text('Info'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Info'));
+      await tester.pump();
+
+      expect(find.text('Informação'), findsOneWidget);
+    });
   });
 
   group('AppErrorMessage', () {
