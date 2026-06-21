@@ -1,15 +1,17 @@
-from datetime import date
+from datetime import date, timedelta
 from io import StringIO
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response
+from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.app_time import today_in_app_tz
+from app.core.app_time import combine_local_date_start_utc, today_in_app_tz
 from app.core.exceptions import AppError, ForbiddenError
-from app.core.role_deps import require_admin_manager_or_supervisor, verify_academy_access
+from app.core.role_deps import require_admin_manager_or_supervisor, require_write_access, verify_academy_access
 from app.database import get_db
-from app.models import User
+from app.models import Academy, AttendanceRecord, AttendanceSession, User
 from app.schemas.metrics import (
     ActiveStudentsReportResponse,
     EngagementReportResponse,
@@ -26,6 +28,23 @@ from app.services.metrics_service import (
     get_technique_execution_summary,
     get_weekly_panel_logins_report,
 )
+
+
+class PunctualityStudentEntry(BaseModel):
+    student_id: UUID
+    name: str | None
+    punctuality_streak: int
+    punctuality_streak_best: int
+    punctual_count: int
+    late_count: int
+    total_checkins: int
+    punctuality_pct: float
+
+
+class PunctualityReportResponse(BaseModel):
+    academy_id: UUID
+    days: int
+    students: list[PunctualityStudentEntry]
 
 router = APIRouter()
 
@@ -290,4 +309,89 @@ async def reports_active_students_csv(
         content=csv_content,
         media_type="text/csv",
         headers={"Content-Disposition": 'attachment; filename="active_students.csv"'},
+    )
+
+
+@router.get("/punctuality", response_model=PunctualityReportResponse)
+async def reports_punctuality(
+    academy_id: UUID | None = Query(default=None),
+    days: int = Query(default=30, ge=7, le=90, description="Janela de análise em dias."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_write_access),
+):
+    """
+    Relatório de pontualidade por aluno nos últimos N dias.
+
+    Retorna contagem de check-ins pontuais/atrasados e o streak atual de cada aluno.
+    Acesso: professor, gerente ou admin.
+    """
+    target_academy_id = academy_id or current_user.academy_id
+    if not target_academy_id:
+        raise AppError("academy_id é obrigatório para este utilizador.", status_code=400)
+    verify_academy_access(current_user, str(target_academy_id))
+
+    cutoff_dt = combine_local_date_start_utc(today_in_app_tz() - timedelta(days=days))
+
+    # Alunos da academia com ao menos um check-in com was_punctual definido no período
+    rows = (
+        await db.execute(
+            select(
+                AttendanceRecord.user_id,
+                func.count(AttendanceRecord.id).filter(AttendanceRecord.was_punctual.is_(True)).label("punctual_count"),
+                func.count(AttendanceRecord.id).label("total_checkins"),
+            )
+            .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+            .where(
+                AttendanceSession.academy_id == target_academy_id,
+                AttendanceRecord.was_punctual.is_not(None),
+                AttendanceSession.starts_at >= cutoff_dt,
+            )
+            .group_by(AttendanceRecord.user_id)
+        )
+    ).all()
+
+    if not rows:
+        return PunctualityReportResponse(
+            academy_id=target_academy_id,
+            days=days,
+            students=[],
+        )
+
+    user_ids = [r[0] for r in rows]
+    users = (
+        await db.execute(
+            select(User).where(User.id.in_(user_ids), User.role == "aluno").order_by(User.name.asc().nulls_last())
+        )
+    ).scalars().all()
+    user_map = {u.id: u for u in users}
+
+    entries: list[PunctualityStudentEntry] = []
+    for row in rows:
+        uid, punctual_count_raw, total = row
+        user = user_map.get(uid)
+        if not user:
+            continue
+        punctual_count = int(punctual_count_raw or 0)
+        total_checkins = int(total or 0)
+        late_count = total_checkins - punctual_count
+        pct = round(punctual_count / total_checkins * 100, 1) if total_checkins else 0.0
+        entries.append(
+            PunctualityStudentEntry(
+                student_id=uid,
+                name=user.name,
+                punctuality_streak=user.punctuality_streak,
+                punctuality_streak_best=user.punctuality_streak_best,
+                punctual_count=punctual_count,
+                late_count=late_count,
+                total_checkins=total_checkins,
+                punctuality_pct=pct,
+            )
+        )
+
+    entries.sort(key=lambda e: -e.punctuality_pct)
+
+    return PunctualityReportResponse(
+        academy_id=target_academy_id,
+        days=days,
+        students=entries,
     )

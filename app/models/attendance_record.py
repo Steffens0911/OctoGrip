@@ -37,6 +37,12 @@ class AttendanceRecord(Base, UUIDMixin):
         default=False,
         comment="True quando o professor adicionou presença pelo modal manual; QR/scan usam false.",
     )
+    was_punctual: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True,
+        default=None,
+        comment="True=chegou antes/no horário do treino; False=atrasado; NULL=sem TrainingSession vinculado.",
+    )
 
     session: Mapped[AttendanceSession] = relationship(
         "AttendanceSession",

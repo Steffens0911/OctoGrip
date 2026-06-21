@@ -4,11 +4,19 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_stats.dart';
 import 'package:viewer/theme/fantasy_theme.dart';
 
-/// Grid 2×2 de estatísticas do aluno — layout horizontal: ícone | número + label.
+/// Grid de estatísticas do aluno — layout horizontal: ícone | número + label.
+/// Exibe card extra de pontualidade quando [punctualityStreak] > 0.
 class StudentStatsSection extends StatelessWidget {
-  const StudentStatsSection({super.key, required this.stats});
+  const StudentStatsSection({
+    super.key,
+    required this.stats,
+    this.punctualityStreak,
+    this.punctualityStreakBest,
+  });
 
   final TrainingStats stats;
+  final int? punctualityStreak;
+  final int? punctualityStreakBest;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +44,9 @@ class StudentStatsSection extends StatelessWidget {
             : days == 1
                 ? 'dia sem treinar'
                 : 'dias sem treinar';
+
+    final streak = punctualityStreak ?? 0;
+    final streakBest = punctualityStreakBest ?? 0;
 
     return Column(
       children: [
@@ -98,6 +109,33 @@ class StudentStatsSection extends StatelessWidget {
           ranking: stats.rankingVideosLast30Days,
           rankingOutOf: stats.rankingPositionsTotalOutOf,
         ),
+        if (streak > 0) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.alarm_on_rounded,
+                  iconColor: const Color(0xFF27AE60),
+                  value: '$streak',
+                  label: streak == 1 ? 'treino pontual seguido' : 'treinos pontuais seguidos',
+                  highlightBorder: streak >= 3,
+                ),
+              ),
+              if (streakBest > 1) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatCard(
+                    icon: Icons.emoji_events_rounded,
+                    iconColor: const Color(0xFFD4A017),
+                    value: '$streakBest',
+                    label: 'recorde de pontualidade',
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
       ],
     );
   }

@@ -8,6 +8,8 @@ import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/face_recognition.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:viewer/screens/academy/face_kiosk_screen.dart';
 import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -17,13 +19,22 @@ import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
+import 'package:viewer/models/pre_checkin.dart';
 import 'package:viewer/widgets/attendance_add_student_dialog.dart';
 
 class AttendanceSessionScreen extends StatefulWidget {
-  const AttendanceSessionScreen({super.key, this.sessionId});
+  const AttendanceSessionScreen({
+    super.key,
+    this.sessionId,
+    this.trainingSessionId,
+  });
 
   /// Quando informado, carrega a sessão existente em vez de exibir "Iniciar chamada".
   final String? sessionId;
+
+  /// Quando informado, vincula esta chamada ao treino lançado (pré-checkin).
+  /// Ao iniciar, pula o diálogo e vincula automaticamente.
+  final String? trainingSessionId;
 
   @override
   State<AttendanceSessionScreen> createState() =>
@@ -41,12 +52,14 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   bool _refreshingQr = false;
   List<AttendanceRecordModel> _records = [];
   Map<String, UserModel> _userById = {};
+  Set<String> _preConfirmedUserIds = {};
 
   bool _loading = true;
   bool _busy = false;
   bool _startingSession = false;
   bool _qrAttendanceEnabled = true;
   bool _faceRecognitionEnabled = false;
+  bool _faceCheckinEnabled = false;
   String? _faceJobId;
   bool _checkingFaceJob = false;
   String? _error;
@@ -274,6 +287,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             setState(() {
               _qrAttendanceEnabled = academy.qrAttendanceEnabled;
               _faceRecognitionEnabled = academy.faceRecognitionEnabled;
+              _faceCheckinEnabled = academy.faceCheckinEnabled;
             });
           }
         } catch (_) {}
@@ -310,6 +324,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             setState(() {
               _qrAttendanceEnabled = academy.qrAttendanceEnabled;
               _faceRecognitionEnabled = academy.faceRecognitionEnabled;
+              _faceCheckinEnabled = academy.faceCheckinEnabled;
             });
           }
         } catch (e) {
@@ -319,6 +334,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
         debugPrint('[AttendanceSession] session.academyId é null/vazio');
       }
       await _hydrateUsersForRecords(recs);
+      unawaited(_loadPreConfirmed());
       if (!mounted) return;
       if (isActive) {
         _startAutoRefresh();
@@ -344,6 +360,19 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   }
 
   Set<String> get _presentUserIds => _records.map((r) => r.userId).toSet();
+
+  Future<void> _loadPreConfirmed() async {
+    final tsId = widget.trainingSessionId ?? _session?.trainingSessionId;
+    if (tsId == null) return;
+    try {
+      final raw = await _api.getPreCheckinStatus(tsId);
+      final status = PreCheckinStatus.fromJson(raw);
+      if (!mounted) return;
+      setState(() {
+        _preConfirmedUserIds = status.confirmants.map((c) => c.userId).toSet();
+      });
+    } catch (_) {}
+  }
 
   Future<void> _addStudentDialog() async {
     final session = _session;
@@ -420,31 +449,36 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
 
   Future<void> _startSession() async {
     if (_busy) return;
-    final titleCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Iniciar chamada'),
-        content: TextField(
-          controller: titleCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Título (opcional)',
-            hintText: 'Ex.: Treino 19h',
+
+    String? title;
+    // Quando vinculado a um treino, pula o diálogo e inicia direto.
+    if (widget.trainingSessionId == null) {
+      final titleCtrl = TextEditingController();
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Iniciar chamada'),
+          content: TextField(
+            controller: titleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Título (opcional)',
+              hintText: 'Ex.: Treino 19h',
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancelar')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Iniciar')),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Iniciar')),
-        ],
-      ),
-    );
-    final title = titleCtrl.text.trim();
-    titleCtrl.dispose();
-    if (ok != true) return;
+      );
+      title = titleCtrl.text.trim();
+      titleCtrl.dispose();
+      if (ok != true) return;
+    }
 
     setState(() {
       _busy = true;
@@ -452,7 +486,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
     });
     try {
       final s = await _api.createAttendanceSession(
-          title: title.isEmpty ? null : title, expiresInMinutes: 20);
+        title: (title?.isEmpty ?? true) ? null : title,
+        expiresInMinutes: 20,
+        trainingSessionId: widget.trainingSessionId,
+      );
       if (!mounted) return;
       setState(() {
         _session = s;
@@ -462,6 +499,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       });
       _startAutoRefresh();
       _startLive(s.id);
+      unawaited(_loadPreConfirmed());
       final recsFuture = _api.getAttendanceSessionRecordsAll(s.id);
       if (_qrAttendanceEnabled) {
         _startQrHeartbeat();
@@ -560,6 +598,28 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   }
 
   // ── Reconhecimento facial ──────────────────────────────────
+
+  void _openFaceKiosk() {
+    final s = _session;
+    if (s == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FaceKioskScreen(
+          sessionId: s.id,
+          captureFrame: () async {
+            final img = await ImagePicker().pickImage(
+              source: ImageSource.camera,
+              imageQuality: 85,
+              maxWidth: 640,
+            );
+            if (img == null) return null;
+            return img.readAsBytes();
+          },
+          onFaceArrive: (bytes) => _api.faceArrive(s.id, bytes),
+        ),
+      ),
+    );
+  }
 
   Future<void> _openFaceRecognitionFlow() async {
     final session = _session;
@@ -685,7 +745,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          if (_faceRecognitionEnabled || _faceJobId != null)
+          if (_faceRecognitionEnabled || _faceCheckinEnabled || _faceJobId != null)
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -695,6 +755,12 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                     onPressed: _busy ? null : _openFaceRecognitionFlow,
                     icon: const Icon(Icons.camera_alt_rounded),
                     label: const Text('Chamada por foto'),
+                  ),
+                if (_faceCheckinEnabled)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _openFaceKiosk,
+                    icon: const Icon(Icons.face_outlined),
+                    label: const Text('Quiosque facial'),
                   ),
                 if (_faceJobId != null)
                   OutlinedButton.icon(
@@ -873,17 +939,40 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                   'face_recognition' || 'face' => 'Facial',
                   _ => r.method,
                 };
+                final preConfirmed = _preConfirmedUserIds.contains(r.userId);
                 return ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.check_circle_rounded,
                       color: AppTheme.primary),
                   title: Text(label,
                       maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(
-                    '${_fmt(r.checkedInAt)} · $methodLabel',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondaryOf(context),
+                  subtitle: Row(
+                    children: [
+                      Text(
+                        '${_fmt(r.checkedInAt)} · $methodLabel',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                      ),
+                      if (preConfirmed) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1D9E75).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            '✓ confirmou',
+                            style: TextStyle(
+                              color: Color(0xFF1D9E75),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
+                      ],
+                    ],
                   ),
                   trailing: IconButton(
                     tooltip: 'Remover presença',

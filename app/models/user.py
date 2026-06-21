@@ -86,6 +86,18 @@ class User(Base, UUIDMixin):
         nullable=True,
         comment="URL privada da foto 3x4 usada exclusivamente pelo reconhecimento facial; não exposta a outros usuários.",
     )
+    punctuality_streak: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Sequência atual de check-ins pontuais em treinos lançados.",
+    )
+    punctuality_streak_best: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        comment="Recorde pessoal de streak de pontualidade.",
+    )
 
     academy: Mapped[Academy | None] = relationship(
         "Academy",

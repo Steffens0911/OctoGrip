@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:viewer/screens/student/trophy_gallery_screen.dart';
+import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 
@@ -48,16 +48,24 @@ Map<String, dynamic> _trophy({
 Widget _screen({String userId = 'u-test'}) => MaterialApp(
       home: ChangeNotifierProvider<AuthService>.value(
         value: AuthService(),
-        child: TrophyGalleryScreen(userId: userId, userName: 'Fulano'),
+        child: TrophyShelfPage(userId: userId, userName: 'Fulano'),
       ),
     );
 
-/// Dispatch de mock GET por caminho de URL.
 http.Response _dispatch(Uri uri) {
   final p = uri.path;
   if (p.contains('/manual-trophies/awards/user/')) return _json(_manualEmpty());
   if (p.contains('/trophies/user/')) return _json([_trophy()]);
   return _json([]);
+}
+
+// TrophyShelfPage usa AnimationController.repeat() — pumpAndSettle trava.
+// Usamos pumps sequenciais para deixar a API mock resolver.
+Future<void> _pumpShelf(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 100));
 }
 
 void main() {
@@ -77,8 +85,7 @@ void main() {
     clearAuthForTesting();
   });
 
-  // ---- Galeria carregada ----
-  group('TrophyGalleryScreen — conteúdo', () {
+  group('TrophyShelfPage — conteúdo', () {
     testWidgets('renderiza nome do troféu após carregar', (tester) async {
       final client = MockHttpClient();
       when(() => client.get(any(), headers: any(named: 'headers')))
@@ -87,12 +94,12 @@ void main() {
       ApiService().setHttpClientForTesting(client);
 
       await tester.pumpWidget(_screen());
-      await tester.pumpAndSettle();
+      await _pumpShelf(tester);
 
       expect(find.textContaining('Armlock'), findsWidgets);
     });
 
-    testWidgets('galeria vazia não exibe cards de troféu', (tester) async {
+    testWidgets('galeria vazia não exibe indicador de carregamento', (tester) async {
       final client = MockHttpClient();
       when(() => client.get(any(), headers: any(named: 'headers')))
           .thenAnswer((inv) async {
@@ -104,13 +111,12 @@ void main() {
       ApiService().setHttpClientForTesting(client);
 
       await tester.pumpWidget(_screen());
-      await tester.pumpAndSettle();
+      await _pumpShelf(tester);
 
-      // Com lista vazia, não há cards de troféu
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
-    testWidgets('troféu conquistado (gold) é exibido com tier', (tester) async {
+    testWidgets('troféu conquistado (gold) é exibido sem indicador de carregamento', (tester) async {
       final client = MockHttpClient();
       when(() => client.get(any(), headers: any(named: 'headers')))
           .thenAnswer((inv) async {
@@ -124,35 +130,31 @@ void main() {
       ApiService().setHttpClientForTesting(client);
 
       await tester.pumpWidget(_screen());
-      await tester.pumpAndSettle();
+      await _pumpShelf(tester);
 
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
   });
 
-  // ---- Erro 403 (galeria privada) ----
-  group('TrophyGalleryScreen — galeria privada', () {
+  group('TrophyShelfPage — galeria privada', () {
     testWidgets('exibe mensagem de privacidade quando recebe 403', (tester) async {
       final client = MockHttpClient();
       when(() => client.get(any(), headers: any(named: 'headers')))
           .thenAnswer((inv) async {
         final p = (inv.positionalArguments[0] as Uri).path;
-        // manual-trophies deve retornar 200 para evitar ApiException não-aguardada
         if (p.contains('/manual-trophies/')) return _json(_manualEmpty());
-        // Galeria de troféus retorna 403 → screen seta "Esta galeria está privada."
         return _json({'detail': 'Forbidden'}, 403);
       });
       ApiService().setHttpClientForTesting(client);
 
       await tester.pumpWidget(_screen(userId: 'outro-user'));
-      await tester.pumpAndSettle();
+      await _pumpShelf(tester);
 
       expect(find.text('Esta galeria está privada.'), findsOneWidget);
     });
   });
 
-  // ---- Campo de busca ----
-  group('TrophyGalleryScreen — busca', () {
+  group('TrophyShelfPage — busca', () {
     testWidgets('campo de busca está presente após carregar', (tester) async {
       final client = MockHttpClient();
       when(() => client.get(any(), headers: any(named: 'headers')))
@@ -161,7 +163,7 @@ void main() {
       ApiService().setHttpClientForTesting(client);
 
       await tester.pumpWidget(_screen());
-      await tester.pumpAndSettle();
+      await _pumpShelf(tester);
 
       expect(find.byType(TextField), findsAtLeastNWidgets(1));
     });

@@ -328,6 +328,7 @@ async def attendance_sessions_list(
             ends_at=s.ends_at,
             expires_at=s.expires_at,
             present_count=count,
+            training_session_id=s.training_session_id,
         )
         for s, count in rows
     ]
@@ -344,6 +345,7 @@ async def attendance_session_create(
         current_user=current_user,
         title=body.title,
         expires_in_minutes=body.expires_in_minutes or 20,
+        training_session_id=body.training_session_id,
     )
     return AttendanceSessionRead(
         id=s.id,
@@ -355,6 +357,7 @@ async def attendance_session_create(
         ends_at=s.ends_at,
         expires_at=s.expires_at,
         present_count=0,
+        training_session_id=s.training_session_id,
     )
 
 
@@ -376,6 +379,7 @@ async def attendance_session_close(
         ends_at=s.ends_at,
         expires_at=s.expires_at,
         present_count=count,
+        training_session_id=s.training_session_id,
     )
 
 
@@ -474,6 +478,7 @@ async def attendance_session_get(
         ends_at=s.ends_at,
         expires_at=s.expires_at,
         present_count=count,
+        training_session_id=s.training_session_id,
     )
 
 

@@ -25,6 +25,12 @@ class AttendanceSession(Base, UUIDMixin):
         nullable=False,
         index=True,
     )
+    training_session_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("training_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Treino lançado vinculado a esta chamada (pré-checkin).",
+    )
     status: Mapped[str] = mapped_column(
         String(16),
         nullable=False,
@@ -47,4 +53,9 @@ class AttendanceSession(Base, UUIDMixin):
         back_populates="session",
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+    training_session: Mapped[TrainingSession | None] = relationship(
+        "TrainingSession",
+        foreign_keys=[training_session_id],
+        lazy="raise",
     )

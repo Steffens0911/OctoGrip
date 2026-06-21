@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.at_risk_tasks",
         "app.tasks.streak_tasks",
         "app.tasks.manual_trophy_tasks",
+        "app.tasks.pre_checkin_tasks",
     ],
 )
 
@@ -69,6 +70,10 @@ celery_app.conf.update(
         "expire-photo-restrictions": {
             "task": "app.tasks.photo_tasks.expire_photo_restrictions",
             "schedule": crontab(minute="*/30"),
+        },
+        "pre-checkin-reminder": {
+            "task": "app.tasks.pre_checkin_tasks.send_pre_checkin_reminder",
+            "schedule": crontab(hour=21, minute=0),  # 18h Brasília (UTC-3)
         },
     },
 )

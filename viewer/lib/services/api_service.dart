@@ -12,6 +12,7 @@ import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/models/academy_student_list_item.dart';
 import 'package:viewer/models/active_students_report.dart';
 import 'package:viewer/models/engagement_report.dart';
+import 'package:viewer/models/face_checkin.dart';
 import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/models/global_partner.dart';
 import 'package:viewer/models/lesson.dart';
@@ -821,6 +822,10 @@ class ApiService {
     bool? qrAttendanceEnabled,
     bool? octophotosEnabled,
     int? userPhotosQuota,
+    bool? preCheckinEnabled,
+    bool? preCheckinStrict,
+    bool? faceCheckinEnabled,
+    int? punctualityXp,
   }) async {
     final body = <String, dynamic>{};
     if (name != null) body['name'] = name;
@@ -848,6 +853,18 @@ class ApiService {
     }
     if (userPhotosQuota != null) {
       body['user_photos_quota'] = userPhotosQuota;
+    }
+    if (preCheckinEnabled != null) {
+      body['pre_checkin_enabled'] = preCheckinEnabled;
+    }
+    if (preCheckinStrict != null) {
+      body['pre_checkin_strict'] = preCheckinStrict;
+    }
+    if (faceCheckinEnabled != null) {
+      body['face_checkin_enabled'] = faceCheckinEnabled;
+    }
+    if (punctualityXp != null) {
+      body['punctuality_xp'] = punctualityXp;
     }
     if (body.isEmpty) return getAcademy(id);
     final r = await _req(_client.patch(
@@ -996,11 +1013,12 @@ class ApiService {
   // --- Attendance (Chamada por QR) ---
 
   Future<AttendanceSessionModel> createAttendanceSession(
-      {String? title, int? expiresInMinutes}) async {
+      {String? title, int? expiresInMinutes, String? trainingSessionId}) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions');
     final body = <String, dynamic>{};
     if (title != null) body['title'] = title;
     if (expiresInMinutes != null) body['expires_in_minutes'] = expiresInMinutes;
+    if (trainingSessionId != null) body['training_session_id'] = trainingSessionId;
     final r = await _req(_client.post(uri,
         headers: await _jsonHeaders(auth: true), body: jsonEncode(body)));
     final data = await _decodeResponse(r);
@@ -2412,6 +2430,183 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     invalidateCache('GET:$baseUrl/mission_today/week');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Training sessions (pré-checkin)
+  // ---------------------------------------------------------------------------
+
+  Future<List<Map<String, dynamic>>> getTrainingTemplates(String academyId) async {
+    final r = await _req(_client.get(
+      Uri.parse('$baseUrl/academies/$academyId/training-templates'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createTrainingTemplate(
+    String academyId, {
+    String? label,
+    required String startTime,
+    int toleranceMinutes = 15,
+    int sortOrder = 0,
+  }) async {
+    final body = <String, dynamic>{
+      'start_time': startTime,
+      'tolerance_minutes': toleranceMinutes,
+      'sort_order': sortOrder,
+    };
+    if (label != null && label.isNotEmpty) body['label'] = label;
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/$academyId/training-templates'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteTrainingTemplate(String templateId) async {
+    final r = await _req(_client.delete(
+      Uri.parse('$baseUrl/academies/training-templates/$templateId'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  Future<List<Map<String, dynamic>>> getTrainingSessions(
+    String academyId, {
+    String? classDate,
+    String? status,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final params = <String, String>{
+      'limit': '$limit',
+      'offset': '$offset',
+    };
+    if (classDate != null) params['class_date'] = classDate;
+    if (status != null) params['status'] = status;
+    final r = await _req(_client.get(
+      Uri.parse('$baseUrl/academies/$academyId/training-sessions')
+          .replace(queryParameters: params),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<List<Map<String, dynamic>>> getTrainingSessionsToday(String academyId) async {
+    final r = await _req(_client.get(
+      Uri.parse('$baseUrl/academies/$academyId/training-sessions/today'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data as List).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createTrainingSession(
+    String academyId, {
+    required String classDate,
+    required String startTime,
+    int toleranceMinutes = 15,
+    String? label,
+    String? templateId,
+  }) async {
+    final body = <String, dynamic>{
+      'class_date': classDate,
+      'start_time': startTime,
+      'tolerance_minutes': toleranceMinutes,
+    };
+    if (label != null && label.isNotEmpty) body['label'] = label;
+    if (templateId != null) body['template_id'] = templateId;
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/$academyId/training-sessions'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(body),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> openTrainingSession(String sessionId) async {
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/open'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> closeTrainingSession(String sessionId) async {
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/close'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteTrainingSession(String sessionId) async {
+    final r = await _req(_client.delete(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  // -------------------------------------------------------------------------
+  // Pré-checkin
+  // -------------------------------------------------------------------------
+
+  Future<Map<String, dynamic>> getPreCheckinStatus(String sessionId) async {
+    final r = await _req(_client.get(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/pre-checkin'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> confirmPreCheckin(String sessionId) async {
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/pre-checkin/confirm'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> cancelPreCheckin(String sessionId) async {
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/pre-checkin/cancel'),
+      headers: await _jsonHeaders(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getTrainingSessionSummary(String sessionId) async {
+    final r = await _req(_client.get(
+      Uri.parse('$baseUrl/academies/training-sessions/$sessionId/summary'),
+      headers: await _headers(auth: true),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return data as Map<String, dynamic>;
   }
 
   Future<List<WeeklyKitRead>> getWeeklyKits(String academyId) async {
@@ -4211,6 +4406,28 @@ class ApiService {
       offset += pageSize;
     }
     return all;
+  }
+
+  /// Quiosque facial: envia frame e recebe resultado de check-in em tempo real.
+  Future<FaceArriveResponse> faceArrive(
+    String sessionId,
+    Uint8List frame,
+  ) async {
+    final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/face-arrive');
+    final request = http.MultipartRequest('POST', uri);
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'frame',
+        frame,
+        filename: 'frame.jpg',
+        contentType: MediaType('image', 'jpeg'),
+      ),
+    );
+    final streamed = await _client.send(request);
+    final response = await http.Response.fromStream(streamed);
+    final data = await _decodeResponse(response);
+    _throwIfNotOk(response, data);
+    return FaceArriveResponse.fromJson(data! as Map<String, dynamic>);
   }
 
 }

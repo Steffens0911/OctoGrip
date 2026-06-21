@@ -15,6 +15,10 @@ class AttendanceSessionCreate(BaseModel):
         le=180,
         description="Tempo total (min) em que a sessão permanece ativa se não for encerrada manualmente.",
     )
+    training_session_id: UUID | None = Field(
+        default=None,
+        description="Treino lançado a vincular a esta chamada (pré-checkin). Opcional.",
+    )
 
 
 class AttendanceSessionRead(BaseModel):
@@ -27,6 +31,7 @@ class AttendanceSessionRead(BaseModel):
     ends_at: datetime | None = None
     expires_at: datetime | None = None
     present_count: int = 0
+    training_session_id: UUID | None = None
 
 
 class QrTokenOut(BaseModel):

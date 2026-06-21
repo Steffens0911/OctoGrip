@@ -49,6 +49,10 @@ class AcademyRead(BaseModel):
     qr_attendance_enabled: bool = True
     octophotos_enabled: bool = False
     user_photos_quota: int = 30
+    pre_checkin_enabled: bool = False
+    pre_checkin_strict: bool = False
+    face_checkin_enabled: bool = False
+    punctuality_xp: int = 15
     updated_at: datetime | None = None
 
     class Config:
@@ -92,6 +96,10 @@ class AcademyUpdate(BaseModel):
     qr_attendance_enabled: bool | None = None
     octophotos_enabled: bool | None = None
     user_photos_quota: int | None = Field(None, ge=1, le=9999)
+    pre_checkin_enabled: bool | None = None
+    pre_checkin_strict: bool | None = None
+    face_checkin_enabled: bool | None = None
+    punctuality_xp: int | None = Field(None, ge=0, le=100)
 
 
 class RankingEntry(BaseModel):

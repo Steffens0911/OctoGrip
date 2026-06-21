@@ -181,6 +181,10 @@ def _academy_to_read(a: Academy) -> AcademyRead:
         qr_attendance_enabled=a.qr_attendance_enabled,
         octophotos_enabled=a.octophotos_enabled,
         user_photos_quota=a.user_photos_quota,
+        pre_checkin_enabled=a.pre_checkin_enabled,
+        pre_checkin_strict=a.pre_checkin_strict,
+        face_checkin_enabled=a.face_checkin_enabled,
+        punctuality_xp=a.punctuality_xp,
         updated_at=getattr(a, "updated_at", None),
     )
 
@@ -348,6 +352,7 @@ async def academy_update(
         updates.pop("qr_attendance_enabled", None)
         updates.pop("octophotos_enabled", None)
         updates.pop("user_photos_quota", None)
+        updates.pop("pre_checkin_enabled", None)
     academy = await update_academy(db, academy_id, audit_user_id=current_user.id, **updates)
     if not academy:
         raise AcademyNotFoundError()

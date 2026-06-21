@@ -26,6 +26,8 @@ from app.models.student_face_embedding import StudentFaceEmbedding
 from app.models.technique import Technique
 from app.models.technique_execution import TechniqueExecution
 from app.models.training_feedback import TrainingFeedback
+from app.models.training_pre_checkin import TrainingPreCheckin
+from app.models.training_session import TrainingSession, TrainingTemplate
 from app.models.training_video import TrainingVideo, TrainingVideoDailyView
 from app.models.trophy import Trophy
 from app.models.user import User
@@ -78,4 +80,7 @@ __all__ = [
     "EnrollmentInvite",
     "PendingEnrollment",
     "PasswordResetToken",
+    "TrainingTemplate",
+    "TrainingSession",
+    "TrainingPreCheckin",
 ]

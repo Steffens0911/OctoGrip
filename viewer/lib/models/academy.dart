@@ -30,6 +30,10 @@ class Academy {
   final bool qrAttendanceEnabled;
   final bool octophotosEnabled;
   final int userPhotosQuota;
+  final bool preCheckinEnabled;
+  final bool preCheckinStrict;
+  final bool faceCheckinEnabled;
+  final int punctualityXp;
   final String? updatedAt;
 
   Academy({
@@ -62,6 +66,10 @@ class Academy {
     this.qrAttendanceEnabled = true,
     this.octophotosEnabled = false,
     this.userPhotosQuota = 30,
+    this.preCheckinEnabled = false,
+    this.preCheckinStrict = false,
+    this.faceCheckinEnabled = false,
+    this.punctualityXp = 15,
     this.updatedAt,
   });
 
@@ -97,6 +105,10 @@ class Academy {
       qrAttendanceEnabled: json['qr_attendance_enabled'] as bool? ?? true,
       octophotosEnabled: json['octophotos_enabled'] as bool? ?? false,
       userPhotosQuota: json['user_photos_quota'] as int? ?? 30,
+      preCheckinEnabled: json['pre_checkin_enabled'] as bool? ?? false,
+      preCheckinStrict: json['pre_checkin_strict'] as bool? ?? false,
+      faceCheckinEnabled: json['face_checkin_enabled'] as bool? ?? false,
+      punctualityXp: json['punctuality_xp'] as int? ?? 15,
       updatedAt: json['updated_at'] as String?,
     );
   }
@@ -123,6 +135,10 @@ class Academy {
         'qr_attendance_enabled': qrAttendanceEnabled,
         'octophotos_enabled': octophotosEnabled,
         'user_photos_quota': userPhotosQuota,
+        'pre_checkin_enabled': preCheckinEnabled,
+        'pre_checkin_strict': preCheckinStrict,
+        'face_checkin_enabled': faceCheckinEnabled,
+        'punctuality_xp': punctualityXp,
         'updated_at': updatedAt,
       };
 }

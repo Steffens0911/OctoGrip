@@ -17,6 +17,12 @@ class UserModel {
   final bool accountFrozen;
   final String? accountFreezeReason;
 
+  /// Sequência atual de check-ins pontuais em treinos lançados.
+  final int punctualityStreak;
+
+  /// Recorde pessoal de streak de pontualidade.
+  final int punctualityStreakBest;
+
   UserModel({
     required this.id,
     required this.email,
@@ -31,6 +37,8 @@ class UserModel {
     this.loginStreakDays = 0,
     this.accountFrozen = false,
     this.accountFreezeReason,
+    this.punctualityStreak = 0,
+    this.punctualityStreakBest = 0,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -48,6 +56,8 @@ class UserModel {
       loginStreakDays: json['login_streak_days'] as int? ?? 0,
       accountFrozen: json['account_frozen'] as bool? ?? false,
       accountFreezeReason: json['account_freeze_reason'] as String?,
+      punctualityStreak: json['punctuality_streak'] as int? ?? 0,
+      punctualityStreakBest: json['punctuality_streak_best'] as int? ?? 0,
     );
   }
 
@@ -65,5 +75,7 @@ class UserModel {
         'login_streak_days': loginStreakDays,
         'account_frozen': accountFrozen,
         'account_freeze_reason': accountFreezeReason,
+        'punctuality_streak': punctualityStreak,
+        'punctuality_streak_best': punctualityStreakBest,
       };
 }

@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:viewer/screens/notifications_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
+import 'package:viewer/screens/student/training_videos_section.dart';
 import 'package:viewer/services/api_service.dart';
 
 import '../helpers/mock_api_service.dart';
@@ -149,6 +150,61 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(MarketplaceScreen), findsNothing);
+    });
+  });
+
+  // ---- video_new ----
+
+  group('NotificationsScreen — video_new', () {
+    final videoNotif = _notif(
+      type: 'video_new',
+      title: 'Novo vídeo diário! 🎬',
+      body: 'Seu vídeo de treinamento de hoje está disponível.',
+    );
+
+    testWidgets('exibe emoji 🎬', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(notifs: [videoNotif]));
+
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+
+      expect(find.text('🎬'), findsOneWidget);
+    });
+
+    testWidgets('é incluído no filtro "Vídeos"', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(notifs: [videoNotif]));
+
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Vídeos'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Novo vídeo diário! 🎬'), findsOneWidget);
+    });
+
+    testWidgets('NÃO aparece no filtro "Missões"', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(notifs: [videoNotif]));
+
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Missões'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Novo vídeo diário! 🎬'), findsNothing);
+    });
+
+    testWidgets('tap abre TrainingVideosSection', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(notifs: [videoNotif]));
+
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Novo vídeo diário! 🎬'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TrainingVideosSection), findsOneWidget);
     });
   });
 }

@@ -9,6 +9,7 @@ import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/execution_confirm_sheet.dart';
 import 'package:viewer/widgets/opponent_picker_sheet.dart';
+import 'package:viewer/widgets/youtube_player_embed.dart';
 // ─────────────────────────────────────────────────────────────
 //  OCTO DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────
@@ -80,12 +81,15 @@ class TrophyShelfPage extends StatefulWidget {
 class _TrophyShelfPageState extends State<TrophyShelfPage>
     with TickerProviderStateMixin {
   final _api = ApiService();
+  final _searchController = TextEditingController();
   List<TrophyWithEarned> _all = [];
   bool _loading = true;
   String? _error;
 
   String? _filterKind; // null / 'medal' / 'trophy'
+  String? _filterTier; // null / 'to_conquer' / 'bronze' / 'silver' / 'gold'
   String  _sortBy = 'tier'; // 'tier' | 'unlocked' | 'name'
+  bool _galleryVisible = true;
 
   late final AnimationController _pulse;
 
@@ -99,6 +103,9 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
+    _galleryVisible = AuthService().currentUser?.galleryVisible ?? true;
+    _searchController.addListener(() => setState(() {}));
+
     if (widget.trophies != null) {
       _all     = widget.trophies!;
       _loading = false;
@@ -110,6 +117,7 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
   @override
   void dispose() {
     _pulse.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -139,9 +147,21 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
   }
 
   List<TrophyWithEarned> get _filtered {
+    final q = _searchController.text.trim().toLowerCase();
     var list = _all.where((t) {
-      if (_filterKind == null) return true;
-      return t.awardKind == _filterKind;
+      if (_filterKind != null && t.awardKind != _filterKind) return false;
+      if (_filterTier == 'to_conquer' && t.unlocked) return false;
+      if (_filterTier == 'bronze' && t.earnedTier != 'bronze') return false;
+      if (_filterTier == 'silver' && t.earnedTier != 'silver') return false;
+      if (_filterTier == 'gold' && t.earnedTier != 'gold') return false;
+      if (q.isNotEmpty) {
+        final name  = t.name.toLowerCase();
+        final tech  = (t.techniqueName ?? '').toLowerCase();
+        final note  = (t.awardNote ?? '').toLowerCase();
+        final event = (t.championshipEventName ?? '').toLowerCase();
+        if (!name.contains(q) && !tech.contains(q) && !note.contains(q) && !event.contains(q)) return false;
+      }
+      return true;
     }).toList();
 
     list.sort((a, b) {
@@ -149,7 +169,6 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
         if (a.unlocked != b.unlocked) return a.unlocked ? -1 : 1;
       }
       if (_sortBy == 'name') return a.name.compareTo(b.name);
-      // tier: gold > silver > bronze > locked
       const order = {'gold': 0, 'silver': 1, 'bronze': 2, null: 3};
       if (a.unlocked != b.unlocked) return a.unlocked ? -1 : 1;
       return (order[a.earnedTier] ?? 3).compareTo(order[b.earnedTier] ?? 3);
@@ -158,7 +177,6 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
   }
 
   int get _earnedCount => _all.where((t) => t.unlocked).length;
-  int get _goldCount   => _all.where((t) => t.earnedTier == 'gold').length;
 
   // ── BUILD ───────────────────────────────────────────────
 
@@ -319,18 +337,92 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
   Widget _buildFilters() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _OctoChip(label: 'Todos',    selected: _filterKind == null,
-              onTap: () => setState(() => _filterKind = null)),
-          const SizedBox(width: 8),
-          _OctoChip(label: 'Medalhas', icon: Icons.military_tech_rounded,
-              selected: _filterKind == 'medal',
-              onTap: () => setState(() => _filterKind = _filterKind == 'medal' ? null : 'medal')),
-          const SizedBox(width: 8),
-          _OctoChip(label: 'Troféus',  icon: Icons.emoji_events_rounded,
-              selected: _filterKind == 'trophy',
-              onTap: () => setState(() => _filterKind = _filterKind == 'trophy' ? null : 'trophy')),
+          // Busca
+          Container(
+            decoration: BoxDecoration(
+              color: _C.card,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _C.border),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 14, color: _C.textPri),
+              decoration: InputDecoration(
+                hintText: 'Buscar por nome ou técnica',
+                hintStyle: const TextStyle(fontSize: 14, color: _C.textSec),
+                prefixIcon: const Icon(Icons.search, color: _C.textSec, size: 20),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: _C.textSec, size: 18),
+                        onPressed: () => _searchController.clear(),
+                      )
+                    : null,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Toggle galeria visível (só quando é a própria galeria)
+          if (_isOwn)
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _C.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _C.border),
+              ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Galeria visível para outros', style: TextStyle(fontSize: 13, color: _C.textPri)),
+                  ),
+                  Switch(
+                    value: _galleryVisible,
+                    onChanged: _onGalleryVisibleChanged,
+                    activeThumbColor: _C.green,
+                    activeTrackColor: _C.green.withValues(alpha: 0.35),
+                    inactiveThumbColor: _C.textSec,
+                    inactiveTrackColor: _C.border,
+                  ),
+                ],
+              ),
+            ),
+          // Chips tipo (Medalha / Troféu)
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _OctoChip(label: 'Todos', selected: _filterKind == null,
+                  onTap: () => setState(() => _filterKind = null)),
+              _OctoChip(label: 'Medalhas', icon: Icons.military_tech_rounded,
+                  selected: _filterKind == 'medal',
+                  onTap: () => setState(() => _filterKind = _filterKind == 'medal' ? null : 'medal')),
+              _OctoChip(label: 'Troféus', icon: Icons.emoji_events_rounded,
+                  selected: _filterKind == 'trophy',
+                  onTap: () => setState(() => _filterKind = _filterKind == 'trophy' ? null : 'trophy')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // Chips tier
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _OctoChip(label: 'A conquistar', selected: _filterTier == 'to_conquer',
+                  onTap: () => setState(() => _filterTier = _filterTier == 'to_conquer' ? null : 'to_conquer')),
+              _OctoChip(label: 'Bronze', selected: _filterTier == 'bronze', color: _C.green,
+                  onTap: () => setState(() => _filterTier = _filterTier == 'bronze' ? null : 'bronze')),
+              _OctoChip(label: 'Prata', selected: _filterTier == 'silver', color: _C.blue,
+                  onTap: () => setState(() => _filterTier = _filterTier == 'silver' ? null : 'silver')),
+              _OctoChip(label: 'Ouro', selected: _filterTier == 'gold', color: _C.gold,
+                  onTap: () => setState(() => _filterTier = _filterTier == 'gold' ? null : 'gold')),
+            ],
+          ),
         ],
       ),
     );
@@ -359,6 +451,68 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
     );
   }
 
+  // ── GALLERY TOGGLE ──────────────────────────────────────
+
+  Future<void> _onGalleryVisibleChanged(bool value) async {
+    setState(() => _galleryVisible = value);
+    try {
+      await _api.patchMeGalleryVisible(value);
+      await AuthService().refreshMe();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _galleryVisible = !value);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(userFacingMessage(e))),
+        );
+      }
+    }
+  }
+
+  // ── VIDEO ────────────────────────────────────────────────
+
+  void _showVideo(TrophyWithEarned t) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: _C.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.65,
+        minChildSize: 0.4,
+        maxChildSize: 0.92,
+        expand: false,
+        builder: (_, sc) => ListView(
+          controller: sc,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: _C.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              t.techniqueName ?? t.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _C.textPri),
+            ),
+            if (t.techniqueName != null && t.techniqueName!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(t.name, style: const TextStyle(fontSize: 12, color: _C.textSec)),
+            ],
+            const SizedBox(height: 16),
+            YoutubePlayerEmbed(videoUrl: t.techniqueVideoUrl!, reelsMode: false),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── DETAIL SHEET ────────────────────────────────────────
 
   void _showDetail(TrophyWithEarned t) {
@@ -372,6 +526,7 @@ class _TrophyShelfPageState extends State<TrophyShelfPage>
         onIndicateOpponent: _isOwn && t.unlocked && !t.isManualAward && (t.academyId?.isNotEmpty ?? false)
             ? () => _indicateOpponent(t)
             : null,
+        onWatchVideo: (t.techniqueVideoUrl?.isNotEmpty ?? false) ? () => _showVideo(t) : null,
       ),
     );
   }
@@ -578,8 +733,9 @@ class _DetailSheet extends StatelessWidget {
   final TrophyWithEarned trophy;
   final bool isOwn;
   final VoidCallback? onIndicateOpponent;
+  final VoidCallback? onWatchVideo;
 
-  const _DetailSheet({required this.trophy, required this.isOwn, this.onIndicateOpponent});
+  const _DetailSheet({required this.trophy, required this.isOwn, this.onIndicateOpponent, this.onWatchVideo});
 
   static String _fmtDate(String iso) {
     final d = DateTime.tryParse(iso);
@@ -675,6 +831,17 @@ class _DetailSheet extends StatelessWidget {
             ],
           ],
           const SizedBox(height: 16),
+          // unlock requirements (locked items only)
+          if (!t.unlocked) ...[
+            if (t.minRewardLevelToUnlock > 0)
+              _UnlockRow(icon: Icons.lock_outline, label: 'Alcance o nível ${t.minRewardLevelToUnlock} para desbloquear'),
+            if (t.minGraduationToUnlock != null && t.minGraduationToUnlock!.isNotEmpty)
+              _UnlockRow(
+                icon: Icons.shield_outlined,
+                label: 'Requer faixa mínima: ${TrophyWithEarned.graduationLabel(t.minGraduationToUnlock) ?? t.minGraduationToUnlock!}',
+              ),
+            const SizedBox(height: 4),
+          ],
           // progress rows (for non-manual, non-gold)
           if (!t.isManualAward && t.earnedTier != 'gold') ...[
             _ProgressSection(trophy: t),
@@ -693,9 +860,26 @@ class _DetailSheet extends StatelessWidget {
                 _Pill(icon: Icons.flag_rounded, label: 'Meta: ${t.targetCount}×', color: _C.green),
             ],
           ),
+          // video button
+          if (onWatchVideo != null) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.play_circle_outline_rounded, size: 16),
+                label: const Text('Ver vídeo da técnica'),
+                onPressed: onWatchVideo,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _C.blue,
+                  side: const BorderSide(color: _C.blue),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
           // indicate opponent button
           if (onIndicateOpponent != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -830,30 +1014,32 @@ class _OctoChip extends StatelessWidget {
   final String label;
   final IconData? icon;
   final bool selected;
+  final Color? color;
   final VoidCallback onTap;
 
-  const _OctoChip({required this.label, this.icon, required this.selected, required this.onTap});
+  const _OctoChip({required this.label, this.icon, required this.selected, this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    final c = selected ? (color ?? _C.green) : _C.textSec;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _C.green.withValues(alpha: 0.15) : _C.card,
+          color: selected ? (color ?? _C.green).withValues(alpha: 0.15) : _C.card,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? _C.green : _C.border, width: selected ? 1.5 : 1),
+          border: Border.all(color: selected ? (color ?? _C.green) : _C.border, width: selected ? 1.5 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 13, color: selected ? _C.green : _C.textSec),
+              Icon(icon, size: 13, color: c),
               const SizedBox(width: 5),
             ],
-            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: selected ? _C.green : _C.textSec)),
+            Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c)),
           ],
         ),
       ),
@@ -920,6 +1106,28 @@ class _SortMenu extends StatelessWidget {
           Text(label, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w400,
               color: sel ? _C.green : _C.textPri)),
           if (sel) ...[const Spacer(), const Icon(Icons.check_rounded, size: 14, color: _C.green)],
+        ],
+      ),
+    );
+  }
+}
+
+class _UnlockRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _UnlockRow({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: _C.textSec),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(label, style: const TextStyle(fontSize: 12, color: _C.textSec)),
+          ),
         ],
       ),
     );

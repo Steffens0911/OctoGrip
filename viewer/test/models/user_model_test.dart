@@ -50,6 +50,20 @@ void main() {
       expect(u.loginStreakDays, 0);
       expect(u.accountFrozen, isFalse);
       expect(u.accountFreezeReason, isNull);
+      expect(u.punctualityStreak, 0);
+      expect(u.punctualityStreakBest, 0);
+    });
+
+    test('mapeia punctuality_streak e punctuality_streak_best', () {
+      final u = UserModel.fromJson({
+        'id': 'u5',
+        'email': 'pct@test.com',
+        'punctuality_streak': 7,
+        'punctuality_streak_best': 12,
+      });
+
+      expect(u.punctualityStreak, 7);
+      expect(u.punctualityStreakBest, 12);
     });
 
     test('role nulo cai no default "aluno"', () {
@@ -85,6 +99,8 @@ void main() {
       expect(back.role, u.role);
       expect(back.accountFrozen, u.accountFrozen);
       expect(back.loginStreakDays, u.loginStreakDays);
+      expect(back.punctualityStreak, 0);
+      expect(back.punctualityStreakBest, 0);
     });
   });
 }

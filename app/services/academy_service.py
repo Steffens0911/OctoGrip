@@ -426,6 +426,14 @@ async def update_academy(
             academy.qr_attendance_enabled = bool(value)
         elif key == "octophotos_enabled" and value is not None:
             academy.octophotos_enabled = bool(value)
+        elif key == "pre_checkin_enabled" and value is not None:
+            academy.pre_checkin_enabled = bool(value)
+        elif key == "pre_checkin_strict" and value is not None:
+            academy.pre_checkin_strict = bool(value)
+        elif key == "face_checkin_enabled" and value is not None:
+            academy.face_checkin_enabled = bool(value)
+        elif key == "punctuality_xp" and value is not None:
+            academy.punctuality_xp = max(0, min(100, int(value)))
         elif key == "login_notice_title":
             academy.login_notice_title = value.strip() if value and str(value).strip() else None
         elif key == "login_notice_body":

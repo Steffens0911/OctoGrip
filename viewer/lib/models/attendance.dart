@@ -8,6 +8,7 @@ class AttendanceSessionModel {
   final DateTime? endsAt;
   final DateTime? expiresAt;
   final int presentCount;
+  final String? trainingSessionId;
 
   AttendanceSessionModel({
     required this.id,
@@ -19,6 +20,7 @@ class AttendanceSessionModel {
     required this.endsAt,
     required this.expiresAt,
     required this.presentCount,
+    this.trainingSessionId,
   });
 
   factory AttendanceSessionModel.fromJson(Map<String, dynamic> json) {
@@ -36,6 +38,7 @@ class AttendanceSessionModel {
           ? DateTime.parse(json['expires_at'] as String)
           : null,
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
+      trainingSessionId: json['training_session_id'] as String?,
     );
   }
 }

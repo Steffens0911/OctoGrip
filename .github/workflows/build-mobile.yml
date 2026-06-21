@@ -1,0 +1,130 @@
+name: Build & Publish Mobile
+
+# Dispara com: git tag v1.2.0+9 && git push --tags
+# Ou manualmente pelo botão "Run workflow" no GitHub Actions.
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+\+[0-9]+'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play Store track'
+        required: true
+        default: 'internal'
+        type: choice
+        options: [internal, alpha, beta, production]
+
+jobs:
+  # ─── Android ────────────────────────────────────────────────────────────────
+  android:
+    name: Android — App Bundle
+    runs-on: ubuntu-latest
+    environment: secrets
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: viewer
+        run: flutter pub get
+
+      - name: Prepare dart defines (mobile)
+        working-directory: viewer
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: python3 tool/prepare_mobile_build.py
+
+      - name: Decode Android keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode \
+            > viewer/android/app/octogrip-upload.jks
+
+      - name: Build App Bundle
+        working-directory: viewer
+        env:
+          KEYSTORE_PATH: octogrip-upload.jks
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          flutter build appbundle --release \
+            --no-pub \
+            --dart-define-from-file=tool/dart_define_mobile.json
+
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: br.com.octogrip.app
+          releaseFiles: viewer/build/app/outputs/bundle/release/app-release.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: completed
+
+  # ─── iOS ────────────────────────────────────────────────────────────────────
+  ios:
+    name: iOS — IPA
+    runs-on: macos-latest
+    environment: secrets
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: viewer
+        run: flutter pub get
+
+      - name: Prepare dart defines (mobile)
+        working-directory: viewer
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: python3 tool/prepare_mobile_build.py
+
+      - name: Add GoogleService-Info.plist
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}" | base64 --decode \
+            > viewer/ios/Runner/GoogleService-Info.plist
+
+      - name: Import distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_CERT_BASE64 }}
+          p12-password: ${{ secrets.APPLE_DISTRIBUTION_CERT_PASSWORD }}
+
+      - name: Download provisioning profiles
+        uses: apple-actions/download-provisioning-profiles@v3
+        with:
+          bundle-id: br.com.octogrip.app
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+
+      - name: Build IPA
+        working-directory: viewer
+        run: |
+          flutter build ipa --release \
+            --no-pub \
+            --dart-define-from-file=tool/dart_define_mobile.json \
+            --export-options-plist=ios/ExportOptions.plist
+
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: viewer/build/ios/ipa/OctoGrip.ipa
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}

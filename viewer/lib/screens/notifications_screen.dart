@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:viewer/features/photos/presentation/pages/photo_from_notification_screen.dart';
 import 'package:viewer/models/notification_model.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
+import 'package:viewer/screens/student/training_videos_section.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -79,6 +81,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const MarketplaceScreen()),
+      );
+      return;
+    }
+    if (n.type == 'video_new') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: const AppStandardAppBar(title: 'Campo de treinamento'),
+            body: const SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: TrainingVideosSection(),
+            ),
+          ),
+        ),
       );
       return;
     }

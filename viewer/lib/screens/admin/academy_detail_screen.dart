@@ -74,7 +74,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
   bool _qrAttendanceEnabled = true;
   bool _octophotosEnabled = false;
   int _userPhotosQuota = 30;
+  bool _preCheckinEnabled = false;
+  bool _preCheckinStrict = false;
+  bool _faceCheckinEnabled = false;
+  int _punctualityXp = 15;
   late TextEditingController _quotaController;
+  late TextEditingController _punctualityXpController;
   bool _savingAdminPersonalization = false;
 
   @override
@@ -92,7 +97,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _qrAttendanceEnabled = _academy.qrAttendanceEnabled;
     _octophotosEnabled = _academy.octophotosEnabled;
     _userPhotosQuota = _academy.userPhotosQuota;
+    _preCheckinEnabled = _academy.preCheckinEnabled;
+    _preCheckinStrict = _academy.preCheckinStrict;
+    _faceCheckinEnabled = _academy.faceCheckinEnabled;
+    _punctualityXp = _academy.punctualityXp;
     _quotaController = TextEditingController(text: _userPhotosQuota.toString());
+    _punctualityXpController = TextEditingController(text: _punctualityXp.toString());
     _mult1Controller = TextEditingController(text: _weeklyMultiplier1.toString());
     _mult2Controller = TextEditingController(text: _weeklyMultiplier2.toString());
     _mult3Controller = TextEditingController(text: _weeklyMultiplier3.toString());
@@ -122,7 +132,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _qrAttendanceEnabled = fresh.qrAttendanceEnabled;
         _octophotosEnabled = fresh.octophotosEnabled;
         _userPhotosQuota = fresh.userPhotosQuota;
+        _preCheckinEnabled = fresh.preCheckinEnabled;
+        _preCheckinStrict = fresh.preCheckinStrict;
+        _faceCheckinEnabled = fresh.faceCheckinEnabled;
+        _punctualityXp = fresh.punctualityXp;
         _quotaController.text = fresh.userPhotosQuota.toString();
+        _punctualityXpController.text = fresh.punctualityXp.toString();
       });
     } catch (_) {
       // Mantém os dados já carregados no detalhe caso o refresh falhe.
@@ -195,6 +210,7 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     _mult2Controller.dispose();
     _mult3Controller.dispose();
     _quotaController.dispose();
+    _punctualityXpController.dispose();
     super.dispose();
   }
 
@@ -303,6 +319,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     bool? qrAttendanceEnabled,
     bool? octophotosEnabled,
     int? userPhotosQuota,
+    bool? preCheckinEnabled,
+    bool? preCheckinStrict,
+    bool? faceCheckinEnabled,
+    int? punctualityXp,
   }) async {
     if (_savingAdminPersonalization) return;
     final previousShowGlobalSupporters = _showGlobalSupporters;
@@ -310,23 +330,21 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
     final previousQrAttendanceEnabled = _qrAttendanceEnabled;
     final previousOctophotosEnabled = _octophotosEnabled;
     final previousUserPhotosQuota = _userPhotosQuota;
+    final previousPreCheckinEnabled = _preCheckinEnabled;
+    final previousPreCheckinStrict = _preCheckinStrict;
+    final previousFaceCheckinEnabled = _faceCheckinEnabled;
+    final previousPunctualityXp = _punctualityXp;
     setState(() {
       _savingAdminPersonalization = true;
-      if (showGlobalSupporters != null) {
-        _showGlobalSupporters = showGlobalSupporters;
-      }
-      if (faceRecognitionEnabled != null) {
-        _faceRecognitionEnabled = faceRecognitionEnabled;
-      }
-      if (qrAttendanceEnabled != null) {
-        _qrAttendanceEnabled = qrAttendanceEnabled;
-      }
-      if (octophotosEnabled != null) {
-        _octophotosEnabled = octophotosEnabled;
-      }
-      if (userPhotosQuota != null) {
-        _userPhotosQuota = userPhotosQuota;
-      }
+      if (showGlobalSupporters != null) _showGlobalSupporters = showGlobalSupporters;
+      if (faceRecognitionEnabled != null) _faceRecognitionEnabled = faceRecognitionEnabled;
+      if (qrAttendanceEnabled != null) _qrAttendanceEnabled = qrAttendanceEnabled;
+      if (octophotosEnabled != null) _octophotosEnabled = octophotosEnabled;
+      if (userPhotosQuota != null) _userPhotosQuota = userPhotosQuota;
+      if (preCheckinEnabled != null) _preCheckinEnabled = preCheckinEnabled;
+      if (preCheckinStrict != null) _preCheckinStrict = preCheckinStrict;
+      if (faceCheckinEnabled != null) _faceCheckinEnabled = faceCheckinEnabled;
+      if (punctualityXp != null) _punctualityXp = punctualityXp;
     });
     try {
       final updated = await _api.updateAcademy(
@@ -336,6 +354,10 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         qrAttendanceEnabled: qrAttendanceEnabled,
         octophotosEnabled: octophotosEnabled,
         userPhotosQuota: userPhotosQuota,
+        preCheckinEnabled: preCheckinEnabled,
+        preCheckinStrict: preCheckinStrict,
+        faceCheckinEnabled: faceCheckinEnabled,
+        punctualityXp: punctualityXp,
       );
       if (!mounted) return;
       setState(() {
@@ -345,7 +367,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _qrAttendanceEnabled = updated.qrAttendanceEnabled;
         _octophotosEnabled = updated.octophotosEnabled;
         _userPhotosQuota = updated.userPhotosQuota;
+        _preCheckinEnabled = updated.preCheckinEnabled;
+        _preCheckinStrict = updated.preCheckinStrict;
+        _faceCheckinEnabled = updated.faceCheckinEnabled;
+        _punctualityXp = updated.punctualityXp;
         _quotaController.text = updated.userPhotosQuota.toString();
+        _punctualityXpController.text = updated.punctualityXp.toString();
         _savingAdminPersonalization = false;
       });
       widget.onUpdated();
@@ -362,7 +389,12 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
         _qrAttendanceEnabled = previousQrAttendanceEnabled;
         _octophotosEnabled = previousOctophotosEnabled;
         _userPhotosQuota = previousUserPhotosQuota;
+        _preCheckinEnabled = previousPreCheckinEnabled;
+        _preCheckinStrict = previousPreCheckinStrict;
+        _faceCheckinEnabled = previousFaceCheckinEnabled;
+        _punctualityXp = previousPunctualityXp;
         _quotaController.text = previousUserPhotosQuota.toString();
+        _punctualityXpController.text = previousPunctualityXp.toString();
         _savingAdminPersonalization = false;
       });
       AppFeedback.show(
@@ -753,6 +785,102 @@ class _AcademyDetailScreenState extends State<AcademyDetailScreen> {
                                 );
                               },
                       ),
+                      SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                        title: const Text('Ativar pré-checkin de treinos'),
+                        subtitle: const Text(
+                          'Habilita o lançamento de treinos e a confirmação antecipada de presença.',
+                        ),
+                        value: _preCheckinEnabled,
+                        onChanged: _savingAdminPersonalization
+                            ? null
+                            : (value) {
+                                _updateAdminPersonalization(
+                                  preCheckinEnabled: value,
+                                );
+                              },
+                      ),
+                      if (_preCheckinEnabled)
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: const Text('Modo estrito de pré-checkin'),
+                          subtitle: const Text(
+                            'Sem confirmação antecipada = sem presença automática. Professor pode dar presença manual.',
+                          ),
+                          value: _preCheckinStrict,
+                          onChanged: _savingAdminPersonalization
+                              ? null
+                              : (value) {
+                                  _updateAdminPersonalization(
+                                    preCheckinStrict: value,
+                                  );
+                                },
+                        ),
+                      if (_faceRecognitionEnabled)
+                        SwitchListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                          title: const Text('Ativar quiosque facial de chegada'),
+                          subtitle: const Text(
+                            'Tablet na recepção identifica o aluno pela câmera e registra presença em tempo real.',
+                          ),
+                          value: _faceCheckinEnabled,
+                          onChanged: _savingAdminPersonalization
+                              ? null
+                              : (value) {
+                                  _updateAdminPersonalization(
+                                    faceCheckinEnabled: value,
+                                  );
+                                },
+                        ),
+                      if (_faceCheckinEnabled)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'XP por pontualidade',
+                                      style: TextStyle(fontSize: 14),
+                                    ),
+                                    Text(
+                                      'Concedido quando o aluno chega antes do início do treino.',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              SizedBox(
+                                width: 72,
+                                child: TextField(
+                                  controller: _punctualityXpController,
+                                  enabled: !_savingAdminPersonalization,
+                                  keyboardType: TextInputType.number,
+                                  textAlign: TextAlign.center,
+                                  decoration: const InputDecoration(
+                                    border: OutlineInputBorder(),
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  onSubmitted: (v) {
+                                    final n = int.tryParse(v);
+                                    if (n != null && n >= 0 && n <= 100) {
+                                      _updateAdminPersonalization(punctualityXp: n);
+                                    } else {
+                                      _punctualityXpController.text = _punctualityXp.toString();
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       if (_octophotosEnabled)
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),

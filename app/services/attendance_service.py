@@ -21,6 +21,7 @@ from app.core.exceptions import (
 from app.core.list_pagination import clamp_list_limit
 from app.core.role_deps import verify_academy_access
 from app.models import Academy, AttendanceRecord, AttendanceSession, User
+from app.models.training_pre_checkin import TrainingPreCheckin
 
 
 def _now_utc() -> datetime:
@@ -33,6 +34,27 @@ _STATS_ME_TTL_SEC = 120
 _STATS_ME_PREFIX = "stats_me:"
 _STATS_DETAIL_TTL_SEC = 120
 _STATS_DETAIL_PREFIX = "stats_detail:"
+
+
+async def _check_pre_checkin_strict(
+    db: AsyncSession,
+    training_session_id: UUID,
+    user_id: UUID,
+) -> None:
+    """Lança ForbiddenError se o aluno não pré-confirmou o treino (modo estrito)."""
+    confirmed = (
+        await db.execute(
+            select(TrainingPreCheckin.id).where(
+                TrainingPreCheckin.training_session_id == training_session_id,
+                TrainingPreCheckin.user_id == user_id,
+                TrainingPreCheckin.status == "confirmed",
+            )
+        )
+    ).scalar_one_or_none()
+    if confirmed is None:
+        raise ForbiddenError(
+            "Pré-checkin obrigatório: confirme sua presença no app antes de bater a chamada."
+        )
 
 
 async def invalidate_attendance_ranking_cache(academy_id: UUID | None) -> None:
@@ -63,6 +85,7 @@ async def create_attendance_session(
     current_user: User,
     title: str | None = None,
     expires_in_minutes: int = 20,
+    training_session_id: UUID | None = None,
 ) -> AttendanceSession:
     if current_user.role not in ("administrador", "gerente_academia", "professor"):
         raise ForbiddenError("Acesso negado.")
@@ -74,6 +97,7 @@ async def create_attendance_session(
     s = AttendanceSession(
         academy_id=current_user.academy_id,
         created_by_user_id=current_user.id,
+        training_session_id=training_session_id,
         status="active",
         title=(title.strip() if isinstance(title, str) and title.strip() else None),
         starts_at=starts_at,
@@ -308,6 +332,7 @@ async def scan_checkin(
                 AttendanceSession.academy_id,
                 AttendanceSession.status,
                 AttendanceSession.expires_at,
+                AttendanceSession.training_session_id,
             ).where(AttendanceSession.id == session_id)
         )
     ).one_or_none()
@@ -317,13 +342,21 @@ async def scan_checkin(
     s_academy_id = _s_row[1]
     s_status = _s_row[2]
     s_expires_at = _s_row[3]
+    s_training_session_id = _s_row[4]
 
     if s_academy_id is not None:
-        qr_enabled = (
-            await db.execute(select(Academy.qr_attendance_enabled).where(Academy.id == s_academy_id))
-        ).scalar_one_or_none()
-        if qr_enabled is False:
-            raise ForbiddenError("A chamada por QR está desativada para esta academia. Faça presença manual.")
+        academy_row = (
+            await db.execute(
+                select(Academy.qr_attendance_enabled, Academy.pre_checkin_strict)
+                .where(Academy.id == s_academy_id)
+            )
+        ).one_or_none()
+        if academy_row is not None:
+            if academy_row[0] is False:
+                raise ForbiddenError("A chamada por QR está desativada para esta academia. Faça presença manual.")
+            # Gate modo estrito: sem pré-confirmação = sem presença via QR
+            if academy_row[1] and s_training_session_id is not None:
+                await _check_pre_checkin_strict(db, s_training_session_id, current_user.id)
     if s_status != "active":
         raise AttendanceSessionClosedError()
     if s_expires_at and s_expires_at < now:
@@ -368,6 +401,30 @@ async def scan_checkin(
 
     await invalidate_attendance_ranking_cache(s_academy_id)
     await invalidate_attendance_stats_cache(s_academy_id, current_user.id)
+
+    # Pontualidade: aplica se a chamada tem um TrainingSession vinculado.
+    if s_training_session_id is not None:
+        try:
+            from app.models.training_session import TrainingSession
+            from app.services.punctuality_service import apply_punctuality
+
+            ts = await db.get(TrainingSession, s_training_session_id)
+            if ts:
+                academy = await db.get(Academy, s_academy_id)
+                user_fresh = await db.get(User, current_user.id)
+                if academy and user_fresh:
+                    await apply_punctuality(
+                        db,
+                        user=user_fresh,
+                        academy=academy,
+                        record=r,
+                        training_session=ts,
+                        checked_in_at=now,
+                    )
+                    await db.commit()
+        except Exception:
+            pass  # pontualidade nunca bloqueia o check-in
+
     return r, True
 
 

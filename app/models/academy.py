@@ -129,6 +129,31 @@ class Academy(Base, UUIDMixin):
         nullable=False,
         comment="Máximo de fotos por aluno no feed. Moderadores são isentos.",
     )
+    pre_checkin_enabled: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Feature premium (gate por assinatura): habilita treinos lançados + pré-confirmação. Só admin global edita.",
+    )
+    pre_checkin_strict: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Modo estrito de pré-checkin: sem pré-confirmação = sem presença automática. Professor edita.",
+    )
+    punctuality_xp: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=15,
+        server_default=text("15"),
+        comment="XP concedido por check-in pontual em treino lançado (Fase 6 — pontualidade).",
+    )
+    face_checkin_enabled: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text("false"),
+        nullable=False,
+        comment="Feature: habilita quiosque facial de chegada na recepção (check-in ao vivo por câmera).",
+    )
 
     weekly_technique: Mapped[Technique | None] = relationship(
         "Technique",

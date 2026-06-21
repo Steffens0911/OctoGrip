@@ -16,9 +16,10 @@ import 'package:viewer/screens/student/lesson_view_data.dart';
 import 'package:viewer/screens/student/lesson_view_screen.dart';
 import 'package:viewer/screens/student/my_executions_screen.dart';
 import 'package:viewer/screens/student/pending_confirmations_screen.dart';
+import 'package:viewer/screens/student/pre_checkin_screen.dart';
 import 'package:viewer/screens/student/points_log_screen.dart';
 import 'package:viewer/screens/student/classmates_gallery_screen.dart';
-import 'package:viewer/screens/student/trophy_gallery_screen.dart';
+import 'package:viewer/features/trophy_shelf/presentation/trophy_shelf_page.dart';
 import 'package:viewer/screens/student/training_video_view_screen.dart';
 import 'package:viewer/models/partner.dart';
 import 'package:viewer/models/trophy.dart';
@@ -93,6 +94,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
   String? _academyName;
   bool _showTrophies = true;
   bool _showPartners = true;
+  bool _preCheckinEnabled = false;
   /// Aviso ao logar (dados da academia; modal uma vez por sessão).
   String? _loginNoticeTitle;
   String? _loginNoticeBody;
@@ -520,6 +522,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         _academyName = academy.name;
         _showTrophies = academy.showTrophies;
         _showPartners = academy.showPartners;
+        _preCheckinEnabled = academy.preCheckinEnabled;
         _loginNoticeTitle = academy.loginNoticeTitle;
         _loginNoticeBody = academy.loginNoticeBody;
         _loginNoticeUrl = academy.loginNoticeUrl;
@@ -572,6 +575,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       _academyName = academy?['name'] as String? ?? _academyName;
       _showTrophies = academy?['show_trophies'] as bool? ?? true;
       _showPartners = academy?['show_partners'] as bool? ?? true;
+      _preCheckinEnabled = academy?['pre_checkin_enabled'] as bool? ?? false;
       _loginNoticeTitle = academy?['login_notice_title'] as String?;
       _loginNoticeBody = academy?['login_notice_body'] as String?;
       _loginNoticeUrl = academy?['login_notice_url'] as String?;
@@ -967,6 +971,10 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                     const SizedBox(height: 10),
                     _buildPendingConfirmationsBanner(),
                   ],
+                  if (_preCheckinEnabled && u != null && u.academyId != null) ...[
+                    const SizedBox(height: 10),
+                    _buildPreCheckinCard(u.academyId!),
+                  ],
                   const SizedBox(height: 10),
                   if (u != null)
                     Align(
@@ -988,7 +996,11 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
                         children: [
                           const MemoSectionLabel('SUA JORNADA'),
                           const SizedBox(height: 8),
-                          StudentStatsSection(stats: _trainingStats!),
+                          StudentStatsSection(
+                            stats: _trainingStats!,
+                            punctualityStreak: AuthService().currentUser?.punctualityStreak,
+                            punctualityStreakBest: AuthService().currentUser?.punctualityStreakBest,
+                          ),
                         ],
                       ),
                     ),
@@ -1126,6 +1138,41 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
         ),
       ),
     ).then((_) => _loadPendingConfirmationsWith());
+  }
+
+  Widget _buildPreCheckinCard(String academyId) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PreCheckinScreen(academyId: academyId),
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1D9E75).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF1D9E75).withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sports_martial_arts_rounded, color: Color(0xFF1D9E75)),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Confirmar presença no treino',
+                style: TextStyle(
+                  color: Color(0xFF1D9E75),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Color(0xFF1D9E75)),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Banner sob o header: confirmações pendentes (fechar só oculta até o contador mudar).
@@ -1653,7 +1700,7 @@ class _StudentHomeScreenState extends State<StudentHomeScreen>
       Navigator.push<void>(
         context,
         MaterialPageRoute<void>(
-          builder: (context) => TrophyGalleryScreen(
+          builder: (context) => TrophyShelfPage(
             userId: userId,
             userName: _selectedUser?.name ?? _selectedUser?.email,
           ),

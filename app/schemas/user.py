@@ -25,6 +25,14 @@ class UserRead(BaseModel):
         0,
         description="Dias consecutivos com login (calendário no fuso APP_TIMEZONE); valor em GET/PATCH /auth/me.",
     )
+    punctuality_streak: int = Field(
+        0,
+        description="Sequência atual de check-ins pontuais em treinos lançados.",
+    )
+    punctuality_streak_best: int = Field(
+        0,
+        description="Recorde pessoal de streak de pontualidade.",
+    )
 
     class Config:
         from_attributes = True

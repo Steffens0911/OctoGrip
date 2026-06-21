@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.routes import (
     academies,
     academy_weekly_kits,
+    training_sessions,
     admin,
     admin_audit,
     admin_backup,
@@ -18,6 +19,7 @@ from app.routes import (
     auth,
     enrollment,
     executions,
+    face_checkin,
     face_recognition,
     health,
     legal,
@@ -65,6 +67,11 @@ api_router.include_router(
     prefix="/academies",
     tags=["academies-weekly-kits"],
 )
+api_router.include_router(
+    training_sessions.router,
+    prefix="/academies",
+    tags=["training-sessions"],
+)
 api_router.include_router(professors.router, prefix="/professors", tags=["professors"])
 api_router.include_router(users.router, prefix="/users", tags=["users"])
 api_router.include_router(students.router, prefix="/students", tags=["students"])
@@ -91,6 +98,7 @@ api_router.include_router(me_push.router, prefix="/me", tags=["me"])
 api_router.include_router(me_privacy.router, prefix="/me", tags=["me-privacy"])
 api_router.include_router(legal.router, prefix="/legal", tags=["legal"])
 api_router.include_router(attendance.router, prefix="/attendance", tags=["attendance"])
+api_router.include_router(face_checkin.router, prefix="/attendance", tags=["face-checkin"])
 api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(photos.router, prefix="/academies", tags=["photos"])
