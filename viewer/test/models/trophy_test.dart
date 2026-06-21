@@ -108,6 +108,30 @@ void main() {
     });
   });
 
+  group('TrophyWithEarned isTrophy/isMedal', () {
+    test('isTrophy é true quando awardKind é trophy', () {
+      final t = TrophyWithEarned(
+        trophyId: 'x', techniqueId: 't', name: 'n',
+        startDate: '2026-01-01', endDate: '2026-01-31', targetCount: 1,
+        awardKind: 'trophy',
+      );
+      expect(t.isTrophy, isTrue);
+      expect(t.isMedal, isFalse);
+      expect(t.awardKindLabel, 'Troféu');
+    });
+
+    test('isMedal é true quando awardKind é medal', () {
+      final t = TrophyWithEarned(
+        trophyId: 'x', techniqueId: 't', name: 'n',
+        startDate: '2026-01-01', endDate: '2026-01-31', targetCount: 1,
+        awardKind: 'medal',
+      );
+      expect(t.isMedal, isTrue);
+      expect(t.isTrophy, isFalse);
+      expect(t.awardKindLabel, 'Medalha');
+    });
+  });
+
   group('AcademyRecentItem helpers', () {
     AcademyRecentItem make(String name) => AcademyRecentItem.fromJson({
           'user_id': 'u',
@@ -124,6 +148,101 @@ void main() {
     test('initials com nome único', () {
       expect(make('Madonna').initials, 'MA');
       expect(make('A').initials, 'A');
+    });
+
+    test('tierEmoji delega para TrophyWithEarned.tierEmoji', () {
+      final item = AcademyRecentItem.fromJson({
+        'user_id': 'u1', 'user_name': 'Ana', 'trophy_name': 'T', 'tier': 'gold',
+      });
+      expect(item.tierEmoji, '🥇');
+    });
+  });
+
+  group('TrophyHomeSummaryItem.fromJson', () {
+    test('desserializa todos os campos', () {
+      final item = TrophyHomeSummaryItem.fromJson({
+        'trophy_id': 'tr1',
+        'name': 'Mestre',
+        'award_kind': 'trophy',
+        'tier': 'silver',
+      });
+
+      expect(item.trophyId, 'tr1');
+      expect(item.name, 'Mestre');
+      expect(item.tier, 'silver');
+      expect(item.emoji, '🥈');
+    });
+
+    test('usa defaults quando campos opcionais ausentes', () {
+      final item = TrophyHomeSummaryItem.fromJson({
+        'trophy_id': 'tr2',
+        'name': 'Básico',
+      });
+
+      expect(item.tier, isNull);
+      expect(item.awardKind, 'trophy');
+      expect(item.emoji, '🏆');
+    });
+  });
+
+  group('AcademyUserEarnedItem.fromJson', () {
+    test('desserializa todos os campos', () {
+      final item = AcademyUserEarnedItem.fromJson({
+        'trophy_id': 'tr3',
+        'name': 'Campeão',
+        'tier': 'gold',
+        'award_kind': 'medal',
+      });
+
+      expect(item.trophyId, 'tr3');
+      expect(item.name, 'Campeão');
+      expect(item.tier, 'gold');
+      expect(item.emoji, '🥇');
+    });
+  });
+
+  group('AcademyUserEarned.fromJson', () {
+    test('desserializa com lista de itens', () {
+      final earned = AcademyUserEarned.fromJson({
+        'user_id': 'u5',
+        'items': [
+          {'trophy_id': 'tr4', 'name': 'A', 'award_kind': 'trophy'},
+          {'trophy_id': 'tr5', 'name': 'B', 'award_kind': 'medal'},
+        ],
+      });
+
+      expect(earned.userId, 'u5');
+      expect(earned.items, hasLength(2));
+    });
+
+    test('items vazio quando ausente', () {
+      final earned = AcademyUserEarned.fromJson({'user_id': 'u6'});
+      expect(earned.items, isEmpty);
+    });
+  });
+
+  group('TrophyHomeSummary.fromJson', () {
+    test('desserializa com listas', () {
+      final summary = TrophyHomeSummary.fromJson({
+        'my_earned_count': 3,
+        'my_recent': [
+          {'trophy_id': 'tr1', 'name': 'X', 'tier': 'gold'},
+        ],
+        'academy_recent': [
+          {'user_id': 'u1', 'user_name': 'Carlos', 'trophy_name': 'Y'},
+        ],
+      });
+
+      expect(summary.myEarnedCount, 3);
+      expect(summary.myRecent, hasLength(1));
+      expect(summary.academyRecent, hasLength(1));
+    });
+
+    test('usa defaults quando campos ausentes', () {
+      final summary = TrophyHomeSummary.fromJson({});
+      expect(summary.myEarnedCount, 0);
+      expect(summary.myRecent, isEmpty);
+      expect(summary.academyRecent, isEmpty);
     });
   });
 }
