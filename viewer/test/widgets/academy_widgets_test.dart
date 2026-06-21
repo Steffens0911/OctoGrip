@@ -109,6 +109,84 @@ void main() {
 
       expect(find.textContaining('fechada'), findsWidgets);
     });
+
+    testWidgets('exibe botão "Abrir link" quando linkUrl fornecido', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => showDialog(
+                context: ctx,
+                builder: (_) => const AcademyLoginNoticeDialog(
+                  titleText: 'Com link',
+                  bodyText: 'Veja mais em:',
+                  linkUrl: 'https://academia.com',
+                ),
+              ),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Abrir link'), findsOneWidget);
+    });
+
+    testWidgets('botão fechar fecha o dialog', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => showDialog(
+                context: ctx,
+                builder: (_) => const AcademyLoginNoticeDialog(
+                  titleText: 'Fechar',
+                  bodyText: 'Teste de fechar.',
+                ),
+              ),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+    });
+
+    testWidgets('botão Entendi fecha o dialog', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (ctx) => ElevatedButton(
+              onPressed: () => showDialog(
+                context: ctx,
+                builder: (_) => const AcademyLoginNoticeDialog(
+                  titleText: 'OK',
+                  bodyText: 'Entendido.',
+                ),
+              ),
+              child: const Text('Abrir'),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('Abrir'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Entendi'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+    });
   });
 
   group('StudentStatsSection', () {
