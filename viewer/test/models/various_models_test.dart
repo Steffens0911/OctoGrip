@@ -95,6 +95,57 @@ void main() {
 
       expect(t.label, isNull);
     });
+
+    test('displayName inclui label quando presente', () {
+      final t = TrainingTemplate.fromJson({
+        'id': 'tt3',
+        'academy_id': 'ac1',
+        'label': 'Noite',
+        'start_time': '20:00',
+        'tolerance_minutes': 10,
+        'sort_order': 0,
+      });
+
+      expect(t.displayName, contains('Noite'));
+      expect(t.displayName, contains('20:00'));
+    });
+  });
+
+  group('TrainingSession.fromJson', () {
+    test('desserializa todos os campos', () {
+      final s = TrainingSession.fromJson({
+        'id': 'ts1',
+        'academy_id': 'ac1',
+        'class_date': '2024-06-01',
+        'start_time': '08:00',
+        'tolerance_minutes': 15,
+        'status': 'open',
+        'created_at': '2024-06-01T07:55:00Z',
+        'pre_checkin_count': 5,
+        'label': 'Manhã',
+      });
+
+      expect(s.id, 'ts1');
+      expect(s.isOpen, isTrue);
+      expect(s.isUpcoming, isFalse);
+      expect(s.isClosed, isFalse);
+      expect(s.preCheckinCount, 5);
+      expect(s.displayName, contains('Manhã'));
+    });
+
+    test('status closed retorna isClosed true', () {
+      final s = TrainingSession.fromJson({
+        'id': 'ts2',
+        'academy_id': 'ac1',
+        'class_date': '2024-06-01',
+        'start_time': '20:00',
+        'status': 'closed',
+        'created_at': '2024-06-01T20:00:00Z',
+      });
+
+      expect(s.isClosed, isTrue);
+      expect(s.displayName, '20:00');
+    });
   });
 
   group('PreCheckinStatus.fromJson', () {
