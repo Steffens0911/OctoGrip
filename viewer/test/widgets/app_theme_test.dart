@@ -183,4 +183,98 @@ void main() {
       expect(captured!.a, greaterThan(0));
     });
   });
+
+  group('AppTheme constantes', () {
+    test('primary é âmbar/dourado não-transparente', () {
+      expect(AppTheme.primary.a, 1.0);
+    });
+
+    test('breakpoints têm valores esperados', () {
+      expect(AppTheme.breakpointTablet, 600);
+      expect(AppTheme.breakpointDesktop, 900);
+      expect(AppTheme.maxContentWidth, 720);
+    });
+  });
+
+  group('AppTheme ThemeData builders', () {
+    testWidgets('light retorna ThemeData com brightness=light', (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.light;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.light);
+      expect(theme!.useMaterial3, isTrue);
+    });
+
+    testWidgets('dark retorna ThemeData com brightness=dark', (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.dark;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.dark);
+      expect(theme!.useMaterial3, isTrue);
+    });
+
+    testWidgets('premiumLight retorna ThemeData com brightness=light',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.premiumLight;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.light);
+    });
+
+    testWidgets('premiumDark retorna ThemeData com brightness=dark',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.premiumDark;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.dark);
+    });
+
+    testWidgets('memoLight retorna ThemeData com brightness=light',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.memoLight;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.light);
+    });
+
+    testWidgets('memoDark retorna ThemeData com brightness=dark',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.memoDark;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.dark);
+    });
+
+    testWidgets('memoLightSans retorna ThemeData com brightness=light',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.memoLightSans;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.light);
+    });
+
+    testWidgets('memoDarkSans retorna ThemeData com brightness=dark',
+        (tester) async {
+      ThemeData? theme;
+      await tester.pumpWidget(Builder(builder: (ctx) {
+        theme = AppTheme.memoDarkSans;
+        return const SizedBox.shrink();
+      }));
+      expect(theme!.brightness, Brightness.dark);
+    });
+  });
 }
