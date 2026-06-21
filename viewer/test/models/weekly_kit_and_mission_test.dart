@@ -128,5 +128,30 @@ void main() {
       expect(m.theme, isNull);
       expect(m.academyId, isNull);
     });
+
+    test('toJson serializa todos os campos', () {
+      final m = Mission(
+        id: 'miss3',
+        techniqueId: 'tc3',
+        techniqueName: 'Armlock',
+        startDate: '2026-06-08',
+        endDate: '2026-06-14',
+        level: 'advanced',
+        theme: 'controle',
+        academyId: 'ac1',
+        isActive: false,
+        multiplier: 30,
+      );
+
+      final json = m.toJson();
+      expect(json['id'], 'miss3');
+      expect(json['technique_id'], 'tc3');
+      expect(json['start_date'], '2026-06-08');
+      expect(json['level'], 'advanced');
+      expect(json['theme'], 'controle');
+      expect(json['academy_id'], 'ac1');
+      expect(json['is_active'], isFalse);
+      expect(json['multiplier'], 30);
+    });
   });
 }
