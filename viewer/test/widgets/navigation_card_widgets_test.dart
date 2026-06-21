@@ -70,6 +70,57 @@ void main() {
       await tester.tap(find.byType(AppNavigationTile));
       expect(tapped, isTrue);
     });
+
+    testWidgets('exibe badge numérico quando badgeCount > 0', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AppNavigationTile(
+            icon: Icons.notifications,
+            title: 'Notificações',
+            subtitle: 'Novas mensagens',
+            onTap: () {},
+            badgeCount: 5,
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('5'), findsOneWidget);
+    });
+
+    testWidgets('exibe "99+" quando badgeCount > 99', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AppNavigationTile(
+            icon: Icons.mail,
+            title: 'Mensagens',
+            subtitle: 'Muitas mensagens',
+            onTap: () {},
+            badgeCount: 150,
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('99+'), findsOneWidget);
+    });
+
+    testWidgets('exibe ícone de alerta quando showAlertBadge é true', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: AppNavigationTile(
+            icon: Icons.warning,
+            title: 'Atenção',
+            subtitle: 'Há problemas',
+            onTap: () {},
+            showAlertBadge: true,
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+    });
   });
 
   group('PartnersCard', () {
