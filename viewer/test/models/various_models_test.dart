@@ -4,6 +4,7 @@ import 'package:viewer/models/pre_checkin.dart';
 import 'package:viewer/models/training_session.dart';
 
 // Testes unitários para modelos: FaceCheckin, PreCheckin, TrainingSession.
+// Inclui PreCheckinStatus e suas propriedades computed (isConfirmed, etc).
 
 void main() {
   group('FaceArriveResponse.fromJson', () {
@@ -93,6 +94,45 @@ void main() {
       });
 
       expect(t.label, isNull);
+    });
+  });
+
+  group('PreCheckinStatus.fromJson', () {
+    test('desserializa com confirmantes', () {
+      final s = PreCheckinStatus.fromJson({
+        'pre_checkin_id': 'pc1',
+        'status': 'confirmed',
+        'confirmed_at': '2024-06-01T09:00:00Z',
+        'confirmants': [
+          {'user_id': 'u1', 'name': 'João'},
+        ],
+        'total_confirmed': 1,
+      });
+
+      expect(s.preCheckinId, 'pc1');
+      expect(s.isConfirmed, isTrue);
+      expect(s.isCancelled, isFalse);
+      expect(s.hasConfirmed, isTrue);
+      expect(s.totalConfirmed, 1);
+      expect(s.confirmants.length, 1);
+    });
+
+    test('status cancelled retorna isCancelled true', () {
+      final s = PreCheckinStatus.fromJson({
+        'status': 'cancelled',
+        'cancelled_at': '2024-06-01T09:30:00Z',
+      });
+
+      expect(s.isCancelled, isTrue);
+      expect(s.isConfirmed, isFalse);
+    });
+
+    test('sem status retorna hasConfirmed false', () {
+      final s = PreCheckinStatus.fromJson({});
+
+      expect(s.hasConfirmed, isFalse);
+      expect(s.confirmants, isEmpty);
+      expect(s.totalConfirmed, 0);
     });
   });
 }
