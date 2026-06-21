@@ -59,6 +59,47 @@ void main() {
 
       expect(find.byIcon(Icons.clear), findsNothing);
     });
+
+    testWidgets('clicar em clear limpa o campo e chama onClear', (tester) async {
+      final ctrl = TextEditingController(text: 'xpto');
+      bool cleared = false;
+      await tester.pumpWidget(wrap(TechniqueSearchBar(
+        controller: ctrl,
+        onChanged: (_) {},
+        onClear: () => cleared = true,
+      )));
+      await tester.pump();
+
+      await tester.tap(find.byIcon(Icons.clear));
+      await tester.pump();
+
+      expect(cleared, isTrue);
+      expect(ctrl.text, isEmpty);
+    });
+
+    testWidgets('trocar controller reconecta listener', (tester) async {
+      final ctrl1 = TextEditingController();
+      final ctrl2 = TextEditingController();
+      String? last;
+
+      await tester.pumpWidget(wrap(TechniqueSearchBar(
+        controller: ctrl1,
+        onChanged: (v) => last = v,
+      )));
+      await tester.pump();
+
+      // Substitui controller via rebuild
+      await tester.pumpWidget(wrap(TechniqueSearchBar(
+        controller: ctrl2,
+        onChanged: (v) => last = v,
+      )));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), 'novo');
+      await tester.pump();
+
+      expect(last, 'novo');
+    });
   });
 
   group('TrophySearchBar', () {
