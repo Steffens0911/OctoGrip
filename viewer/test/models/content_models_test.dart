@@ -8,6 +8,28 @@ import 'package:viewer/models/partner.dart';
 // GlobalPartner e Partner.
 
 void main() {
+  group('Lesson.toJson', () {
+    test('serializa todos os campos', () {
+      final l = Lesson(
+        id: 'ls5',
+        title: 'Raspagem',
+        slug: 'raspagem',
+        orderIndex: 2,
+        techniqueId: 'tc5',
+        videoUrl: 'https://example.com/v.mp4',
+        content: 'Conteúdo da aula',
+      );
+
+      final json = l.toJson();
+      expect(json['id'], 'ls5');
+      expect(json['title'], 'Raspagem');
+      expect(json['slug'], 'raspagem');
+      expect(json['video_url'], 'https://example.com/v.mp4');
+      expect(json['order_index'], 2);
+      expect(json['technique_id'], 'tc5');
+    });
+  });
+
   group('Lesson.fromJson', () {
     test('desserializa todos os campos', () {
       final l = Lesson.fromJson({
