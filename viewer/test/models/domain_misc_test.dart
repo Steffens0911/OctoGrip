@@ -62,6 +62,29 @@ void main() {
       expect(v.durationSeconds, isNull);
       expect(v.lastCompletedAt, isNull);
     });
+
+    test('toJson serializa campos corretos', () {
+      final v = TrainingVideo(
+        id: 'v3',
+        title: 'Raspar',
+        youtubeUrl: 'https://youtu.be/yyy',
+        pointsPerDay: 15,
+        isActive: false,
+        durationSeconds: 120,
+        positionDescription: 'Guarda',
+        academyId: 'ac1',
+        academyName: 'Academia JJ',
+        hasCompletedToday: true,
+      );
+
+      final json = v.toJson();
+      expect(json['id'], 'v3');
+      expect(json['youtube_url'], 'https://youtu.be/yyy');
+      expect(json['points_per_day'], 15);
+      expect(json['is_active'], isFalse);
+      expect(json['duration_seconds'], 120);
+      expect(json['academy_name'], 'Academia JJ');
+    });
   });
 
   group('TrainingVideoCompletionResult.fromJson', () {
