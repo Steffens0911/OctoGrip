@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -29,6 +30,14 @@ http.Response jsonError(int status, String detail, {String? errorType}) {
       headers: {'content-type': 'application/json'});
 }
 
+/// StreamedResponse JSON — usado para mockar `client.send` (faceArrive é multipart).
+http.StreamedResponse streamedJson(Object body, int status) =>
+    http.StreamedResponse(
+      Stream.value(utf8.encode(jsonEncode(body))),
+      status,
+      headers: {'content-type': 'application/json'},
+    );
+
 /// Configura SharedPreferences como mock e injeta um MockHttpClient no ApiService.
 MockHttpClient setUpApiService({String? token}) {
   SharedPreferences.setMockInitialValues({
@@ -49,6 +58,7 @@ void main() {
     // Registra fallbacks exigidos pelo mocktail para tipos Uri e BaseRequest.
     registerFallbackValue(Uri.parse('http://fallback'));
     registerFallbackValue(<String, String>{});
+    registerFallbackValue(http.Request('POST', Uri.parse('http://fallback')));
   });
 
   tearDown(() {
@@ -371,5 +381,80 @@ void main() {
         throwsA(isA<TimeoutException>()),
       );
     }, timeout: const Timeout(Duration(seconds: 35)));
+  });
+
+  // -------------------------------------------------------------------------
+  // Quiosque facial — retry transiente no faceArrive (POST multipart idempotente)
+  // -------------------------------------------------------------------------
+  group('ApiService — faceArrive retry transiente', () {
+    final frame = Uint8List.fromList(const [1, 2, 3, 4]);
+
+    test('retenta após 503 do worker e retorna sucesso', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.send(any())).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) return streamedJson({'detail': 'indisponível'}, 503);
+        return streamedJson({
+          'matched': true,
+          'confidence': 0.9,
+          'student_id': 's1',
+          'student_name': 'Aluno',
+          'greeting': 'Bem-vindo!',
+          'xp_awarded': 10,
+        }, 200);
+      });
+
+      final result = await ApiService().faceArrive('sess1', frame);
+
+      expect(calls, 2, reason: '503 transiente deve disparar nova tentativa');
+      expect(result.matched, true);
+      expect(result.studentName, 'Aluno');
+    });
+
+    test('retenta após 502 e desiste após esgotar tentativas', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.send(any())).thenAnswer((_) async {
+        calls++;
+        return streamedJson({'detail': 'Bad Gateway'}, 502);
+      });
+
+      await expectLater(
+        ApiService().faceArrive('sess1', frame),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 502)),
+      );
+      expect(calls, 3, reason: 'tenta uma vez e refaz duas antes de desistir');
+    });
+
+    test('retenta após ClientException e propaga se todas falham', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.send(any())).thenAnswer((_) async {
+        calls++;
+        throw http.ClientException('Failed to fetch');
+      });
+
+      await expectLater(
+        ApiService().faceArrive('sess1', frame),
+        throwsA(isA<http.ClientException>()),
+      );
+      expect(calls, 3);
+    });
+
+    test('não retenta em erro não-transiente (ex.: 409 sessão inativa)', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.send(any())).thenAnswer((_) async {
+        calls++;
+        return streamedJson({'detail': 'A chamada não está ativa.'}, 409);
+      });
+
+      await expectLater(
+        ApiService().faceArrive('sess1', frame),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 409)),
+      );
+      expect(calls, 1, reason: '409 não é transiente — falha na primeira tentativa');
+    });
   });
 }

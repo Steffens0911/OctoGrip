@@ -18,8 +18,6 @@ os.environ.setdefault(
     "postgresql://jjb:jjb_secret@localhost:5432/jjb_db_test",
 )
 os.environ["SEED_ON_STARTUP"] = "false"
-# Evita carregar o modelo facial (deepface/TensorFlow) durante a suíte de testes.
-os.environ["FACE_WARMUP_ON_STARTUP"] = "false"
 # Evita 429 no endpoint GET /admin/backup/database (SlowAPI) ao correr a suíte de testes.
 os.environ["BACKUP_DOWNLOAD_RATE_LIMIT"] = "200/minute"
 # Vários POST /auth/login na mesma suíte (streak, auth) sem 429.

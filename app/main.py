@@ -264,55 +264,19 @@ def register_exception_handlers(application: FastAPI) -> None:
         )
 
 
-async def _warmup_face_model() -> None:
-    """
-    Pré-aquece o modelo facial (build + represent dummy) em background.
-
-    Elimina o cold start de ~16s na primeira chamada do quiosque e também o
-    custo extra do primeiro represent (inicialização do detector + grafo TF).
-    Roda em thread pool para não bloquear o event loop; falhas são apenas logadas.
-    """
-    import asyncio
-    import logging as _logging
-
-    _log = _logging.getLogger("app.warmup")
-
-    def _warm() -> None:
-        import numpy as np
-        from deepface import DeepFace
-
-        from app.face_model import get_model
-
-        get_model()
-        dummy = (np.random.rand(160, 160, 3) * 255).astype("uint8")
-        DeepFace.represent(
-            dummy,
-            model_name="Facenet512",
-            detector_backend="opencv",
-            enforce_detection=False,
-        )
-
-    try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, _warm)
-        _log.info("kiosk_face_model_ready")
-    except Exception:  # noqa: BLE001 - warmup é best-effort, nunca derruba o boot
-        _log.warning("Falha ao pré-aquecer modelo facial.", exc_info=True)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Inicialização leve dos workers HTTP."""
+    """
+    Inicialização leve dos workers HTTP.
+
+    A API não carrega o modelo facial: o check-in do quiosque delega a inferência ao
+    celery-worker-face (ver app.services.face_checkin_service). Manter o TensorFlow
+    fora do processo web é o que elimina o OOM/502 no startup e no primeiro check-in.
+    """
     setup_logging(level=settings.LOG_LEVEL, format_type=settings.LOG_FORMAT)
 
     # Inicializar Sentry se configurado
     init_sentry(settings.SENTRY_DSN)
-
-    # Pré-aquece o modelo facial em background (não atrasa o startup).
-    if settings.FACE_WARMUP_ON_STARTUP:
-        import asyncio
-
-        asyncio.create_task(_warmup_face_model())
 
     yield
 

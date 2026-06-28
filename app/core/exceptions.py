@@ -127,3 +127,22 @@ class AttendanceSessionClosedError(AppError):
 class AttendanceQrInvalidError(AppError):
     def __init__(self, message: str = "QR inválido ou expirado."):
         super().__init__(message, status_code=400)
+
+
+# --- Service Unavailable (503) ---
+
+
+class KioskInferenceUnavailableError(AppError):
+    """
+    Worker de reconhecimento facial indisponível ou lento (quiosque).
+
+    Sinaliza falha temporária de infraestrutura — não "rosto não reconhecido". O
+    quiosque deve retentar (o app trata 503 com retry transparente). Distinto de uma
+    confiança baixa, que é uma resposta 200 normal orientando ao QR Code.
+    """
+
+    def __init__(
+        self,
+        message: str = "Serviço de reconhecimento facial temporariamente indisponível. Tente novamente.",
+    ):
+        super().__init__(message, status_code=503)

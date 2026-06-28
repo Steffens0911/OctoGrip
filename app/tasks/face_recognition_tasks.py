@@ -363,6 +363,54 @@ def process_face_recognition(self, job_id: str) -> None:
                 pass
 
 
+@celery_app.task(bind=True, max_retries=0, time_limit=60, soft_time_limit=45)
+def generate_kiosk_embedding(self, frame_b64: str) -> dict:
+    """
+    Gera o embedding facial de um frame do quiosque de chegada (fila 'face').
+
+    Roda no worker dedicado de visão — com o modelo Facenet512 pré-carregado e quente
+    (pool solo) — e NUNCA no processo web da API. É isto que mantém o uvicorn leve e
+    elimina o OOM/502 que ocorria quando a inferência rodava dentro do worker HTTP.
+
+    Recebe o frame em base64 (JPEG/PNG pequeno da webcam) e devolve
+    ``{"embedding": [...]}`` L2-normalizado, ou ``{"embedding": None}`` se não houver
+    face utilizável. O frame é descartado imediatamente após o embedding (LGPD).
+    """
+    from deepface import DeepFace
+
+    from app.face_model import get_model
+
+    tmp_path: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+            tmp.write(base64.b64decode(frame_b64))
+            tmp_path = tmp.name
+
+        get_model()
+        represented = DeepFace.represent(
+            img_path=tmp_path,
+            model_name="Facenet512",
+            detector_backend="opencv",
+            enforce_detection=False,
+        )
+        faces = represented if isinstance(represented, list) else [represented]
+        embedding_raw = faces[0].get("embedding") if faces else None
+        if not embedding_raw:
+            return {"embedding": None}
+
+        arr = np.asarray(embedding_raw, dtype=np.float32)
+        norm = float(np.linalg.norm(arr))
+        if norm > 1e-8:
+            arr = arr / norm
+        return {"embedding": arr.tolist()}
+    finally:
+        if tmp_path:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+
+
 @celery_app.task(bind=True, max_retries=2, time_limit=120)
 def generate_student_embedding(self, student_id: str) -> None:
     from deepface import DeepFace

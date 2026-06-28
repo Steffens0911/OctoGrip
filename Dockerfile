@@ -72,4 +72,11 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').close()" || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--loop", "uvloop", "--http", "httptools", "--no-access-log"]
+# Mantido alinhado com o `command:` do docker-compose.yml. Plataformas como o Coolify
+# podem usar ESTE CMD da imagem em vez do override do compose, então os flags críticos
+# vivem aqui também:
+#   --workers 2          : a API é leve (a inferência facial roda no celery-worker-face,
+#                          nunca aqui); 2 workers async/uvloop servem a carga com folga.
+#   --timeout-keep-alive 120 : evita o 502 intermitente da race de keep-alive com o proxy
+#                          (uvicorn fechava em 5s e o Traefik reusava a conexão morta).
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--loop", "uvloop", "--http", "httptools", "--no-access-log", "--timeout-keep-alive", "120"]
