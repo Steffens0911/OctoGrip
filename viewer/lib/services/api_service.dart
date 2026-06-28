@@ -186,10 +186,21 @@ class ApiService {
     return _fetchAndCache(uri, key, ttlSeconds);
   }
 
-  /// GET com 1 retry após [http.ClientException] — falha transiente de conexão
-  /// (ex.: "Failed to fetch" no web quando a API ainda está acordando). Evita
-  /// que o usuário precise apertar "Tentar novamente" por uma oscilação pontual.
-  /// [headers] já resolvidos; reusados na 2ª tentativa.
+  /// Backoff entre as tentativas de [_getWithRetry]. O nº de retries é o
+  /// tamanho desta lista (2 retries → 3 tentativas no total).
+  static const List<Duration> _getRetryBackoff = [
+    Duration(milliseconds: 500),
+    Duration(milliseconds: 1200),
+  ];
+
+  /// GET com até 3 tentativas após [http.ClientException] — falha transiente de
+  /// conexão (ex.: "Failed to fetch" no web quando a API oscila sob carga ou
+  /// ainda está acordando). Backoff crescente entre as tentativas. Evita que o
+  /// usuário precise apertar "Tentar novamente" por uma oscilação pontual.
+  /// [headers] já resolvidos; reusados nas tentativas seguintes.
+  ///
+  /// Timeouts (resposta lenta) NÃO são retentados de propósito: refazer
+  /// multiplicaria a espera (até 3×); é melhor propagar rápido nesse caso.
   Future<http.Response> _getWithRetry(
     Uri uri,
     Map<String, String> headers, {
@@ -197,11 +208,13 @@ class ApiService {
   }) async {
     Future<http.Response> attempt() async =>
         _req(_client.get(uri, headers: headers), timeout: timeout);
-    try {
-      return await attempt();
-    } on http.ClientException {
-      await Future<void>.delayed(const Duration(milliseconds: 800));
-      return await attempt();
+    for (var i = 0;; i++) {
+      try {
+        return await attempt();
+      } on http.ClientException {
+        if (i >= _getRetryBackoff.length) rethrow;
+        await Future<void>.delayed(_getRetryBackoff[i]);
+      }
     }
   }
 
@@ -3807,8 +3820,9 @@ class ApiService {
       'limit': '$limit',
       if (unreadOnly) 'unread_only': 'true',
     });
-    final r = await _req(
-      _client.get(uri, headers: await _headers(auth: true)),
+    final r = await _getWithRetry(
+      uri,
+      await _headers(auth: true),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);
@@ -3818,11 +3832,9 @@ class ApiService {
   }
 
   Future<int> getUnreadNotificationsCount() async {
-    final r = await _req(
-      _client.get(
-        Uri.parse('$baseUrl/notifications/unread-count'),
-        headers: await _headers(auth: true),
-      ),
+    final r = await _getWithRetry(
+      Uri.parse('$baseUrl/notifications/unread-count'),
+      await _headers(auth: true),
       timeout: _getTimeout,
     );
     final data = await _decodeResponse(r);

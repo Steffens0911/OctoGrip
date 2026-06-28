@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:viewer/models/user.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/services/auth_service.dart';
 
@@ -262,7 +261,7 @@ void main() {
       expect(result.first['id'], 's1');
     });
 
-    test('getTrainingSessions propaga erro se ambas as tentativas falham', () async {
+    test('getTrainingSessions propaga erro se todas as tentativas falham', () async {
       final client = setUpApiService(token: 'tok');
       var calls = 0;
       when(() => client.get(any(), headers: any(named: 'headers')))
@@ -275,7 +274,46 @@ void main() {
         ApiService().getTrainingSessions('a1'),
         throwsA(isA<http.ClientException>()),
       );
-      expect(calls, 2, reason: 'tenta uma vez e refaz uma vez antes de desistir');
+      expect(calls, 3, reason: 'tenta uma vez e refaz duas vezes antes de desistir');
+    });
+
+    test('getNotifications refaz após ClientException e retorna sucesso', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        if (calls < 3) {
+          throw http.ClientException('Failed to fetch');
+        }
+        return jsonOk([
+          {'id': 'n1'},
+        ]);
+      });
+
+      final result = await ApiService().getNotifications();
+
+      expect(calls, 3, reason: 'duas falhas e sucesso na terceira tentativa');
+      expect(result, hasLength(1));
+      expect(result.first['id'], 'n1');
+    });
+
+    test('getUnreadNotificationsCount refaz após ClientException', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        if (calls == 1) {
+          throw http.ClientException('Failed to fetch');
+        }
+        return jsonOk({'count': 7});
+      });
+
+      final count = await ApiService().getUnreadNotificationsCount();
+
+      expect(calls, 2, reason: 'deve ter tentado uma segunda vez');
+      expect(count, 7);
     });
   });
 
