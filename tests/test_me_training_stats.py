@@ -101,7 +101,7 @@ def ts_headers(ts_aluno):
 @pytest.mark.asyncio
 async def test_training_stats_returns_new_fields(client, ts_aluno, ts_headers):
     """Endpoint retorna todos os campos novos com valores válidos."""
-    r = client.get("/me/training_stats", headers=ts_headers)
+    r = await client.get("/me/training_stats", headers=ts_headers)
     assert r.status_code == 200
     data = r.json()
 
@@ -129,7 +129,7 @@ async def test_training_stats_returns_new_fields(client, ts_aluno, ts_headers):
 @pytest.mark.asyncio
 async def test_training_stats_punctuality_from_user(client, ts_aluno, ts_headers):
     """Streak e recorde de pontualidade vêm do campo armazenado no User."""
-    r = client.get("/me/training_stats", headers=ts_headers)
+    r = await client.get("/me/training_stats", headers=ts_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["punctuality_streak"] == ts_aluno.punctuality_streak
@@ -146,7 +146,7 @@ async def test_training_stats_login_streak_from_login_days(client, db, ts_aluno,
         db.add(UserLoginDay(user_id=ts_aluno.id, login_day=today - timedelta(days=delta)))
     await db.commit()
 
-    r = client.get("/me/training_stats", headers=ts_headers)
+    r = await client.get("/me/training_stats", headers=ts_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["login_streak_current"] == 3
@@ -156,7 +156,7 @@ async def test_training_stats_login_streak_from_login_days(client, db, ts_aluno,
 @pytest.mark.asyncio
 async def test_training_stats_ranking_xp_with_academy(client, db, ts_academy, ts_aluno, ts_headers):
     """Ranking de XP é calculado quando aluno pertence a uma academia."""
-    r = client.get("/me/training_stats", headers=ts_headers)
+    r = await client.get("/me/training_stats", headers=ts_headers)
     assert r.status_code == 200
     data = r.json()
     # Com apenas 1 aluno na academia, ranking deve ser 1
@@ -167,7 +167,7 @@ async def test_training_stats_ranking_xp_with_academy(client, db, ts_academy, ts
 @pytest.mark.asyncio
 async def test_training_stats_ranking_punctuality(client, db, ts_academy, ts_aluno, ts_headers):
     """Ranking de pontualidade é retornado corretamente."""
-    r = client.get("/me/training_stats", headers=ts_headers)
+    r = await client.get("/me/training_stats", headers=ts_headers)
     assert r.status_code == 200
     data = r.json()
     assert data["ranking_punctuality"] == 1

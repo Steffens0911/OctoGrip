@@ -124,14 +124,15 @@ MockHttpClient _buildClient({
   final client = MockHttpClient();
   final sessionList = sessions ?? [];
   final status = checkinStatus ?? _checkinStatus();
-  final statsData = stats ?? _statsPayload();
 
   when(() => client.get(any(), headers: any(named: 'headers')))
       .thenAnswer((inv) async {
     final uri = inv.positionalArguments[0] as Uri;
     if (uri.path.contains('/pre-checkin')) return _json(status);
     if (uri.path.contains('/training-sessions')) return _json(sessionList);
-    if (uri.path.contains('/training_stats')) return _json(statsData);
+    if (uri.path.contains('/training_stats')) {
+      return stats != null ? _json(stats) : http.Response('{}', 500, headers: {'content-type': 'application/json'});
+    }
     return _json([]);
   });
 
@@ -163,6 +164,7 @@ void main() {
 
   tearDown(() {
     ApiService().setHttpClientForTesting(http.Client());
+    ApiService().invalidateCache();
     clearAuthForTesting();
   });
 
@@ -308,6 +310,7 @@ void main() {
       ApiService().setHttpClientForTesting(_buildClient(
         sessions: [_session()],
         checkinStatus: _checkinStatus(),
+        stats: _statsPayload(),
       ));
       await tester.pumpWidget(_screen());
       await tester.pumpAndSettle();

@@ -36,6 +36,14 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(PreCheckinScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.academyId != widget.academyId || oldWidget.date != widget.date) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
