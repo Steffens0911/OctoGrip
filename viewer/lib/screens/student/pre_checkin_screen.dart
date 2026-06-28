@@ -420,10 +420,17 @@ class _ConfirmantsSheet extends StatelessWidget {
             itemCount: confirmants.length,
             itemBuilder: (ctx, i) {
               final c = confirmants[i];
+              final base = ApiService().baseUrl;
+              final rawUrl = c.avatarUrl;
+              final fullUrl = rawUrl == null
+                  ? null
+                  : rawUrl.startsWith('/')
+                      ? '$base$rawUrl'
+                      : rawUrl;
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundImage: c.avatarUrl != null ? NetworkImage(c.avatarUrl!) : null,
-                  child: c.avatarUrl == null
+                  backgroundImage: fullUrl != null ? NetworkImage(fullUrl) : null,
+                  child: fullUrl == null
                       ? Text(c.name.isNotEmpty ? c.name[0].toUpperCase() : '?')
                       : null,
                 ),
