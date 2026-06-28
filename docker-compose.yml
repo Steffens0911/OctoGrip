@@ -75,6 +75,14 @@ services:
       PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      # Limita as threads do TensorFlow/BLAS por inferência facial do quiosque.
+      # Sem isto, cada reconhecimento (DeepFace.represent síncrono) ocupa todos os
+      # vCPUs e satura a API durante os treinos. FACE_NUM_THREADS ajustável no .env.
+      OMP_NUM_THREADS: ${FACE_NUM_THREADS:-2}
+      TF_NUM_INTRAOP_THREADS: ${FACE_NUM_THREADS:-2}
+      TF_NUM_INTEROP_THREADS: "1"
+      OPENBLAS_NUM_THREADS: ${FACE_NUM_THREADS:-2}
+      MKL_NUM_THREADS: ${FACE_NUM_THREADS:-2}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@octogrip.com.br}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
@@ -118,6 +126,12 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
       FACE_WORKER: "1"
+      # Mesmo limite de threads do TF/BLAS do serviço api (ver comentário lá).
+      OMP_NUM_THREADS: ${FACE_NUM_THREADS:-2}
+      TF_NUM_INTRAOP_THREADS: ${FACE_NUM_THREADS:-2}
+      TF_NUM_INTEROP_THREADS: "1"
+      OPENBLAS_NUM_THREADS: ${FACE_NUM_THREADS:-2}
+      MKL_NUM_THREADS: ${FACE_NUM_THREADS:-2}
     depends_on:
       postgres:
         condition: service_healthy
