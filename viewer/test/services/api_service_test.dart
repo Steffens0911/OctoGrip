@@ -237,6 +237,49 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // Retry automático em GET após falha de conexão transiente
+  // -------------------------------------------------------------------------
+  group('ApiService — retry em GET transiente', () {
+    test('getTrainingSessions refaz após ClientException e retorna sucesso', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        if (calls == 1) {
+          throw http.ClientException('Failed to fetch');
+        }
+        return jsonOk([
+          {'id': 's1'},
+        ]);
+      });
+
+      final result =
+          await ApiService().getTrainingSessions('a1', classDate: '2026-06-29');
+
+      expect(calls, 2, reason: 'deve ter tentado uma segunda vez');
+      expect(result, hasLength(1));
+      expect(result.first['id'], 's1');
+    });
+
+    test('getTrainingSessions propaga erro se ambas as tentativas falham', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        throw http.ClientException('Failed to fetch');
+      });
+
+      await expectLater(
+        ApiService().getTrainingSessions('a1'),
+        throwsA(isA<http.ClientException>()),
+      );
+      expect(calls, 2, reason: 'tenta uma vez e refaz uma vez antes de desistir');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Timeout
   // -------------------------------------------------------------------------
   group('ApiService — timeout', () {

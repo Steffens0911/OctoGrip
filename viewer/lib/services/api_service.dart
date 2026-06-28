@@ -186,22 +186,35 @@ class ApiService {
     return _fetchAndCache(uri, key, ttlSeconds);
   }
 
+  /// GET com 1 retry após [http.ClientException] — falha transiente de conexão
+  /// (ex.: "Failed to fetch" no web quando a API ainda está acordando). Evita
+  /// que o usuário precise apertar "Tentar novamente" por uma oscilação pontual.
+  /// [headers] já resolvidos; reusados na 2ª tentativa.
+  Future<http.Response> _getWithRetry(
+    Uri uri,
+    Map<String, String> headers, {
+    Duration? timeout,
+  }) async {
+    Future<http.Response> attempt() async =>
+        _req(_client.get(uri, headers: headers), timeout: timeout);
+    try {
+      return await attempt();
+    } on http.ClientException {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      return await attempt();
+    }
+  }
+
   Future<http.Response> _fetchAndCache(Uri uri, String key, int ttlSeconds) {
     final inFlight = _inFlightGets[key];
     if (inFlight != null) return inFlight;
     final future = () async {
       try {
-        Future<http.Response> attempt() async => _req(
-              _client.get(uri, headers: await _headers(auth: true)),
-              timeout: _getTimeout,
-            );
-        http.Response r;
-        try {
-          r = await attempt();
-        } on http.ClientException {
-          await Future<void>.delayed(const Duration(milliseconds: 800));
-          r = await attempt();
-        }
+        final r = await _getWithRetry(
+          uri,
+          await _headers(auth: true),
+          timeout: _getTimeout,
+        );
         if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
           _setCache(key, r.body, r.statusCode, ttlSeconds);
         }
@@ -2499,11 +2512,11 @@ class ApiService {
     };
     if (classDate != null) params['class_date'] = classDate;
     if (status != null) params['status'] = status;
-    final r = await _req(_client.get(
+    final r = await _getWithRetry(
       Uri.parse('$baseUrl/academies/$academyId/training-sessions')
           .replace(queryParameters: params),
-      headers: await _jsonHeaders(auth: true),
-    ));
+      await _jsonHeaders(auth: true),
+    );
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return (data as List).cast<Map<String, dynamic>>();
