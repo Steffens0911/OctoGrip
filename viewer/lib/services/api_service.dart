@@ -82,10 +82,13 @@ class ApiService {
   static const _getTimeout = Duration(seconds: 15);
 
   /// Cliente HTTP — substituível em testes via [setHttpClientForTesting].
-  http.Client _client = http.Client();
+  /// Envolto em [_ResilientHttpClient] para retentar GETs transientes (502/503/
+  /// 504 do proxy e ClientException) de forma transparente a todos os endpoints.
+  http.Client _client = _ResilientHttpClient(http.Client());
 
   @visibleForTesting
-  void setHttpClientForTesting(http.Client client) => _client = client;
+  void setHttpClientForTesting(http.Client client) =>
+      _client = _ResilientHttpClient(client);
 
   final Map<String, _CacheEntry> _getCache = {};
   static const int _cacheTtlShort =
@@ -186,37 +189,17 @@ class ApiService {
     return _fetchAndCache(uri, key, ttlSeconds);
   }
 
-  /// Backoff entre as tentativas de [_getWithRetry]. O nº de retries é o
-  /// tamanho desta lista (2 retries → 3 tentativas no total).
-  static const List<Duration> _getRetryBackoff = [
-    Duration(milliseconds: 500),
-    Duration(milliseconds: 1200),
-  ];
-
-  /// GET com até 3 tentativas após [http.ClientException] — falha transiente de
-  /// conexão (ex.: "Failed to fetch" no web quando a API oscila sob carga ou
-  /// ainda está acordando). Backoff crescente entre as tentativas. Evita que o
-  /// usuário precise apertar "Tentar novamente" por uma oscilação pontual.
-  /// [headers] já resolvidos; reusados nas tentativas seguintes.
-  ///
+  /// GET resiliente. O retry de falhas transientes (502/503/504 e
+  /// [http.ClientException]) é feito de forma transparente pelo
+  /// [_ResilientHttpClient] que envolve [_client] — aqui só aplicamos o timeout.
   /// Timeouts (resposta lenta) NÃO são retentados de propósito: refazer
-  /// multiplicaria a espera (até 3×); é melhor propagar rápido nesse caso.
+  /// multiplicaria a espera; é melhor propagar rápido nesse caso.
   Future<http.Response> _getWithRetry(
     Uri uri,
     Map<String, String> headers, {
     Duration? timeout,
-  }) async {
-    Future<http.Response> attempt() async =>
-        _req(_client.get(uri, headers: headers), timeout: timeout);
-    for (var i = 0;; i++) {
-      try {
-        return await attempt();
-      } on http.ClientException {
-        if (i >= _getRetryBackoff.length) rethrow;
-        await Future<void>.delayed(_getRetryBackoff[i]);
-      }
-    }
-  }
+  }) =>
+      _req(_client.get(uri, headers: headers), timeout: timeout);
 
   Future<http.Response> _fetchAndCache(Uri uri, String key, int ttlSeconds) {
     final inFlight = _inFlightGets[key];
@@ -4481,4 +4464,86 @@ class ApiService {
     return FaceArriveResponse.fromJson(data! as Map<String, dynamic>);
   }
 
+}
+
+/// Status transientes de gateway/proxy que valem uma nova tentativa.
+const Set<int> _kTransientStatuses = {502, 503, 504};
+
+/// Wrapper de [http.Client] que retenta automaticamente **apenas GETs**
+/// (idempotentes) em falhas transientes: [http.ClientException] (conexão
+/// recusada/resetada, "Failed to fetch") e respostas 502/503/504 do proxy
+/// (race de keep-alive, worker reiniciando). Cobre todos os endpoints de leitura
+/// de forma transparente, sem tocar nos call sites.
+///
+/// POST/PUT/PATCH/DELETE e streaming passam direto: reenviá-los poderia duplicar
+/// efeitos (presença, XP, uploads). Timeouts também não são retentados aqui — o
+/// timeout é aplicado por fora, em ApiService._req.
+class _ResilientHttpClient implements http.Client {
+  _ResilientHttpClient(this._inner);
+
+  final http.Client _inner;
+
+  /// Backoff entre tentativas. O tamanho define o nº de retries (2 → 3 no total).
+  static const List<Duration> _backoff = [
+    Duration(milliseconds: 300),
+    Duration(milliseconds: 900),
+  ];
+
+  @override
+  Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
+    for (var attempt = 0;; attempt++) {
+      try {
+        final response = await _inner.get(url, headers: headers);
+        if (_kTransientStatuses.contains(response.statusCode) &&
+            attempt < _backoff.length) {
+          await Future<void>.delayed(_backoff[attempt]);
+          continue;
+        }
+        return response;
+      } on http.ClientException {
+        if (attempt >= _backoff.length) rethrow;
+        await Future<void>.delayed(_backoff[attempt]);
+      }
+    }
+  }
+
+  // Métodos não-idempotentes / streaming: sem retry, delegação direta.
+  @override
+  Future<http.Response> head(Uri url, {Map<String, String>? headers}) =>
+      _inner.head(url, headers: headers);
+
+  @override
+  Future<http.Response> post(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _inner.post(url, headers: headers, body: body, encoding: encoding);
+
+  @override
+  Future<http.Response> put(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _inner.put(url, headers: headers, body: body, encoding: encoding);
+
+  @override
+  Future<http.Response> patch(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _inner.patch(url, headers: headers, body: body, encoding: encoding);
+
+  @override
+  Future<http.Response> delete(Uri url,
+          {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
+      _inner.delete(url, headers: headers, body: body, encoding: encoding);
+
+  @override
+  Future<String> read(Uri url, {Map<String, String>? headers}) =>
+      _inner.read(url, headers: headers);
+
+  @override
+  Future<Uint8List> readBytes(Uri url, {Map<String, String>? headers}) =>
+      _inner.readBytes(url, headers: headers);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      _inner.send(request);
+
+  @override
+  void close() => _inner.close();
 }

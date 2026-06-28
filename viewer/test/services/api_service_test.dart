@@ -315,6 +315,42 @@ void main() {
       expect(calls, 2, reason: 'deve ter tentado uma segunda vez');
       expect(count, 7);
     });
+
+    test('GET refaz em resposta 502 transiente do proxy', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        if (calls == 1) {
+          return jsonError(502, 'Bad Gateway');
+        }
+        return jsonOk([
+          {'id': 's1'},
+        ]);
+      });
+
+      final result = await ApiService().getTrainingSessions('a1');
+
+      expect(calls, 2, reason: '502 deve disparar nova tentativa');
+      expect(result, hasLength(1));
+    });
+
+    test('GET propaga 502 se todas as tentativas retornam 502', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async {
+        calls++;
+        return jsonError(502, 'Bad Gateway');
+      });
+
+      await expectLater(
+        ApiService().getTrainingSessions('a1'),
+        throwsA(isA<ApiException>()),
+      );
+      expect(calls, 3, reason: 'tenta uma vez e refaz duas vezes antes de desistir');
+    });
   });
 
   // -------------------------------------------------------------------------
