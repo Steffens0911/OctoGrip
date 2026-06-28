@@ -50,7 +50,10 @@ services:
     build: .
     container_name: jjb_api
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --loop uvloop --http httptools --no-access-log
+    # --timeout-keep-alive 120: mantém conexões ociosas abertas por mais tempo que
+    # o pool do proxy (Traefik/Coolify). Sem isto o uvicorn fecha em 5s e o proxy
+    # reusa a conexão morta → 502 intermitente sob navegação (rajadas de GETs).
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --loop uvloop --http httptools --no-access-log --timeout-keep-alive 120
     ports:
       # Host 8001 evita conflito com uvicorn local na 8000; dentro do contentor continua 8000.
       # Bind em 0.0.0.0 para permitir acesso da rede local (celular, outros devices).
