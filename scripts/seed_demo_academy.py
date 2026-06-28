@@ -77,20 +77,34 @@ today = now.date()
 GRADUATIONS = ["white", "blue", "purple", "brown", "black"]
 
 # Faixas dos 25 alunos (distribuição realista: muitos brancos, poucos pretos)
-STUDENT_BELTS = (
-    ["white"] * 10
-    + ["blue"] * 7
-    + ["purple"] * 4
-    + ["brown"] * 3
-    + ["black"] * 1
-)
+STUDENT_BELTS = ["white"] * 10 + ["blue"] * 7 + ["purple"] * 4 + ["brown"] * 3 + ["black"] * 1
 
 STUDENT_NAMES = [
-    "Lucas Almeida", "Mariana Costa", "Rafael Souza", "Beatriz Lima", "Gabriel Rocha",
-    "Juliana Martins", "Felipe Carvalho", "Camila Ferreira", "Bruno Oliveira", "Larissa Gomes",
-    "Thiago Ribeiro", "Amanda Barbosa", "Diego Nunes", "Patrícia Araújo", "Vinícius Pinto",
-    "Fernanda Dias", "Rodrigo Teixeira", "Aline Cardoso", "Marcelo Castro", "Carolina Moraes",
-    "Eduardo Ramos", "Tatiane Freitas", "Gustavo Mendes", "Priscila Lopes", "André Correia",
+    "Lucas Almeida",
+    "Mariana Costa",
+    "Rafael Souza",
+    "Beatriz Lima",
+    "Gabriel Rocha",
+    "Juliana Martins",
+    "Felipe Carvalho",
+    "Camila Ferreira",
+    "Bruno Oliveira",
+    "Larissa Gomes",
+    "Thiago Ribeiro",
+    "Amanda Barbosa",
+    "Diego Nunes",
+    "Patrícia Araújo",
+    "Vinícius Pinto",
+    "Fernanda Dias",
+    "Rodrigo Teixeira",
+    "Aline Cardoso",
+    "Marcelo Castro",
+    "Carolina Moraes",
+    "Eduardo Ramos",
+    "Tatiane Freitas",
+    "Gustavo Mendes",
+    "Priscila Lopes",
+    "André Correia",
 ]
 
 TECHNIQUES = [
@@ -128,9 +142,7 @@ def email_for(name: str) -> str:
 async def wipe_demo(db, academy_id: UUID) -> None:
     """Remove, em ordem segura de FKs, tudo ligado à academia demo."""
     user_ids_subq = select(User.id).where(User.academy_id == academy_id).scalar_subquery()
-    session_ids_subq = (
-        select(AttendanceSession.id).where(AttendanceSession.academy_id == academy_id).scalar_subquery()
-    )
+    session_ids_subq = select(AttendanceSession.id).where(AttendanceSession.academy_id == academy_id).scalar_subquery()
 
     # Filhos por usuário
     await db.execute(delete(UserTrophyEarned).where(UserTrophyEarned.user_id.in_(user_ids_subq)))
@@ -148,9 +160,7 @@ async def wipe_demo(db, academy_id: UUID) -> None:
     await db.execute(delete(AcademyChampionshipEvent).where(AcademyChampionshipEvent.academy_id == academy_id))
     await db.execute(delete(AcademyTrophyTemplate).where(AcademyTrophyTemplate.academy_id == academy_id))
     await db.execute(delete(Mission).where(Mission.academy_id == academy_id))
-    kit_ids_subq = (
-        select(WeeklyTechniqueKit.id).where(WeeklyTechniqueKit.academy_id == academy_id).scalar_subquery()
-    )
+    kit_ids_subq = select(WeeklyTechniqueKit.id).where(WeeklyTechniqueKit.academy_id == academy_id).scalar_subquery()
     await db.execute(delete(WeeklyKitItem).where(WeeklyKitItem.kit_id.in_(kit_ids_subq)))
     await db.execute(delete(WeeklyTechniqueKit).where(WeeklyTechniqueKit.academy_id == academy_id))
     await db.execute(delete(CollectiveGoal).where(CollectiveGoal.academy_id == academy_id))
@@ -711,9 +721,7 @@ async def main() -> int:
     args = parser.parse_args()
 
     async with AsyncSessionLocal() as db:
-        existing = (
-            await db.execute(select(Academy).where(Academy.slug == DEMO_SLUG))
-        ).scalar_one_or_none()
+        existing = (await db.execute(select(Academy).where(Academy.slug == DEMO_SLUG))).scalar_one_or_none()
 
         if existing is not None:
             if not args.reset:

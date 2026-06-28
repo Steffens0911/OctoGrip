@@ -7,6 +7,7 @@ Regras acordadas:
 - Atrasado = check-in > start_time → zera streak imediatamente
 - Ausente = não registrou presença → não afeta o streak
 """
+
 from __future__ import annotations
 
 import logging

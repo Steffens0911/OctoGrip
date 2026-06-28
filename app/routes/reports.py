@@ -46,6 +46,7 @@ class PunctualityReportResponse(BaseModel):
     days: int
     students: list[PunctualityStudentEntry]
 
+
 router = APIRouter()
 
 _MAX_REPORT_DATE_RANGE_DAYS = 366
@@ -359,10 +360,14 @@ async def reports_punctuality(
 
     user_ids = [r[0] for r in rows]
     users = (
-        await db.execute(
-            select(User).where(User.id.in_(user_ids), User.role == "aluno").order_by(User.name.asc().nulls_last())
+        (
+            await db.execute(
+                select(User).where(User.id.in_(user_ids), User.role == "aluno").order_by(User.name.asc().nulls_last())
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     user_map = {u.id: u for u in users}
 
     entries: list[PunctualityStudentEntry] = []

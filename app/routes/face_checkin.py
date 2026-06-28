@@ -5,6 +5,7 @@ Endpoint público (sem auth header) usado pelo tablet fixo na recepção.
 Recebe um frame da câmera, identifica o aluno e registra presença em tempo real.
 Frame descartado imediatamente após o embedding ser gerado (LGPD).
 """
+
 import logging
 from datetime import UTC, datetime
 from uuid import UUID
@@ -138,9 +139,7 @@ async def face_arrive(
 
     # Broadcast para o painel do professor em tempo real
     present_count = (
-        await db.execute(
-            select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id)
-        )
+        await db.execute(select(func.count(AttendanceRecord.id)).where(AttendanceRecord.session_id == session_id))
     ).scalar_one()
     rec_read = AttendanceRecordRead(
         id=record.id,

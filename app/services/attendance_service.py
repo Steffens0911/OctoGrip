@@ -52,9 +52,7 @@ async def _check_pre_checkin_strict(
         )
     ).scalar_one_or_none()
     if confirmed is None:
-        raise ForbiddenError(
-            "Pré-checkin obrigatório: confirme sua presença no app antes de bater a chamada."
-        )
+        raise ForbiddenError("Pré-checkin obrigatório: confirme sua presença no app antes de bater a chamada.")
 
 
 async def invalidate_attendance_ranking_cache(academy_id: UUID | None) -> None:
@@ -347,8 +345,7 @@ async def scan_checkin(
     if s_academy_id is not None:
         academy_row = (
             await db.execute(
-                select(Academy.qr_attendance_enabled, Academy.pre_checkin_strict)
-                .where(Academy.id == s_academy_id)
+                select(Academy.qr_attendance_enabled, Academy.pre_checkin_strict).where(Academy.id == s_academy_id)
             )
         ).one_or_none()
         if academy_row is not None:

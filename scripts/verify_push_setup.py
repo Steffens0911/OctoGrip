@@ -84,8 +84,7 @@ def main() -> int:
     print("OK: POST /admin/push_broadcast ->", summary)
     if summary.get("target_tokens", 0) == 0:
         print(
-            "NOTA: target_tokens=0 - nenhum dispositivo na tabela user_device_tokens "
-            "(faca login num cliente com FCM)."
+            "NOTA: target_tokens=0 - nenhum dispositivo na tabela user_device_tokens (faca login num cliente com FCM)."
         )
     elif summary.get("sent", 0) == 0:
         print(

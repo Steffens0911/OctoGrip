@@ -18,9 +18,7 @@ from app.schemas.training_session import ConfirmantRead, PreCheckinStatusRead
 
 class PreCheckinWindowClosedError(ForbiddenError):
     def __init__(self) -> None:
-        super().__init__(
-            "O prazo para confirmação encerrou (30 min antes do treino)."
-        )
+        super().__init__("O prazo para confirmação encerrou (30 min antes do treino).")
 
 
 class PreCheckinSessionNotOpen(ForbiddenError):
@@ -51,9 +49,7 @@ async def confirm(
     user: User,
 ) -> TrainingPreCheckin:
     """Aluno confirma presença antecipada."""
-    result = await db.execute(
-        select(TrainingSession).where(TrainingSession.id == session_id)
-    )
+    result = await db.execute(select(TrainingSession).where(TrainingSession.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise NotFoundError("Treino não encontrado.")
@@ -111,9 +107,7 @@ async def cancel(
         raise NotFoundError("Confirmação não encontrada.")
 
     # Verifica janela antes de cancelar
-    session_result = await db.execute(
-        select(TrainingSession).where(TrainingSession.id == session_id)
-    )
+    session_result = await db.execute(select(TrainingSession).where(TrainingSession.id == session_id))
     session = session_result.scalar_one_or_none()
     if session:
         _check_window(session)
@@ -142,10 +136,12 @@ async def get_status(
 
     # Lista de confirmantes (lazy="selectin" carrega user automaticamente)
     confirmants_result = await db.execute(
-        select(TrainingPreCheckin).where(
+        select(TrainingPreCheckin)
+        .where(
             TrainingPreCheckin.training_session_id == session_id,
             TrainingPreCheckin.status == "confirmed",
-        ).order_by(TrainingPreCheckin.confirmed_at)
+        )
+        .order_by(TrainingPreCheckin.confirmed_at)
     )
     confirmants = list(confirmants_result.scalars().all())
 
@@ -171,7 +167,9 @@ async def get_status(
 async def count_confirmed(db: AsyncSession, session_id: UUID) -> int:
     """Contagem de confirmados para uma sessão (para o professor)."""
     result = await db.execute(
-        select(func.count()).select_from(TrainingPreCheckin).where(
+        select(func.count())
+        .select_from(TrainingPreCheckin)
+        .where(
             TrainingPreCheckin.training_session_id == session_id,
             TrainingPreCheckin.status == "confirmed",
         )

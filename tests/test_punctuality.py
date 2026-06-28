@@ -3,6 +3,7 @@ Testes do sistema de pontualidade e do endpoint de quiosque facial.
 
 O face matching é mockado para testar o fluxo completo sem precisar de DeepFace.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
@@ -305,7 +306,9 @@ async def test_streak_best_atualizado(db: AsyncSession, pct_academy, pct_aluno):
     await db.refresh(record)
 
     early = datetime(date.today().year, date.today().month, date.today().day, 0, 0, 0, tzinfo=UTC)
-    await apply_punctuality(db, user=pct_aluno, academy=pct_academy, record=record, training_session=ts, checked_in_at=early)
+    await apply_punctuality(
+        db, user=pct_aluno, academy=pct_academy, record=record, training_session=ts, checked_in_at=early
+    )
 
     assert pct_aluno.punctuality_streak == 10
     assert pct_aluno.punctuality_streak_best == 10

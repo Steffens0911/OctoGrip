@@ -1,6 +1,6 @@
 """Serviços para treinos lançados pelo professor e templates (favoritos)."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError
 from app.models import Academy, User
-from app.models.attendance_session import AttendanceSession
 from app.models.attendance_record import AttendanceRecord
+from app.models.attendance_session import AttendanceSession
 from app.models.training_pre_checkin import TrainingPreCheckin
 from app.models.training_session import TrainingSession, TrainingTemplate
 from app.schemas.training_session import (
@@ -40,6 +40,7 @@ class PreCheckinNotEnabledError(ForbiddenError):
 # ---------------------------------------------------------------------------
 # Templates (favoritos)
 # ---------------------------------------------------------------------------
+
 
 async def list_templates(db: AsyncSession, academy_id: UUID) -> list[TrainingTemplate]:
     result = await db.execute(
@@ -111,6 +112,7 @@ async def delete_template(db: AsyncSession, template_id: UUID, academy_id: UUID)
 # Sessions (treinos lançados)
 # ---------------------------------------------------------------------------
 
+
 async def _get_academy(db: AsyncSession, academy_id: UUID) -> Academy:
     result = await db.execute(select(Academy).where(Academy.id == academy_id))
     academy = result.scalar_one_or_none()
@@ -122,7 +124,7 @@ async def _get_academy(db: AsyncSession, academy_id: UUID) -> Academy:
 async def list_sessions(
     db: AsyncSession,
     academy_id: UUID,
-    class_date: str | None = None,
+    class_date: date | None = None,
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -138,9 +140,7 @@ async def list_sessions(
 
 
 async def get_session(db: AsyncSession, session_id: UUID) -> TrainingSession:
-    result = await db.execute(
-        select(TrainingSession).where(TrainingSession.id == session_id)
-    )
+    result = await db.execute(select(TrainingSession).where(TrainingSession.id == session_id))
     session = result.scalar_one_or_none()
     if not session:
         raise TrainingSessionNotFoundError()
@@ -240,36 +240,42 @@ async def get_session_summary(
 
     # IDs de quem pré-confirmou (status = confirmed)
     pre_rows = (
-        await db.execute(
-            select(TrainingPreCheckin.user_id).where(
-                TrainingPreCheckin.training_session_id == session_id,
-                TrainingPreCheckin.status == "confirmed",
+        (
+            await db.execute(
+                select(TrainingPreCheckin.user_id).where(
+                    TrainingPreCheckin.training_session_id == session_id,
+                    TrainingPreCheckin.status == "confirmed",
+                )
             )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     pre_confirmed_ids: set[UUID] = set(pre_rows)
 
     # IDs de quem bateu presença via qualquer chamada vinculada a este treino
     attended_rows = (
-        await db.execute(
-            select(AttendanceRecord.user_id)
-            .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
-            .where(AttendanceSession.training_session_id == session_id)
-            .distinct()
+        (
+            await db.execute(
+                select(AttendanceRecord.user_id)
+                .join(AttendanceSession, AttendanceRecord.session_id == AttendanceSession.id)
+                .where(AttendanceSession.training_session_id == session_id)
+                .distinct()
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     attended_ids: set[UUID] = set(attended_rows)
 
     # Todos os user_ids envolvidos
     all_ids = pre_confirmed_ids | attended_ids
     user_rows = (
-        await db.execute(
-            select(User.id, User.name, User.avatar_url).where(User.id.in_(all_ids))
-        )
-    ).all() if all_ids else []
-    user_map: dict[UUID, tuple[str | None, str | None]] = {
-        row[0]: (row[1], row[2]) for row in user_rows
-    }
+        (await db.execute(select(User.id, User.name, User.avatar_url).where(User.id.in_(all_ids)))).all()
+        if all_ids
+        else []
+    )
+    user_map: dict[UUID, tuple[str | None, str | None]] = {row[0]: (row[1], row[2]) for row in user_rows}
 
     def _person(uid: UUID) -> PersonSummaryRead:
         name, avatar_url = user_map.get(uid, (None, None))

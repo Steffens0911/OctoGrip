@@ -17,6 +17,7 @@ def _validate_time(v: str) -> str:
 # Templates (favoritos)
 # ---------------------------------------------------------------------------
 
+
 class TrainingTemplateCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -60,6 +61,7 @@ class TrainingTemplateRead(BaseModel):
 # ---------------------------------------------------------------------------
 # Sessions (treinos lançados)
 # ---------------------------------------------------------------------------
+
 
 class TrainingSessionCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -111,6 +113,7 @@ class TrainingSessionRead(BaseModel):
 # Pre-checkin
 # ---------------------------------------------------------------------------
 
+
 class ConfirmantRead(BaseModel):
     """Dados mínimos de quem confirmou presença (para prova social)."""
 
@@ -150,6 +153,7 @@ class PreCheckinStatusRead(BaseModel):
 # ---------------------------------------------------------------------------
 # Resumo pós-treino (furo inteligente)
 # ---------------------------------------------------------------------------
+
 
 class PersonSummaryRead(BaseModel):
     """Dados mínimos de uma pessoa para o resumo pós-treino."""

@@ -8,6 +8,7 @@ para garantir resposta imediata ao aluno que se aproxima do quiosque.
 Threshold mais restritivo (0.60 vs 0.55 do lote) para reduzir falsos positivos
 em ambiente sem supervisão dedicada.
 """
+
 from __future__ import annotations
 
 import logging

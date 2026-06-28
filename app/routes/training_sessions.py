@@ -42,6 +42,7 @@ router = APIRouter()
 
 async def _session_read(db: AsyncSession, s) -> TrainingSessionRead:
     from app.services.pre_checkin_service import count_confirmed
+
     count = await count_confirmed(db, s.id)
     return TrainingSessionRead(
         id=s.id,
@@ -63,6 +64,7 @@ async def _session_read(db: AsyncSession, s) -> TrainingSessionRead:
 # ---------------------------------------------------------------------------
 # Templates
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{academy_id}/training-templates", response_model=list[TrainingTemplateRead])
 async def get_templates(
@@ -96,8 +98,10 @@ async def patch_template(
     academy_id = current_user.academy_id
     if current_user.role == "administrador":
         # admin pode editar qualquer template; busca sem filtro de academia
-        from app.models.training_session import TrainingTemplate
         from sqlalchemy import select
+
+        from app.models.training_session import TrainingTemplate
+
         result = await db.execute(select(TrainingTemplate).where(TrainingTemplate.id == template_id))
         t = result.scalar_one_or_none()
         if t:
@@ -113,8 +117,10 @@ async def del_template(
 ):
     academy_id = current_user.academy_id
     if current_user.role == "administrador":
-        from app.models.training_session import TrainingTemplate
         from sqlalchemy import select
+
+        from app.models.training_session import TrainingTemplate
+
         result = await db.execute(select(TrainingTemplate).where(TrainingTemplate.id == template_id))
         t = result.scalar_one_or_none()
         if t:
@@ -125,6 +131,7 @@ async def del_template(
 # ---------------------------------------------------------------------------
 # Sessions
 # ---------------------------------------------------------------------------
+
 
 @router.get("/{academy_id}/training-sessions", response_model=list[TrainingSessionRead])
 async def get_sessions(
@@ -140,7 +147,7 @@ async def get_sessions(
     sessions = await list_sessions(
         db,
         academy_id,
-        class_date=str(class_date) if class_date else None,
+        class_date=class_date,
         status=status,
         limit=limit,
         offset=offset,
@@ -156,9 +163,10 @@ async def get_sessions_today(
 ):
     """Sessões do dia atual (horário de Brasília). Usado para o link de WhatsApp."""
     from app.core.app_time import today_in_app_tz
+
     today = today_in_app_tz()
     verify_academy_access(current_user, str(academy_id))
-    sessions = await list_sessions(db, academy_id, class_date=str(today), limit=20)
+    sessions = await list_sessions(db, academy_id, class_date=today, limit=20)
     return [await _session_read(db, s) for s in sessions]
 
 
@@ -237,6 +245,7 @@ async def delete_session_route(
 # Pre-checkin endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.get(
     "/training-sessions/{session_id}/pre-checkin",
     response_model=PreCheckinStatusRead,
@@ -282,6 +291,7 @@ async def cancel_pre_checkin(
 # ---------------------------------------------------------------------------
 # Resumo pós-treino (furo inteligente)
 # ---------------------------------------------------------------------------
+
 
 @router.get(
     "/training-sessions/{session_id}/summary",

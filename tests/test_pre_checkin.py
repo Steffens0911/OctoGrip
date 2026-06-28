@@ -160,9 +160,7 @@ async def test_criar_sessao_requer_pre_checkin_habilitado(client, professor_head
 
 
 @pytest.mark.asyncio
-async def test_criar_sessao_com_pre_checkin_habilitado(
-    client, pce_academy, pce_prof_headers
-):
+async def test_criar_sessao_com_pre_checkin_habilitado(client, pce_academy, pce_prof_headers):
     """Professor cria sessão de treino quando academia tem pré-checkin habilitado."""
     class_date = str(date.today() + timedelta(days=2))
     r = await client.post(
@@ -235,9 +233,7 @@ async def test_aluno_cancela_pre_checkin(client, pce_session, pce_aluno_headers)
 
 
 @pytest.mark.asyncio
-async def test_cancelar_sem_confirmacao_retorna_404(
-    client, pce_session, pce_aluno_headers
-):
+async def test_cancelar_sem_confirmacao_retorna_404(client, pce_session, pce_aluno_headers):
     """Cancelar sem ter confirmado antes retorna 404."""
     r = await client.post(
         f"/academies/training-sessions/{pce_session.id}/pre-checkin/cancel",
@@ -247,9 +243,7 @@ async def test_cancelar_sem_confirmacao_retorna_404(
 
 
 @pytest.mark.asyncio
-async def test_janela_fechada_nao_permite_confirmar(
-    client, pce_session_passado, pce_aluno_headers
-):
+async def test_janela_fechada_nao_permite_confirmar(client, pce_session_passado, pce_aluno_headers):
     """Não é possível confirmar após o prazo (30 min antes do treino)."""
     r = await client.post(
         f"/academies/training-sessions/{pce_session_passado.id}/pre-checkin/confirm",
@@ -280,9 +274,7 @@ async def test_status_sem_confirmacao(client, pce_session, pce_aluno_headers):
 
 
 @pytest.mark.asyncio
-async def test_status_apos_confirmacao(
-    client, pce_session, pce_aluno, pce_aluno_headers
-):
+async def test_status_apos_confirmacao(client, pce_session, pce_aluno, pce_aluno_headers):
     """Status após confirmar: status=confirmed, aparece na lista."""
     await client.post(
         f"/academies/training-sessions/{pce_session.id}/pre-checkin/confirm",
@@ -367,11 +359,7 @@ async def test_pre_checkin_count_atualiza_apos_confirmacao(
         headers=pce_prof_headers,
     )
     assert r_before.status_code == 200
-    count_before = next(
-        s["pre_checkin_count"]
-        for s in r_before.json()
-        if str(s["id"]) == str(pce_session.id)
-    )
+    count_before = next(s["pre_checkin_count"] for s in r_before.json() if str(s["id"]) == str(pce_session.id))
     assert count_before == 0
 
     await client.post(
@@ -383,11 +371,7 @@ async def test_pre_checkin_count_atualiza_apos_confirmacao(
         f"/academies/{pce_academy.id}/training-sessions",
         headers=pce_prof_headers,
     )
-    count_after = next(
-        s["pre_checkin_count"]
-        for s in r_after.json()
-        if str(s["id"]) == str(pce_session.id)
-    )
+    count_after = next(s["pre_checkin_count"] for s in r_after.json() if str(s["id"]) == str(pce_session.id))
     assert count_after == 1
 
 
@@ -436,9 +420,7 @@ async def test_resumo_furo_aluno_confirmou_mas_nao_veio(
 
 
 @pytest.mark.asyncio
-async def test_resumo_apenas_professor_acessa(
-    client, pce_session, pce_aluno_headers
-):
+async def test_resumo_apenas_professor_acessa(client, pce_session, pce_aluno_headers):
     """Aluno não pode acessar o resumo (require_write_access)."""
     r = await client.get(
         f"/academies/training-sessions/{pce_session.id}/summary",

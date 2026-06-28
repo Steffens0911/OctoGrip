@@ -1,4 +1,5 @@
 """Diagnóstico: streak e UserRead para um user_id. Uso: docker compose exec api python /app/scripts/debug_streak_user.py"""
+
 import asyncio
 import sys
 from uuid import UUID

@@ -83,6 +83,7 @@ celery_app.conf.update(
 def _init_sentry_in_worker(**_: object) -> None:
     """Inicializa Sentry em cada processo worker para capturar exceções de tasks."""
     from app.core.error_tracking import init_sentry
+
     init_sentry(settings.SENTRY_DSN)
 
 

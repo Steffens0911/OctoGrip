@@ -18,6 +18,7 @@ def send_pre_checkin_reminder(self) -> None:
 
     async def _wrapper() -> None:
         from app.database import async_engine
+
         try:
             await _run()
         finally:

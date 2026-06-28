@@ -43,6 +43,4 @@ class TrainingPreCheckin(Base, UUIDMixin):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped[User] = relationship("User", foreign_keys=[user_id], lazy="selectin")
-    session: Mapped[TrainingSession] = relationship(
-        "TrainingSession", foreign_keys=[training_session_id], lazy="raise"
-    )
+    session: Mapped[TrainingSession] = relationship("TrainingSession", foreign_keys=[training_session_id], lazy="raise")

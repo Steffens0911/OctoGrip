@@ -88,6 +88,10 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     FACE_JOBS_DIR: str = "/tmp/face_jobs"
     FACE_MAX_IMAGE_SIDE: int = 1280
+    # Pré-aquece o modelo facial no startup dos workers da API (elimina o cold
+    # start de ~16s na primeira chamada do quiosque). Custo: ~830MB de RAM por
+    # worker, ocupados desde o boot. Desligue em ambientes com pouca memória.
+    FACE_WARMUP_ON_STARTUP: bool = True
 
     # LGPD / Privacidade
     # Versão vigente de cada documento legal. Quando o texto muda de forma relevante,
