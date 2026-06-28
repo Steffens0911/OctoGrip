@@ -8,7 +8,6 @@ from fastapi import APIRouter
 from app.routes import (
     academies,
     academy_weekly_kits,
-    training_sessions,
     admin,
     admin_audit,
     admin_backup,
@@ -46,6 +45,7 @@ from app.routes import (
     students,
     techniques,
     training_feedback,
+    training_sessions,
     training_videos,
     trophies,
     users,

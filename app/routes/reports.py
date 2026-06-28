@@ -11,7 +11,7 @@ from app.core.app_time import combine_local_date_start_utc, today_in_app_tz
 from app.core.exceptions import AppError, ForbiddenError
 from app.core.role_deps import require_admin_manager_or_supervisor, require_write_access, verify_academy_access
 from app.database import get_db
-from app.models import Academy, AttendanceRecord, AttendanceSession, User
+from app.models import AttendanceRecord, AttendanceSession, User
 from app.schemas.metrics import (
     ActiveStudentsReportResponse,
     EngagementReportResponse,

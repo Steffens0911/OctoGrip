@@ -10,7 +10,8 @@ Regras acordadas:
 from __future__ import annotations
 
 import logging
-from datetime import UTC, date, datetime, time as dt_time
+from datetime import UTC, datetime
+from datetime import time as dt_time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

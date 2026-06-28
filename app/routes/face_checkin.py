@@ -16,12 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AppError, AttendanceSessionNotFoundError, ForbiddenError
 from app.core.rate_limit import limiter
 from app.database import get_db
-from app.models import Academy, AttendanceRecord, AttendanceSession, User
+from app.models import Academy, AttendanceRecord, AttendanceSession
 from app.models.training_session import TrainingSession
 from app.schemas.attendance import AttendanceRecordRead
 from app.schemas.face_checkin import FaceArriveResponse
 from app.services.attendance_realtime import attendance_manager
-from app.services.face_checkin_service import KIOSK_CONFIDENCE_THRESHOLD, match_face_for_kiosk
+from app.services.face_checkin_service import match_face_for_kiosk
 from app.services.punctuality_service import apply_punctuality
 
 router = APIRouter()

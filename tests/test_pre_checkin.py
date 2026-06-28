@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password_sync
 
-
 # ---------------------------------------------------------------------------
 # Fixtures locais
 # ---------------------------------------------------------------------------

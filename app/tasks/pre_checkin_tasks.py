@@ -29,7 +29,7 @@ def send_pre_checkin_reminder(self) -> None:
 async def _run() -> None:
     from datetime import timedelta
 
-    from sqlalchemy import and_, exists, not_, select
+    from sqlalchemy import exists, not_, select
 
     from app.config import settings
     from app.core.app_time import today_in_app_tz

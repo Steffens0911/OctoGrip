@@ -5,7 +5,7 @@ O face matching é mockado para testar o fluxo completo sem precisar de DeepFace
 """
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -13,7 +13,6 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import create_access_token, hash_password_sync
-
 
 # ---------------------------------------------------------------------------
 # Fixtures locais
@@ -83,8 +82,6 @@ def pct_prof_headers(pct_professor):
 @pytest.fixture
 async def pct_session(db: AsyncSession, pct_academy, pct_professor):
     """Sessão de chamada ativa com TrainingSession vinculado (treino às 19h de hoje)."""
-    from datetime import timezone
-
     from app.models import AttendanceSession
     from app.models.training_session import TrainingSession
 
