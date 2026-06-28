@@ -78,9 +78,12 @@ services:
       PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
+      # Warmup desligado na API: 2 workers carregando o modelo simultaneamente no
+      # startup (~1.5 GB pico cada) ultrapassava o mem_limit e causava OOM/crash loop.
+      # O modelo é mantido quente no celery-worker-face; o primeiro check-in do dia
+      # na API tem cold start de ~16s, mas a API para de morrer no boot.
+      FACE_WARMUP_ON_STARTUP: "false"
       # Limita as threads do TensorFlow/BLAS por inferência facial do quiosque.
-      # Sem isto, cada reconhecimento (DeepFace.represent síncrono) ocupa todos os
-      # vCPUs e satura a API durante os treinos. FACE_NUM_THREADS ajustável no .env.
       OMP_NUM_THREADS: ${FACE_NUM_THREADS:-2}
       TF_NUM_INTRAOP_THREADS: ${FACE_NUM_THREADS:-2}
       TF_NUM_INTEROP_THREADS: "1"
@@ -107,8 +110,8 @@ services:
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
       - ./docs/legal:/app/docs/legal:ro
-    # Warmup mantém o modelo facial (~830MB/worker × 2) em memória desde o boot.
-    mem_limit: 3g
+    # 4g: sem warmup a API usa ~1-1.5 GB base; margem para picos de inferência facial.
+    mem_limit: 4g
     mem_reservation: 1g
 
   celery-worker-face:
