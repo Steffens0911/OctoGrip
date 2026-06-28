@@ -26,6 +26,7 @@ import 'package:viewer/features/photos/presentation/pages/photos_feed_screen.dar
 import 'package:viewer/features/photos/presentation/pages/student_search_photos_page.dart';
 import 'package:viewer/screens/auth/reset_password_screen.dart';
 import 'package:viewer/screens/enrollment/public_registration_screen.dart';
+import 'package:viewer/screens/student/pre_checkin_screen.dart';
 import 'package:viewer/screens/notifications_screen.dart';
 import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/training_videos_section.dart';
@@ -70,6 +71,11 @@ void main() async {
 }
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+/// Armazena deep links pendentes entre o AuthGate e o MainShell.
+class _DeepLinks {
+  static String? date;
+}
 
 class OctoGripApp extends StatefulWidget {
   const OctoGripApp({super.key});
@@ -267,6 +273,11 @@ class AuthGate extends StatelessWidget {
       if (resetToken != null && resetToken.isNotEmpty) {
         return ResetPasswordScreen(token: resetToken);
       }
+      // Detecta link de pré-checkin compartilhado pelo professor: /?data=YYYY-MM-DD
+      final dataParam = Uri.base.queryParameters['data'];
+      if (dataParam != null && dataParam.isNotEmpty) {
+        _DeepLinks.date = dataParam;
+      }
     }
 
     final auth = context.watch<AuthService>();
@@ -333,11 +344,12 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _savedTabName = loadTab();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _applyRestoredTab();
-      AuthService().restoreImpersonation();
+      await AuthService().restoreImpersonation();
       _fetchUnreadCount();
       _loadAcademy();
+      _handlePendingDeepLink();
     });
     _startNotifPolling();
   }
@@ -379,6 +391,20 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _notifPollTimer?.cancel();
       _notifPollTimer = null;
     }
+  }
+
+  void _handlePendingDeepLink() {
+    final date = _DeepLinks.date;
+    if (date == null) return;
+    final academyId = AuthService().currentUser?.academyId?.trim() ?? '';
+    if (academyId.isEmpty || !mounted) return;
+    _DeepLinks.date = null;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PreCheckinScreen(academyId: academyId, date: date),
+      ),
+    );
   }
 
   Future<void> _loadAcademy() async {

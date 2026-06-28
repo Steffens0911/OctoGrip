@@ -200,6 +200,107 @@
       }, false);
     })();
   </script>
+  <!-- face-api.js: carregado dinamicamente só quando o quiosque facial é aberto. -->
+  <script>
+    // Carrega face-api.js uma única vez de forma lazy (não impacta o boot do app).
+    window.__loadFaceApi = (function () {
+      var _promise = null;
+      return function () {
+        if (_promise) return _promise;
+        _promise = new Promise(function (resolve, reject) {
+          if (window.faceapi) { resolve(); return; }
+          var s = document.createElement('script');
+          s.src = 'face-api.min.js';
+          s.onload = resolve;
+          s.onerror = function () { _promise = null; reject(new Error('face-api.js falhou ao carregar')); };
+          document.head.appendChild(s);
+        });
+        return _promise;
+      };
+    })();
+
+    // Wrapper de detecção facial — chamado pelo Flutter via dart:js_interop.
+    window.__faceDetect = {
+      _ready: false,
+      _lastBox: null,   // bounding box da última face detectada {x,y,width,height}
+
+      // Largura máxima do recorte enviado ao servidor. A face recortada em
+      // resolução moderada é suficiente para o embedding e reduz upload + o
+      // tempo de detecção opencv no backend (que reprocessa para alinhar).
+      _maxWidth: 320,
+      // Margem ao redor da face para o backend conseguir detectar/alinhar bem.
+      _margin: 0.4,
+
+      initialize: async function () {
+        if (this._ready) return;
+        await window.__loadFaceApi();
+        await faceapi.nets.tinyFaceDetector.loadFromUri('models');
+        this._ready = true;
+      },
+
+      hasFace: async function (video) {
+        if (!this._ready) return false;
+        try {
+          var opts = new faceapi.TinyFaceDetectorOptions({ scoreThreshold: 0.5, inputSize: 160 });
+          var d = await faceapi.detectSingleFace(video, opts);
+          this._lastBox = d ? d.box : null;
+          return d != null;
+        } catch (_) { this._lastBox = null; return false; }
+      },
+
+      captureJpeg: function (video) {
+        try {
+          var vw = video.videoWidth  || 640;
+          var vh = video.videoHeight || 480;
+
+          // Região de origem: recorte da face (com margem) ou frame inteiro.
+          var sx = 0, sy = 0, sw = vw, sh = vh;
+          var box = this._lastBox;
+          if (box && box.width > 0 && box.height > 0) {
+            var mx = box.width  * this._margin;
+            var my = box.height * this._margin;
+            sx = Math.max(0, box.x - mx);
+            sy = Math.max(0, box.y - my);
+            sw = Math.min(vw - sx, box.width  + mx * 2);
+            sh = Math.min(vh - sy, box.height + my * 2);
+          }
+
+          // Redimensiona para no máximo _maxWidth de largura (mantém proporção).
+          var scale = sw > this._maxWidth ? this._maxWidth / sw : 1;
+          var dw = Math.max(1, Math.round(sw * scale));
+          var dh = Math.max(1, Math.round(sh * scale));
+
+          var c = document.createElement('canvas');
+          c.width = dw;
+          c.height = dh;
+          c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, dw, dh);
+          return c.toDataURL('image/jpeg', 0.85);
+        } catch (_) { return null; }
+      }
+    };
+
+    // Utilitários de câmera — getUserMedia encapsulado para facilitar interop Dart.
+    window.__camera = {
+      startCamera: async function (video, facingMode) {
+        var stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facingMode || 'user' },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.autoplay  = true;
+        video.muted     = true;
+        video.setAttribute('playsinline', '');
+        video.style.width      = '100%';
+        video.style.height     = '100%';
+        video.style.objectFit  = 'cover';
+        await video.play();
+        return stream;
+      },
+      stopStream: function (stream) {
+        if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+      }
+    };
+  </script>
   <!-- defer: registo do service worker mais previsível que async (critério de instalação PWA no Chrome). -->
   <script src="flutter_bootstrap.js" defer></script>
 </body>

@@ -50,7 +50,7 @@ services:
     build: .
     container_name: jjb_api
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --loop uvloop --http httptools --no-access-log
     ports:
       # Host 8001 evita conflito com uvicorn local na 8000; dentro do contentor continua 8000.
       # Bind em 0.0.0.0 para permitir acesso da rede local (celular, outros devices).
@@ -72,6 +72,7 @@ services:
       DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-6}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
@@ -95,8 +96,9 @@ services:
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
       - ./docs/legal:/app/docs/legal:ro
-    mem_limit: 512m
-    mem_reservation: 256m
+    # Warmup mantém o modelo facial (~830MB/worker × 2) em memória desde o boot.
+    mem_limit: 3g
+    mem_reservation: 1g
 
   celery-worker-face:
     build: .
@@ -112,6 +114,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
       FACE_WORKER: "1"
@@ -143,6 +146,7 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_SERVICE_ACCOUNT_PATH: ${FIREBASE_SERVICE_ACCOUNT_PATH:-secrets/firebase-service-account.json}
+      PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     depends_on:
       postgres:

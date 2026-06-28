@@ -92,7 +92,7 @@ MockHttpClient _buildClient({
   return client;
 }
 
-Widget _screen() => wrapApp(const PreCheckinScreen(academyId: 'academy-1'));
+Widget _screen({String? date}) => wrapApp(PreCheckinScreen(academyId: 'academy-1', date: date));
 
 void main() {
   setUpAll(() {
@@ -246,6 +246,36 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('25/06/2026'), findsOneWidget);
       expect(find.text('26/06/2026'), findsOneWidget);
+    });
+  });
+
+  group('PreCheckinScreen — modo filtrado por data (link do professor)', () {
+    testWidgets('exibe título com a data formatada', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(sessions: []));
+      await tester.pumpWidget(_screen(date: '2026-06-25'));
+      await tester.pumpAndSettle();
+      expect(find.text('Treinos de 25/06/2026'), findsOneWidget);
+    });
+
+    testWidgets('exibe mensagem específica quando sem sessões no dia', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(sessions: []));
+      await tester.pumpWidget(_screen(date: '2026-06-25'));
+      await tester.pumpAndSettle();
+      expect(find.text('Nenhum treino encontrado para este dia.'), findsOneWidget);
+    });
+
+    testWidgets('exibe sessões do dia informado', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(
+        sessions: [
+          _session(id: 's1', classDate: '2026-06-25', label: 'Manhã'),
+          _session(id: 's2', classDate: '2026-06-25', label: 'Noite'),
+        ],
+        checkinStatus: _checkinStatus(),
+      ));
+      await tester.pumpWidget(_screen(date: '2026-06-25'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Manhã'), findsOneWidget);
+      expect(find.textContaining('Noite'), findsOneWidget);
     });
   });
 }

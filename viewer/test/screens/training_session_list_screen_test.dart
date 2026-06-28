@@ -225,6 +225,47 @@ void main() {
     });
   });
 
+  group('TrainingSessionListScreen — link de pré-checkin', () {
+    testWidgets('exibe "Copiar link" para sessão upcoming', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(
+        sessions: [_session(status: 'upcoming')],
+      ));
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+      expect(find.text('Copiar link'), findsOneWidget);
+    });
+
+    testWidgets('exibe "Copiar link" para sessão open', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(
+        sessions: [_session(status: 'open')],
+      ));
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+      expect(find.text('Copiar link'), findsOneWidget);
+    });
+
+    testWidgets('não exibe "Copiar link" para sessão closed', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(
+        sessions: [_session(status: 'closed')],
+      ));
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+      expect(find.text('Copiar link'), findsNothing);
+    });
+
+    testWidgets('exibe "Copiar link" apenas nas sessões não encerradas', (tester) async {
+      ApiService().setHttpClientForTesting(_buildClient(
+        sessions: [
+          _session(id: 's1', status: 'upcoming', classDate: '2026-06-25'),
+          _session(id: 's2', status: 'closed', classDate: '2026-06-25'),
+        ],
+      ));
+      await tester.pumpWidget(_screen());
+      await tester.pumpAndSettle();
+      expect(find.text('Copiar link'), findsOneWidget);
+    });
+  });
+
   group('TrainingSessionListScreen — label e data', () {
     testWidgets('exibe label quando preenchido', (tester) async {
       ApiService().setHttpClientForTesting(_buildClient(

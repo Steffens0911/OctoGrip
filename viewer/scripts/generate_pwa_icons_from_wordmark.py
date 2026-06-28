@@ -5,6 +5,7 @@ Gera favicon.png e icons/Icon-*.png a partir de assets/branding/flowroll_wordmar
 
 Executar na raiz do viewer: python scripts/generate_pwa_icons_from_wordmark.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path

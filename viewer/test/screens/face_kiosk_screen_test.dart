@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/face_checkin.dart';
 import 'package:viewer/screens/academy/face_kiosk_screen.dart';
 
@@ -14,6 +15,12 @@ import '../helpers/pump_app.dart';
 // ---------------------------------------------------------------------------
 
 const _fakeFrame = [0xFF, 0xD8, 0xFF, 0xE0]; // mini JPEG header
+
+QrTokenModel _fakeQr() => QrTokenModel(
+      token: 'token-abc',
+      expiresAt: DateTime.now().add(const Duration(minutes: 1)),
+      shortCode: 'ABC123',
+    );
 
 FaceArriveResponse _noMatch() => const FaceArriveResponse(
       matched: false,
@@ -56,17 +63,39 @@ FaceArriveResponse _matchDuplicate() => const FaceArriveResponse(
       duplicate: true,
     );
 
+/// Monta o widget com câmera e QR mockados.
+///
+/// [detectFaceResult] controla o que detectFace() retorna (padrão: false).
+/// [onFaceArrive] é obrigatório para testes de resultado.
 Widget _screen({
-  required Future<Uint8List?> Function() captureFrame,
+  bool detectFaceResult = false,
   required Future<FaceArriveResponse> Function(Uint8List) onFaceArrive,
+  Future<Uint8List?> Function()? captureJpegOverride,
 }) =>
     wrapApp(
       FaceKioskScreen(
         sessionId: 'session-1',
-        captureFrame: captureFrame,
+        setupCamera: (_) async {}, // no-op — sem câmera real nos testes
+        detectFace: () async => detectFaceResult,
+        captureJpeg: captureJpegOverride ?? () async => Uint8List.fromList(_fakeFrame),
+        buildCameraView: (_) => const ColoredBox(color: Colors.grey), // placeholder
+        fetchQr: () async => _fakeQr(),
         onFaceArrive: onFaceArrive,
       ),
     );
+
+/// Avança até a tela estar em estado [ready] (setupCamera completo).
+Future<void> _pumpToReady(WidgetTester tester) async {
+  await tester.pump(); // build inicial (loading)
+  await tester.pump(); // setupCamera completa (estado ready)
+}
+
+/// Dispara um ciclo de detecção: avança 800ms + processa resultado.
+Future<void> _triggerDetection(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 800)); // timer de detecção
+  await tester.pump(); // captureJpeg + onFaceArrive
+  await tester.pump(); // setState resultado
+}
 
 // ---------------------------------------------------------------------------
 // Testes
@@ -87,181 +116,225 @@ void main() {
   });
 
   group('FaceKioskScreen — estado inicial', () {
-    testWidgets('exibe ícone e instrução de aguardar', (tester) async {
+    testWidgets('exibe loading enquanto câmera inicializa', (tester) async {
+      var setupCompleter = Completer<void>();
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) => setupCompleter.future,
+        detectFace: () async => false,
+        captureJpeg: () async => null,
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
+        onFaceArrive: (_) async => _noMatch(),
+      )));
+      await tester.pump();
+      expect(find.text('Iniciando câmera…'), findsOneWidget);
+      setupCompleter.complete();
+    });
+
+    testWidgets('exibe instrução de posicionamento após câmera pronta', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => null,
         onFaceArrive: (_) async => _noMatch(),
       ));
-      expect(find.byIcon(Icons.face_outlined), findsOneWidget);
+      await _pumpToReady(tester);
       expect(find.textContaining('câmera'), findsOneWidget);
     });
 
-    testWidgets('exibe botão "Identificar"', (tester) async {
-      await tester.pumpWidget(_screen(
-        captureFrame: () async => null,
-        onFaceArrive: (_) async => _noMatch(),
-      ));
-      expect(find.text('Identificar'), findsOneWidget);
-    });
-
     testWidgets('exibe título do AppBar', (tester) async {
-      await tester.pumpWidget(_screen(
-        captureFrame: () async => null,
-        onFaceArrive: (_) async => _noMatch(),
-      ));
+      await tester.pumpWidget(_screen(onFaceArrive: (_) async => _noMatch()));
+      await _pumpToReady(tester);
       expect(find.text('Quiosque de Entrada'), findsOneWidget);
     });
+
+    testWidgets('exibe QR Code após câmera pronta', (tester) async {
+      await tester.pumpWidget(_screen(onFaceArrive: (_) async => _noMatch()));
+      await _pumpToReady(tester);
+      await tester.pump(); // fetchQr completa
+      expect(find.textContaining('Ou escaneie'), findsOneWidget);
+    });
   });
 
-  group('FaceKioskScreen — captura sem reconhecimento', () {
-    testWidgets('exibe "Identificando…" durante processamento', (tester) async {
-      final completer = <Completer<FaceArriveResponse>>[];
-      await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
-        onFaceArrive: (_) {
-          final c = Completer<FaceArriveResponse>();
-          completer.add(c);
-          return c.future;
-        },
-      ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pump();
-
-      expect(find.text('Identificando…'), findsOneWidget);
-
-      completer.first.complete(_noMatch());
-      await tester.pumpAndSettle();
-    });
-
-    testWidgets('exibe greeting de não reconhecido', (tester) async {
-      await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+  group('FaceKioskScreen — detecção automática', () {
+    testWidgets('exibe "Rosto detectado" quando detectFace retorna true', (tester) async {
+      // captureJpeg bloqueado com Completer para manter o estado "detected" visível.
+      final captureCompleter = Completer<Uint8List?>();
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) async {},
+        detectFace: () async => true,
+        captureJpeg: () => captureCompleter.future,
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
         onFaceArrive: (_) async => _noMatch(),
+      )));
+      await _pumpToReady(tester);
+      await tester.pump(const Duration(milliseconds: 800)); // timer dispara
+      await tester.pump(); // detectFace completa → setState(detected) → captureJpeg inicia (bloqueado)
+      expect(find.textContaining('Rosto detectado'), findsOneWidget);
+      captureCompleter.complete(null); // libera para não vazar o timer
+    });
+
+    testWidgets('exibe "Identificando…" durante envio ao servidor', (tester) async {
+      final completer = Completer<FaceArriveResponse>();
+      await tester.pumpWidget(_screen(
+        detectFaceResult: true,
+        onFaceArrive: (_) => completer.future,
       ));
+      await _pumpToReady(tester);
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(); // captura
+      await tester.pump(); // sending state
+      expect(find.textContaining('Identificando'), findsOneWidget);
+      completer.complete(_noMatch());
+    });
 
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('QR'), findsOneWidget);
+    testWidgets('não captura quando detectFace retorna false', (tester) async {
+      var captureCount = 0;
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) async {},
+        detectFace: () async => false,
+        captureJpeg: () async {
+          captureCount++;
+          return Uint8List.fromList(_fakeFrame);
+        },
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
+        onFaceArrive: (_) async => _noMatch(),
+      )));
+      await _pumpToReady(tester);
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump();
+      expect(captureCount, 0);
     });
   });
 
-  group('FaceKioskScreen — aluno pontual', () {
-    testWidgets('exibe greeting de boas-vindas pontual', (tester) async {
+  group('FaceKioskScreen — resultado: aluno pontual', () {
+    testWidgets('exibe greeting de boas-vindas', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchPontual(),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('Bem-vindo'), findsOneWidget);
       expect(find.textContaining('Chegou na hora'), findsOneWidget);
     });
 
     testWidgets('exibe XP concedido', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchPontual(xp: 15),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('+15 XP'), findsOneWidget);
     });
 
     testWidgets('exibe streak quando > 1', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchPontual(streak: 5, xp: 15),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('5 treinos pontuais'), findsOneWidget);
     });
 
     testWidgets('não exibe streak quando streak = 1', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchPontual(streak: 1),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('treinos pontuais'), findsNothing);
     });
   });
 
-  group('FaceKioskScreen — aluno atrasado', () {
+  group('FaceKioskScreen — resultado: aluno atrasado', () {
     testWidgets('exibe greeting de atraso', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchAtrasado(),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('Atrasado'), findsOneWidget);
     });
 
-    testWidgets('não exibe XP quando atrasado', (tester) async {
+    testWidgets('não exibe XP quando atrasado (xp = 0)', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchAtrasado(),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('XP'), findsNothing);
     });
   });
 
-  group('FaceKioskScreen — presença duplicada', () {
+  group('FaceKioskScreen — resultado: presença duplicada', () {
     testWidgets('exibe mensagem de presença já registrada', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => _matchDuplicate(),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('já foi registrada'), findsOneWidget);
+    });
+  });
+
+  group('FaceKioskScreen — resultado: não reconhecido', () {
+    testWidgets('exibe greeting de não reconhecido', (tester) async {
+      await tester.pumpWidget(_screen(
+        detectFaceResult: true,
+        onFaceArrive: (_) async => _noMatch(),
+      ));
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
+      expect(find.textContaining('QR'), findsWidgets); // "Use o QR Code"
     });
   });
 
   group('FaceKioskScreen — erro', () {
     testWidgets('captura nula volta para estado de espera', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => null,
+        detectFaceResult: true,
+        captureJpegOverride: () async => null, // captura falha
         onFaceArrive: (_) async => _noMatch(),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
-      // Volta ao estado de espera (não chama onFaceArrive com null)
-      expect(find.text('Identificar'), findsOneWidget);
+      await _pumpToReady(tester);
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump();
+      // Voltou ao estado ready — instrução de câmera volta
+      expect(find.textContaining('câmera'), findsOneWidget);
     });
 
     testWidgets('exibe mensagem de erro quando onFaceArrive lança exceção', (tester) async {
       await tester.pumpWidget(_screen(
-        captureFrame: () async => Uint8List.fromList(_fakeFrame),
+        detectFaceResult: true,
         onFaceArrive: (_) async => throw Exception('Sem conexão'),
       ));
-
-      await tester.tap(find.text('Identificar'));
-      await tester.pumpAndSettle();
-
+      await _pumpToReady(tester);
+      await _triggerDetection(tester);
       expect(find.textContaining('Erro ao processar'), findsOneWidget);
+    });
+
+    testWidgets('exibe erro de câmera quando setupCamera lança exceção', (tester) async {
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) async => throw Exception('NotAllowed'),
+        detectFace: () async => false,
+        captureJpeg: () async => null,
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
+        onFaceArrive: (_) async => _noMatch(),
+      )));
+      await tester.pump();
+      await tester.pump();
+      expect(find.textContaining('Permissão de câmera'), findsOneWidget);
     });
   });
 }

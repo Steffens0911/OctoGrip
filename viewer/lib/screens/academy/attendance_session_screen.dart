@@ -1,15 +1,18 @@
 import 'dart:async' show StreamSubscription, TimeoutException, Timer, unawaited;
+import 'dart:js_interop';
+import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:web/web.dart' as web;
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/attendance.dart';
 import 'package:viewer/models/attendance_qr.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/face_recognition.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:viewer/screens/academy/face_kiosk_screen.dart';
+import 'package:viewer/services/face_detection_service.dart';
 import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -602,23 +605,43 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   void _openFaceKiosk() {
     final s = _session;
     if (s == null) return;
+
+    final cam = CameraController();
+    final detector = WebFaceDetector();
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => FaceKioskScreen(
           sessionId: s.id,
-          captureFrame: () async {
-            final img = await ImagePicker().pickImage(
-              source: ImageSource.camera,
-              imageQuality: 85,
-              maxWidth: 640,
-            );
-            if (img == null) return null;
-            return img.readAsBytes();
+          setupCamera: (viewId) async {
+            await cam.start(facingMode: 'user');
+            ui_web.platformViewRegistry.registerViewFactory(viewId, (_) {
+              // A factory é chamada toda vez que o HtmlElementView é re-inserido
+              // na árvore (ex: ao voltar do resultado). Chamar play() aqui garante
+              // que o vídeo retoma imediatamente, sem depender de timing externo.
+              final video = cam.videoElement as web.HTMLVideoElement;
+              unawaited(video.play().toDart);
+              return video;
+            });
+            await detector.initialize();
           },
+          detectFace: () {
+            final video = cam.videoElement as web.HTMLVideoElement?;
+            if (video == null || video.videoWidth == 0) return Future.value(false);
+            return detector.hasFace(video);
+          },
+          captureJpeg: () {
+            final video = cam.videoElement;
+            if (video == null) return Future.value(null);
+            return detector.captureJpeg(video);
+          },
+          buildCameraView: (viewId) => HtmlElementView(viewType: viewId),
+          fetchQr: () => _api.getAttendanceQrToken(s.id, ttlSeconds: 60),
           onFaceArrive: (bytes) => _api.faceArrive(s.id, bytes),
+          resumeCamera: () => cam.resume(),
         ),
       ),
-    );
+    ).then((_) => cam.stop());
   }
 
   Future<void> _openFaceRecognitionFlow() async {

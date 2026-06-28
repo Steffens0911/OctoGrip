@@ -8,10 +8,14 @@ import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 /// Tela do aluno: lista treinos agendados e permite confirmar/cancelar presença.
+///
+/// Quando [date] é fornecido (formato YYYY-MM-DD), exibe apenas as sessões
+/// daquele dia (link compartilhado pelo professor).
 class PreCheckinScreen extends StatefulWidget {
   final String academyId;
+  final String? date;
 
-  const PreCheckinScreen({super.key, required this.academyId});
+  const PreCheckinScreen({super.key, required this.academyId, this.date});
 
   @override
   State<PreCheckinScreen> createState() => _PreCheckinScreenState();
@@ -35,10 +39,10 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
       _error = null;
     });
     try {
-      // Carrega treinos upcoming da academia (próximos 7 dias)
       final raw = await _api.getTrainingSessions(
         widget.academyId,
-        status: 'upcoming',
+        classDate: widget.date,
+        status: widget.date == null ? 'upcoming' : null,
         limit: 50,
       );
       if (!mounted) return;
@@ -55,10 +59,18 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
     }
   }
 
+  String _appBarTitle() {
+    final d = widget.date;
+    if (d == null) return 'Confirmar presença';
+    final parts = d.split('-');
+    if (parts.length == 3) return 'Treinos de ${parts[2]}/${parts[1]}/${parts[0]}';
+    return 'Confirmar presença';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Confirmar presença'),
+      appBar: AppStandardAppBar(title: _appBarTitle()),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
@@ -99,13 +111,17 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
           Icon(Icons.sports_martial_arts, size: 64, color: AppTheme.textMutedOf(context)),
           const SizedBox(height: 12),
           Text(
-            'Nenhum treino agendado por enquanto.',
+            widget.date != null
+                ? 'Nenhum treino encontrado para este dia.'
+                : 'Nenhum treino agendado por enquanto.',
             style: TextStyle(color: AppTheme.textSecondaryOf(context)),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Quando o professor lançar um treino ele aparece aqui.',
+            widget.date != null
+                ? 'O professor ainda não lançou treinos para esta data.'
+                : 'Quando o professor lançar um treino ele aparece aqui.',
             style: TextStyle(color: AppTheme.textMutedOf(context), fontSize: 13),
             textAlign: TextAlign.center,
           ),

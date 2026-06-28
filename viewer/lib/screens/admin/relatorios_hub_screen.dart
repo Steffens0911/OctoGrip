@@ -3,6 +3,7 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/academy.dart';
 import 'package:viewer/models/engagement_report.dart';
 import 'package:viewer/models/mission_completion_report.dart';
+import 'package:viewer/models/punctuality_report.dart';
 import 'package:viewer/models/students_attention_report.dart';
 import 'package:viewer/models/technique_execution_summary.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
@@ -34,6 +35,9 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
   MissionCompletionReport? _missions;
   TechniqueExecutionSummary? _executions;
   StudentsAttentionReport? _attention;
+  PunctualityReport? _punctuality;
+  int _punctualityDays = 30;
+  bool _loadingPunctuality = false;
 
   bool _loading = true;
   String? _error;
@@ -45,6 +49,7 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
     _toDate = DateTime(now.year, now.month, now.day);
     _fromDate = _toDate.subtract(const Duration(days: 6));
     _loadAll();
+    _loadPunctuality();
   }
 
   Future<void> _loadAll() async {
@@ -88,6 +93,31 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
         _loading = false;
         _error = userFacingMessage(e);
       });
+    }
+  }
+
+  Future<void> _loadPunctuality() async {
+    if (_selectedAcademyId == null || _selectedAcademyId!.isEmpty) {
+      setState(() {
+        _punctuality = null;
+        _loadingPunctuality = false;
+      });
+      return;
+    }
+    setState(() => _loadingPunctuality = true);
+    try {
+      final r = await _api.getPunctualityReport(
+        academyId: _selectedAcademyId,
+        days: _punctualityDays,
+      );
+      if (!mounted) return;
+      setState(() {
+        _punctuality = r;
+        _loadingPunctuality = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingPunctuality = false);
     }
   }
 
@@ -153,6 +183,10 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
                 _buildSectionTitle(context, 'Alunos para dar atenção'),
                 const SizedBox(height: 12),
                 _buildAttentionCard(context),
+                const SizedBox(height: 28),
+                _buildSectionTitle(context, 'Pontualidade'),
+                const SizedBox(height: 12),
+                _buildPunctualitySection(context),
               ],
             ],
           ),
@@ -204,6 +238,7 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
           onChanged: (value) {
             setState(() => _selectedAcademyId = value);
             _loadAll();
+            _loadPunctuality();
           },
         ),
       ],
@@ -469,6 +504,108 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
     );
   }
 
+  Widget _buildPunctualitySection(BuildContext context) {
+    const dayOptions = [7, 30, 60, 90];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Chips de período independentes do filtro de datas principal
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: dayOptions.map((d) {
+              final selected = d == _punctualityDays;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text('$d dias'),
+                  selected: selected,
+                  onSelected: (_) {
+                    if (_punctualityDays == d) return;
+                    setState(() => _punctualityDays = d);
+                    _loadPunctuality();
+                  },
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_loadingPunctuality)
+          const Center(child: Padding(
+            padding: EdgeInsets.all(24),
+            child: CircularProgressIndicator(),
+          ))
+        else if (_selectedAcademyId == null || _selectedAcademyId!.isEmpty)
+          _ReportCard(
+            icon: Icons.timer_outlined,
+            title: 'Ranking de pontualidade',
+            tooltip: 'Selecione uma academia para ver o relatório de pontualidade.',
+            child: Text(
+              'Selecione uma academia no filtro acima para ver o ranking de pontualidade.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+          )
+        else if (_punctuality == null || _punctuality!.students.isEmpty)
+          _ReportCard(
+            icon: Icons.timer_outlined,
+            title: 'Ranking de pontualidade',
+            tooltip: 'Alunos ordenados por % de check-ins pontuais (chegada antes do horário da sessão) nos últimos $_punctualityDays dias.',
+            child: Text(
+              'Nenhum dado de pontualidade para o período.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondaryOf(context),
+                  ),
+            ),
+          )
+        else ...[
+          // Cards de resumo
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _SummaryCard(
+                label: 'Média de pontualidade',
+                value: '${_punctuality!.avgPct.toStringAsFixed(1)}%',
+                sub: '${_punctuality!.students.length} alunos com check-ins',
+                color: _pctColor(_punctuality!.avgPct),
+                tooltip: 'Média de pontualidade de todos os alunos com check-ins nos últimos $_punctualityDays dias.',
+              ),
+              _SummaryCard(
+                label: 'Maior streak ativo',
+                value: '${_punctuality!.maxActiveStreak}',
+                sub: 'treinos pontuais seguidos',
+                color: const Color(0xFF1D9E75),
+                tooltip: 'Maior streak de pontualidade atual entre os alunos.',
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _ReportCard(
+            icon: Icons.timer_outlined,
+            title: 'Ranking de pontualidade',
+            tooltip: 'Alunos ordenados por % de check-ins pontuais nos últimos $_punctualityDays dias.\nVerde ≥80% · Azul 60-79% · Âmbar 40-59% · Vermelho <40%.',
+            child: Column(
+              children: _punctuality!.students
+                  .take(15)
+                  .map((s) => _PunctualityRow(entry: s))
+                  .toList(),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  static Color _pctColor(double pct) {
+    if (pct >= 80) return const Color(0xFF1D9E75);
+    if (pct >= 60) return const Color(0xFF378ADD);
+    if (pct >= 40) return const Color(0xFFBA7517);
+    return const Color(0xFFE24B4A);
+  }
+
   Widget _buildMissionsCard(BuildContext context) {
     final missions = _missions;
     return _ReportCard(
@@ -498,6 +635,112 @@ class _RelatoriosHubScreenState extends State<RelatoriosHubScreen> {
 // ---------------------------------------------------------------------------
 // Widgets internos
 // ---------------------------------------------------------------------------
+
+class _PunctualityRow extends StatelessWidget {
+  final PunctualityStudentEntry entry;
+  const _PunctualityRow({required this.entry});
+
+  static Color _pctColor(double pct) {
+    if (pct >= 80) return const Color(0xFF1D9E75);
+    if (pct >= 60) return const Color(0xFF378ADD);
+    if (pct >= 40) return const Color(0xFFBA7517);
+    return const Color(0xFFE24B4A);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _pctColor(entry.punctualityPct);
+    final name = entry.name ?? '—';
+    final initials =
+        name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: color.withValues(alpha: 0.15),
+            child: Text(
+              initials,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textPrimaryOf(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          value: (entry.punctualityPct / 100).clamp(0.0, 1.0),
+                          minHeight: 5,
+                          backgroundColor: AppTheme.surfaceOf(context),
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${entry.punctualCount}/${entry.totalCheckins}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.textSecondaryOf(context),
+                          ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${entry.punctualityPct.toStringAsFixed(0)}%',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              if (entry.punctualityStreak > 0)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.local_fire_department_rounded,
+                        size: 13, color: const Color(0xFF1D9E75)),
+                    Text(
+                      '${entry.punctualityStreak}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: const Color(0xFF1D9E75),
+                          ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _AttentionRow extends StatelessWidget {
   final StudentAttentionItem student;

@@ -29,6 +29,7 @@ import 'package:viewer/models/training_video.dart';
 import 'package:viewer/models/usage_metrics.dart';
 import 'package:viewer/models/mission_completion_report.dart';
 import 'package:viewer/models/students_attention_report.dart';
+import 'package:viewer/models/punctuality_report.dart';
 import 'package:viewer/models/user_academy_stats.dart';
 import 'package:viewer/models/technique_execution_summary.dart';
 import 'package:viewer/models/weekly_panel_login_report.dart';
@@ -3021,6 +3022,24 @@ class ApiService {
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data);
     return TechniqueExecutionSummary.fromJson(data! as Map<String, dynamic>);
+  }
+
+  Future<PunctualityReport> getPunctualityReport({
+    String? academyId,
+    int days = 30,
+  }) async {
+    final params = <String, String>{
+      'days': '$days',
+      if (academyId != null && academyId.isNotEmpty) 'academy_id': academyId,
+    };
+    final uri = Uri.parse('$baseUrl/reports/punctuality')
+        .replace(queryParameters: params);
+    final r = await _req(
+      _client.get(uri, headers: await _headers(auth: true, realUserOnly: true)),
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return PunctualityReport.fromJson(data! as Map<String, dynamic>);
   }
 
   Future<StudentsAttentionReport> getStudentsAttentionReport({

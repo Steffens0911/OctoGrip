@@ -4,6 +4,7 @@ Fundo sólido #262433 (cartão do login) para o PNG transparente ler bem na barr
 
 Executar na raiz do viewer: python scripts/generate_pwa_icons_from_octogrip.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path

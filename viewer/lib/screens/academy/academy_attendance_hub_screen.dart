@@ -3,6 +3,8 @@ import 'package:viewer/app_theme.dart';
 import 'package:viewer/screens/academy/attendance_frequency_screen.dart';
 import 'package:viewer/screens/academy/attendance_history_screen.dart';
 import 'package:viewer/screens/academy/attendance_session_screen.dart';
+import 'package:viewer/screens/academy/training_session_list_screen.dart';
+import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
 class AcademyAttendanceHubScreen extends StatelessWidget {
@@ -10,6 +12,7 @@ class AcademyAttendanceHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final academyId = AuthService().currentUser?.academyId ?? '';
     return Scaffold(
       appBar: const AppStandardAppBar(
         title: 'Chamada e frequência',
@@ -17,6 +20,27 @@ class AcademyAttendanceHubScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: AppTheme.primary.withValues(alpha: 0.2),
+                child: const Icon(Icons.event_available_rounded, color: AppTheme.primary),
+              ),
+              title: const Text(
+                'Pré-checkin',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: const Text('Treinos lançados, confirmações e link para WhatsApp'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TrainingSessionListScreen(academyId: academyId),
+                ),
+              ),
+            ),
+          ),
           Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(

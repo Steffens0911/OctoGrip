@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/training_session.dart';
 import 'package:viewer/screens/academy/attendance_session_screen.dart';
@@ -82,6 +83,21 @@ class _TrainingSessionListScreenState extends State<TrainingSessionListScreen> {
       if (!mounted) return;
       AppFeedback.show(context, message: userFacingMessage(e), type: AppFeedbackType.error);
     }
+  }
+
+  void _copyLink(String date) {
+    final origin = Uri.base.hasPort && Uri.base.port != 80 && Uri.base.port != 443
+        ? '${Uri.base.scheme}://${Uri.base.host}:${Uri.base.port}'
+        : '${Uri.base.scheme}://${Uri.base.host}';
+    final link = '$origin/?data=$date';
+    Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Link copiado! Cole no WhatsApp para os alunos confirmarem presença.'),
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _delete(TrainingSession s) async {
@@ -241,6 +257,7 @@ class _TrainingSessionListScreenState extends State<TrainingSessionListScreen> {
                             ),
                           )
                       : null,
+                  onCopyLink: !s.isClosed ? () => _copyLink(s.classDate) : null,
                 )),
           ],
         );
@@ -255,6 +272,7 @@ class _SessionCard extends StatelessWidget {
   final VoidCallback onClose;
   final VoidCallback onDelete;
   final VoidCallback? onSummary;
+  final VoidCallback? onCopyLink;
 
   const _SessionCard({
     required this.session,
@@ -262,6 +280,7 @@ class _SessionCard extends StatelessWidget {
     required this.onClose,
     required this.onDelete,
     this.onSummary,
+    this.onCopyLink,
   });
 
   @override
@@ -326,6 +345,12 @@ class _SessionCard extends StatelessWidget {
                     onPressed: onSummary,
                     icon: const Icon(Icons.analytics_outlined, size: 18),
                     label: const Text('Ver resumo'),
+                  ),
+                if (onCopyLink != null)
+                  OutlinedButton.icon(
+                    onPressed: onCopyLink,
+                    icon: const Icon(Icons.link_outlined, size: 18),
+                    label: const Text('Copiar link'),
                   ),
                 if (!session.isOpen)
                   OutlinedButton.icon(

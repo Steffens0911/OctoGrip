@@ -4,6 +4,7 @@ pictograma simples — âmbar (#D4A017) com fundo transparente (PNG alpha).
 
 Executar na raiz do viewer: python scripts/generate_flowroll_icons.py
 """
+
 from __future__ import annotations
 
 from pathlib import Path

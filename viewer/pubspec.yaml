@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.2.0+8
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.3.0 <4.0.0'
 
 # Dependencies aligned with Flutter 3 / Dart 3 (Context7 docs: Material 3, ThemeData.colorScheme, TextTheme M3 names).
 dependencies:
