@@ -191,10 +191,17 @@ class ApiService {
     if (inFlight != null) return inFlight;
     final future = () async {
       try {
-        final r = await _req(
-          _client.get(uri, headers: await _headers(auth: true)),
-          timeout: _getTimeout,
-        );
+        Future<http.Response> attempt() async => _req(
+              _client.get(uri, headers: await _headers(auth: true)),
+              timeout: _getTimeout,
+            );
+        http.Response r;
+        try {
+          r = await attempt();
+        } on http.ClientException {
+          await Future<void>.delayed(const Duration(milliseconds: 800));
+          r = await attempt();
+        }
         if (ttlSeconds > 0 && r.statusCode >= 200 && r.statusCode < 300) {
           _setCache(key, r.body, r.statusCode, ttlSeconds);
         }
