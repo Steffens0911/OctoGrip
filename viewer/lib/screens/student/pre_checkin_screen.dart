@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/models/pre_checkin.dart';
 import 'package:viewer/models/training_session.dart';
+import 'package:viewer/models/training_stats.dart';
 import 'package:viewer/services/api_service.dart';
 import 'package:viewer/utils/error_message.dart';
 import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
+import 'package:viewer/widgets/student/student_hankins_section.dart';
 
 /// Tela do aluno: lista treinos agendados e permite confirmar/cancelar presença.
 ///
@@ -24,6 +26,7 @@ class PreCheckinScreen extends StatefulWidget {
 class _PreCheckinScreenState extends State<PreCheckinScreen> {
   final ApiService _api = ApiService();
   List<TrainingSession> _sessions = [];
+  TrainingStats? _stats;
   bool _loading = true;
   String? _error;
 
@@ -39,15 +42,25 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
       _error = null;
     });
     try {
-      final raw = await _api.getTrainingSessions(
+      final sessionsFuture = _api.getTrainingSessions(
         widget.academyId,
         classDate: widget.date,
         status: widget.date == null ? 'upcoming' : null,
         limit: 50,
       );
+      Future<TrainingStats?> statsFuture() async {
+        try {
+          return await _api.getTrainingStats();
+        } catch (_) {
+          return null;
+        }
+      }
+
+      final results = await Future.wait([sessionsFuture, statsFuture()]);
       if (!mounted) return;
       setState(() {
-        _sessions = raw.map(TrainingSession.fromJson).toList();
+        _sessions = (results[0] as List).map((e) => TrainingSession.fromJson(e as Map<String, dynamic>)).toList();
+        _stats = results[1] as TrainingStats?;
         _loading = false;
       });
     } catch (e) {
@@ -136,19 +149,25 @@ class _PreCheckinScreenState extends State<PreCheckinScreen> {
       (byDate[s.classDate] ??= []).add(s);
     }
     final dates = byDate.keys.toList()..sort();
+    final pad = AppTheme.screenPadding(context);
 
     return ListView.builder(
-      padding: EdgeInsets.all(AppTheme.screenPadding(context)),
-      itemCount: dates.length,
+      padding: EdgeInsets.fromLTRB(pad, pad, pad, pad),
+      itemCount: dates.length + 1,
       itemBuilder: (context, i) {
-        final day = dates[i];
+        if (i == 0) {
+          return _stats != null
+              ? StudentHankinsSection(stats: _stats!)
+              : const SizedBox.shrink();
+        }
+        final day = dates[i - 1];
         final daySessions = byDate[day]!;
         final parts = day.split('-');
         final label = '${parts[2]}/${parts[1]}/${parts[0]}';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (i > 0) const SizedBox(height: 16),
+            if (i > 1) const SizedBox(height: 16),
             Text(
               label,
               style: Theme.of(context)
