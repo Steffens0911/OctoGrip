@@ -1,77 +1,92 @@
 """
-Reconhecimento facial síncrono para o quiosque de chegada.
+Reconhecimento facial do quiosque de chegada — orquestração na API.
 
-Diferente do módulo de chamada em lote (face_recognition_tasks.py),
-aqui o embedding é gerado diretamente no processo da API (em thread pool)
-para garantir resposta imediata ao aluno que se aproxima do quiosque.
+A inferência pesada (DeepFace/TensorFlow) roda no worker Celery dedicado da fila
+``face`` — modelo Facenet512 pré-carregado e quente, pool solo, memória isolada — e
+**nunca** no processo web da API. O endpoint apenas:
 
-Threshold mais restritivo (0.60 vs 0.55 do lote) para reduzir falsos positivos
-em ambiente sem supervisão dedicada.
+  1. despacha o frame ao worker e aguarda o embedding (com timeout);
+  2. compara o embedding com os da academia (numpy, leve);
+  3. devolve o aluno correspondente.
+
+Esta separação elimina o OOM/502 que ocorria quando o uvicorn carregava o modelo
+(~1.5 GB por worker) durante o request, e mantém a CPU da API estável durante os
+treinos. Threshold mais restritivo (0.60 vs 0.55 do lote) para reduzir falsos
+positivos no quiosque sem supervisão dedicada.
 """
 
 from __future__ import annotations
 
+import asyncio
+import base64
 import logging
-import os
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
 import numpy as np
+from celery.exceptions import TimeoutError as CeleryTimeoutError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.core.exceptions import KioskInferenceUnavailableError
 from app.models import StudentFaceEmbedding, User
 
 logger = logging.getLogger(__name__)
 
 KIOSK_CONFIDENCE_THRESHOLD = 0.60
 
-# Pool dedicado para não bloquear workers Uvicorn durante o forward-pass do modelo.
-_KIOSK_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="kiosk_face")
+# Pool pequeno apenas para AGUARDAR (bloqueante) o resultado da task no result backend.
+# São threads ociosas esperando no Redis — não consomem CPU; isolam a espera do
+# executor default do event loop, que serve o resto da API.
+_KIOSK_WAIT_EXECUTOR = ThreadPoolExecutor(max_workers=4, thread_name_prefix="kiosk_wait")
 
 
-def _generate_embedding_sync(image_bytes: bytes) -> list[float] | None:
-    """Gera embedding Facenet512 no thread pool. Frame descartado ao sair."""
-    from deepface import DeepFace
+async def _embed_via_worker(image_bytes: bytes) -> list[float] | None:
+    """
+    Delega a geração do embedding ao worker da fila ``face`` e aguarda o resultado.
 
-    from app.face_model import get_model
+    Retorna o embedding L2-normalizado, ou ``None`` quando o worker processou mas não
+    encontrou face utilizável. Levanta :class:`KioskInferenceUnavailableError` (503,
+    retentável) se o worker estiver indisponível ou demorar além de
+    ``KIOSK_EMBED_TIMEOUT_SEC`` — falha de infra, não "rosto desconhecido".
+    """
+    from app.tasks.face_recognition_tasks import generate_kiosk_embedding
 
-    tmp_path: str | None = None
+    frame_b64 = base64.b64encode(image_bytes).decode("ascii")
+
     try:
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
-            tmp.write(image_bytes)
-            tmp_path = tmp.name
+        async_result = generate_kiosk_embedding.apply_async(args=[frame_b64], queue="face")
+    except Exception:  # broker indisponível, fila inacessível, etc.
+        logger.warning("Falha ao despachar embedding do quiosque ao worker de visão.", exc_info=True)
+        raise KioskInferenceUnavailableError() from None
 
-        get_model()
-        represented = DeepFace.represent(
-            img_path=tmp_path,
-            model_name="Facenet512",
-            detector_backend="opencv",
-            enforce_detection=False,
+    loop = asyncio.get_event_loop()
+    try:
+        payload = await loop.run_in_executor(
+            _KIOSK_WAIT_EXECUTOR,
+            lambda: async_result.get(timeout=settings.KIOSK_EMBED_TIMEOUT_SEC, propagate=True),
         )
-        faces = represented if isinstance(represented, list) else [represented]
-        if not faces:
-            return None
-
-        embedding_raw = faces[0].get("embedding")
-        if not embedding_raw:
-            return None
-
-        arr = np.asarray(embedding_raw, dtype=np.float32)
-        norm = float(np.linalg.norm(arr))
-        if norm > 1e-8:
-            arr = arr / norm
-        return arr.tolist()
+    except CeleryTimeoutError:
+        logger.warning("Timeout aguardando embedding do quiosque (worker de visão lento/indisponível).")
+        raise KioskInferenceUnavailableError() from None
     except Exception:
-        logger.warning("Falha ao gerar embedding no quiosque.", exc_info=True)
-        return None
+        # Exceção propagada da própria task (erro inesperado na inferência).
+        logger.warning("Erro na task de embedding do quiosque.", exc_info=True)
+        raise KioskInferenceUnavailableError() from None
     finally:
-        if tmp_path:
-            try:
-                os.remove(tmp_path)
-            except OSError:
-                pass
+        # Não deixa biometria (embedding) parada no result backend até expirar.
+        try:
+            async_result.forget()
+        except Exception:
+            pass
+
+    if not isinstance(payload, dict):
+        raise KioskInferenceUnavailableError()
+    embedding = payload.get("embedding")
+    if not embedding:
+        return None
+    return embedding
 
 
 async def match_face_for_kiosk(
@@ -80,18 +95,13 @@ async def match_face_for_kiosk(
     db: AsyncSession,
 ) -> tuple[User | None, float]:
     """
-    Compara o frame com os embeddings da academia.
+    Identifica o aluno a partir do frame do quiosque.
 
-    Retorna (aluno correspondente, confiança) ou (None, melhor_sim) se abaixo do threshold.
+    Retorna ``(aluno, confiança)`` se a melhor similaridade ≥ threshold, senão
+    ``(None, melhor_similaridade)``. Levanta :class:`KioskInferenceUnavailableError`
+    se o worker de inferência estiver indisponível (o app retenta).
     """
-    import asyncio
-
-    loop = asyncio.get_event_loop()
-    query_embedding = await loop.run_in_executor(
-        _KIOSK_EXECUTOR,
-        _generate_embedding_sync,
-        image_bytes,
-    )
+    query_embedding = await _embed_via_worker(image_bytes)
     if query_embedding is None:
         return None, 0.0
 

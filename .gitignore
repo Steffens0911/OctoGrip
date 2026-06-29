@@ -37,6 +37,8 @@ htmlcov/
 
 # Claude Code — worktrees locais (espelho completo do repo; não versionar)
 .claude/worktrees/
+# Claude Code — memória do assistente que vazou para a raiz do repo (não versionar)
+/memory/
 
 # IDE (opcional)
 .idea/

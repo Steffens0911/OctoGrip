@@ -78,17 +78,12 @@ services:
       PUSH_NOTIFICATIONS_ENABLED: ${PUSH_NOTIFICATIONS_ENABLED:-false}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       FACE_JOBS_DIR: ${FACE_JOBS_DIR:-/tmp/face_jobs}
-      # Warmup desligado na API: 2 workers carregando o modelo simultaneamente no
-      # startup (~1.5 GB pico cada) ultrapassava o mem_limit e causava OOM/crash loop.
-      # O modelo é mantido quente no celery-worker-face; o primeiro check-in do dia
-      # na API tem cold start de ~16s, mas a API para de morrer no boot.
-      FACE_WARMUP_ON_STARTUP: "false"
-      # Limita as threads do TensorFlow/BLAS por inferência facial do quiosque.
-      OMP_NUM_THREADS: ${FACE_NUM_THREADS:-2}
-      TF_NUM_INTRAOP_THREADS: ${FACE_NUM_THREADS:-2}
-      TF_NUM_INTEROP_THREADS: "1"
-      OPENBLAS_NUM_THREADS: ${FACE_NUM_THREADS:-2}
-      MKL_NUM_THREADS: ${FACE_NUM_THREADS:-2}
+      # A API NÃO carrega TensorFlow: o check-in facial do quiosque delega a inferência
+      # ao celery-worker-face (modelo quente, pool solo) e só faz o matching vetorial.
+      # Por isso não há limites de thread do TF aqui nem warmup — o uvicorn fica leve
+      # (~1-1.5 GB) e o OOM/502 no check-in foi eliminado na raiz.
+      # KIOSK_EMBED_TIMEOUT_SEC: segundos que a API espera o worker antes de devolver 503.
+      KIOSK_EMBED_TIMEOUT_SEC: ${KIOSK_EMBED_TIMEOUT_SEC:-15}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-noreply@octogrip.com.br}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
@@ -110,9 +105,11 @@ services:
       # JSON da service account Firebase (mesmo caminho que FIREBASE_SERVICE_ACCOUNT_PATH no .env)
       - ./secrets:/app/secrets:ro
       - ./docs/legal:/app/docs/legal:ro
-    # 4g: sem warmup a API usa ~1-1.5 GB base; margem para picos de inferência facial.
-    mem_limit: 4g
-    mem_reservation: 1g
+    # Sem TensorFlow no processo da API, o uvicorn usa ~1-1.5 GB. 3g dá margem ampla
+    # para picos (gzip, restore de backup) sem o risco de OOM que a inferência facial
+    # trazia — e ainda libera 1 GB na VPS frente aos 4g anteriores.
+    mem_limit: 3g
+    mem_reservation: 768m
 
   celery-worker-face:
     build: .

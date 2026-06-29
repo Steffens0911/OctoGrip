@@ -4443,25 +4443,46 @@ class ApiService {
   }
 
   /// Quiosque facial: envia frame e recebe resultado de check-in em tempo real.
+  ///
+  /// Retenta em falhas transientes (502/503/504, [http.ClientException]) — ao contrário
+  /// dos POSTs genéricos, este é seguro de retentar porque o endpoint é idempotente
+  /// (trata duplicata pelo par sessão+aluno). Cobre restart de worker/deploy e o 503
+  /// retornado quando o worker de visão está momentaneamente indisponível, sem mostrar
+  /// "Erro ao processar" ao aluno na primeira falha.
   Future<FaceArriveResponse> faceArrive(
     String sessionId,
     Uint8List frame,
   ) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/face-arrive');
-    final request = http.MultipartRequest('POST', uri);
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'frame',
-        frame,
-        filename: 'frame.jpg',
-        contentType: MediaType('image', 'jpeg'),
-      ),
-    );
-    final streamed = await _client.send(request);
-    final response = await http.Response.fromStream(streamed);
-    final data = await _decodeResponse(response);
-    _throwIfNotOk(response, data);
-    return FaceArriveResponse.fromJson(data! as Map<String, dynamic>);
+    // Backoff curto: o aluno está parado em frente ao quiosque esperando.
+    const backoff = [Duration(milliseconds: 400), Duration(milliseconds: 1200)];
+    for (var attempt = 0;; attempt++) {
+      try {
+        // MultipartRequest é de uso único: recriado a cada tentativa.
+        final request = http.MultipartRequest('POST', uri)
+          ..files.add(
+            http.MultipartFile.fromBytes(
+              'frame',
+              frame,
+              filename: 'frame.jpg',
+              contentType: MediaType('image', 'jpeg'),
+            ),
+          );
+        final streamed = await _client.send(request);
+        final response = await http.Response.fromStream(streamed);
+        if (_kTransientStatuses.contains(response.statusCode) &&
+            attempt < backoff.length) {
+          await Future<void>.delayed(backoff[attempt]);
+          continue;
+        }
+        final data = await _decodeResponse(response);
+        _throwIfNotOk(response, data);
+        return FaceArriveResponse.fromJson(data! as Map<String, dynamic>);
+      } on http.ClientException {
+        if (attempt >= backoff.length) rethrow;
+        await Future<void>.delayed(backoff[attempt]);
+      }
+    }
   }
 
 }

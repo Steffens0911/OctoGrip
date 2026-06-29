@@ -88,10 +88,11 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     FACE_JOBS_DIR: str = "/tmp/face_jobs"
     FACE_MAX_IMAGE_SIDE: int = 1280
-    # Pré-aquece o modelo facial no startup dos workers da API (elimina o cold
-    # start de ~16s na primeira chamada do quiosque). Custo: ~830MB de RAM por
-    # worker, ocupados desde o boot. Desligue em ambientes com pouca memória.
-    FACE_WARMUP_ON_STARTUP: bool = True
+    # Quiosque facial: tempo máximo (s) que a API aguarda o worker de visão gerar o
+    # embedding antes de devolver 503 (retentável pelo app). A inferência roda no
+    # celery-worker-face (modelo quente, pool solo), nunca no processo da API — por
+    # isso o uvicorn não carrega TensorFlow e não há mais OOM/502 no check-in facial.
+    KIOSK_EMBED_TIMEOUT_SEC: float = 15.0
 
     # LGPD / Privacidade
     # Versão vigente de cada documento legal. Quando o texto muda de forma relevante,
