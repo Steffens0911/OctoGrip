@@ -328,6 +328,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
   String? _lastEffectiveUserId;
   DateTime? _lastResumeAt;
   String? _savedTabName;
+  bool _hasExplicitTab = false;
 
   /// Último contador vindo da [StudentHomeScreen] (badge na aba Campo de treinamento).
   int _pendingConfirmationsNavBadge = 0;
@@ -344,6 +345,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _savedTabName = loadTab();
+    _hasExplicitTab = _savedTabName != null;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _applyRestoredTab();
       await AuthService().restoreImpersonation();
@@ -412,7 +414,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     if (academyId == null || academyId.isEmpty) return;
     try {
       final academy = await ApiService().getAcademy(academyId);
-      if (mounted) setState(() => _academy = academy);
+      if (!mounted) return;
+      setState(() => _academy = academy);
+      if (!_hasExplicitTab) {
+        final tabs = _availableTabs(AuthService());
+        final idx = tabs.indexOf('Fotos');
+        if (idx >= 0) setState(() => _selected = idx);
+      }
     } catch (_) {}
   }
 
