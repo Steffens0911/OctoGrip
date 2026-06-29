@@ -139,8 +139,8 @@ async def test_training_stats_punctuality_from_user(client, ts_aluno, ts_headers
 @pytest.mark.asyncio
 async def test_training_stats_login_streak_from_login_days(client, db, ts_aluno, ts_headers):
     """login_streak_current reflete os dias reais de login registrados."""
-    from app.models.user_login_day import UserLoginDay
     from app.core.app_time import today_in_app_tz
+    from app.models.user_login_day import UserLoginDay
 
     today = today_in_app_tz()  # mesmo fuso que compute_login_streak_days usa
     for delta in range(3):
