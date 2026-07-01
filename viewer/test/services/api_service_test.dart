@@ -364,6 +364,87 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // Retry em mutações (POST/PATCH/DELETE) na race de keep-alive
+  // -------------------------------------------------------------------------
+  group('ApiService — retry em mutação transiente', () {
+    test('POST refaz após ClientException e conclui (login)', () async {
+      final client = setUpApiService();
+      var posts = 0;
+      when(() => client.post(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((invocation) async {
+        final uri = invocation.positionalArguments.first as Uri;
+        if (uri.path.endsWith('/auth/login')) {
+          posts++;
+          if (posts == 1) throw http.ClientException('Failed to fetch');
+          return jsonOk({'access_token': 'tok', 'streak_bonus_points': 0});
+        }
+        return jsonOk({});
+      });
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async => jsonOk({'id': 'u1', 'email': 'a@b.com'}));
+
+      final res = await ApiService().login('a@b.com', 'senha');
+
+      expect(posts, 2, reason: 'ClientException no POST deve disparar retry');
+      expect(res.token, 'tok');
+    });
+
+    test('PATCH refaz após ClientException e retorna sucesso', () async {
+      final client = setUpApiService(token: 'tok');
+      var calls = 0;
+      when(() => client.patch(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((_) async {
+        calls++;
+        if (calls == 1) throw http.ClientException('Failed to fetch');
+        return jsonOk({'id': 'a1', 'name': 'Academia'});
+      });
+
+      final academy = await ApiService().updateAcademyTheme('a1', 'Guarda');
+
+      expect(calls, 2, reason: 'PATCH deve retentar em falha de conexão');
+      expect(academy.id, 'a1');
+    });
+
+    test('POST propaga ClientException se todas as tentativas falham', () async {
+      final client = setUpApiService();
+      var calls = 0;
+      when(() => client.post(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((_) async {
+        calls++;
+        throw http.ClientException('Failed to fetch');
+      });
+
+      await expectLater(
+        ApiService().forgotPassword('x@y.com'),
+        throwsA(isA<http.ClientException>()),
+      );
+      expect(calls, 3, reason: 'tenta uma vez e refaz duas vezes antes de desistir');
+    });
+
+    test('POST NÃO retenta em 5xx (evita duplicar efeito) e lança ApiException',
+        () async {
+      final client = setUpApiService();
+      var calls = 0;
+      when(() => client.post(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((_) async {
+        calls++;
+        return jsonError(502, 'Bad Gateway');
+      });
+
+      await expectLater(
+        ApiService().forgotPassword('x@y.com'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 502)),
+      );
+      expect(calls, 1,
+          reason: '502 numa mutação não é retentado: o servidor pode ter processado');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Timeout
   // -------------------------------------------------------------------------
   group('ApiService — timeout', () {

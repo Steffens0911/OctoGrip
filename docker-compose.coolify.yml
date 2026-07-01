@@ -60,7 +60,11 @@ services:
     pull_policy: always
     container_name: jjb_api
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log
+    # --timeout-keep-alive 120: mantem conexoes ociosas abertas por mais tempo que
+    # o pool do proxy (Traefik/Coolify). Sem isto o uvicorn fecha em 5s (default) e
+    # o proxy reusa a conexao morta -> 502 / "Failed to fetch" intermitente no app,
+    # que some ao repetir a acao. DEVE bater com o Dockerfile e o docker-compose.yml.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log --timeout-keep-alive 120
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}

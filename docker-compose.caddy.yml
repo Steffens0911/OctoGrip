@@ -20,6 +20,10 @@ services:
       - "8000"
       - --proxy-headers
       - --forwarded-allow-ips=*
+      # Mantem conexoes ociosas abertas mais que o pool do proxy (evita 502/"Failed
+      # to fetch" da race de keep-alive). Este override substitui o command do base.
+      - --timeout-keep-alive
+      - "120"
 
   caddy:
     image: caddy:2-alpine
