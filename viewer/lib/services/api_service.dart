@@ -4490,15 +4490,21 @@ class ApiService {
 /// Status transientes de gateway/proxy que valem uma nova tentativa.
 const Set<int> _kTransientStatuses = {502, 503, 504};
 
-/// Wrapper de [http.Client] que retenta automaticamente **apenas GETs**
-/// (idempotentes) em falhas transientes: [http.ClientException] (conexão
-/// recusada/resetada, "Failed to fetch") e respostas 502/503/504 do proxy
-/// (race de keep-alive, worker reiniciando). Cobre todos os endpoints de leitura
-/// de forma transparente, sem tocar nos call sites.
+/// Wrapper de [http.Client] que retenta automaticamente falhas transientes,
+/// de forma transparente e sem tocar nos call sites:
 ///
-/// POST/PUT/PATCH/DELETE e streaming passam direto: reenviá-los poderia duplicar
-/// efeitos (presença, XP, uploads). Timeouts também não são retentados aqui — o
-/// timeout é aplicado por fora, em ApiService._req.
+/// - **GET** (idempotente): retenta em [http.ClientException] (conexão
+///   recusada/resetada, "Failed to fetch") **e** em respostas 502/503/504 do
+///   proxy (race de keep-alive, worker reiniciando).
+/// - **POST/PUT/PATCH/DELETE**: retenta **apenas** em [http.ClientException] —
+///   falha de estabelecimento de conexão em que o pedido não chegou ao servidor
+///   (reenviar é seguro). NÃO retenta em 5xx, pois o servidor respondeu e pode
+///   ter processado (reenviar duplicaria presença/XP/etc).
+///
+/// [send] (streaming/multipart) passa direto: o request é de uso único e não
+/// pode ser reenviado genericamente (uploads que precisam de retry o fazem no
+/// call site recriando o request — ver [ApiService.faceArrive]). Timeouts também
+/// não são retentados aqui — são aplicados por fora, em ApiService._req.
 class _ResilientHttpClient implements http.Client {
   _ResilientHttpClient(this._inner);
 
@@ -4528,7 +4534,31 @@ class _ResilientHttpClient implements http.Client {
     }
   }
 
-  // Métodos não-idempotentes / streaming: sem retry, delegação direta.
+  /// Retenta métodos mutáveis **apenas** em [http.ClientException] — falha ao
+  /// estabelecer a conexão em que a requisição comprovadamente NÃO chegou ao
+  /// servidor (ex.: "Failed to fetch" / conexão recusada/resetada da race de
+  /// keep-alive: o proxy reusa uma conexão que o backend acabou de fechar).
+  /// Reenviar aí é seguro — nada foi processado, logo não há efeito duplicado.
+  ///
+  /// De propósito NÃO retenta em respostas 5xx (o servidor respondeu e pode ter
+  /// processado o pedido: reenviar poderia duplicar presença/XP/uploads) nem em
+  /// timeouts (aplicados por fora, em ApiService._req — o servidor pode ainda
+  /// estar a processar). O corpo destes métodos é uma String/bytes reenviável,
+  /// ao contrário de [send], cujo stream é de uso único (ver abaixo).
+  Future<http.Response> _sendWithConnRetry(
+    Future<http.Response> Function() attempt,
+  ) async {
+    for (var i = 0;; i++) {
+      try {
+        return await attempt();
+      } on http.ClientException {
+        if (i >= _backoff.length) rethrow;
+        await Future<void>.delayed(_backoff[i]);
+      }
+    }
+  }
+
+  // HEAD é idempotente mas praticamente não usado: delegação direta.
   @override
   Future<http.Response> head(Uri url, {Map<String, String>? headers}) =>
       _inner.head(url, headers: headers);
@@ -4536,22 +4566,26 @@ class _ResilientHttpClient implements http.Client {
   @override
   Future<http.Response> post(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
-      _inner.post(url, headers: headers, body: body, encoding: encoding);
+      _sendWithConnRetry(() =>
+          _inner.post(url, headers: headers, body: body, encoding: encoding));
 
   @override
   Future<http.Response> put(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
-      _inner.put(url, headers: headers, body: body, encoding: encoding);
+      _sendWithConnRetry(() =>
+          _inner.put(url, headers: headers, body: body, encoding: encoding));
 
   @override
   Future<http.Response> patch(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
-      _inner.patch(url, headers: headers, body: body, encoding: encoding);
+      _sendWithConnRetry(() =>
+          _inner.patch(url, headers: headers, body: body, encoding: encoding));
 
   @override
   Future<http.Response> delete(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
-      _inner.delete(url, headers: headers, body: body, encoding: encoding);
+      _sendWithConnRetry(() =>
+          _inner.delete(url, headers: headers, body: body, encoding: encoding));
 
   @override
   Future<String> read(Uri url, {Map<String, String>? headers}) =>
