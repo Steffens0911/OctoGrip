@@ -3,6 +3,7 @@ import os
 import time
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -90,17 +91,24 @@ async def health_db(db: AsyncSession = Depends(get_db)):
         db_latency_ms = round((time.time() - start_time) * 1000, 2)
         db_status = "disconnected"
 
+        # 503 para que monitores de uptime detectem a indisponibilidade pelo status HTTP
         # Em produção, não expor detalhes do erro de conexão
         if _IS_PRODUCTION:
-            return {
-                "status": "error",
-                "database": "disconnected",
-                "db_latency_ms": db_latency_ms,
-            }
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "database": "disconnected",
+                    "db_latency_ms": db_latency_ms,
+                },
+            )
         else:
             # Em desenvolvimento, mostrar detalhes para debug
-            return {
-                "status": "error",
-                "database": str(e),
-                "db_latency_ms": db_latency_ms,
-            }
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "database": str(e),
+                    "db_latency_ms": db_latency_ms,
+                },
+            )
