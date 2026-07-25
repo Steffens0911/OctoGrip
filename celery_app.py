@@ -71,6 +71,14 @@ celery_app.conf.update(
             "task": "app.tasks.photo_tasks.expire_photo_restrictions",
             "schedule": crontab(minute="*/30"),
         },
+        # Rede de segurança do OctoPhotos: o post é commitado como "processing" antes
+        # de a task de resize ser enfileirada, então uma mensagem perdida no broker
+        # deixaria o post em "Processando..." para sempre. A cada 5 min o que ficou
+        # para trás volta para a fila.
+        "requeue-stuck-photos": {
+            "task": "app.tasks.photo_tasks.requeue_stuck_photos",
+            "schedule": crontab(minute="*/5"),
+        },
         "pre-checkin-reminder": {
             "task": "app.tasks.pre_checkin_tasks.send_pre_checkin_reminder",
             "schedule": crontab(hour=21, minute=0),  # 18h Brasília (UTC-3)
