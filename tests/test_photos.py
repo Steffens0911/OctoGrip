@@ -178,9 +178,7 @@ async def _notifications_for(db: AsyncSession, user_id, type_: str) -> list:
 
     from app.models import Notification
 
-    result = await db.execute(
-        select(Notification).where(Notification.user_id == user_id, Notification.type == type_)
-    )
+    result = await db.execute(select(Notification).where(Notification.user_id == user_id, Notification.type == type_))
     return list(result.scalars().all())
 
 
