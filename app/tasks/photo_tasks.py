@@ -121,6 +121,59 @@ def process_photo_upload(self, photo_id: str, raw_file_path: str) -> None:
 
 
 @celery_app.task
+def requeue_stuck_photos(older_than_minutes: int = 5, limit: int = 50) -> int:
+    """Reenfileira posts presos em ``processing`` e devolve quantos foram redisparados.
+
+    O post é gravado e commitado com ``status='processing'`` *antes* de a task de
+    resize ser enfileirada (``routes/photos.py``). Se a mensagem se perder entre o
+    commit e o worker — Redis do broker reiniciado, chave da fila despejada, broker
+    fora do ar no momento do ``delay()`` — o post fica "Processando..." para sempre,
+    porque nada reprocessa. Esta varredura é a reconciliação desses dois passos.
+
+    Só considera posts com ``raw_file_path`` preenchido: é o que o resize consome.
+    Se o arquivo bruto já não existe, não há o que processar e o post vira ``failed``.
+    O resize é idempotente (grava sempre em ``{photo_id}_full.jpg``), então redisparar
+    um post que o worker ainda esteja processando é inofensivo.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import select, update
+
+    from app.models.academy_photo import AcademyPhoto
+
+    cutoff = datetime.now(UTC) - timedelta(minutes=older_than_minutes)
+    requeued = 0
+
+    with SyncSessionLocal() as db:
+        rows = db.execute(
+            select(AcademyPhoto.id, AcademyPhoto.raw_file_path)
+            .where(
+                AcademyPhoto.status == "processing",
+                AcademyPhoto.deleted_at.is_(None),
+                AcademyPhoto.raw_file_path.is_not(None),
+                AcademyPhoto.created_at <= cutoff,
+            )
+            .order_by(AcademyPhoto.created_at)
+            .limit(limit)
+        ).all()
+
+        for photo_id, raw_path in rows:
+            if not os.path.exists(raw_path):
+                logger.warning("Arquivo bruto sumiu, marcando failed photo_id=%s: %s", photo_id, raw_path)
+                db.execute(update(AcademyPhoto).where(AcademyPhoto.id == photo_id).values(status="failed"))
+                continue
+            process_photo_upload.delay(str(photo_id), raw_path)
+            requeued += 1
+            logger.info("Post preso reenfileirado photo_id=%s", photo_id)
+
+        db.commit()
+
+    if requeued:
+        logger.info("Posts presos reenfileirados: %d", requeued)
+    return requeued
+
+
+@celery_app.task
 def expire_photo_restrictions() -> None:
     """Desativa restrições com expires_at no passado (rodar periodicamente via beat)."""
     from datetime import UTC, datetime

@@ -35,9 +35,14 @@ services:
     image: redis:7-alpine
     container_name: jjb_redis
     restart: unless-stopped
+    # volatile-lru (não allkeys-lru): esta instância é cache do app E broker do Celery.
+    # As chaves de cache têm TTL (setex), as filas do Celery não. Com allkeys-lru o
+    # Redis podia despejar a fila ao bater no maxmemory, matando tasks pendentes em
+    # silêncio (post de foto preso em "Processando..." para sempre). volatile-lru só
+    # despeja quem tem TTL, ou seja, nunca a fila.
     command: >
       redis-server --save "" --appendonly no --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory-policy volatile-lru
     ports:
       - "6379:6379"
     healthcheck:

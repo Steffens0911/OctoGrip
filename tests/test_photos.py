@@ -169,6 +169,79 @@ async def test_criar_post_caption_muito_longa(client: AsyncClient, db: AsyncSess
     assert r.status_code == 403
 
 
+# ─── @menções na legenda do post ──────────────────────────────────────────────
+
+
+async def _notifications_for(db: AsyncSession, user_id, type_: str) -> list:
+    """Busca notificações de um usuário por tipo."""
+    from sqlalchemy import select
+
+    from app.models import Notification
+
+    result = await db.execute(
+        select(Notification).where(Notification.user_id == user_id, Notification.type == type_)
+    )
+    return list(result.scalars().all())
+
+
+@pytest.mark.asyncio
+async def test_criar_post_menciona_colega_gera_notificacao(client: AsyncClient, db: AsyncSession):
+    academy = await _make_academy(db, octophotos=True)
+    autor, token = await _make_user(db, academy=academy)
+    colega, _ = await _make_user(db, academy=academy)
+
+    r = await client.post(
+        f"/academies/{academy.id}/photos",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("foto.jpg", _tiny_jpeg(), "image/jpeg")},
+        data={"caption": f"Rolando com @[{colega.name}|{colega.id}] hoje!"},
+    )
+    assert r.status_code == 201
+
+    notifs = await _notifications_for(db, colega.id, "photo_mention")
+    assert len(notifs) == 1
+    assert notifs[0].title == f"{autor.name} te marcou em uma foto"
+    # A tag @[Nome|uuid] é convertida para @Nome no corpo exibido
+    assert "@[" not in notifs[0].body
+    assert f"@{colega.name}" in notifs[0].body
+    assert notifs[0].data["photo_id"] == r.json()["id"]
+
+
+@pytest.mark.asyncio
+async def test_criar_post_nao_notifica_o_proprio_autor(client: AsyncClient, db: AsyncSession):
+    academy = await _make_academy(db, octophotos=True)
+    autor, token = await _make_user(db, academy=academy)
+
+    r = await client.post(
+        f"/academies/{academy.id}/photos",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("foto.jpg", _tiny_jpeg(), "image/jpeg")},
+        data={"caption": f"Selfie pós-treino @[{autor.name}|{autor.id}]"},
+    )
+    assert r.status_code == 201
+
+    notifs = await _notifications_for(db, autor.id, "photo_mention")
+    assert notifs == []
+
+
+@pytest.mark.asyncio
+async def test_criar_post_sem_mencao_nao_gera_notificacao(client: AsyncClient, db: AsyncSession):
+    academy = await _make_academy(db, octophotos=True)
+    _, token = await _make_user(db, academy=academy)
+    colega, _ = await _make_user(db, academy=academy)
+
+    r = await client.post(
+        f"/academies/{academy.id}/photos",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("foto.jpg", _tiny_jpeg(), "image/jpeg")},
+        data={"caption": "Treino leve hoje"},
+    )
+    assert r.status_code == 201
+
+    notifs = await _notifications_for(db, colega.id, "photo_mention")
+    assert notifs == []
+
+
 # ─── like / unlike ──────────────────────────────────────────────────────────
 
 

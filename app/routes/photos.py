@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import logging
 import uuid
 from pathlib import Path
 
@@ -51,6 +52,8 @@ from app.services.photos_service import (
     unlike_photo,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
 
 _MEDIA_ROOT = (Path(__file__).resolve().parent.parent.parent / "app_media").resolve()
@@ -76,6 +79,46 @@ def _is_academy_member(user: User, academy_id: uuid.UUID) -> bool:
 
 def _is_moderator(user: User) -> bool:
     return user.role in _MOD_ROLES
+
+
+async def _notify_mentions(
+    db: AsyncSession,
+    *,
+    academy_id: uuid.UUID,
+    author: User,
+    text: str,
+    title: str,
+    data: dict,
+    already_notified: set[uuid.UUID] | None = None,
+) -> None:
+    """Cria notificações photo_mention para todos os usuários @mencionados em ``text``.
+
+    Suporta o novo formato ``@[Nome|uuid]`` e o legado ``@Palavra`` (resolvido por nome).
+    Não faz commit — cabe ao chamador. ``already_notified`` acumula quem já recebeu
+    (inclui o próprio autor) para evitar notificação duplicada.
+    """
+    seen = already_notified if already_notified is not None else set()
+    seen.add(author.id)
+
+    # 1) Novo formato @[Nome|uuid] — extrai UUIDs diretamente
+    mention_ids: list[uuid.UUID] = [uid for uid in extract_mention_ids(text) if uid not in seen]
+    # 2) Formato legado @Palavra — resolve por nome (fallback)
+    legacy_names = extract_mentions(text)
+    if legacy_names:
+        legacy_ids = await resolve_mention_user_ids(db, academy_id=academy_id, names=legacy_names, exclude_ids=seen)
+        mention_ids.extend(uid for uid in legacy_ids if uid not in seen)
+
+    clean_text = strip_mention_tags(text)
+    for uid in mention_ids:
+        seen.add(uid)
+        await create_notification(
+            db,
+            user_id=uid,
+            type="photo_mention",
+            title=title,
+            body=clean_text[:120],
+            data=data,
+        )
 
 
 def _photo_to_read(photo, liked_ids: set[uuid.UUID]) -> PhotoRead:
@@ -233,10 +276,26 @@ async def create_post(
     await db.refresh(photo)
     await invalidate_feed_cache(academy_id)
 
-    # Disparar task Celery de resize em background
+    # Notifica usuários @mencionados na legenda
+    if caption:
+        await _notify_mentions(
+            db,
+            academy_id=academy_id,
+            author=current_user,
+            text=caption,
+            title=f"{current_user.name} te marcou em uma foto",
+            data={"photo_id": str(photo.id), "academy_id": str(academy_id)},
+        )
+
+    # Disparar task Celery de resize em background. O upload e o registro já foram
+    # persistidos, então uma falha ao falar com o broker não deve virar 500 para o
+    # autor: o post fica em "processing" e a varredura requeue_stuck_photos reenfileira.
     from app.tasks.photo_tasks import process_photo_upload
 
-    process_photo_upload.delay(str(photo.id), str(raw_path))
+    try:
+        process_photo_upload.delay(str(photo.id), str(raw_path))
+    except Exception:
+        logger.exception("Falha ao enfileirar resize photo_id=%s; varredura periódica assume", photo.id)
 
     return _photo_to_read(photo, set())
 
@@ -479,26 +538,15 @@ async def add_comment(
         )
 
     # Notifica usuários @mencionados no comentário
-    # 1) Novo formato @[Nome|uuid] — extrai UUIDs diretamente
-    mention_ids: list[uuid.UUID] = [uid for uid in extract_mention_ids(body.body) if uid not in already_notified]
-    # 2) Formato legado @Palavra — resolve por nome (fallback)
-    legacy_names = extract_mentions(body.body)
-    if legacy_names:
-        legacy_ids = await resolve_mention_user_ids(
-            db, academy_id=academy_id, names=legacy_names, exclude_ids=already_notified
-        )
-        mention_ids.extend(uid for uid in legacy_ids if uid not in already_notified)
-    clean_body = strip_mention_tags(body.body)
-    for uid in mention_ids:
-        already_notified.add(uid)
-        await create_notification(
-            db,
-            user_id=uid,
-            type="photo_mention",
-            title=f"{current_user.name} te marcou em um comentário",
-            body=clean_body[:120],
-            data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
-        )
+    await _notify_mentions(
+        db,
+        academy_id=academy_id,
+        author=current_user,
+        text=body.body,
+        title=f"{current_user.name} te marcou em um comentário",
+        data={"photo_id": str(photo.id), "academy_id": str(academy_id), "comment_id": str(comment.id)},
+        already_notified=already_notified,
+    )
 
     return CommentRead(
         id=comment.id,
