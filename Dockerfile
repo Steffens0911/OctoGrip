@@ -15,9 +15,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY requirements.txt .
 
 # Instala deps como usuário app → /home/app/.local (sem precisar de chown depois)
+#
+# deepface declara opencv-python (variante com GUI) como dependência própria, sem limite
+# de versão superior — isso instala opencv-python JUNTO com o opencv-python-headless que
+# pedimos no requirements.txt. Os dois pacotes escrevem no mesmo namespace cv2/, corrompendo
+# cv2/data/ (falta o haarcascade_frontalface_default.xml e o DeepFace quebra com "Confirm
+# that opencv is installed on your environment!"). Por isso removemos o opencv-python (GUI)
+# se ele entrar como transitiva e reinstalamos o headless por cima, sozinho e sem
+# dependências, garantindo que os arquivos de dados fiquem completos.
+# Ver https://github.com/serengil/deepface/issues/595.
 USER app
 RUN pip install --upgrade pip --user && \
-    pip install --user --no-warn-script-location -r requirements.txt
+    pip install --user --no-warn-script-location -r requirements.txt && \
+    (pip uninstall -y opencv-python || true) && \
+    pip install --user --no-warn-script-location --force-reinstall --no-deps opencv-python-headless==4.10.0.84
 
 # Estágio 2: Runtime - imagem final
 FROM python:3.12-slim-bookworm
