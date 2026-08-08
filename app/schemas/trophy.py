@@ -100,6 +100,12 @@ class TrophyRead(BaseModel):
 
 TrophyTier = Literal["bronze", "silver", "gold"]
 
+# Medalhas manuais de campeonato também aceitam "participation" (ver
+# VALID_MEDAL_TYPES em manual_trophy_service). Respostas que misturam troféus
+# automáticos com concessões manuais precisam deste tipo mais largo — senão o
+# Pydantic rejeita a resposta inteira e o endpoint devolve 500.
+MedalTier = Literal["bronze", "silver", "gold", "participation"]
+
 
 class UserTrophyEarned(BaseModel):
     """Item da galeria: troféu ou medalha com tier conquistado (ou nenhum)."""
@@ -131,7 +137,7 @@ class TrophyHomeSummaryItem(BaseModel):
     trophy_id: UUID
     name: str
     award_kind: str
-    tier: TrophyTier | None = None
+    tier: MedalTier | None = None
 
 
 class AcademyRecentItem(BaseModel):
@@ -139,7 +145,7 @@ class AcademyRecentItem(BaseModel):
 
     user_id: UUID
     user_name: str
-    tier: TrophyTier | None = None
+    tier: MedalTier | None = None
     trophy_name: str
     award_kind: str
     earned_at: datetime | None = None
@@ -148,7 +154,7 @@ class AcademyRecentItem(BaseModel):
 class AcademyUserEarnedItem(BaseModel):
     trophy_id: UUID
     name: str
-    tier: TrophyTier | None = None
+    tier: MedalTier | None = None
     award_kind: str = "trophy"
 
 
