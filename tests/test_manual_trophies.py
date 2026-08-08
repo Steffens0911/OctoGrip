@@ -423,3 +423,58 @@ async def test_revogar_concessao(client, professor_headers, aluno_user, custom_t
 async def test_revogar_concessao_inexistente(client, professor_headers):
     r = await client.delete(f"/manual-trophies/awards/{uuid4()}", headers=professor_headers)
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Medalha de participação nas respostas agregadas
+#
+# Regressão: "participation" é um medal_type válido em campeonatos, mas os
+# schemas de resposta que misturam troféus automáticos e medalhas manuais
+# aceitavam apenas bronze/silver/gold. O Pydantic rejeitava a resposta inteira
+# e o endpoint devolvia 500 — derrubando a Galeria dos colegas da academia.
+# ---------------------------------------------------------------------------
+
+
+async def test_academy_earned_aceita_medalha_de_participacao(
+    client, professor_headers, aluno_user, academy, championship_template, championship_event, db
+):
+    from app.models.manual_trophy import AcademyTrophyAward
+
+    db.add(
+        AcademyTrophyAward(
+            template_id=championship_template.id,
+            user_id=aluno_user.id,
+            championship_event_id=championship_event.id,
+            medal_type="participation",
+        )
+    )
+    await db.commit()
+
+    r = await client.get(f"/trophies/academy-earned?academy_id={academy.id}", headers=professor_headers)
+    assert r.status_code == 200, r.text
+
+    tiers = [item["tier"] for entry in r.json() for item in entry["items"]]
+    assert "participation" in tiers
+
+
+async def test_home_summary_aceita_medalha_de_participacao(
+    client, aluno_headers, aluno_user, championship_template, championship_event, db
+):
+    from app.models.manual_trophy import AcademyTrophyAward
+
+    db.add(
+        AcademyTrophyAward(
+            template_id=championship_template.id,
+            user_id=aluno_user.id,
+            championship_event_id=championship_event.id,
+            medal_type="participation",
+        )
+    )
+    await db.commit()
+
+    r = await client.get("/trophies/me/home-summary", headers=aluno_headers)
+    assert r.status_code == 200, r.text
+
+    data = r.json()
+    assert "participation" in [item["tier"] for item in data["my_recent"]]
+    assert "participation" in [item["tier"] for item in data["academy_recent"]]
