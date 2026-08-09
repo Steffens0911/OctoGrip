@@ -61,7 +61,7 @@ Base: `/academies`. Detalhes em [ACADEMIAS.md](ACADEMIAS.md).
 | PATCH  | /academies/{id}             | Atualiza academia (incl. 3 técnicas semanais)  |
 | DELETE | /academies/{id}             | Exclui academia                                |
 | GET    | /academies/{id}/ranking     | Ranking interno (`period_days` ou `start_date`+`end_date`, `limit`) |
-| GET    | /academies/{id}/difficulties| Posições mais reportadas como difíceis         |
+| GET    | /academies/{id}/difficulties| Observações de dificuldade (texto livre) mais reportadas |
 | GET    | /academies/{id}/report/weekly | Conclusões no período (`year`/`week` ISO ou `start_date`+`end_date`) |
 | GET    | /academies/{id}/report/weekly/csv | Export CSV (mesmos parâmetros do JSON)   |
 | GET    | /academies/{id}/weekly-kits      | Lista **turmas** semanais (rótulo + itens) da academia |

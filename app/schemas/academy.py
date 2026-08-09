@@ -122,10 +122,13 @@ class RankingResponse(BaseModel):
 
 
 class DifficultyEntry(BaseModel):
-    """T-02: Posição com quantidade de feedbacks de dificuldade."""
+    """T-02: Observação de dificuldade (texto livre) com quantidade de ocorrências.
 
-    position_id: UUID
-    position_name: str
+    TrainingFeedback não tem vínculo com Position (ver app/models/training_feedback.py),
+    por isso o agrupamento é pelo texto normalizado da observação, não por posição.
+    """
+
+    observation: str
     count: int
 
 

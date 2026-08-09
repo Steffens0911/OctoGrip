@@ -87,13 +87,11 @@ void main() {
   group('AcademyDifficultyEntry.fromJson', () {
     test('desserializa todos os campos', () {
       final d = AcademyDifficultyEntry.fromJson({
-        'position_id': 'pos1',
-        'position_name': 'Guarda Fechada',
+        'observation': 'Dificuldade para passar a guarda',
         'count': 12,
       });
 
-      expect(d.positionId, 'pos1');
-      expect(d.positionName, 'Guarda Fechada');
+      expect(d.observation, 'Dificuldade para passar a guarda');
       expect(d.count, 12);
     });
   });

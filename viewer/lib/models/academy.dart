@@ -167,22 +167,20 @@ class AcademyRankingEntry {
   }
 }
 
-/// Posição com quantidade de feedbacks de dificuldade (GET /academies/{id}/difficulties).
+/// Observação de dificuldade (texto livre) com quantidade de ocorrências
+/// (GET /academies/{id}/difficulties).
 class AcademyDifficultyEntry {
-  final String positionId;
-  final String positionName;
+  final String observation;
   final int count;
 
   AcademyDifficultyEntry({
-    required this.positionId,
-    required this.positionName,
+    required this.observation,
     required this.count,
   });
 
   factory AcademyDifficultyEntry.fromJson(Map<String, dynamic> json) {
     return AcademyDifficultyEntry(
-      positionId: json['position_id'] as String,
-      positionName: json['position_name'] as String,
+      observation: json['observation'] as String,
       count: json['count'] as int,
     );
   }
