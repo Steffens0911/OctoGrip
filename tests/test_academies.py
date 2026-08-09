@@ -129,6 +129,28 @@ async def test_dificuldades_academia_vazio(client, admin_headers, academy):
     assert data["entries"] == []
 
 
+async def test_dificuldades_academia_com_feedback(client, admin_headers, aluno_user, db):
+    """Regressão: TrainingFeedback não tem position_id (removido em 6645d3a);
+    o endpoint deve agrupar por observação (texto livre), não quebrar com ValidationError."""
+    from app.models.training_feedback import TrainingFeedback
+
+    db.add_all(
+        [
+            TrainingFeedback(user_id=aluno_user.id, difficulty_level=4, note="Passagem de guarda"),
+            TrainingFeedback(user_id=aluno_user.id, difficulty_level=3, note="Passagem de guarda"),
+            TrainingFeedback(user_id=aluno_user.id, difficulty_level=5, note="Finalização de armlock"),
+        ]
+    )
+    await db.commit()
+
+    r = await client.get(f"/academies/{aluno_user.academy_id}/difficulties", headers=admin_headers)
+    assert r.status_code == 200
+    data = r.json()
+    entries = {e["observation"]: e["count"] for e in data["entries"]}
+    assert entries["passagem de guarda"] == 2
+    assert entries["finalização de armlock"] == 1
+
+
 async def test_relatorio_semanal_academia(client, admin_headers, academy):
     r = await client.get(f"/academies/{academy.id}/report/weekly", headers=admin_headers)
     assert r.status_code == 200

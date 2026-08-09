@@ -211,7 +211,7 @@ class AcademyService {
     };
   }
 
-  /// Posições mais reportadas como difíceis. [limit] máx 100.
+  /// Observações de dificuldade mais reportadas (texto livre). [limit] máx 100.
   Future<Map<String, dynamic>> getDifficulties(
     String academyId, {
     int limit = 50,
