@@ -360,11 +360,7 @@ async def reports_punctuality(
 
     user_ids = [r[0] for r in rows]
     users = (
-        (
-            await db.execute(
-                select(User).where(User.id.in_(user_ids)).order_by(User.name.asc().nulls_last())
-            )
-        )
+        (await db.execute(select(User).where(User.id.in_(user_ids)).order_by(User.name.asc().nulls_last())))
         .scalars()
         .all()
     )

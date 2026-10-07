@@ -278,9 +278,7 @@ async def test_my_position_preenchido_para_professor(client, att_session, att_ge
 async def test_stats_students_inclui_quem_bateu_presenca(
     client, att_session, att_gerente, att_professor, att_aluno, att_supervisor
 ):
-    assert (
-        await _add_manual(client, att_session.id, att_gerente, [att_professor.id, att_aluno.id])
-    ).status_code == 201
+    assert (await _add_manual(client, att_session.id, att_gerente, [att_professor.id, att_aluno.id])).status_code == 201
 
     r = await client.get(
         f"/attendance/stats/students?academy_id={att_session.academy_id}",
