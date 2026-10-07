@@ -162,3 +162,56 @@ def verify_academy_access(
             },
         )
         raise ForbiddenError("Acesso negado. Você só pode acessar recursos da sua academia.")
+
+
+# Papéis que podem constar numa chamada (receber presença ou bater a própria).
+# Escrito literalmente, e NÃO derivado de app/schemas/user.py:VALID_ROLES: "papel válido no
+# sistema" e "papel elegível a presença" são conceitos distintos que hoje coincidem — derivar
+# um do outro faria um papel futuro entrar na chamada por acidente.
+# O critério de presença é o VÍNCULO COM A ACADEMIA, não o papel: a mesma pessoa pode ser
+# professor numa aula e aluno em outra.
+ATTENDANCE_ELIGIBLE_ROLES: frozenset[str] = frozenset(
+    {"aluno", "professor", "gerente_academia", "supervisor", "administrador"}
+)
+
+
+def assert_attendance_target_allowed(
+    *,
+    target_role: str | None,
+    target_academy_id,
+    session_academy_id,
+    current_user: User,
+) -> None:
+    """Valida se alguém pode RECEBER presença numa chamada (manual ou facial).
+
+    Quem *lança* a presença continua restrito a staff (require_write_access); aqui só se
+    verifica o alvo: papel elegível + mesma academia da sessão.
+    """
+    if target_role not in ATTENDANCE_ELIGIBLE_ROLES:
+        _log_access_denied(current_user, "attendance_target")
+        raise ForbiddenError("Este perfil não pode receber presença.")
+
+    if session_academy_id is not None:
+        if target_academy_id is None or str(target_academy_id) != str(session_academy_id):
+            raise ForbiddenError("Esta pessoa não pertence à academia desta chamada.")
+        return
+
+    # Sessão sem academia vinculada: só o administrador global escapa do confronto de academia.
+    if current_user.role != "administrador":
+        if not current_user.academy_id or target_academy_id is None:
+            raise ForbiddenError("Esta pessoa não está na sua academia.")
+        if str(target_academy_id) != str(current_user.academy_id):
+            raise ForbiddenError("Esta pessoa não está na sua academia.")
+
+
+def assert_can_self_checkin(current_user: User) -> None:
+    """Valida se o utilizador logado pode registrar a PRÓPRIA presença (QR).
+
+    Nota: o supervisor é leitura-only na maior parte do sistema (require_readonly_or_write),
+    mas escreve o próprio check-in por decisão de produto — ele também treina. É a exceção.
+    """
+    if current_user.role not in ATTENDANCE_ELIGIBLE_ROLES:
+        _log_access_denied(current_user, "self_checkin")
+        raise ForbiddenError("Este perfil não pode registrar presença.")
+    if not current_user.academy_id:
+        raise ForbiddenError("Vincule-se a uma academia para registrar presença.")

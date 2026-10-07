@@ -573,3 +573,47 @@ async def test_relatorio_pontualidade_com_dados(client, db: AsyncSession, pct_ac
     assert entry["total_checkins"] == 1
     assert entry["punctuality_pct"] == 100.0
     assert entry["punctuality_streak"] == 3
+
+
+@pytest.mark.asyncio
+async def test_relatorio_pontualidade_inclui_professor(
+    client, db: AsyncSession, pct_academy, pct_professor, pct_prof_headers
+):
+    """Quem treina aparece no relatório mesmo não sendo aluno (professor numa aula, aluno em outra)."""
+    from app.models import AttendanceSession
+    from app.models.attendance_record import AttendanceRecord
+
+    att = AttendanceSession(
+        academy_id=pct_academy.id,
+        created_by_user_id=pct_professor.id,
+        status="active",
+        starts_at=datetime.now(UTC),
+        expires_at=datetime.now(UTC) + timedelta(hours=2),
+    )
+    db.add(att)
+    await db.commit()
+    await db.refresh(att)
+
+    db.add(
+        AttendanceRecord(
+            session_id=att.id,
+            user_id=pct_professor.id,
+            checked_in_at=datetime.now(UTC),
+            method="qr",
+            added_manually=False,
+            was_punctual=True,
+        )
+    )
+    pct_professor.punctuality_streak = 2
+    pct_professor.punctuality_streak_best = 2
+    await db.commit()
+
+    r = await client.get(
+        "/reports/punctuality",
+        params={"academy_id": str(pct_academy.id), "days": 30},
+        headers=pct_prof_headers,
+    )
+
+    assert r.status_code == 200, r.text
+    ids = [e["student_id"] for e in r.json()["students"]]
+    assert str(pct_professor.id) in ids

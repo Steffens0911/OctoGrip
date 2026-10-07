@@ -83,7 +83,7 @@ class _AttendanceStudentDetailScreenState extends State<AttendanceStudentDetailS
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const AppStandardAppBar(title: 'Frequência do aluno'),
+      appBar: const AppStandardAppBar(title: 'Frequência'),
       body: _loading
           ? const AppScreenState.loading()
           : _error != null

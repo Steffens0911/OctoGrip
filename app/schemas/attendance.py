@@ -45,12 +45,16 @@ class QrScanIn(BaseModel):
 
 
 class AttendanceManualCheckinRequest(BaseModel):
-    """Correção de presença: professor/gestor adiciona aluno(s) sem QR."""
+    """Correção de presença: professor/gestor adiciona pessoa(s) sem QR.
 
-    user_id: UUID | None = Field(default=None, description="Um aluno (contrato legado).")
+    O nome `student_ids` é mantido por compatibilidade de contrato; qualquer perfil
+    vinculado à academia da chamada pode receber presença.
+    """
+
+    user_id: UUID | None = Field(default=None, description="Uma pessoa (contrato legado).")
     student_ids: list[UUID] | None = Field(
         default=None,
-        description="Vários alunos na mesma requisição.",
+        description="Várias pessoas na mesma requisição.",
     )
 
     @model_validator(mode="after")

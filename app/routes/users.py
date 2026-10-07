@@ -127,8 +127,7 @@ async def _save_facial_photo_and_enqueue(
     target.facial_photo_url = f"/media/user_facial_photos/{filename}"
     await db.commit()
     await db.refresh(target)
-    if target.role == "aluno":
-        generate_student_embedding.delay(str(target.id))
+    generate_student_embedding.delay(str(target.id))
     return target
 
 
@@ -483,7 +482,7 @@ async def user_update(
     )
     if not updated:
         raise UserNotFoundError()
-    if "avatar_url" in payload and updated.role == "aluno" and updated.avatar_url:
+    if "avatar_url" in payload and updated.avatar_url:
         generate_student_embedding.delay(str(updated.id))
     return updated
 

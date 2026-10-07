@@ -420,7 +420,7 @@ def generate_student_embedding(self, student_id: str) -> None:
     uid = UUID(student_id)
     with SyncSessionLocal() as db:
         user = db.get(User, uid)
-        if not user or user.role != "aluno" or not user.academy_id:
+        if not user or not user.academy_id:
             return
         photo_url = getattr(user, "facial_photo_url", None) or user.avatar_url
         if not photo_url:

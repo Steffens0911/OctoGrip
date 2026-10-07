@@ -362,7 +362,7 @@ async def reports_punctuality(
     users = (
         (
             await db.execute(
-                select(User).where(User.id.in_(user_ids), User.role == "aluno").order_by(User.name.asc().nulls_last())
+                select(User).where(User.id.in_(user_ids)).order_by(User.name.asc().nulls_last())
             )
         )
         .scalars()

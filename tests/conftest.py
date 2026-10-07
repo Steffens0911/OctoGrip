@@ -193,6 +193,34 @@ def gerente_headers(gerente_token) -> dict:
 
 
 @pytest.fixture
+async def supervisor_user(db: AsyncSession, academy):
+    from app.models import User
+
+    user = User(
+        email=f"supervisor-{uuid4().hex[:8]}@test.com",
+        name="Supervisor Teste",
+        role="supervisor",
+        graduation="black",
+        academy_id=academy.id,
+        password_hash=hash_password_sync("supervisor12"),
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user
+
+
+@pytest.fixture
+def supervisor_token(supervisor_user) -> str:
+    return create_access_token(supervisor_user.id)
+
+
+@pytest.fixture
+def supervisor_headers(supervisor_token) -> dict:
+    return {"Authorization": f"Bearer {supervisor_token}"}
+
+
+@pytest.fixture
 async def technique(db: AsyncSession, academy):
     from app.models import Technique
 

@@ -13,6 +13,9 @@ import 'package:viewer/widgets/app_feedback.dart';
 const Color _kAccentGreen = Color(0xFF4ECF8A);
 
 /// Modal de presença manual na chamada (multi-selecção).
+///
+/// Lista qualquer pessoa vinculada à academia, não só alunos — o critério de
+/// presença é o vínculo com a academia, não o papel.
 class AttendanceAddStudentDialog extends StatefulWidget {
   const AttendanceAddStudentDialog({
     super.key,
@@ -90,7 +93,9 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
     if (q.isEmpty) return _allStudents;
     return _allStudents.where((s) {
       final name = (s.name ?? '').toLowerCase();
-      return name.contains(q);
+      final role = (s.role ?? '').trim();
+      final roleLabel = role.isEmpty ? '' : _roleLabel(role).toLowerCase();
+      return name.contains(q) || (roleLabel.isNotEmpty && roleLabel.contains(q));
     }).toList();
   }
 
@@ -123,6 +128,32 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
     }
   }
 
+  /// Rótulo do papel — só exibido para quem não é aluno.
+  String _roleLabel(String role) {
+    switch (role.toLowerCase()) {
+      case 'professor':
+        return 'Professor';
+      case 'gerente_academia':
+        return 'Gerente';
+      case 'supervisor':
+        return 'Supervisor';
+      case 'administrador':
+        return 'Administrador';
+      default:
+        return role;
+    }
+  }
+
+  /// Linha secundária: faixa para alunos; papel (+ faixa, se houver) para o resto.
+  /// "Sem faixa" só faz sentido para aluno — para um gerente seria ruído.
+  String _subtitle(AcademyStudentListItem s) {
+    final role = (s.role ?? '').trim().toLowerCase();
+    if (role.isEmpty || role == 'aluno') return _beltLabel(s.belt);
+    final label = _roleLabel(role);
+    final belt = (s.belt ?? '').trim();
+    return belt.isEmpty ? label : '$label · ${_beltLabel(belt)}';
+  }
+
   String _initials(AcademyStudentListItem s) {
     final n = (s.name ?? '').trim();
     if (n.isEmpty) return '?';
@@ -150,7 +181,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
         AppFeedback.show(
           context,
           message:
-              'Nenhuma presença nova — os alunos seleccionados já estavam presentes.',
+              'Nenhuma presença nova — as pessoas selecionadas já estavam presentes.',
           type: AppFeedbackType.warning,
         );
       } else {
@@ -204,7 +235,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Adicionar aluno',
+                            'Adicionar presença',
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: AppTheme.textPrimaryOf(context),
@@ -212,7 +243,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Selecione um ou mais alunos',
+                            'Selecione uma ou mais pessoas',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.textSecondaryOf(context),
                                 ),
@@ -234,7 +265,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                   controller: _search,
                   enabled: !_submitting && !_loading && _loadError == null,
                   decoration: InputDecoration(
-                    hintText: 'Buscar aluno...',
+                    hintText: 'Buscar pessoa...',
                     prefixIcon: const Icon(Icons.search),
                     filled: true,
                     fillColor: isDark ? const Color(0xFF1e2435) : null,
@@ -245,42 +276,47 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                 ),
                 const SizedBox(height: 12),
                 if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 48),
+                  const Expanded(
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else if (_loadError != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Column(
-                      children: [
-                        Text(
-                          _loadError!,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: scheme.error),
+                  Expanded(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _loadError!,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: scheme.error),
+                            ),
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: _submitting ? null : () => unawaited(_loadStudents()),
+                              child: const Text('Tentar novamente'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 12),
-                        OutlinedButton(
-                          onPressed: _submitting ? null : () => unawaited(_loadStudents()),
-                          child: const Text('Tentar novamente'),
-                        ),
-                      ],
+                      ),
                     ),
                   )
                 else if (_allStudents.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Column(
-                      children: [
-                        Icon(Icons.event_available_outlined,
-                            size: 48, color: AppTheme.textSecondaryOf(context)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Todos os alunos já estão presentes',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                      ],
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.event_available_outlined,
+                              size: 48, color: AppTheme.textSecondaryOf(context)),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Todos já estão presentes',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
                     ),
                   )
                 else
@@ -288,7 +324,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                     child: _filtered.isEmpty
                         ? Center(
                             child: Text(
-                              'Nenhum aluno encontrado',
+                              'Nenhuma pessoa encontrada',
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: AppTheme.textSecondaryOf(context),
                                   ),
@@ -373,7 +409,7 @@ class _AttendanceAddStudentDialogState extends State<AttendanceAddStudentDialog>
                                                         ),
                                                         const SizedBox(height: 2),
                                                         Text(
-                                                          _beltLabel(s.belt),
+                                                          _subtitle(s),
                                                           maxLines: 1,
                                                           overflow:
                                                               TextOverflow.ellipsis,

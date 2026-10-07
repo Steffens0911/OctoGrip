@@ -1129,7 +1129,10 @@ class ApiService {
     return AttendanceRecordModel.fromJson(data! as Map<String, dynamic>);
   }
 
-  /// Lista paginada de alunos da academia (`GET /students/academy/{id}/list`).
+  /// Lista paginada de pessoas da academia (`GET /students/academy/{id}/list`).
+  ///
+  /// Traz qualquer perfil vinculado à academia (não só alunos): o critério de
+  /// presença é o vínculo com a academia, não o papel. Cada item carrega `role`.
   Future<List<AcademyStudentListItem>> getAcademyStudentsList(
     String academyId, {
     bool asRealUser = false,

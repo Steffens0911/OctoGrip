@@ -256,7 +256,7 @@ class _AttendanceFrequencyScreenState extends State<AttendanceFrequencyScreen>
             controller: _tabController,
             tabs: const [
               Tab(text: 'Minhas sessões'),
-              Tab(text: 'Alunos da academia'),
+              Tab(text: 'Frequência da academia'),
             ],
           ),
           Expanded(
@@ -388,7 +388,7 @@ class _AttendanceFrequencyScreenState extends State<AttendanceFrequencyScreen>
               padding: EdgeInsets.all(AppTheme.screenPadding(context)),
               children: [
                 Text(
-                  'Nenhum aluno encontrado para esta academia.',
+                  'Nenhum registo de frequência para esta academia.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppTheme.textSecondaryOf(context),
                       ),
