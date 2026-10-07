@@ -17,7 +17,12 @@ from app.core.exceptions import (
     UserNotFoundError,
 )
 from app.core.rate_limit import limiter
-from app.core.role_deps import require_admin_or_manager, require_write_access, verify_academy_access
+from app.core.role_deps import (
+    assert_attendance_target_allowed,
+    require_admin_or_manager,
+    require_write_access,
+    verify_academy_access,
+)
 from app.database import get_db
 from app.models import (
     Academy,
@@ -204,10 +209,12 @@ async def face_recognition_confirm(
         student = await db.get(User, student_id)
         if not student:
             raise UserNotFoundError()
-        if student.role != "aluno":
-            raise ForbiddenError("Apenas alunos podem receber presença via reconhecimento facial.")
-        if student.academy_id != session.academy_id:
-            raise ForbiddenError("Aluno não pertence à academia da sessão.")
+        assert_attendance_target_allowed(
+            target_role=student.role,
+            target_academy_id=student.academy_id,
+            session_academy_id=session.academy_id,
+            current_user=current_user,
+        )
 
         existing = (
             await db.execute(
@@ -300,21 +307,19 @@ async def face_generate_embedding(
     student = await db.get(User, student_id)
     if not student:
         raise UserNotFoundError()
-    if student.role != "aluno":
-        raise ForbiddenError("Apenas alunos possuem embedding facial.")
     verify_academy_access(
         current_user,
         str(student.academy_id) if student.academy_id else None,
         allow_none=False,
     )
     if not student.avatar_url:
-        raise AppError("Aluno sem avatar_url cadastrado.", status_code=400)
+        raise AppError("Utilizador sem avatar_url cadastrado.", status_code=400)
 
-    # LGPD: dado biométrico exige consentimento específico e vigente do próprio aluno.
+    # LGPD: dado biométrico exige consentimento específico e vigente do próprio titular.
     if not await has_active_biometric_consent(db, student.id):
         raise ForbiddenError(
-            "Aluno não autorizou o uso de reconhecimento facial. "
-            "É necessário o consentimento biométrico do aluno antes de gerar o embedding."
+            "Esta pessoa não autorizou o uso de reconhecimento facial. "
+            "É necessário o consentimento biométrico do titular antes de gerar o embedding."
         )
 
     generate_student_embedding.delay(str(student.id))
@@ -336,7 +341,7 @@ async def face_embedding_status(
         (
             await db.execute(
                 select(User)
-                .where(User.academy_id == target_academy_id, User.role == "aluno")
+                .where(User.academy_id == target_academy_id)
                 .order_by(User.name.asc().nulls_last(), User.email.asc())
             )
         )

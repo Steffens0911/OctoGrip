@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Literal, NamedTuple
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,11 @@ from app.core.exceptions import (
     UserNotFoundError,
 )
 from app.core.list_pagination import clamp_list_limit
-from app.core.role_deps import verify_academy_access
+from app.core.role_deps import (
+    assert_attendance_target_allowed,
+    assert_can_self_checkin,
+    verify_academy_access,
+)
 from app.models import Academy, AttendanceRecord, AttendanceSession, User
 from app.models.training_pre_checkin import TrainingPreCheckin
 
@@ -231,16 +235,12 @@ async def add_record_manual(
     _target_row = (await db.execute(select(User.role, User.academy_id).where(User.id == target_user_id))).one_or_none()
     if _target_row is None:
         raise UserNotFoundError()
-    if _target_row[0] != "aluno":
-        raise ForbiddenError("Apenas alunos podem receber presença nesta sessão.")
-
-    if s.academy_id is not None:
-        if _target_row[1] != s.academy_id:
-            raise ForbiddenError("O aluno não pertence à mesma academia desta sessão.")
-    else:
-        if current_user.role != "administrador":
-            if not current_user.academy_id or _target_row[1] != current_user.academy_id:
-                raise ForbiddenError("O aluno não está na sua academia.")
+    assert_attendance_target_allowed(
+        target_role=_target_row[0],
+        target_academy_id=_target_row[1],
+        session_academy_id=s.academy_id,
+        current_user=current_user,
+    )
 
     existing = (
         await db.execute(
@@ -308,10 +308,7 @@ async def scan_checkin(
     from app.services.qr_service import verify as qr_verify
     from app.services.qr_service import verify_short as qr_verify_short
 
-    if current_user.role not in ("aluno", "professor", "gerente_academia"):
-        raise ForbiddenError("Apenas alunos, professores e gerentes podem registrar presença via QR.")
-    if not current_user.academy_id:
-        raise ForbiddenError("Usuário não está vinculado a uma academia.")
+    assert_can_self_checkin(current_user)
 
     stripped = token.strip()
     if len(stripped) == 5:
@@ -622,7 +619,10 @@ async def stats_students(
         )
         .select_from(User)
         .outerjoin(agg_subq, User.id == agg_subq.c.uid)
-        .where(User.academy_id == aid, User.role == "aluno")
+        .where(User.academy_id == aid)
+        # Todos os alunos (mesmo sem presença, como sempre) + qualquer pessoa que tenha
+        # batido presença no período — staff sem check-in não polui a lista.
+        .where(or_(User.role == "aluno", agg_subq.c.pc.is_not(None)))
         .order_by(User.name.asc().nullslast(), User.email.asc())
         .limit(lim)
     )
@@ -661,12 +661,12 @@ async def stats_student_detail(
 ) -> AttendanceStudentDetailResult:
     """Detalhe de frequência de um aluno + lista de presenças no período."""
     target = await db.get(User, student_id)
-    if not target or target.role != "aluno":
-        raise UserNotFoundError("Aluno não encontrado.")
+    if not target:
+        raise UserNotFoundError("Utilizador não encontrado.")
 
     aid = academy_id or target.academy_id
     if aid is None:
-        raise ForbiddenError("Aluno sem academia.")
+        raise ForbiddenError("Utilizador sem academia.")
 
     if current_user.role not in ("aluno", "administrador", "gerente_academia", "professor", "supervisor"):
         raise ForbiddenError("Acesso negado.")
@@ -676,7 +676,7 @@ async def stats_student_detail(
     verify_academy_access(current_user, str(aid), allow_none=False)
 
     if target.academy_id != aid:
-        raise ForbiddenError("academy_id não corresponde ao aluno.")
+        raise ForbiddenError("academy_id não corresponde ao utilizador.")
 
     df, dt = _default_stats_date_range(date_from, date_to)
 
@@ -1071,7 +1071,6 @@ async def _ranking_rows_for_range(
             AttendanceSession.starts_at >= range_start,
             AttendanceSession.starts_at < range_end,
             User.academy_id == academy_id,
-            User.role == "aluno",
         )
         .group_by(AttendanceRecord.user_id)
         .subquery()

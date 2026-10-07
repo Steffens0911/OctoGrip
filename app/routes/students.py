@@ -1,4 +1,4 @@
-"""Lista compacta de alunos por academia (chamada manual)."""
+"""Lista compacta de pessoas da academia (chamada manual)."""
 
 from uuid import UUID
 
@@ -23,14 +23,18 @@ async def academy_students_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Todos os alunos activos (não congelados) da academia, ordenados por nome."""
+    """Todas as pessoas activas (não congeladas) da academia, ordenadas por nome.
+
+    Não filtra por papel: quem pode receber presença é definido pelo vínculo com a academia
+    (ver ATTENDANCE_ELIGIBLE_ROLES em app/core/role_deps.py), porque a mesma pessoa pode ser
+    professor numa aula e aluno em outra.
+    """
     verify_academy_access(current_user, str(academy_id))
 
     sort_key = func.lower(func.coalesce(User.name, User.email))
     stmt = (
         select(User)
         .where(User.academy_id == academy_id)
-        .where(User.role == "aluno")
         .where(User.account_frozen.is_(False))
         .order_by(sort_key.asc())
         .offset(offset)
@@ -43,6 +47,7 @@ async def academy_students_list(
             name=u.name,
             belt=u.graduation,
             avatar_url=u.avatar_url,
+            role=u.role,
         )
         for u in rows
     ]

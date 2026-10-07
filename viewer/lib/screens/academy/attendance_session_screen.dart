@@ -559,7 +559,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Encerrar chamada'),
         content: const Text(
-            'Depois de encerrar, alunos não conseguem mais registrar presença.'),
+            'Depois de encerrar, ninguém consegue mais registrar presença.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -717,8 +717,8 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             const SizedBox(height: 12),
             Text(
               _qrAttendanceEnabled
-                  ? 'O QR é renovado automaticamente. Os alunos escaneiam com o app para registrar presença.'
-                  : 'Nesta academia, o QR está desativado. Use "Adicionar aluno" para registrar presença manual.',
+                  ? 'O QR é renovado automaticamente. Quem está no treino escaneia com o app para registrar presença.'
+                  : 'Nesta academia, o QR está desativado. Use "Adicionar presença" para registrar manualmente.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
@@ -793,7 +793,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
             child: OutlinedButton.icon(
               onPressed: _busy ? null : _addStudentDialog,
               icon: const Icon(Icons.person_add_rounded, size: 18),
-              label: const Text('Adicionar aluno'),
+              label: const Text('Adicionar presença'),
             ),
           ),
           const SizedBox(height: 8),
@@ -817,7 +817,7 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
                         height: 240,
                         child: Center(
                           child: Text(
-                            'QR desativado nesta academia.\nUse "Adicionar aluno" para presença manual.',
+                            'QR desativado nesta academia.\nUse "Adicionar presença" para presença manual.',
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),

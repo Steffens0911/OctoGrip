@@ -12,6 +12,35 @@ import 'package:viewer/widgets/app_feedback.dart';
 import 'package:viewer/widgets/app_screen_state.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 
+/// Rótulo de uma pessoa no autocomplete: nome · Papel · Faixa X.
+///
+/// O papel só aparece para quem não é aluno (a lista da academia traz staff
+/// também) e a faixa só quando existe — "Faixa " vazio seria ruído.
+String personAutocompleteLabel(AcademyStudentListItem s) {
+  final role = (s.role ?? '').trim().toLowerCase();
+  final belt = (s.belt ?? '').trim();
+  return [
+    if ((s.name ?? '').trim().isNotEmpty) s.name!.trim(),
+    if (role.isNotEmpty && role != 'aluno') _personRoleLabel(role),
+    if (belt.isNotEmpty) 'Faixa $belt',
+  ].join(' · ');
+}
+
+String _personRoleLabel(String role) {
+  switch (role) {
+    case 'professor':
+      return 'Professor';
+    case 'gerente_academia':
+      return 'Gerente';
+    case 'supervisor':
+      return 'Supervisor';
+    case 'administrador':
+      return 'Administrador';
+    default:
+      return role;
+  }
+}
+
 class ReviewFaceResultsScreen extends StatefulWidget {
   final String sessionId;
   final String jobId;
@@ -463,7 +492,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           Text('Identificados', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           if (auto.isEmpty)
-            const Text('Nenhum aluno identificado automaticamente.')
+            const Text('Ninguém identificado automaticamente.')
           else
             ...auto.map((r) => _buildItem(r, initiallyChecked: true)),
           const SizedBox(height: 16),
@@ -479,7 +508,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
             const Text('Nenhuma sugestão para conferência.')
           else ...[
             Text(
-              'Confira a sugestão ou busque outro aluno para este rosto.',
+              'Confira a sugestão ou busque outra pessoa para este rosto.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
@@ -506,7 +535,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
           if (unknown.isNotEmpty)
             Text(
               '${unknown.length} rosto${unknown.length > 1 ? 's' : ''} não ${unknown.length > 1 ? 'foram' : 'foi'} identificado${unknown.length > 1 ? 's' : ''} automaticamente. '
-              'Selecione o aluno correspondente ou deixe em branco.',
+              'Selecione a pessoa correspondente ou deixe em branco.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppTheme.textSecondaryOf(context),
                   ),
@@ -541,7 +570,7 @@ class _ReviewFaceResultsScreenState extends State<ReviewFaceResultsScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : Text(
-                  'Salvar presenças (${_confirmedStudentIds.length} alunos)'),
+                  'Salvar presenças (${_confirmedStudentIds.length})'),
         ),
       ),
     );
@@ -603,11 +632,7 @@ class _SuggestionFaceItemState extends State<_SuggestionFaceItem> {
     return s != null ? _studentLabel(s) : '';
   }
 
-  String _studentLabel(AcademyStudentListItem s) {
-    final belt =
-        (s.belt != null && s.belt!.isNotEmpty) ? ' · Faixa ${s.belt}' : '';
-    return '${s.name ?? ''}$belt';
-  }
+  String _studentLabel(AcademyStudentListItem s) => personAutocompleteLabel(s);
 
   @override
   Widget build(BuildContext context) {
@@ -682,8 +707,8 @@ class _SuggestionFaceItemState extends State<_SuggestionFaceItem> {
                         focusNode: focusNode,
                         decoration: InputDecoration(
                           hintText: widget.students.isEmpty
-                              ? 'Carregando alunos...'
-                              : 'Buscar aluno…',
+                              ? 'Carregando pessoas...'
+                              : 'Buscar pessoa…',
                           prefixIcon:
                               const Icon(Icons.search_rounded, size: 18),
                           isDense: true,
@@ -766,10 +791,7 @@ class _UnknownFaceItemState extends State<_UnknownFaceItem> {
     return s != null ? _studentLabel(s) : '';
   }
 
-  String _studentLabel(AcademyStudentListItem s) {
-    final belt = (s.belt != null && s.belt!.isNotEmpty) ? ' · Faixa ${s.belt}' : '';
-    return '${s.name ?? ''}$belt';
-  }
+  String _studentLabel(AcademyStudentListItem s) => personAutocompleteLabel(s);
 
   @override
   Widget build(BuildContext context) {
@@ -815,8 +837,8 @@ class _UnknownFaceItemState extends State<_UnknownFaceItem> {
                         focusNode: focusNode,
                         decoration: InputDecoration(
                           hintText: widget.students.isEmpty
-                              ? 'Carregando alunos...'
-                              : 'Buscar aluno...',
+                              ? 'Carregando pessoas...'
+                              : 'Buscar pessoa...',
                           prefixIcon:
                               const Icon(Icons.search_rounded, size: 18),
                           isDense: true,

@@ -1,4 +1,4 @@
-"""Reenfileira geração de embedding facial para todos os alunos com avatar_url.
+"""Reenfileira geração de embedding facial para todos os utilizadores com avatar_url.
 
 Útil após mudanças no pipeline de embedding (ex.: adição de normalização L2).
 Os jobs são processados pelos workers Celery já em execução.
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Regenera embeddings faciais dos alunos.")
+    parser = argparse.ArgumentParser(description="Regenera embeddings faciais dos utilizadores da academia.")
     parser.add_argument(
         "--academy-id",
         type=str,
@@ -33,7 +33,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Apenas lista os alunos sem enfileirar os jobs.",
+        help="Apenas lista os utilizadores sem enfileirar os jobs.",
     )
     return parser.parse_args()
 
@@ -42,16 +42,14 @@ def run_regenerate(academy_id: UUID | None = None, dry_run: bool = False) -> Non
     from app.tasks.face_recognition_tasks import generate_student_embedding
 
     with SyncSessionLocal() as db:
-        query = select(User.id, User.email, User.name, User.academy_id).where(
-            User.role == "aluno", User.avatar_url.is_not(None)
-        )
+        query = select(User.id, User.email, User.name, User.academy_id).where(User.avatar_url.is_not(None))
         if academy_id:
             query = query.where(User.academy_id == academy_id)
 
         rows = db.execute(query).all()
 
         if not rows:
-            print("Nenhum aluno com avatar_url encontrado.")
+            print("Nenhum utilizador com avatar_url encontrado.")
             return
 
         existing_ids = set(

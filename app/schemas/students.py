@@ -1,4 +1,4 @@
-"""Schemas para listagens de alunos (chamada, relatórios)."""
+"""Schemas para listagens de pessoas da academia (chamada, relatórios)."""
 
 from uuid import UUID
 
@@ -10,3 +10,4 @@ class AcademyStudentListItem(BaseModel):
     name: str | None = None
     belt: str | None = None
     avatar_url: str | None = None
+    role: str | None = None

@@ -220,7 +220,6 @@ async def my_training_stats(
             .where(
                 AttendanceSession.academy_id == current_user.academy_id,
                 AttendanceRecord.checked_in_at >= cutoff,
-                User.role == "aluno",
             )
             .group_by(AttendanceRecord.user_id)
             .order_by(func.count(AttendanceRecord.id).desc())
@@ -384,7 +383,6 @@ async def my_training_stats(
             )
             .where(
                 User.academy_id == current_user.academy_id,
-                User.role == "aluno",
             )
             .subquery()
         )

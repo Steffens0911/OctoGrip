@@ -187,7 +187,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Encerrar chamada'),
-        content: const Text('Depois de encerrar, alunos não conseguem mais registrar presença via QR.'),
+        content: const Text('Depois de encerrar, ninguém consegue mais registrar presença via QR.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Encerrar')),
@@ -408,7 +408,7 @@ class _AttendanceSessionDetailScreenState extends State<AttendanceSessionDetailS
               OutlinedButton.icon(
                 onPressed: _busy ? null : _addStudentDialog,
                 icon: const Icon(Icons.person_add_rounded),
-                label: const Text('Adicionar aluno'),
+                label: const Text('Adicionar presença'),
               ),
               if (_faceJobId != null)
                 OutlinedButton.icon(
