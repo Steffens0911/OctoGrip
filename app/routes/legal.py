@@ -39,6 +39,12 @@ _DOCS: dict[str, dict[str, str]] = {
         "filename": "AVISO_BIOMETRIA.md",
         "version": settings.LEGAL_BIOMETRIC_VERSION,
     },
+    # Link público exigido pela Play Store (Data safety → exclusão de conta). Não exige aceite.
+    "account-deletion": {
+        "title": "Exclusão de conta e dados",
+        "filename": "EXCLUSAO_DE_CONTA.md",
+        "version": "2026-10-22",
+    },
 }
 
 
