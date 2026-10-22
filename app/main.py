@@ -17,7 +17,7 @@ from starlette.staticfiles import StaticFiles
 from app.config import settings
 from app.core.cors_policy import CORS_ORIGIN_REGEX, is_allowed_cors_origin, merge_json_response_headers
 from app.core.error_tracking import capture_exception, init_sentry
-from app.core.exceptions import AppError, AuthenticationError
+from app.core.exceptions import AppError, AppUpdateRequiredError, AuthenticationError
 from app.core.logging_config import setup_logging
 from app.core.metrics import http_errors_total
 from app.core.middleware import (
@@ -90,16 +90,20 @@ def register_exception_handlers(application: FastAPI) -> None:
         if isinstance(exc, AuthenticationError):
             headers["WWW-Authenticate"] = "Bearer"
 
+        content = error_payload(
+            request,
+            detail=exc.message,
+            status_code=exc.status_code,
+            error_code=error_code,
+            error_type=error_type,
+            message=exc.message,
+        )
+        if isinstance(exc, AppUpdateRequiredError):
+            content["update"] = {"min_version": exc.min_version, "store_url": exc.store_url}
+
         return JSONResponse(
             status_code=exc.status_code,
-            content=error_payload(
-                request,
-                detail=exc.message,
-                status_code=exc.status_code,
-                error_code=error_code,
-                error_type=error_type,
-                message=exc.message,
-            ),
+            content=content,
             headers=merge_json_response_headers(request, headers if headers else None),
         )
 

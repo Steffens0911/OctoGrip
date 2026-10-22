@@ -37,6 +37,18 @@ class AccountFrozenError(ForbiddenError):
         super().__init__(message)
 
 
+class AppUpdateRequiredError(AppError):
+    """App abaixo da versão mínima da plataforma (426); o handler inclui ``update`` com os dados da loja."""
+
+    def __init__(self, min_version: str, store_url: str | None, update_message: str | None = None):
+        self.min_version = min_version
+        self.store_url = store_url
+        super().__init__(
+            update_message or "Há uma nova versão do Octogrip. Atualize o app para continuar.",
+            status_code=426,
+        )
+
+
 # --- Not Found (404) ---
 
 

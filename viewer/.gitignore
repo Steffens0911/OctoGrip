@@ -49,3 +49,5 @@ app.*.map.json
 
 # Gerado pelo Docker build (FCM Web)
 /tool/dart_define_web.json
+# Gerado pelo build-mobile.yml
+/tool/dart_define_mobile.json

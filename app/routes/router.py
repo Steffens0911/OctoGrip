@@ -3,8 +3,9 @@ Agregação de todos os routers da API.
 Centraliza prefixos e tags; main.py só inclui este router.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.core.app_version_deps import enforce_min_app_version
 from app.routes import (
     academies,
     academy_weekly_kits,
@@ -14,6 +15,7 @@ from app.routes import (
     admin_global_partners,
     admin_push,
     admin_undo,
+    app_config,
     attendance,
     auth,
     enrollment,
@@ -51,7 +53,8 @@ from app.routes import (
     users,
 )
 
-api_router = APIRouter()
+# Toda rota passa pela checagem de versão mínima do app (426); exceções em app_version_deps.
+api_router = APIRouter(dependencies=[Depends(enforce_min_app_version)])
 
 api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(admin_global_partners.router, prefix="/admin", tags=["admin-global-partners"])
@@ -61,6 +64,8 @@ api_router.include_router(admin_audit.router, prefix="/admin", tags=["admin-audi
 api_router.include_router(admin_undo.router, prefix="/admin", tags=["admin-undo"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(health.router, prefix="/health", tags=["health"])
+api_router.include_router(app_config.router, prefix="/app", tags=["app-config"])
+api_router.include_router(app_config.admin_router, prefix="/admin", tags=["admin-app-config"])
 api_router.include_router(academies.router, prefix="/academies", tags=["academies"])
 api_router.include_router(
     academy_weekly_kits.router,

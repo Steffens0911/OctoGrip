@@ -1,0 +1,88 @@
+# App Android — release e compatibilidade com a API
+
+Plano completo: documento "Octogrip Android — plano de lançamento e atualizações".
+Regra central: **uma versão do app já instalada nunca pode quebrar por causa de um deploy da API.**
+
+## Identidade do app
+
+- `applicationId` / `namespace`: `br.com.octogrip.app` (`viewer/android/app/build.gradle.kts`).
+  Depois do primeiro envio à Play Store, **nunca muda**.
+- Firebase: o `google-services.json` precisa conter um app Android com o pacote `br.com.octogrip.app`
+  (Console Firebase → projeto `octogrip` → Adicionar app → Android). Sem isso o build Android falha
+  com "No matching client found for package name".
+
+## Chave de assinatura
+
+1. Gerar a chave de upload (uma vez, fora do repositório):
+
+   ```bash
+   keytool -genkey -v -keystore octogrip-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   ```
+
+2. Ativar o **Play App Signing** no primeiro envio (a Google guarda a chave definitiva).
+3. Guardar o `.jks` e as senhas no gerenciador de senhas e numa cópia offline. **Nunca no git**
+   (`*.jks` e `key.properties` já estão no `.gitignore`).
+4. Secrets do GitHub (environment `secrets`): `ANDROID_KEYSTORE_BASE64` (`base64 -w0 octogrip-upload.jks`),
+   `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`,
+   `API_BASE_URL` (`https://api.octogrip.com.br`).
+5. Build de release local (opcional): `viewer/android/key.properties`
+
+   ```properties
+   storeFile=/caminho/para/octogrip-upload.jks
+   storePassword=...
+   keyAlias=upload
+   keyPassword=...
+   ```
+
+   Sem chave, `flutter run --release` local usa a chave de debug; no CI isso é erro.
+
+## Publicar uma versão
+
+1. Subir a versão no `viewer/pubspec.yaml` (`1.3.0+12`: o número depois do `+` sobe a cada envio).
+2. `git tag v1.3.0+12 && git push --tags` → `build-mobile.yml` roda os testes, gera o `.aab` e envia
+   para a trilha **interna**.
+3. Produção: GitHub Actions → *Build & Publish Mobile* → *Run workflow* com `track: production`
+   e `user_fraction: 0.2`. Depois de 2–3 dias sem erro novo no Sentry, aumentar para 100% no console da Play.
+
+## Versão mínima e feature flags (API)
+
+| Rota | Quem | Para quê |
+| --- | --- | --- |
+| `GET /app/config?platform=android` | público | o app lê ao abrir: `min_version`, `latest_version`, `update_message`, `store_url`, `feature_flags` |
+| `PUT /admin/app-config/android` | admin | muda os valores acima (vale em até 60 s em todos os workers) |
+| `GET /admin/app-versions?days=30` | admin | quantos usuários ativos estão em cada versão |
+
+- O app manda `X-App-Version: 1.3.0+12` e `X-App-Platform: android` em toda requisição.
+- Abaixo de `min_version`, qualquer rota (exceto `/app/config`, `/health`, `/metrics`, `/legal`)
+  responde **426** com `update.min_version` e `update.store_url`.
+- Sem esses headers (web, apps antigos) nada é bloqueado.
+- A versão de cada usuário fica em `users.last_app_version` / `last_app_platform` / `last_app_seen_at`.
+
+## Contrato da API (`docs/openapi_snapshot.json`)
+
+`tests/test_openapi_contract.py` compara a API atual com o snapshot:
+
+- **quebra** (campo removido ou renomeado, tipo trocado, campo que passa a aceitar `null`, enum com valor novo,
+  campo novo obrigatório na requisição, endpoint removido) → o teste falha. Torne a mudança aditiva ou siga o
+  ciclo de depreciação abaixo;
+- **mudança aditiva** → o teste pede para atualizar o snapshot:
+
+  ```bash
+  python scripts/update_openapi_snapshot.py
+  ```
+
+Só rotas com `response_model` têm a resposta verificada; rotas que devolvem `dict` sem schema ficam de fora.
+
+### Ciclo de depreciação
+
+1. Marcar o campo/rota com `# DEPRECATED desde app X.Y` e anotar abaixo.
+2. Publicar uma versão do app que não usa mais aquilo.
+3. Acompanhar `GET /admin/app-versions` até quase ninguém ficar abaixo dessa versão (ex.: < 5% em 7 dias).
+4. Subir `min_version` para essa versão.
+5. Remover da API e rodar `python scripts/update_openapi_snapshot.py --force`.
+
+### Depreciações em andamento
+
+| Campo / rota | Depreciado desde | App que parou de usar | Remover quando |
+| --- | --- | --- | --- |
+| — | — | — | — |

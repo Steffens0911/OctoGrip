@@ -10,7 +10,7 @@ const String _kApiBaseFromBuild = String.fromEnvironment(
   'API_BASE_URL',
   defaultValue: '',
 );
-const String _kProdApiBaseDefault = 'https://octogrip.com.br';
+const String _kProdApiBaseDefault = 'https://api.octogrip.com.br';
 
 String getApiBaseUrl() {
   final fromBuild = _kApiBaseFromBuild.trim();
