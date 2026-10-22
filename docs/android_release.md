@@ -1,6 +1,7 @@
 # App Android — release e compatibilidade com a API
 
 Plano completo: documento "Octogrip Android — plano de lançamento e atualizações".
+Ficha da loja, Data safety e classificação: `docs/play_store.md`.
 Regra central: **uma versão do app já instalada nunca pode quebrar por causa de um deploy da API.**
 
 ## Identidade do app

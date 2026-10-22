@@ -29,3 +29,11 @@ async def test_view_endpoint_returns_html(client: AsyncClient):
     assert r.status_code == 200
     assert "text/html" in r.headers["content-type"]
     assert "<h1>" in r.text
+
+
+async def test_account_deletion_page_is_public(client):
+    """Link exigido pela Play Store: instruções de exclusão de conta sem precisar do app."""
+    r = await client.get("/legal/account-deletion/view")
+    assert r.status_code == 200
+    assert "privacidade@octogrip.com.br" in r.text
+    assert "Excluir conta" in r.text
