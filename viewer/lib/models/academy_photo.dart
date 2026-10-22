@@ -7,7 +7,7 @@ class PhotoAuthor {
 
   factory PhotoAuthor.fromJson(Map<String, dynamic> json) {
     return PhotoAuthor(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
     );
@@ -31,11 +31,13 @@ class PhotoComment {
 
   factory PhotoComment.fromJson(Map<String, dynamic> json) {
     return PhotoComment(
-      id: json['id'] as String,
-      photoId: json['photo_id'] as String,
-      author: PhotoAuthor.fromJson(json['author'] as Map<String, dynamic>),
-      body: json['body'] as String,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      id: (json['id'] as String? ?? ''),
+      photoId: (json['photo_id'] as String? ?? ''),
+      author: PhotoAuthor.fromJson((json['author'] as Map<String, dynamic>? ??
+          const <String, dynamic>{})),
+      body: (json['body'] as String? ?? ''),
+      createdAt: (DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
     );
   }
 }
@@ -77,9 +79,10 @@ class AcademyPhoto {
 
   factory AcademyPhoto.fromJson(Map<String, dynamic> json) {
     return AcademyPhoto(
-      id: json['id'] as String,
-      academyId: json['academy_id'] as String,
-      author: PhotoAuthor.fromJson(json['author'] as Map<String, dynamic>),
+      id: (json['id'] as String? ?? ''),
+      academyId: (json['academy_id'] as String? ?? ''),
+      author: PhotoAuthor.fromJson((json['author'] as Map<String, dynamic>? ??
+          const <String, dynamic>{})),
       imageUrl: json['image_url'] as String?,
       thumbnailUrl: json['thumbnail_url'] as String?,
       caption: json['caption'] as String?,
@@ -90,7 +93,8 @@ class AcademyPhoto {
       isSystemPost: json['is_system_post'] as bool? ?? false,
       systemPostType: json['system_post_type'] as String?,
       systemPostRefId: json['system_post_ref_id'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: (DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
     );
   }
 
@@ -169,16 +173,18 @@ class PhotoRestriction {
 
   factory PhotoRestriction.fromJson(Map<String, dynamic> json) {
     return PhotoRestriction(
-      id: json['id'] as String,
-      academyId: json['academy_id'] as String,
-      userId: json['user_id'] as String,
+      id: (json['id'] as String? ?? ''),
+      academyId: (json['academy_id'] as String? ?? ''),
+      userId: (json['user_id'] as String? ?? ''),
       userName: json['user_name'] as String?,
       reason: json['reason'] as String?,
       expiresAt: json['expires_at'] != null
-          ? DateTime.parse(json['expires_at'] as String)
+          ? (DateTime.tryParse(json['expires_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       active: json['active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: (DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
     );
   }
 }

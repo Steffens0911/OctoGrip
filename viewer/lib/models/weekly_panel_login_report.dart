@@ -23,13 +23,10 @@ class WeeklyPanelLoginUserItem {
     final rawDays = (json['login_days'] as List<dynamic>? ?? const <dynamic>[])
         .whereType<String>()
         .toList();
-    final parsedDays = rawDays
-        .map(parseApiDate)
-        .whereType<DateTime>()
-        .toList()
+    final parsedDays = rawDays.map(parseApiDate).whereType<DateTime>().toList()
       ..sort();
     return WeeklyPanelLoginUserItem(
-      userId: json['user_id'] as String,
+      userId: (json['user_id'] as String? ?? ''),
       name: json['name'] as String?,
       email: json['email'] as String? ?? '',
       role: json['role'] as String? ?? '',

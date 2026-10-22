@@ -15,16 +15,18 @@ class TrainingTemplate {
     required this.sortOrder,
   });
 
-  factory TrainingTemplate.fromJson(Map<String, dynamic> json) => TrainingTemplate(
-        id: json['id'] as String,
-        academyId: json['academy_id'] as String,
+  factory TrainingTemplate.fromJson(Map<String, dynamic> json) =>
+      TrainingTemplate(
+        id: (json['id'] as String? ?? ''),
+        academyId: (json['academy_id'] as String? ?? ''),
         label: json['label'] as String?,
-        startTime: json['start_time'] as String,
+        startTime: (json['start_time'] as String? ?? ''),
         toleranceMinutes: json['tolerance_minutes'] as int? ?? 15,
         sortOrder: json['sort_order'] as int? ?? 0,
       );
 
-  String get displayName => label?.isNotEmpty == true ? '$label — $startTime' : startTime;
+  String get displayName =>
+      label?.isNotEmpty == true ? '$label — $startTime' : startTime;
 }
 
 class TrainingSession {
@@ -58,23 +60,25 @@ class TrainingSession {
     this.preCheckinCount = 0,
   });
 
-  factory TrainingSession.fromJson(Map<String, dynamic> json) => TrainingSession(
-        id: json['id'] as String,
-        academyId: json['academy_id'] as String,
+  factory TrainingSession.fromJson(Map<String, dynamic> json) =>
+      TrainingSession(
+        id: (json['id'] as String? ?? ''),
+        academyId: (json['academy_id'] as String? ?? ''),
         createdByUserId: json['created_by_user_id'] as String?,
         templateId: json['template_id'] as String?,
-        classDate: json['class_date'] as String,
-        startTime: json['start_time'] as String,
+        classDate: (json['class_date'] as String? ?? ''),
+        startTime: (json['start_time'] as String? ?? ''),
         toleranceMinutes: json['tolerance_minutes'] as int? ?? 15,
         label: json['label'] as String?,
-        status: json['status'] as String,
+        status: (json['status'] as String? ?? ''),
         openedAt: json['opened_at'] as String?,
         closedAt: json['closed_at'] as String?,
-        createdAt: json['created_at'] as String,
+        createdAt: (json['created_at'] as String? ?? ''),
         preCheckinCount: json['pre_checkin_count'] as int? ?? 0,
       );
 
-  String get displayName => label?.isNotEmpty == true ? '$label — $startTime' : startTime;
+  String get displayName =>
+      label?.isNotEmpty == true ? '$label — $startTime' : startTime;
 
   bool get isUpcoming => status == 'upcoming';
   bool get isOpen => status == 'open';

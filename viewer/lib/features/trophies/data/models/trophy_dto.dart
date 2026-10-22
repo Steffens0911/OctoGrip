@@ -27,10 +27,12 @@ class TrophyDto {
   final int? minDurationDays;
   final int minRewardLevelToUnlock;
   final String? minGraduationToUnlock;
+
   /// Máx. execuções que contam por adversário no período; null = regras padrão (bronze distinto).
   final int? maxCountPerOpponent;
 
-  factory TrophyDto.fromJson(Map<String, dynamic> json, {required String academyId}) {
+  factory TrophyDto.fromJson(Map<String, dynamic> json,
+      {required String academyId}) {
     String d(dynamic v) {
       if (v == null) return '';
       if (v is String) return v;
@@ -41,7 +43,7 @@ class TrophyDto {
       id: d(json['id']),
       academyId: json['academy_id'] != null ? d(json['academy_id']) : academyId,
       techniqueId: d(json['technique_id']),
-      name: json['name'] as String,
+      name: (json['name'] as String? ?? ''),
       startDateIso: d(json['start_date']),
       endDateIso: d(json['end_date']),
       targetCount: (json['target_count'] as num?)?.toInt() ?? 0,
@@ -75,13 +77,13 @@ class TrophyDto {
     final fromLevel = (map['min_reward_level_to_unlock'] as num?)?.toInt();
     final legacyPoints = (map['min_points_to_unlock'] as num?)?.toInt();
     return TrophyDto(
-      id: map['id'] as String,
-      academyId: map['academy_id'] as String,
-      techniqueId: map['technique_id'] as String,
-      name: map['name'] as String,
-      startDateIso: map['start_date'] as String,
-      endDateIso: map['end_date'] as String,
-      targetCount: (map['target_count'] as num).toInt(),
+      id: (map['id'] as String? ?? ''),
+      academyId: (map['academy_id'] as String? ?? ''),
+      techniqueId: (map['technique_id'] as String? ?? ''),
+      name: (map['name'] as String? ?? ''),
+      startDateIso: (map['start_date'] as String? ?? ''),
+      endDateIso: (map['end_date'] as String? ?? ''),
+      targetCount: ((map['target_count'] as num? ?? 0)).toInt(),
       awardKind: map['award_kind'] as String? ?? 'trophy',
       techniqueName: map['technique_name'] as String?,
       minDurationDays: (map['min_duration_days'] as num?)?.toInt(),

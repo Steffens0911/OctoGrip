@@ -15,7 +15,7 @@ class WeeklyKitItemRead {
   factory WeeklyKitItemRead.fromJson(Map<String, dynamic> json) {
     return WeeklyKitItemRead(
       orderIndex: json['order_index'] as int? ?? 0,
-      techniqueId: json['technique_id'] as String,
+      techniqueId: (json['technique_id'] as String? ?? ''),
       techniqueName: json['technique_name'] as String?,
       multiplier: json['multiplier'] as int? ?? 10,
     );
@@ -47,11 +47,13 @@ class WeeklyKitRead {
   factory WeeklyKitRead.fromJson(Map<String, dynamic> json) {
     final raw = json['items'] as List<dynamic>? ?? [];
     return WeeklyKitRead(
-      id: json['id'] as String,
-      academyId: json['academy_id'] as String,
+      id: (json['id'] as String? ?? ''),
+      academyId: (json['academy_id'] as String? ?? ''),
       label: json['label'] as String? ?? '',
       sortOrder: json['sort_order'] as int? ?? 0,
-      items: raw.map((e) => WeeklyKitItemRead.fromJson(e as Map<String, dynamic>)).toList(),
+      items: raw
+          .map((e) => WeeklyKitItemRead.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

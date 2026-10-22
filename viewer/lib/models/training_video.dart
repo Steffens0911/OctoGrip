@@ -27,10 +27,10 @@ class TrainingVideo {
 
   factory TrainingVideo.fromJson(Map<String, dynamic> json) {
     return TrainingVideo(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      youtubeUrl: json['youtube_url'] as String,
-      pointsPerDay: (json['points_per_day'] as num).toInt(),
+      id: (json['id'] as String? ?? ''),
+      title: (json['title'] as String? ?? ''),
+      youtubeUrl: (json['youtube_url'] as String? ?? ''),
+      pointsPerDay: ((json['points_per_day'] as num? ?? 0)).toInt(),
       isActive: json['is_active'] as bool? ?? true,
       durationSeconds: (json['duration_seconds'] as num?)?.toInt(),
       positionDescription: json['position_description'] as String?,
@@ -38,7 +38,7 @@ class TrainingVideo {
       academyName: json['academy_name'] as String?,
       hasCompletedToday: json['has_completed_today'] as bool? ?? false,
       lastCompletedAt: json['last_completed_at'] != null
-          ? DateTime.tryParse(json['last_completed_at'] as String)
+          ? DateTime.tryParse((json['last_completed_at'] as String? ?? ''))
           : null,
     );
   }
@@ -75,7 +75,7 @@ class TrainingVideoCompletionResult {
 
   factory TrainingVideoCompletionResult.fromJson(Map<String, dynamic> json) {
     return TrainingVideoCompletionResult(
-      trainingVideoId: json['training_video_id'] as String,
+      trainingVideoId: (json['training_video_id'] as String? ?? ''),
       hasCompletedToday: json['has_completed_today'] as bool? ?? false,
       alreadyCompletedToday: json['already_completed_today'] as bool? ?? false,
       pointsGranted: (json['points_granted'] as num?)?.toInt(),

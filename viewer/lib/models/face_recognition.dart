@@ -11,7 +11,7 @@ class FaceRecognitionSubmitResponse {
 
   factory FaceRecognitionSubmitResponse.fromJson(Map<String, dynamic> json) {
     return FaceRecognitionSubmitResponse(
-      jobId: json['job_id'] as String,
+      jobId: (json['job_id'] as String? ?? ''),
       status: json['status'] as String? ?? 'pending',
       message: json['message'] as String? ?? '',
     );
@@ -33,7 +33,7 @@ class FaceRecognitionStudentModel {
 
   factory FaceRecognitionStudentModel.fromJson(Map<String, dynamic> json) {
     return FaceRecognitionStudentModel(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       belt: json['belt'] as String?,
@@ -64,7 +64,8 @@ class FaceRecognitionResultModel {
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0,
       student: json['student'] is Map<String, dynamic>
           ? FaceRecognitionStudentModel.fromJson(
-              json['student'] as Map<String, dynamic>)
+              (json['student'] as Map<String, dynamic>? ??
+                  const <String, dynamic>{}))
           : null,
     );
   }
@@ -77,6 +78,7 @@ class FaceRecognitionJobStatusModel {
   final int totalFacesDetected;
   final List<FaceRecognitionResultModel> results;
   final String? errorMessage;
+
   /// JPEG base64 reduzido só para conferência (opcional).
   final String? referencePhotoBase64;
 
@@ -93,9 +95,9 @@ class FaceRecognitionJobStatusModel {
   factory FaceRecognitionJobStatusModel.fromJson(Map<String, dynamic> json) {
     final resultList = (json['results'] as List<dynamic>? ?? const []);
     return FaceRecognitionJobStatusModel(
-      jobId: json['job_id'] as String,
+      jobId: (json['job_id'] as String? ?? ''),
       status: json['status'] as String? ?? 'pending',
-      sessionId: json['session_id'] as String,
+      sessionId: (json['session_id'] as String? ?? ''),
       totalFacesDetected: (json['total_faces_detected'] as num?)?.toInt() ?? 0,
       results: resultList
           .whereType<Map<String, dynamic>>()
@@ -126,7 +128,7 @@ class FaceRecognitionEmbeddingStatusStudentModel {
     Map<String, dynamic> json,
   ) {
     return FaceRecognitionEmbeddingStatusStudentModel(
-      studentId: json['student_id'] as String,
+      studentId: (json['student_id'] as String? ?? ''),
       name: json['name'] as String?,
       email: json['email'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
@@ -154,7 +156,7 @@ class FaceRecognitionEmbeddingStatusModel {
       Map<String, dynamic> json) {
     final rows = (json['students'] as List<dynamic>? ?? const []);
     return FaceRecognitionEmbeddingStatusModel(
-      academyId: json['academy_id'] as String,
+      academyId: (json['academy_id'] as String? ?? ''),
       totalStudents: (json['total_students'] as num?)?.toInt() ?? 0,
       withEmbedding: (json['with_embedding'] as num?)?.toInt() ?? 0,
       withoutEmbedding: (json['without_embedding'] as num?)?.toInt() ?? 0,

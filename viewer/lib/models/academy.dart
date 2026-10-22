@@ -75,8 +75,8 @@ class Academy {
 
   factory Academy.fromJson(Map<String, dynamic> json) {
     return Academy(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: (json['id'] as String? ?? ''),
+      name: (json['name'] as String? ?? ''),
       slug: json['slug'] as String?,
       logoUrl: json['logo_url'] as String?,
       scheduleImageUrl: json['schedule_image_url'] as String?,
@@ -159,10 +159,10 @@ class AcademyRankingEntry {
 
   factory AcademyRankingEntry.fromJson(Map<String, dynamic> json) {
     return AcademyRankingEntry(
-      rank: json['rank'] as int,
-      userId: json['user_id'] as String,
+      rank: ((json['rank'] as num?)?.toInt() ?? 0),
+      userId: (json['user_id'] as String? ?? ''),
       name: json['name'] as String?,
-      completionsCount: json['completions_count'] as int,
+      completionsCount: ((json['completions_count'] as num?)?.toInt() ?? 0),
     );
   }
 }
@@ -180,8 +180,8 @@ class AcademyDifficultyEntry {
 
   factory AcademyDifficultyEntry.fromJson(Map<String, dynamic> json) {
     return AcademyDifficultyEntry(
-      observation: json['observation'] as String,
-      count: json['count'] as int,
+      observation: (json['observation'] as String? ?? ''),
+      count: ((json['count'] as num?)?.toInt() ?? 0),
     );
   }
 }
@@ -211,11 +211,11 @@ class AcademyWeeklyReport {
             .toList() ??
         [];
     return AcademyWeeklyReport(
-      academyId: json['academy_id'] as String,
-      weekStart: json['week_start'] as String,
-      weekEnd: json['week_end'] as String,
-      completionsCount: json['completions_count'] as int,
-      activeUsersCount: json['active_users_count'] as int,
+      academyId: (json['academy_id'] as String? ?? ''),
+      weekStart: (json['week_start'] as String? ?? ''),
+      weekEnd: (json['week_end'] as String? ?? ''),
+      completionsCount: ((json['completions_count'] as num?)?.toInt() ?? 0),
+      activeUsersCount: ((json['active_users_count'] as num?)?.toInt() ?? 0),
       entries: entries,
     );
   }

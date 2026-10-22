@@ -39,6 +39,7 @@ import 'package:viewer/models/attendance_ranking.dart';
 import 'package:viewer/models/user.dart';
 import 'package:viewer/models/training_stats.dart';
 import 'package:viewer/models/weekly_kit.dart';
+import 'package:viewer/services/app_update_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/backup_multipart_io.dart'
     if (dart.library.html) 'package:viewer/services/backup_multipart_web.dart'
@@ -3133,7 +3134,7 @@ class ApiService {
         [];
     return {
       'academy_id': map['academy_id'],
-      'period_days': map['period_days'] as int,
+      'period_days': (map['period_days'] as num?)?.toInt() ?? 0,
       if (map['period_start'] != null)
         'period_start': map['period_start'] as String,
       if (map['period_end'] != null) 'period_end': map['period_end'] as String,
@@ -4158,7 +4159,7 @@ class ApiService {
       ),
     );
     final data = await _decodeResponse(r);
-    return data['message'] as String;
+    return data['message'] as String? ?? '';
   }
 
   // -------------------------------------------------------------------------
@@ -4504,6 +4505,9 @@ const Set<int> _kTransientStatuses = {502, 503, 504};
 ///   (reenviar é seguro). NÃO retenta em 5xx, pois o servidor respondeu e pode
 ///   ter processado (reenviar duplicaria presença/XP/etc).
 ///
+/// Também identifica o app ([AppClientInfo.headers]) em toda requisição e avisa o
+/// [AppUpdateService] quando a API responde 426 (versão abaixo da mínima).
+///
 /// [send] (streaming/multipart) passa direto: o request é de uso único e não
 /// pode ser reenviado genericamente (uploads que precisam de retry o fazem no
 /// call site recriando o request — ver [ApiService.faceArrive]). Timeouts também
@@ -4519,11 +4523,25 @@ class _ResilientHttpClient implements http.Client {
     Duration(milliseconds: 900),
   ];
 
+  static Map<String, String>? _withAppHeaders(Map<String, String>? headers) {
+    final app = AppClientInfo.headers;
+    if (app.isEmpty) return headers;
+    return {...?headers, ...app};
+  }
+
+  static http.Response _watchUpdateRequired(http.Response response) {
+    if (response.statusCode == 426) {
+      AppUpdateService.instance.handleUpdateRequiredResponse(response.body);
+    }
+    return response;
+  }
+
   @override
   Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
     for (var attempt = 0;; attempt++) {
       try {
-        final response = await _inner.get(url, headers: headers);
+        final response = _watchUpdateRequired(
+            await _inner.get(url, headers: _withAppHeaders(headers)));
         if (_kTransientStatuses.contains(response.statusCode) &&
             attempt < _backoff.length) {
           await Future<void>.delayed(_backoff[attempt]);
@@ -4553,7 +4571,7 @@ class _ResilientHttpClient implements http.Client {
   ) async {
     for (var i = 0;; i++) {
       try {
-        return await attempt();
+        return _watchUpdateRequired(await attempt());
       } on http.ClientException {
         if (i >= _backoff.length) rethrow;
         await Future<void>.delayed(_backoff[i]);
@@ -4564,43 +4582,54 @@ class _ResilientHttpClient implements http.Client {
   // HEAD é idempotente mas praticamente não usado: delegação direta.
   @override
   Future<http.Response> head(Uri url, {Map<String, String>? headers}) =>
-      _inner.head(url, headers: headers);
+      _inner.head(url, headers: _withAppHeaders(headers));
 
   @override
   Future<http.Response> post(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
       _sendWithConnRetry(() =>
-          _inner.post(url, headers: headers, body: body, encoding: encoding));
+          _inner.post(url,
+              headers: _withAppHeaders(headers), body: body, encoding: encoding));
 
   @override
   Future<http.Response> put(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
       _sendWithConnRetry(() =>
-          _inner.put(url, headers: headers, body: body, encoding: encoding));
+          _inner.put(url,
+              headers: _withAppHeaders(headers), body: body, encoding: encoding));
 
   @override
   Future<http.Response> patch(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
       _sendWithConnRetry(() =>
-          _inner.patch(url, headers: headers, body: body, encoding: encoding));
+          _inner.patch(url,
+              headers: _withAppHeaders(headers), body: body, encoding: encoding));
 
   @override
   Future<http.Response> delete(Uri url,
           {Map<String, String>? headers, Object? body, Encoding? encoding}) =>
       _sendWithConnRetry(() =>
-          _inner.delete(url, headers: headers, body: body, encoding: encoding));
+          _inner.delete(url,
+              headers: _withAppHeaders(headers), body: body, encoding: encoding));
 
   @override
   Future<String> read(Uri url, {Map<String, String>? headers}) =>
-      _inner.read(url, headers: headers);
+      _inner.read(url, headers: _withAppHeaders(headers));
 
   @override
   Future<Uint8List> readBytes(Uri url, {Map<String, String>? headers}) =>
-      _inner.readBytes(url, headers: headers);
+      _inner.readBytes(url, headers: _withAppHeaders(headers));
 
   @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) =>
-      _inner.send(request);
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    request.headers.addAll(AppClientInfo.headers);
+    final response = await _inner.send(request);
+    if (response.statusCode == 426) {
+      // Corpo é stream de uso único (do chamador); o bloqueio vale sem os detalhes.
+      AppUpdateService.instance.handleUpdateRequiredResponse('');
+    }
+    return response;
+  }
 
   @override
   void close() => _inner.close();

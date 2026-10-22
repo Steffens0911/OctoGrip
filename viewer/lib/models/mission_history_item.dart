@@ -16,7 +16,8 @@ class MissionHistoryItem {
     return MissionHistoryItem(
       lessonId: json['lesson_id'] as String?,
       lessonTitle: (json['lesson_title'] as String?) ?? '',
-      completedAt: DateTime.parse((json['completed_at'] as String?) ?? ''),
+      completedAt: DateTime.tryParse((json['completed_at'] as String?) ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0),
       usageType: json['usage_type'] as String? ?? 'after_training',
     );
   }

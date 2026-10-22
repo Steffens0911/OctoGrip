@@ -15,12 +15,13 @@ class UserAcademyStats {
     this.daysSinceLastWorkout,
   });
 
-  factory UserAcademyStats.fromJson(Map<String, dynamic> json) => UserAcademyStats(
-        userId: json['user_id'] as String,
-        videosInPeriod: (json['videos_in_period'] as num).toInt(),
-        positionsInPeriod: (json['positions_in_period'] as num).toInt(),
-        workoutsInPeriod: (json['workouts_in_period'] as num).toInt(),
-        trophiesCount: (json['trophies_count'] as num).toInt(),
+  factory UserAcademyStats.fromJson(Map<String, dynamic> json) =>
+      UserAcademyStats(
+        userId: (json['user_id'] as String? ?? ''),
+        videosInPeriod: ((json['videos_in_period'] as num? ?? 0)).toInt(),
+        positionsInPeriod: ((json['positions_in_period'] as num? ?? 0)).toInt(),
+        workoutsInPeriod: ((json['workouts_in_period'] as num? ?? 0)).toInt(),
+        trophiesCount: ((json['trophies_count'] as num? ?? 0)).toInt(),
         daysSinceLastWorkout: json['days_since_last_workout'] as int?,
       );
 }

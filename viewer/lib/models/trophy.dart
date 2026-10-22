@@ -11,25 +11,34 @@ class TrophyWithEarned {
   final String startDate;
   final String endDate;
   final int targetCount;
+
   /// 'medal' = premiação ordinária; 'trophy' = premiação especial (longo prazo).
   final String awardKind;
   final int? minDurationDays;
+
   /// Nível mínimo (reward_level) para desbloquear; 0 = sem requisito.
   final int minRewardLevelToUnlock;
+
   /// Faixa mínima para desbloquear (white, blue, purple, brown, black); null = todos.
   final String? minGraduationToUnlock;
+
   /// Limite de execuções que contam por adversário no período; null = regras padrão.
   final int? maxCountPerOpponent;
+
   /// Se o aluno já atingiu nível e faixa mínimos para poder competir por este troféu.
   final bool unlocked;
-  final String? earnedTier; // 'gold' | 'silver' | 'bronze' | 'participation' | null
+  final String?
+      earnedTier; // 'gold' | 'silver' | 'bronze' | 'participation' | null
   final int goldCount;
   final int silverCount;
   final int bronzeCount;
+
   /// true quando veio de uma concessão manual (professor concedeu), não de execuções.
   final bool isManualAward;
+
   /// Observação livre do professor ao conceder o troféu manualmente.
   final String? awardNote;
+
   /// Nome do campeonato (para concessões de campeonato).
   final String? championshipEventName;
 
@@ -60,14 +69,14 @@ class TrophyWithEarned {
 
   factory TrophyWithEarned.fromJson(Map<String, dynamic> json) {
     return TrophyWithEarned(
-      trophyId: json['trophy_id'] as String,
-      techniqueId: json['technique_id'] as String,
+      trophyId: (json['trophy_id'] as String? ?? ''),
+      techniqueId: (json['technique_id'] as String? ?? ''),
       academyId: json['academy_id'] as String?,
-      name: json['name'] as String,
+      name: (json['name'] as String? ?? ''),
       techniqueName: json['technique_name'] as String?,
       techniqueVideoUrl: json['technique_video_url'] as String?,
-      startDate: json['start_date'] as String,
-      endDate: json['end_date'] as String,
+      startDate: (json['start_date'] as String? ?? ''),
+      endDate: (json['end_date'] as String? ?? ''),
       targetCount: (json['target_count'] as num?)?.toInt() ?? 0,
       awardKind: json['award_kind'] as String? ?? 'trophy',
       minDurationDays: (json['min_duration_days'] as num?)?.toInt(),
@@ -107,11 +116,16 @@ class TrophyWithEarned {
 
   static String tierEmoji(String? tier) {
     switch (tier) {
-      case 'gold': return '🥇';
-      case 'silver': return '🥈';
-      case 'bronze': return '🥉';
-      case 'participation': return '🎖️';
-      default: return '🏆';
+      case 'gold':
+        return '🥇';
+      case 'silver':
+        return '🥈';
+      case 'bronze':
+        return '🥉';
+      case 'participation':
+        return '🎖️';
+      default:
+        return '🏆';
     }
   }
 
@@ -119,23 +133,34 @@ class TrophyWithEarned {
     if (isManualAward && earnedTier == null) return 'Concedido';
     if (earnedTier == null) return 'A conquistar';
     switch (earnedTier!) {
-      case 'gold': return 'Ouro';
-      case 'silver': return 'Prata';
-      case 'bronze': return 'Bronze';
-      case 'participation': return 'Participação';
-      default: return earnedTier!;
+      case 'gold':
+        return 'Ouro';
+      case 'silver':
+        return 'Prata';
+      case 'bronze':
+        return 'Bronze';
+      case 'participation':
+        return 'Participação';
+      default:
+        return earnedTier!;
     }
   }
 
   static String? graduationLabel(String? graduation) {
     if (graduation == null || graduation.isEmpty) return null;
     switch (graduation.toLowerCase()) {
-      case 'white': return 'Branca';
-      case 'blue': return 'Azul';
-      case 'purple': return 'Roxa';
-      case 'brown': return 'Marrom';
-      case 'black': return 'Preta';
-      default: return graduation;
+      case 'white':
+        return 'Branca';
+      case 'blue':
+        return 'Azul';
+      case 'purple':
+        return 'Roxa';
+      case 'brown':
+        return 'Marrom';
+      case 'black':
+        return 'Preta';
+      default:
+        return graduation;
     }
   }
 }
@@ -155,8 +180,8 @@ class TrophyHomeSummaryItem {
 
   factory TrophyHomeSummaryItem.fromJson(Map<String, dynamic> json) =>
       TrophyHomeSummaryItem(
-        trophyId: json['trophy_id'] as String,
-        name: json['name'] as String,
+        trophyId: (json['trophy_id'] as String? ?? ''),
+        name: (json['name'] as String? ?? ''),
         awardKind: json['award_kind'] as String? ?? 'trophy',
         tier: json['tier'] as String?,
       );
@@ -181,10 +206,10 @@ class AcademyRecentItem {
 
   factory AcademyRecentItem.fromJson(Map<String, dynamic> json) =>
       AcademyRecentItem(
-        userId: json['user_id'] as String,
-        userName: json['user_name'] as String,
+        userId: (json['user_id'] as String? ?? ''),
+        userName: (json['user_name'] as String? ?? ''),
         tier: json['tier'] as String?,
-        trophyName: json['trophy_name'] as String,
+        trophyName: (json['trophy_name'] as String? ?? ''),
         awardKind: json['award_kind'] as String? ?? 'trophy',
       );
 
@@ -212,8 +237,8 @@ class AcademyUserEarnedItem {
 
   factory AcademyUserEarnedItem.fromJson(Map<String, dynamic> json) =>
       AcademyUserEarnedItem(
-        trophyId: json['trophy_id'] as String,
-        name: json['name'] as String,
+        trophyId: (json['trophy_id'] as String? ?? ''),
+        name: (json['name'] as String? ?? ''),
         tier: json['tier'] as String?,
         awardKind: json['award_kind'] as String? ?? 'trophy',
       );
@@ -229,9 +254,10 @@ class AcademyUserEarned {
 
   factory AcademyUserEarned.fromJson(Map<String, dynamic> json) =>
       AcademyUserEarned(
-        userId: json['user_id'] as String,
+        userId: (json['user_id'] as String? ?? ''),
         items: (json['items'] as List<dynamic>? ?? [])
-            .map((e) => AcademyUserEarnedItem.fromJson(e as Map<String, dynamic>))
+            .map((e) =>
+                AcademyUserEarnedItem.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 }
@@ -251,7 +277,8 @@ class TrophyHomeSummary {
       TrophyHomeSummary(
         myEarnedCount: (json['my_earned_count'] as num?)?.toInt() ?? 0,
         myRecent: (json['my_recent'] as List<dynamic>? ?? [])
-            .map((e) => TrophyHomeSummaryItem.fromJson(e as Map<String, dynamic>))
+            .map((e) =>
+                TrophyHomeSummaryItem.fromJson(e as Map<String, dynamic>))
             .toList(),
         academyRecent: (json['academy_recent'] as List<dynamic>? ?? [])
             .map((e) => AcademyRecentItem.fromJson(e as Map<String, dynamic>))

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:viewer/config.dart';
 import 'package:viewer/models/professor.dart';
+import 'package:viewer/services/app_update_service.dart';
 import 'package:viewer/services/auth_service.dart';
 
 class ProfessorServiceException implements Exception {
@@ -19,7 +20,7 @@ class ProfessorService {
   String get _professorsUrl => '$_base/professors';
 
   Map<String, String> _getHeaders({bool auth = false}) {
-    final headers = <String, String>{};
+    final headers = <String, String>{...AppClientInfo.headers};
     if (auth) {
       final bearer = AuthService().authHeader;
       if (bearer != null) headers['Authorization'] = bearer;

@@ -15,9 +15,9 @@ class Technique {
 
   factory Technique.fromJson(Map<String, dynamic> json) {
     return Technique(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      slug: json['slug'] as String,
+      id: (json['id'] as String? ?? ''),
+      name: (json['name'] as String? ?? ''),
+      slug: (json['slug'] as String? ?? ''),
       description: json['description'] as String?,
       videoUrl: json['video_url'] as String?,
     );

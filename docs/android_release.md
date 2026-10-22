@@ -24,7 +24,8 @@ Regra central: **uma versão do app já instalada nunca pode quebrar por causa d
    (`*.jks` e `key.properties` já estão no `.gitignore`).
 4. Secrets do GitHub (environment `secrets`): `ANDROID_KEYSTORE_BASE64` (`base64 -w0 octogrip-upload.jks`),
    `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`, `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`,
-   `API_BASE_URL` (`https://api.octogrip.com.br`).
+   `API_BASE_URL` (`https://api.octogrip.com.br`) e, opcional, `SENTRY_DSN_APP` (DSN de um projeto Sentry
+   só do app, ex.: `octogrip-app`; sem ele o Sentry fica desligado no app).
 5. Build de release local (opcional): `viewer/android/key.properties`
 
    ```properties
@@ -57,6 +58,18 @@ Regra central: **uma versão do app já instalada nunca pode quebrar por causa d
   responde **426** com `update.min_version` e `update.store_url`.
 - Sem esses headers (web, apps antigos) nada é bloqueado.
 - A versão de cada usuário fica em `users.last_app_version` / `last_app_platform` / `last_app_seen_at`.
+
+## Do lado do app (Flutter)
+
+- `AppClientInfo` (`lib/services/app_update_service.dart`) lê a versão do pacote e o cliente HTTP da
+  `ApiService` manda os headers em toda requisição. Só Android/iOS se identificam; a web não.
+- `AppUpdateService` consulta `/app/config` ao abrir e ao voltar ao app (no máximo a cada 30 min) e trata
+  qualquer 426. `AppUpdateGate` (no `MaterialApp.builder`) mostra a tela "Atualização necessária" ou o aviso
+  de versão nova. O botão usa o fluxo nativo da Play (`in_app_update`) e cai no link da loja se não der.
+- Feature flag: `AppUpdateService.instance.isFeatureEnabled('novo_ranking')`.
+- Modelos (`lib/models`) leem o JSON com padrão (`as String? ?? ''`); `test/models/models_tolerant_json_test.dart`
+  garante que todo `fromJson` aceita `{}`. **Modelo novo entra nessa lista.**
+- Sentry do app em `lib/services/error_reporting.dart`, ativado só com `SENTRY_DSN` no build, sem PII.
 
 ## Contrato da API (`docs/openapi_snapshot.json`)
 

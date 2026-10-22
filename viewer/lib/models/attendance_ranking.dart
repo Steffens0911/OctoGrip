@@ -22,12 +22,13 @@ class AttendanceRankingEntryModel {
   factory AttendanceRankingEntryModel.fromJson(Map<String, dynamic> json) {
     return AttendanceRankingEntryModel(
       position: (json['position'] as num?)?.toInt() ?? 0,
-      studentId: json['student_id'] as String,
+      studentId: (json['student_id'] as String? ?? ''),
       name: json['name'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
       belt: json['belt'] as String?,
       totalCheckins: (json['total_checkins'] as num?)?.toInt() ?? 0,
-      attendancePercentage: (json['attendance_percentage'] as num?)?.toInt() ?? 0,
+      attendancePercentage:
+          (json['attendance_percentage'] as num?)?.toInt() ?? 0,
       positionChange: (json['position_change'] as num?)?.toInt(),
     );
   }
@@ -50,7 +51,8 @@ class AttendanceMyPositionModel {
     return AttendanceMyPositionModel(
       position: (json['position'] as num?)?.toInt() ?? 0,
       totalCheckins: (json['total_checkins'] as num?)?.toInt() ?? 0,
-      attendancePercentage: (json['attendance_percentage'] as num?)?.toInt() ?? 0,
+      attendancePercentage:
+          (json['attendance_percentage'] as num?)?.toInt() ?? 0,
       positionChange: (json['position_change'] as num?)?.toInt(),
     );
   }
@@ -81,13 +83,18 @@ class AttendanceRankingModel {
       month: json['month'] as String?,
       periodKind: json['period_kind'] as String? ?? 'month',
       periodLabel: json['period_label'] as String? ?? '',
-      periodStart: DateTime.parse(json['period_start'] as String),
-      periodEnd: DateTime.parse(json['period_end'] as String),
+      periodStart: (DateTime.tryParse(json['period_start'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
+      periodEnd: (DateTime.tryParse(json['period_end'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       ranking: rankingRaw
-          .map((e) => AttendanceRankingEntryModel.fromJson(e as Map<String, dynamic>))
+          .map((e) =>
+              AttendanceRankingEntryModel.fromJson(e as Map<String, dynamic>))
           .toList(),
       myPosition: json['my_position'] != null
-          ? AttendanceMyPositionModel.fromJson(json['my_position'] as Map<String, dynamic>)
+          ? AttendanceMyPositionModel.fromJson(
+              (json['my_position'] as Map<String, dynamic>? ??
+                  const <String, dynamic>{}))
           : null,
     );
   }

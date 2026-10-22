@@ -24,8 +24,8 @@ class GlobalPartner {
 
   factory GlobalPartner.fromJson(Map<String, dynamic> json) {
     return GlobalPartner(
-      id: json['id'] as String,
-      name: json['name'] as String,
+      id: (json['id'] as String? ?? ''),
+      name: (json['name'] as String? ?? ''),
       description: json['description'] as String?,
       logoUrl: json['logo_url'] as String?,
       offerText: json['offer_text'] as String?,

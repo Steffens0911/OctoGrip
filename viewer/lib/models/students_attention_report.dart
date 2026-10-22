@@ -21,14 +21,14 @@ class StudentAttentionItem {
 
   factory StudentAttentionItem.fromJson(Map<String, dynamic> json) {
     return StudentAttentionItem(
-      userId: json['user_id'] as String,
+      userId: (json['user_id'] as String? ?? ''),
       name: json['name'] as String?,
-      email: json['email'] as String,
+      email: (json['email'] as String? ?? ''),
       graduation: json['graduation'] as String?,
       academyId: json['academy_id'] as String?,
       academyName: json['academy_name'] as String?,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.tryParse(json['last_seen_at'] as String)
+          ? DateTime.tryParse((json['last_seen_at'] as String? ?? ''))
           : null,
       daysAbsent: (json['days_absent'] as num?)?.toInt(),
     );

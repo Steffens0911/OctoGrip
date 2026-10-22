@@ -57,10 +57,12 @@ class TrainingStats {
   });
 
   factory TrainingStats.fromJson(Map<String, dynamic> json) => TrainingStats(
-        workoutsLast30Days: (json['workouts_last_30_days'] as num).toInt(),
+        workoutsLast30Days:
+            ((json['workouts_last_30_days'] as num? ?? 0)).toInt(),
         daysSinceLastWorkout: json['days_since_last_workout'] as int?,
-        positionsLast30Days: (json['positions_last_30_days'] as num).toInt(),
-        positionsTotal: (json['positions_total'] as num).toInt(),
+        positionsLast30Days:
+            ((json['positions_last_30_days'] as num? ?? 0)).toInt(),
+        positionsTotal: ((json['positions_total'] as num? ?? 0)).toInt(),
         avgTop10WorkoutsLast30Days:
             (json['avg_top10_workouts_last_30_days'] as num?)?.toDouble(),
         avgTop10PositionsLast30Days:

@@ -32,11 +32,14 @@ import 'package:viewer/screens/student/marketplace_screen.dart';
 import 'package:viewer/screens/student/training_videos_section.dart';
 import 'package:viewer/widgets/app_standard_app_bar.dart';
 import 'package:viewer/services/api_service.dart';
+import 'package:viewer/services/app_update_service.dart';
 import 'package:viewer/services/auth_service.dart';
 import 'package:viewer/services/daily_checkin_service.dart';
+import 'package:viewer/services/error_reporting.dart';
 import 'package:viewer/services/push_notification_service.dart';
 import 'package:viewer/services/theme_service.dart';
 import 'package:viewer/utils/tab_store.dart';
+import 'package:viewer/widgets/app_update_gate.dart';
 import 'package:viewer/widgets/pwa_install_banner.dart';
 
 void main() async {
@@ -48,12 +51,15 @@ void main() async {
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
   await Hive.initFlutter();
+  await AppClientInfo.init();
   await AuthService().init();
-  runApp(
-    ProviderScope(
-      child: ChangeNotifierProvider<AuthService>.value(
-        value: AuthService(),
-        child: const OctoGripApp(),
+  await runWithErrorReporting(
+    () => runApp(
+      ProviderScope(
+        child: ChangeNotifierProvider<AuthService>.value(
+          value: AuthService(),
+          child: const OctoGripApp(),
+        ),
       ),
     ),
   );
@@ -68,6 +74,8 @@ void main() async {
     }));
   }
   unawaited(DailyCheckinService.instance.maybeCheckin());
+  // App de loja: versão mínima/mais recente e feature flags (não bloqueia o startup).
+  unawaited(AppUpdateService.instance.checkForUpdate());
 }
 
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -203,6 +211,7 @@ class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
     if (kIsWeb) return;
     if (state == AppLifecycleState.resumed) {
       unawaited(DailyCheckinService.instance.maybeCheckin());
+      unawaited(AppUpdateService.instance.checkForUpdate());
     }
   }
 
@@ -229,7 +238,9 @@ class _OctoGripAppState extends State<OctoGripApp> with WidgetsBindingObserver {
         final mq = MediaQuery.of(context);
         return MediaQuery(
           data: mq.copyWith(textScaler: TextScaler.linear(_textScale)),
-          child: PwaInstallBanner(child: child ?? const SizedBox.shrink()),
+          child: AppUpdateGate(
+            child: PwaInstallBanner(child: child ?? const SizedBox.shrink()),
+          ),
         );
       },
       home: AuthGate(
