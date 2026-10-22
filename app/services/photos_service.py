@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import datetime
+from pathlib import Path
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -459,3 +460,110 @@ async def patch_restriction(
     await db.flush()
     await db.refresh(restriction)
     return restriction
+
+
+# --- Exclusão de conta (LGPD, art. 18) ---
+
+_MEDIA_ROOT = (Path(__file__).resolve().parents[2] / "app_media").resolve()
+_REMOVED_USER_LABEL = "Usuário removido"
+
+
+def media_url_to_path(url: str | None) -> Path | None:
+    """``/media/photos/x.jpg`` → caminho no disco; None se não for um arquivo de ``app_media``."""
+    if not url:
+        return None
+    if url.startswith("/media/"):
+        candidate = (_MEDIA_ROOT / url.removeprefix("/media/")).resolve()
+    else:
+        candidate = Path(url).resolve()  # raw_file_path já é caminho absoluto
+    if not candidate.is_relative_to(_MEDIA_ROOT):
+        return None
+    return candidate
+
+
+async def erase_user_photo_content(db: AsyncSession, user_id: uuid.UUID) -> tuple[set[uuid.UUID], list[Path]]:
+    """Apaga de fato (sem soft delete) tudo que a pessoa publicou ou deixou no feed.
+
+    - posts dela, inclusive os automáticos de troféu/faixa (cascata leva comentários e curtidas de terceiros);
+    - comentários e curtidas dela em posts de outras pessoas, ajustando os contadores;
+    - menções a ela em comentários e legendas de outras pessoas viram "Usuário removido".
+
+    Não faz commit. Retorna as academias cujo cache de feed deve ser invalidado e os arquivos
+    de imagem a apagar **depois** do commit.
+    """
+    own_posts = (
+        await db.execute(
+            select(
+                AcademyPhoto.id,
+                AcademyPhoto.academy_id,
+                AcademyPhoto.image_url,
+                AcademyPhoto.thumbnail_url,
+                AcademyPhoto.raw_file_path,
+            ).where(AcademyPhoto.author_id == user_id)
+        )
+    ).all()
+    own_post_ids = {row.id for row in own_posts}
+    academy_ids = {row.academy_id for row in own_posts}
+    files = [
+        path
+        for row in own_posts
+        for path in map(media_url_to_path, (row.image_url, row.thumbnail_url, row.raw_file_path))
+        if path is not None
+    ]
+
+    # Contadores dos posts de terceiros: só comentários ativos contam em comments_count.
+    comment_counts = (
+        await db.execute(
+            select(AcademyPhotoComment.photo_id, AcademyPhoto.academy_id, func.count())
+            .join(AcademyPhoto, AcademyPhoto.id == AcademyPhotoComment.photo_id)
+            .where(
+                AcademyPhotoComment.author_id == user_id,
+                AcademyPhotoComment.deleted_at.is_(None),
+                AcademyPhoto.author_id != user_id,
+            )
+            .group_by(AcademyPhotoComment.photo_id, AcademyPhoto.academy_id)
+        )
+    ).all()
+    for photo_id, academy_id, n in comment_counts:
+        academy_ids.add(academy_id)
+        await db.execute(
+            update(AcademyPhoto)
+            .where(AcademyPhoto.id == photo_id)
+            .values(comments_count=func.greatest(AcademyPhoto.comments_count - n, 0))
+        )
+
+    liked = (
+        await db.execute(
+            select(AcademyPhotoLike.photo_id, AcademyPhoto.academy_id)
+            .join(AcademyPhoto, AcademyPhoto.id == AcademyPhotoLike.photo_id)
+            .where(AcademyPhotoLike.user_id == user_id, AcademyPhoto.author_id != user_id)
+        )
+    ).all()
+    for photo_id, academy_id in liked:
+        academy_ids.add(academy_id)
+        await db.execute(
+            update(AcademyPhoto)
+            .where(AcademyPhoto.id == photo_id)
+            .values(likes_count=func.greatest(AcademyPhoto.likes_count - 1, 0))
+        )
+
+    await db.execute(delete(AcademyPhotoComment).where(AcademyPhotoComment.author_id == user_id))
+    await db.execute(delete(AcademyPhotoLike).where(AcademyPhotoLike.user_id == user_id))
+    if own_post_ids:
+        await db.execute(delete(AcademyPhoto).where(AcademyPhoto.id.in_(own_post_ids)))
+
+    # Menções no formato @[Nome|uuid]: o nome fica gravado no texto de quem mencionou.
+    mention_re = re.compile(r"@\[[^\|\]]+\|" + re.escape(str(user_id)) + r"\]")
+    replacement = f"@[{_REMOVED_USER_LABEL}|{user_id}]"
+    needle = f"%|{user_id}]%"
+    comments = (
+        (await db.execute(select(AcademyPhotoComment).where(AcademyPhotoComment.body.like(needle)))).scalars().all()
+    )
+    for comment in comments:
+        comment.body = mention_re.sub(replacement, comment.body)
+    captioned = (await db.execute(select(AcademyPhoto).where(AcademyPhoto.caption.like(needle)))).scalars().all()
+    for photo in captioned:
+        photo.caption = mention_re.sub(replacement, photo.caption or "")
+        academy_ids.add(photo.academy_id)
+
+    return academy_ids, files

@@ -191,8 +191,9 @@ class _PrivacyDataScreenState extends State<PrivacyDataScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Excluir minha conta'),
         content: const Text(
-          'Esta ação é irreversível. Seus dados pessoais (nome, e-mail, foto e biometria) '
-          'serão removidos e você perderá o acesso ao aplicativo.\n\nDeseja continuar?',
+          'Esta ação é irreversível. Seus dados pessoais (nome, e-mail, foto, biometria e '
+          'suas fotos e comentários no feed da academia) serão removidos e você perderá o '
+          'acesso ao aplicativo.\n\nDeseja continuar?',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),

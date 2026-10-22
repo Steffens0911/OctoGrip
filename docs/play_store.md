@@ -10,8 +10,7 @@ Baseado no código e em `docs/legal/` em 2026-10-22. Itens marcados com **DECIDI
 - [ ] **Política de Privacidade não cita** as fotos e comentários do feed da academia (OctoPhotos) nem o
       Sentry (relatórios de falha do app). O formulário Data safety abaixo declara os dois; a política
       precisa dizer o mesmo. Recomendado passar pela revisão jurídica já pendente.
-- [ ] **Exclusão de conta não apaga as fotos do feed** que a pessoa publicou (`privacy_service.anonymize_user`).
-      A página pública diz isso com transparência, mas o ideal é a exclusão apagar também essas fotos.
+- [x] Exclusão de conta apaga também fotos, comentários e curtidas do feed (com os arquivos de imagem).
 - [ ] Publicar a API com a página `/legal/account-deletion/view` (vai no próximo deploy do `main`).
 
 ## Links pedidos pela Play Console

@@ -22,6 +22,8 @@ com o assunto **"Excluir minha conta"**. Confirmamos a identidade e concluímos 
 - Nome, e-mail e senha.
 - Foto de perfil e foto facial.
 - **Dado biométrico facial** (foto e vetor numérico usados no reconhecimento de presença).
+- **Fotos, comentários e curtidas no feed da academia**, inclusive os posts automáticos de troféus e
+  faixas. Onde outra pessoa mencionou você, o nome passa a aparecer como "Usuário removido".
 - Tokens de notificação do aparelho.
 
 ## O que é mantido
@@ -30,8 +32,5 @@ com o assunto **"Excluir minha conta"**. Confirmamos a identidade e concluímos 
   conformidade com a LGPD, pelo prazo legal aplicável.
 - **Histórico de treino anonimizado** (presenças, pontos e missões), sem nenhum dado que identifique
   você, para manter corretos os relatórios e rankings da academia.
-- **Fotos e comentários publicados no feed da academia** continuam visíveis, exibidos como
-  "Usuário removido". Para apagá-los, exclua-os no feed antes de excluir a conta, ou peça a remoção
-  pelo e-mail acima.
 
 Mais detalhes na [Política de Privacidade](/legal/privacy/view).
