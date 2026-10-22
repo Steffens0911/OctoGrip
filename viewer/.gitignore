@@ -44,8 +44,8 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Firebase Android (contém chaves; manter local ou fornecer em CI)
-/android/app/google-services.json
+# Firebase Android: google-services.json é versionado. A chave é um identificador público do projeto
+# (a mesma já está em tool/prepare_firebase_web_build.py e vai dentro de todo APK); o build do CI precisa dele.
 
 # Gerado pelo Docker build (FCM Web)
 /tool/dart_define_web.json
