@@ -14,6 +14,11 @@ on:
         default: 'internal'
         type: choice
         options: [internal, alpha, beta, production]
+      user_fraction:
+        description: 'Rollout gradual em produção (0.2 = 20%; 1.0 = todos)'
+        required: false
+        default: '1.0'
+        type: string
 
 jobs:
   # ─── Android ────────────────────────────────────────────────────────────────
@@ -42,6 +47,11 @@ jobs:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: python3 tool/prepare_mobile_build.py
 
+      # Nenhuma tag com teste quebrado chega à loja.
+      - name: Flutter test
+        working-directory: viewer
+        run: flutter test --no-pub
+
       - name: Decode Android keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode \
@@ -60,6 +70,7 @@ jobs:
             --dart-define-from-file=tool/dart_define_mobile.json
 
       - name: Upload to Google Play
+        if: ${{ github.event.inputs.track != 'production' || github.event.inputs.user_fraction == '1.0' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -67,6 +78,19 @@ jobs:
           releaseFiles: viewer/build/app/outputs/bundle/release/app-release.aab
           track: ${{ github.event.inputs.track || 'internal' }}
           status: completed
+
+      # Produção com rollout gradual: a Play libera só para a fração informada;
+      # o aumento para 100% é feito no console depois de 2–3 dias sem erros no Sentry.
+      - name: Upload to Google Play (rollout gradual)
+        if: ${{ github.event.inputs.track == 'production' && github.event.inputs.user_fraction != '1.0' }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: br.com.octogrip.app
+          releaseFiles: viewer/build/app/outputs/bundle/release/app-release.aab
+          track: production
+          status: inProgress
+          userFraction: ${{ github.event.inputs.user_fraction }}
 
   # ─── iOS ────────────────────────────────────────────────────────────────────
   ios:

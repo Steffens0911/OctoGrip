@@ -64,6 +64,22 @@ class User(Base, UUIDMixin):
         index=True,
         comment="Data/hora do último login bem-sucedido.",
     )
+    last_app_version: Mapped[str | None] = mapped_column(
+        String(32),
+        nullable=True,
+        comment="Última versão do app vista no header X-App-Version (ex.: 1.3.0+12).",
+    )
+    last_app_platform: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+        comment="Plataforma da última versão vista (android | ios | web).",
+    )
+    last_app_seen_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        index=True,
+        comment="Quando last_app_version foi registrada (atualizada no máximo 1x/dia por versão).",
+    )
     account_frozen: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

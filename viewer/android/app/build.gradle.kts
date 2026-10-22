@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,8 +9,21 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Assinatura de release: no CI vem das variáveis KEYSTORE_* (build-mobile.yml);
+// localmente, de android/key.properties (fora do git). Ver docs/android_release.md.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) FileInputStream(file).use { load(it) }
+}
+
+fun signingValue(envName: String, propName: String): String? =
+    System.getenv(envName)?.takeIf { it.isNotBlank() } ?: keystoreProperties.getProperty(propName)
+
+val releaseStoreFile = signingValue("KEYSTORE_PATH", "storeFile")
+
 android {
-    namespace = "com.example.viewer"
+    // Identificador definitivo na Play Store: depois do primeiro envio, NUNCA muda.
+    namespace = "br.com.octogrip.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,21 +37,37 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.viewer"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        applicationId = "br.com.octogrip.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
+        // versionCode = número depois do "+" no pubspec.yaml; precisa subir a cada envio à Play.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (releaseStoreFile != null) {
+                storeFile = file(releaseStoreFile)
+                storePassword = signingValue("KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (releaseStoreFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                // Sem chave configurada: `flutter run --release` local continua funcionando.
+                // No CI isso é erro — um .aab assinado com a chave de debug é rejeitado pela Play.
+                if (System.getenv("CI") == "true") {
+                    throw GradleException("KEYSTORE_PATH não definido: o build de release no CI precisa da chave de upload.")
+                }
+                signingConfigs.getByName("debug")
+            }
         }
     }
 }

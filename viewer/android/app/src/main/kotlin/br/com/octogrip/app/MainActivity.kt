@@ -1,4 +1,4 @@
-package com.example.viewer
+package br.com.octogrip.app
 
 import io.flutter.embedding.android.FlutterActivity
 

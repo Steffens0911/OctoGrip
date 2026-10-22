@@ -4,6 +4,7 @@ from app.database import Base
 from app.models.academy import Academy
 from app.models.academy_marketplace_item import AcademyMarketplaceItem
 from app.models.academy_photo import AcademyPhoto, AcademyPhotoLike, AcademyPhotoRestriction
+from app.models.app_config import AppConfig
 from app.models.attendance_record import AttendanceRecord
 from app.models.attendance_session import AttendanceSession
 from app.models.audit_log import AuditLog
@@ -83,4 +84,5 @@ __all__ = [
     "TrainingTemplate",
     "TrainingSession",
     "TrainingPreCheckin",
+    "AppConfig",
 ]

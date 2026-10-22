@@ -7,11 +7,13 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.app_version import APP_PLATFORM_HEADER, APP_VERSION_HEADER, is_valid_app_version, normalize_platform
 from app.core.exceptions import AccountFrozenError, AuthenticationError, ForbiddenError
 from app.core.middleware import set_request_context
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models import User
+from app.services.app_config_service import record_app_version
 from app.services.user_service import get_user
 
 logger = logging.getLogger(__name__)
@@ -41,6 +43,12 @@ async def get_current_user(
         user_id=str(real_user.id),
         academy_id=str(real_user.academy_id) if real_user.academy_id else None,
     )
+
+    # Versão do app do usuário real (não do simulado): base do ciclo de depreciação da API.
+    app_version = request.headers.get(APP_VERSION_HEADER)
+    if app_version and is_valid_app_version(app_version):
+        platform = normalize_platform(request.headers.get(APP_PLATFORM_HEADER))
+        await record_app_version(db, real_user, app_version.strip(), platform)
 
     impersonate_header = request.headers.get("X-Impersonate-User")
     if impersonate_header and real_user.role == "administrador":
