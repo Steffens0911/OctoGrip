@@ -21,7 +21,7 @@ class PunctualityStudentEntry {
 
   factory PunctualityStudentEntry.fromJson(Map<String, dynamic> json) =>
       PunctualityStudentEntry(
-        studentId: json['student_id'] as String,
+        studentId: (json['student_id'] as String? ?? ''),
         name: json['name'] as String?,
         punctualityStreak: json['punctuality_streak'] as int? ?? 0,
         punctualityStreakBest: json['punctuality_streak_best'] as int? ?? 0,
@@ -45,11 +45,11 @@ class PunctualityReport {
 
   factory PunctualityReport.fromJson(Map<String, dynamic> json) =>
       PunctualityReport(
-        academyId: json['academy_id'] as String,
+        academyId: (json['academy_id'] as String? ?? ''),
         days: json['days'] as int? ?? 30,
         students: (json['students'] as List<dynamic>?)
-                ?.map((e) => PunctualityStudentEntry.fromJson(
-                    e as Map<String, dynamic>))
+                ?.map((e) =>
+                    PunctualityStudentEntry.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
       );

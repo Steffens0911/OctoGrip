@@ -14,9 +14,9 @@ class Professor {
 
   factory Professor.fromJson(Map<String, dynamic> json) {
     return Professor(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
+      id: (json['id'] as String? ?? ''),
+      name: (json['name'] as String? ?? ''),
+      email: (json['email'] as String? ?? ''),
       academyId: json['academy_id'] as String?,
     );
   }

@@ -10,8 +10,8 @@ class Confirmant {
   });
 
   factory Confirmant.fromJson(Map<String, dynamic> json) => Confirmant(
-        userId: json['user_id'] as String,
-        name: json['name'] as String,
+        userId: (json['user_id'] as String? ?? ''),
+        name: (json['name'] as String? ?? ''),
         avatarUrl: json['avatar_url'] as String?,
       );
 }
@@ -37,7 +37,8 @@ class PreCheckinStatus {
   bool get isCancelled => status == 'cancelled';
   bool get hasConfirmed => status != null;
 
-  factory PreCheckinStatus.fromJson(Map<String, dynamic> json) => PreCheckinStatus(
+  factory PreCheckinStatus.fromJson(Map<String, dynamic> json) =>
+      PreCheckinStatus(
         preCheckinId: json['pre_checkin_id'] as String?,
         status: json['status'] as String?,
         confirmedAt: json['confirmed_at'] as String?,

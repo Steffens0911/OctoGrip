@@ -26,6 +26,8 @@ def main() -> None:
 
     defines: dict[str, str] = {
         "API_BASE_URL": api_base.rstrip("/"),
+        # Projeto Sentry do app (não o da API); vazio = Sentry desligado.
+        "SENTRY_DSN": (os.environ.get("SENTRY_DSN") or "").strip(),
     }
 
     out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -33,7 +35,8 @@ def main() -> None:
 
     print(
         "[prepare_mobile_build] wrote tool/dart_define_mobile.json; "
-        f"custom_api_base={'yes' if os.environ.get('API_BASE_URL', '').strip() else 'no'}"
+        f"custom_api_base={'yes' if os.environ.get('API_BASE_URL', '').strip() else 'no'}; "
+        f"sentry={'yes' if defines['SENTRY_DSN'] else 'no'}"
     )
 
 

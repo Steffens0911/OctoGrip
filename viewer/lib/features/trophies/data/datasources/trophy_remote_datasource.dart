@@ -54,7 +54,9 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
       if (page.length < pageSize) break;
       offset += pageSize;
     }
-    return list.map((e) => TrophyDto.fromJson(e, academyId: academyId)).toList();
+    return list
+        .map((e) => TrophyDto.fromJson(e, academyId: academyId))
+        .toList();
   }
 
   @override
@@ -116,7 +118,8 @@ class TrophyRemoteDataSourceImpl implements TrophyRemoteDataSource {
       maxCountPerOpponent: maxCountPerOpponent,
       setMaxCountPerOpponent: setMaxCountPerOpponent,
     );
-    return TrophyDto.fromJson(map, academyId: map['academy_id'] as String);
+    return TrophyDto.fromJson(map,
+        academyId: (map['academy_id'] as String? ?? ''));
   }
 
   @override

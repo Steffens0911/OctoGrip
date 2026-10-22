@@ -45,6 +45,7 @@ jobs:
         working-directory: viewer
         env:
           API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN_APP }}
         run: python3 tool/prepare_mobile_build.py
 
       # Nenhuma tag com teste quebrado chega à loja.

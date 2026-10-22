@@ -20,14 +20,15 @@ class ActiveStudent {
   factory ActiveStudent.fromJson(Map<String, dynamic> json) {
     final lastLoginStr = json['last_login_at'] as String?;
     return ActiveStudent(
-      id: json['id'] as String,
-      email: json['email'] as String,
+      id: (json['id'] as String? ?? ''),
+      email: (json['email'] as String? ?? ''),
       name: json['name'] as String?,
       graduation: json['graduation'] as String?,
       academyId: json['academy_id'] as String?,
       academyName: json['academy_name'] as String?,
-      lastLoginAt:
-          lastLoginStr != null && lastLoginStr.isNotEmpty ? DateTime.parse(lastLoginStr) : null,
+      lastLoginAt: lastLoginStr != null && lastLoginStr.isNotEmpty
+          ? DateTime.parse(lastLoginStr)
+          : null,
     );
   }
 }
@@ -78,4 +79,3 @@ class ActiveStudentsReport {
     );
   }
 }
-

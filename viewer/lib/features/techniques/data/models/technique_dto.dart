@@ -21,10 +21,10 @@ class TechniqueDto {
     required String academyId,
   }) {
     return TechniqueDto(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       academyId: academyId,
-      name: json['name'] as String,
-      slug: json['slug'] as String,
+      name: (json['name'] as String? ?? ''),
+      slug: (json['slug'] as String? ?? ''),
       description: json['description'] as String?,
       videoUrl: json['video_url'] as String?,
     );
@@ -41,10 +41,10 @@ class TechniqueDto {
 
   factory TechniqueDto.fromHiveMap(Map<dynamic, dynamic> map) {
     return TechniqueDto(
-      id: map['id'] as String,
-      academyId: map['academy_id'] as String,
-      name: map['name'] as String,
-      slug: map['slug'] as String,
+      id: (map['id'] as String? ?? ''),
+      academyId: (map['academy_id'] as String? ?? ''),
+      name: (map['name'] as String? ?? ''),
+      slug: (map['slug'] as String? ?? ''),
       description: map['description'] as String?,
       videoUrl: map['video_url'] as String?,
     );

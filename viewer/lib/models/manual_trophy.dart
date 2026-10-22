@@ -24,9 +24,9 @@ class TrophyTemplate {
   });
 
   factory TrophyTemplate.fromJson(Map<String, dynamic> j) => TrophyTemplate(
-        id: j['id'] as String,
-        academyId: j['academy_id'] as String,
-        name: j['name'] as String,
+        id: (j['id'] as String? ?? ''),
+        academyId: (j['academy_id'] as String? ?? ''),
+        name: (j['name'] as String? ?? ''),
         description: j['description'] as String?,
         icon: j['icon'] as String?,
         color: j['color'] as String?,
@@ -55,12 +55,13 @@ class ChampionshipEvent {
     required this.createdAt,
   });
 
-  factory ChampionshipEvent.fromJson(Map<String, dynamic> j) => ChampionshipEvent(
-        id: j['id'] as String,
-        academyId: j['academy_id'] as String,
-        name: j['name'] as String,
+  factory ChampionshipEvent.fromJson(Map<String, dynamic> j) =>
+      ChampionshipEvent(
+        id: (j['id'] as String? ?? ''),
+        academyId: (j['academy_id'] as String? ?? ''),
+        name: (j['name'] as String? ?? ''),
         location: j['location'] as String?,
-        eventDate: j['event_date'] as String,
+        eventDate: (j['event_date'] as String? ?? ''),
         createdAt: j['created_at'] as String? ?? '',
       );
 }
@@ -99,15 +100,15 @@ class TrophyAward {
   });
 
   factory TrophyAward.fromJson(Map<String, dynamic> j) => TrophyAward(
-        id: j['id'] as String,
-        templateId: j['template_id'] as String,
-        templateName: j['template_name'] as String,
+        id: (j['id'] as String? ?? ''),
+        templateId: (j['template_id'] as String? ?? ''),
+        templateName: (j['template_name'] as String? ?? ''),
         templateIcon: j['template_icon'] as String?,
         templateColor: j['template_color'] as String?,
         trophyType: j['trophy_type'] as String? ?? 'custom',
-        userId: j['user_id'] as String,
+        userId: (j['user_id'] as String? ?? ''),
         awardedBy: j['awarded_by'] as String?,
-        awardedAt: j['awarded_at'] as String,
+        awardedAt: (j['awarded_at'] as String? ?? ''),
         championshipEventId: j['championship_event_id'] as String?,
         championshipEventName: j['championship_event_name'] as String?,
         championshipEventDate: j['championship_event_date'] as String?,
@@ -129,11 +130,12 @@ class UserTrophyAwardsResponse {
 
   factory UserTrophyAwardsResponse.fromJson(Map<String, dynamic> j) =>
       UserTrophyAwardsResponse(
-        userId: j['user_id'] as String,
-        championshipAwards: (j['championship_awards'] as List<dynamic>)
-            .map((e) => TrophyAward.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        customAwards: (j['custom_awards'] as List<dynamic>)
+        userId: (j['user_id'] as String? ?? ''),
+        championshipAwards:
+            (j['championship_awards'] as List<dynamic>? ?? const [])
+                .map((e) => TrophyAward.fromJson(e as Map<String, dynamic>))
+                .toList(),
+        customAwards: (j['custom_awards'] as List<dynamic>? ?? const [])
             .map((e) => TrophyAward.fromJson(e as Map<String, dynamic>))
             .toList(),
       );

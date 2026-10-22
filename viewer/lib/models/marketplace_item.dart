@@ -8,6 +8,7 @@ class MarketplaceItem {
   final int priceCents;
   final String currency;
   final String? imageUrl;
+
   /// URL `wa.me` calculada na API; null se o anúncio não tiver WhatsApp.
   final String? whatsappUrl;
   final String? whatsappDdd;
@@ -35,8 +36,8 @@ class MarketplaceItem {
 
   factory MarketplaceItem.fromStudentJson(Map<String, dynamic> json) {
     return MarketplaceItem(
-      id: json['id'] as String,
-      title: json['title'] as String,
+      id: (json['id'] as String? ?? ''),
+      title: (json['title'] as String? ?? ''),
       description: json['description'] as String?,
       priceCents: json['price_cents'] as int? ?? 0,
       currency: json['currency'] as String? ?? 'BRL',
@@ -47,10 +48,10 @@ class MarketplaceItem {
 
   factory MarketplaceItem.fromAdminJson(Map<String, dynamic> json) {
     return MarketplaceItem(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       academyId: json['academy_id'] as String?,
       academyName: json['academy_name'] as String?,
-      title: json['title'] as String,
+      title: (json['title'] as String? ?? ''),
       description: json['description'] as String?,
       priceCents: json['price_cents'] as int? ?? 0,
       currency: json['currency'] as String? ?? 'BRL',

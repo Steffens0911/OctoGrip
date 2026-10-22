@@ -22,18 +22,18 @@ class AuditLogItem {
 
   factory AuditLogItem.fromJson(Map<String, dynamic> json) {
     return AuditLogItem(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       userId: json['user_id'] as String?,
-      action: json['action'] as String,
-      entity: json['entity'] as String,
-      entityId: json['entity_id'] as String,
+      action: (json['action'] as String? ?? ''),
+      entity: (json['entity'] as String? ?? ''),
+      entityId: (json['entity_id'] as String? ?? ''),
       oldData: json['old_data'] != null
           ? Map<String, dynamic>.from(json['old_data'] as Map)
           : null,
       newData: json['new_data'] != null
           ? Map<String, dynamic>.from(json['new_data'] as Map)
           : null,
-      createdAt: json['created_at'] as String,
+      createdAt: (json['created_at'] as String? ?? ''),
     );
   }
 }
@@ -59,9 +59,9 @@ class AuditHistoryResult {
       items: raw
           .map((e) => AuditLogItem.fromJson(e as Map<String, dynamic>))
           .toList(),
-      total: json['total'] as int,
-      limit: json['limit'] as int,
-      offset: json['offset'] as int,
+      total: ((json['total'] as num?)?.toInt() ?? 0),
+      limit: ((json['limit'] as num?)?.toInt() ?? 0),
+      offset: ((json['offset'] as num?)?.toInt() ?? 0),
       order: json['order'] as String? ?? 'asc',
     );
   }
@@ -84,10 +84,10 @@ class RestoreResult {
 
   factory RestoreResult.fromJson(Map<String, dynamic> json) {
     return RestoreResult(
-      restored: json['restored'] as bool,
-      mode: json['mode'] as String,
-      entity: json['entity'] as String,
-      id: json['id'] as String,
+      restored: (json['restored'] as bool? ?? false),
+      mode: (json['mode'] as String? ?? ''),
+      entity: (json['entity'] as String? ?? ''),
+      id: (json['id'] as String? ?? ''),
       fromAuditLogId: json['from_audit_log_id'] as String?,
     );
   }

@@ -43,12 +43,11 @@ class EngagementReport {
     return EngagementReport(
       academyId: json['academy_id'] as String?,
       weekly: EngagementPeriodMetrics.fromJson(
-        json['weekly'] as Map<String, dynamic>,
+        (json['weekly'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
       ),
       monthly: EngagementPeriodMetrics.fromJson(
-        json['monthly'] as Map<String, dynamic>,
+        (json['monthly'] as Map<String, dynamic>? ?? const <String, dynamic>{}),
       ),
     );
   }
 }
-

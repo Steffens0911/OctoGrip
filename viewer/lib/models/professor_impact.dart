@@ -5,7 +5,7 @@ class ExecutionDetail {
   const ExecutionDetail({required this.executorName, this.opponentName});
 
   factory ExecutionDetail.fromJson(Map<String, dynamic> j) => ExecutionDetail(
-        executorName: j['executor_name'] as String,
+        executorName: (j['executor_name'] as String? ?? ''),
         opponentName: j['opponent_name'] as String?,
       );
 }
@@ -17,8 +17,9 @@ class DailyVideoView {
   const DailyVideoView({required this.date, required this.viewsCount});
 
   factory DailyVideoView.fromJson(Map<String, dynamic> j) => DailyVideoView(
-        date: DateTime.parse(j['view_date'] as String),
-        viewsCount: j['views_count'] as int,
+        date: (DateTime.tryParse(j['view_date'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0)),
+        viewsCount: ((j['views_count'] as num?)?.toInt() ?? 0),
       );
 }
 
@@ -40,11 +41,11 @@ class TechniqueImpact {
   });
 
   factory TechniqueImpact.fromJson(Map<String, dynamic> j) => TechniqueImpact(
-        techniqueName: j['technique_name'] as String,
-        studentsCompleted: j['students_completed'] as int,
-        totalStudents: j['total_students'] as int,
-        completionPct: (j['completion_pct'] as num).toDouble(),
-        missionsCount: j['missions_count'] as int,
+        techniqueName: (j['technique_name'] as String? ?? ''),
+        studentsCompleted: ((j['students_completed'] as num?)?.toInt() ?? 0),
+        totalStudents: ((j['total_students'] as num?)?.toInt() ?? 0),
+        completionPct: ((j['completion_pct'] as num? ?? 0)).toDouble(),
+        missionsCount: ((j['missions_count'] as num?)?.toInt() ?? 0),
         executions: (j['executions'] as List? ?? [])
             .map((e) => ExecutionDetail.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -65,10 +66,10 @@ class AtRiskStudent {
   });
 
   factory AtRiskStudent.fromJson(Map<String, dynamic> j) => AtRiskStudent(
-        id: j['id'] as String,
-        name: j['name'] as String,
-        daysInactive: j['days_inactive'] as int,
-        riskLevel: j['risk_level'] as String,
+        id: (j['id'] as String? ?? ''),
+        name: (j['name'] as String? ?? ''),
+        daysInactive: ((j['days_inactive'] as num?)?.toInt() ?? 0),
+        riskLevel: (j['risk_level'] as String? ?? ''),
       );
 }
 
@@ -100,22 +101,26 @@ class ProfessorImpact {
   });
 
   factory ProfessorImpact.fromJson(Map<String, dynamic> j) => ProfessorImpact(
-        weekStart: DateTime.parse(j['week_start'] as String),
-        weekEnd: DateTime.parse(j['week_end'] as String),
-        studentsReached: j['students_reached'] as int,
-        totalStudents: j['total_students'] as int,
-        completionRate: (j['completion_rate'] as num).toDouble(),
+        weekStart: (DateTime.tryParse(j['week_start'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0)),
+        weekEnd: (DateTime.tryParse(j['week_end'] as String? ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0)),
+        studentsReached: ((j['students_reached'] as num?)?.toInt() ?? 0),
+        totalStudents: ((j['total_students'] as num?)?.toInt() ?? 0),
+        completionRate: ((j['completion_rate'] as num? ?? 0)).toDouble(),
         completionRateDelta: j['completion_rate_delta'] == null
             ? null
-            : (j['completion_rate_delta'] as num).toDouble(),
-        techniques: (j['techniques'] as List)
+            : ((j['completion_rate_delta'] as num? ?? 0)).toDouble(),
+        techniques: ((j['techniques'] as List? ?? const []))
             .map((e) => TechniqueImpact.fromJson(e as Map<String, dynamic>))
             .toList(),
-        atRiskStudents: (j['at_risk_students'] as List)
+        atRiskStudents: ((j['at_risk_students'] as List? ?? const []))
             .map((e) => AtRiskStudent.fromJson(e as Map<String, dynamic>))
             .toList(),
-        totalMissionsInAcademy: j['total_missions_in_academy'] as int,
-        totalCompletionsAllTime: j['total_completions_all_time'] as int,
+        totalMissionsInAcademy:
+            ((j['total_missions_in_academy'] as num?)?.toInt() ?? 0),
+        totalCompletionsAllTime:
+            ((j['total_completions_all_time'] as num?)?.toInt() ?? 0),
         dailyVideoViews: (j['daily_video_views'] as List? ?? [])
             .map((e) => DailyVideoView.fromJson(e as Map<String, dynamic>))
             .toList(),
@@ -123,11 +128,22 @@ class ProfessorImpact {
 
   String get weekLabel {
     const months = [
-      'jan', 'fev', 'mar', 'abr', 'mai', 'jun',
-      'jul', 'ago', 'set', 'out', 'nov', 'dez'
+      'jan',
+      'fev',
+      'mar',
+      'abr',
+      'mai',
+      'jun',
+      'jul',
+      'ago',
+      'set',
+      'out',
+      'nov',
+      'dez'
     ];
     final startLabel = '${weekStart.day} ${months[weekStart.month - 1]}';
-    final endLabel = '${weekEnd.day} ${months[weekEnd.month - 1]} ${weekEnd.year}';
+    final endLabel =
+        '${weekEnd.day} ${months[weekEnd.month - 1]} ${weekEnd.year}';
     return '$startLabel–$endLabel';
   }
 }

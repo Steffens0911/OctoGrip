@@ -25,17 +25,20 @@ class AttendanceSessionModel {
 
   factory AttendanceSessionModel.fromJson(Map<String, dynamic> json) {
     return AttendanceSessionModel(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       academyId: json['academy_id'] as String?,
-      createdByUserId: json['created_by_user_id'] as String,
+      createdByUserId: (json['created_by_user_id'] as String? ?? ''),
       status: json['status'] as String? ?? 'active',
       title: json['title'] as String?,
-      startsAt: DateTime.parse(json['starts_at'] as String),
+      startsAt: (DateTime.tryParse(json['starts_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       endsAt: json['ends_at'] != null
-          ? DateTime.parse(json['ends_at'] as String)
+          ? (DateTime.tryParse(json['ends_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       expiresAt: json['expires_at'] != null
-          ? DateTime.parse(json['expires_at'] as String)
+          ? (DateTime.tryParse(json['expires_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
       trainingSessionId: json['training_session_id'] as String?,
@@ -64,10 +67,11 @@ class AttendanceRecordModel {
 
   factory AttendanceRecordModel.fromJson(Map<String, dynamic> json) {
     return AttendanceRecordModel(
-      id: json['id'] as String,
-      sessionId: json['session_id'] as String,
-      userId: json['user_id'] as String,
-      checkedInAt: DateTime.parse(json['checked_in_at'] as String),
+      id: (json['id'] as String? ?? ''),
+      sessionId: (json['session_id'] as String? ?? ''),
+      userId: (json['user_id'] as String? ?? ''),
+      checkedInAt: (DateTime.tryParse(json['checked_in_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       method: json['method'] as String? ?? 'qr',
       faceRecognition: json['face_recognition'] as bool? ?? false,
       addedManually: json['added_manually'] as bool? ?? false,
@@ -92,12 +96,15 @@ class AttendanceUserSummaryModel {
 
   factory AttendanceUserSummaryModel.fromJson(Map<String, dynamic> json) {
     return AttendanceUserSummaryModel(
-      userId: json['user_id'] as String,
-      fromDt: DateTime.parse(json['from_dt'] as String),
-      toDt: DateTime.parse(json['to_dt'] as String),
+      userId: (json['user_id'] as String? ?? ''),
+      fromDt: (DateTime.tryParse(json['from_dt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
+      toDt: (DateTime.tryParse(json['to_dt'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.parse(json['last_seen_at'] as String)
+          ? (DateTime.tryParse(json['last_seen_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
     );
   }
@@ -123,11 +130,13 @@ class AttendanceSessionStatModel {
 
   factory AttendanceSessionStatModel.fromJson(Map<String, dynamic> json) {
     return AttendanceSessionStatModel(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       title: json['title'] as String?,
-      startsAt: DateTime.parse(json['starts_at'] as String),
+      startsAt: (DateTime.tryParse(json['starts_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       endsAt: json['ends_at'] != null
-          ? DateTime.parse(json['ends_at'] as String)
+          ? (DateTime.tryParse(json['ends_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       status: json['status'] as String? ?? 'active',
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
@@ -159,15 +168,16 @@ class AttendanceStudentStatModel {
 
   factory AttendanceStudentStatModel.fromJson(Map<String, dynamic> json) {
     return AttendanceStudentStatModel(
-      userId: json['user_id'] as String,
-      email: json['email'] as String,
+      userId: (json['user_id'] as String? ?? ''),
+      email: (json['email'] as String? ?? ''),
       name: json['name'] as String?,
       graduation: json['graduation'] as String?,
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
       totalSessions: (json['total_sessions'] as num?)?.toInt() ?? 0,
       attendanceRate: (json['attendance_rate'] as num?)?.toDouble() ?? 0.0,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.parse(json['last_seen_at'] as String)
+          ? (DateTime.tryParse(json['last_seen_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
     );
   }
@@ -193,11 +203,14 @@ class AttendanceRecordWithSessionModel {
 
   factory AttendanceRecordWithSessionModel.fromJson(Map<String, dynamic> json) {
     return AttendanceRecordWithSessionModel(
-      id: json['id'] as String,
-      sessionId: json['session_id'] as String,
+      id: (json['id'] as String? ?? ''),
+      sessionId: (json['session_id'] as String? ?? ''),
       sessionTitle: json['session_title'] as String?,
-      sessionStartsAt: DateTime.parse(json['session_starts_at'] as String),
-      checkedInAt: DateTime.parse(json['checked_in_at'] as String),
+      sessionStartsAt:
+          (DateTime.tryParse(json['session_starts_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0)),
+      checkedInAt: (DateTime.tryParse(json['checked_in_at'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       method: json['method'] as String? ?? 'qr',
     );
   }
@@ -230,15 +243,16 @@ class AttendanceStudentDetailModel {
   factory AttendanceStudentDetailModel.fromJson(Map<String, dynamic> json) {
     final raw = json['records'] as List<dynamic>? ?? const [];
     return AttendanceStudentDetailModel(
-      userId: json['user_id'] as String,
-      email: json['email'] as String,
+      userId: (json['user_id'] as String? ?? ''),
+      email: (json['email'] as String? ?? ''),
       name: json['name'] as String?,
       graduation: json['graduation'] as String?,
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
       totalSessions: (json['total_sessions'] as num?)?.toInt() ?? 0,
       attendanceRate: (json['attendance_rate'] as num?)?.toDouble() ?? 0.0,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.parse(json['last_seen_at'] as String)
+          ? (DateTime.tryParse(json['last_seen_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       records: raw
           .map((e) => AttendanceRecordWithSessionModel.fromJson(
@@ -264,9 +278,11 @@ class AttendancePeriodBucketModel {
 
   factory AttendancePeriodBucketModel.fromJson(Map<String, dynamic> json) {
     return AttendancePeriodBucketModel(
-      periodStart: DateTime.parse(json['period_start'] as String),
-      periodEnd: DateTime.parse(json['period_end'] as String),
-      label: json['label'] as String,
+      periodStart: (DateTime.tryParse(json['period_start'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
+      periodEnd: (DateTime.tryParse(json['period_end'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
+      label: (json['label'] as String? ?? ''),
       presentCount: (json['present_count'] as num?)?.toInt() ?? 0,
     );
   }
@@ -318,14 +334,17 @@ class AttendanceMyStatsModel {
             e as Map<String, dynamic>))
         .toList();
     return AttendanceMyStatsModel(
-      fromDate: DateTime.parse(json['from_date'] as String),
-      toDate: DateTime.parse(json['to_date'] as String),
+      fromDate: (DateTime.tryParse(json['from_date'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
+      toDate: (DateTime.tryParse(json['to_date'] as String? ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0)),
       bucket: json['bucket'] as String? ?? 'week',
       totalSessions: (json['total_sessions'] as num?)?.toInt() ?? 0,
       totalCheckins: (json['total_checkins'] as num?)?.toInt() ?? 0,
       percentage: (json['percentage'] as num?)?.toDouble() ?? 0.0,
       lastSeenAt: json['last_seen_at'] != null
-          ? DateTime.parse(json['last_seen_at'] as String)
+          ? (DateTime.tryParse(json['last_seen_at'] as String? ?? '') ??
+              DateTime.fromMillisecondsSinceEpoch(0))
           : null,
       lifetimeTotalSessions:
           (json['lifetime_total_sessions'] as num?)?.toInt() ?? 0,

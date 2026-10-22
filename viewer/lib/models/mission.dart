@@ -27,12 +27,12 @@ class Mission {
 
   factory Mission.fromJson(Map<String, dynamic> json) {
     return Mission(
-      id: json['id'] as String,
-      techniqueId: json['technique_id'] as String,
+      id: (json['id'] as String? ?? ''),
+      techniqueId: (json['technique_id'] as String? ?? ''),
       techniqueName: json['technique_name'] as String?,
-      startDate: json['start_date'] as String,
-      endDate: json['end_date'] as String,
-      level: json['level'] as String,
+      startDate: (json['start_date'] as String? ?? ''),
+      endDate: (json['end_date'] as String? ?? ''),
+      level: (json['level'] as String? ?? ''),
       theme: json['theme'] as String?,
       academyId: json['academy_id'] as String?,
       isActive: json['is_active'] as bool? ?? true,

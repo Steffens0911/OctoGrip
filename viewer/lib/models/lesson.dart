@@ -27,14 +27,14 @@ class Lesson {
 
   factory Lesson.fromJson(Map<String, dynamic> json) {
     return Lesson(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       academyId: json['academy_id'] as String?,
-      title: json['title'] as String,
-      slug: json['slug'] as String,
+      title: (json['title'] as String? ?? ''),
+      slug: (json['slug'] as String? ?? ''),
       videoUrl: json['video_url'] as String?,
       content: json['content'] as String?,
-      orderIndex: (json['order_index'] as num).toInt(),
-      techniqueId: json['technique_id'] as String,
+      orderIndex: ((json['order_index'] as num? ?? 0)).toInt(),
+      techniqueId: (json['technique_id'] as String? ?? ''),
       techniqueName: json['technique_name'] as String?,
       positionName: json['position_name'] as String?,
       techniqueVideoUrl: json['technique_video_url'] as String?,

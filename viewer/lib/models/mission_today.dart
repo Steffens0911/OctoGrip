@@ -85,7 +85,8 @@ class MissionWeekSlot {
     final m = json['mission'];
     return MissionWeekSlot(
       periodLabel: json['period_label'] as String? ?? '',
-      mission: m != null ? MissionToday.fromJson(m as Map<String, dynamic>) : null,
+      mission:
+          m != null ? MissionToday.fromJson(m as Map<String, dynamic>) : null,
     );
   }
 
@@ -109,7 +110,7 @@ class WeeklyKitOption {
 
   factory WeeklyKitOption.fromJson(Map<String, dynamic> json) {
     return WeeklyKitOption(
-      kitId: json['kit_id'] as String,
+      kitId: (json['kit_id'] as String? ?? ''),
       label: json['label'] as String? ?? '',
       itemCount: json['item_count'] as int? ?? 0,
     );
@@ -134,7 +135,9 @@ class MissionWeek {
     final list = (json['entries'] as List<dynamic>?) ?? [];
     final kitsRaw = json['available_kits'] as List<dynamic>? ?? [];
     return MissionWeek(
-      entries: list.map((e) => MissionWeekSlot.fromJson(e as Map<String, dynamic>)).toList(),
+      entries: list
+          .map((e) => MissionWeekSlot.fromJson(e as Map<String, dynamic>))
+          .toList(),
       needsKitChoice: json['needs_kit_choice'] as bool? ?? false,
       availableKits: kitsRaw
           .map((e) => WeeklyKitOption.fromJson(e as Map<String, dynamic>))

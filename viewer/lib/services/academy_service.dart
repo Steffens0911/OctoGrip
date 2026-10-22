@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:viewer/config.dart';
 import 'package:viewer/constants/reward_points.dart';
 import 'package:viewer/models/academy.dart';
+import 'package:viewer/services/app_update_service.dart';
 import 'package:viewer/services/auth_service.dart';
 
 class AcademyServiceException implements Exception {
@@ -20,7 +21,7 @@ class AcademyService {
   String get _academiesUrl => '$_base/academies';
 
   Map<String, String> _getHeaders({bool auth = false}) {
-    final headers = <String, String>{};
+    final headers = <String, String>{...AppClientInfo.headers};
     if (auth) {
       final bearer = AuthService().authHeader;
       if (bearer != null) headers['Authorization'] = bearer;
@@ -204,7 +205,7 @@ class AcademyService {
         .toList() ?? [];
     return {
       'academy_id': map['academy_id'],
-      'period_days': map['period_days'] as int,
+      'period_days': (map['period_days'] as num?)?.toInt() ?? 0,
       if (map['period_start'] != null) 'period_start': map['period_start'] as String,
       if (map['period_end'] != null) 'period_end': map['period_end'] as String,
       'entries': entries,

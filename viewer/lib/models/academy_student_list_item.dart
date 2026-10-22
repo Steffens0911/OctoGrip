@@ -19,7 +19,7 @@ class AcademyStudentListItem {
 
   factory AcademyStudentListItem.fromJson(Map<String, dynamic> json) {
     return AcademyStudentListItem(
-      id: json['id'] as String,
+      id: (json['id'] as String? ?? ''),
       name: json['name'] as String?,
       belt: json['belt'] as String?,
       avatarUrl: json['avatar_url'] as String?,
