@@ -32,8 +32,13 @@ async def training_videos_list(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_write_access),
 ):
-    """Lista todos os vídeos de treinamento (admin/professor)."""
-    videos = await list_training_videos(db, limit=limit, offset=offset)
+    """Lista vídeos de treinamento. Admin vê todos; gestor/professor só os da própria academia."""
+    scope_academy_id: UUID | None = None
+    if current_user.role != "administrador":
+        if current_user.academy_id is None:
+            return []
+        scope_academy_id = current_user.academy_id
+    videos = await list_training_videos(db, limit=limit, offset=offset, academy_id=scope_academy_id)
     return [TrainingVideoAdminRead.model_validate(v) for v in videos]
 
 

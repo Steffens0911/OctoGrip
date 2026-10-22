@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import random
 from datetime import date
 from uuid import UUID
 
@@ -35,17 +36,49 @@ def _optional_text(value: str | None) -> str | None:
     return stripped or None
 
 
+def _cycle_order(count: int, scope_key: str, cycle: int) -> list[int]:
+    order = list(range(count))
+    random.Random(f"{scope_key}:{count}:{cycle}").shuffle(order)
+    return order
+
+
+def pick_daily_video(videos: list[TrainingVideo], *, scope_key: str, today: date) -> TrainingVideo:
+    """Escolhe o vídeo do dia em ordem aleatória, estável ao longo do dia.
+
+    Os dias são agrupados em ciclos do tamanho da lista. Em cada ciclo todos os vídeos
+    aparecem uma única vez, embaralhados de forma determinística (todos os alunos da
+    academia veem o mesmo vídeo no dia). Nunca repete o vídeo do dia anterior.
+    """
+    count = len(videos)
+    if count == 1:
+        return videos[0]
+    cycle, position = divmod(today.toordinal(), count)
+    if count == 2:
+        # Só alternam; o sorteio decide qual vem primeiro nesta academia.
+        return videos[(position + random.Random(scope_key).randrange(2)) % 2]
+    order = _cycle_order(count, scope_key, cycle)
+    previous_last = _cycle_order(count, scope_key, cycle - 1)[-1]
+    if order[0] == previous_last:
+        # Só as posições 0 e 1 mudam, então o último de cada ciclo é sempre o do embaralhamento puro.
+        order[0], order[1] = order[1], order[0]
+    return videos[order[position]]
+
+
 async def list_training_videos(
     db: AsyncSession,
     *,
     limit: int = 50,
     offset: int = 0,
+    academy_id: UUID | None = None,
 ) -> list[TrainingVideo]:
+    """Lista vídeos; com `academy_id`, restringe aos vídeos locais dessa academia."""
     safe_limit = clamp_list_limit(limit)
     safe_offset = max(0, int(offset))
+    stmt = select(TrainingVideo)
+    if academy_id is not None:
+        stmt = stmt.where(TrainingVideo.academy_id == academy_id)
     stmt = (
-        select(TrainingVideo)
-        .order_by(TrainingVideo.order_index.nulls_last(), TrainingVideo.created_at.desc())
+        stmt.order_by(TrainingVideo.order_index.nulls_last(), TrainingVideo.created_at.desc())
         .offset(safe_offset)
         .limit(safe_limit)
     )
@@ -251,12 +284,10 @@ async def get_training_videos_for_user_today(
     global_videos = [v for v in all_videos if v.academy_id is None]
 
     # 1 vídeo por dia: local tem prioridade, global é fallback.
-    day_ordinal = today.toordinal()
-
     if local_videos:
-        videos = [local_videos[day_ordinal % len(local_videos)]]
+        videos = [pick_daily_video(local_videos, scope_key=str(user.academy_id), today=today)]
     elif global_videos:
-        videos = [global_videos[day_ordinal % len(global_videos)]]
+        videos = [pick_daily_video(global_videos, scope_key="global", today=today)]
     else:
         return []
 

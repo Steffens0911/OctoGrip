@@ -135,6 +135,36 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
     }
   }
 
+  Future<void> _toggleActive(TrainingVideo video, bool isActive) async {
+    try {
+      await _api.updateTrainingVideo(
+        id: video.id,
+        title: video.title,
+        youtubeUrl: video.youtubeUrl,
+        pointsPerDay: video.pointsPerDay,
+        isActive: isActive,
+        durationSeconds: video.durationSeconds,
+        positionDescription: video.positionDescription ?? '',
+      );
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: isActive
+            ? 'Vídeo voltou para a rotação diária.'
+            : 'Vídeo fora da rotação diária.',
+        type: AppFeedbackType.success,
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      AppFeedback.show(
+        context,
+        message: userFacingMessage(e),
+        type: AppFeedbackType.error,
+      );
+    }
+  }
+
   Future<void> _delete(TrainingVideo video) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -228,6 +258,38 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                     Expanded(
                                       child: Text(
                                         'Para exibir ou ocultar o quadro "Apoiadores do app" na home do aluno: Administração → Academias → toque em uma academia → role até "Visibilidade na tela do aluno".',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppTheme.textSecondaryOf(
+                                                  context),
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (widget.localOnly)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                            child: Card(
+                              color: AppTheme.primary.withValues(alpha: 0.06),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.shuffle_rounded,
+                                      size: 20,
+                                      color: AppTheme.primary,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Cadastre quantos vídeos quiser: o app sorteia um por dia entre os ativos, sem repetir o do dia anterior. Use a chave para tirar um vídeo da rotação sem apagá-lo.',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
@@ -356,12 +418,16 @@ class _TrainingVideoListScreenState extends State<TrainingVideoListScreen> {
                                         ? Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              if (!v.isActive)
-                                                const Icon(
-                                                  Icons.visibility_off,
-                                                  size: 18,
-                                                  color: Colors.grey,
+                                              Tooltip(
+                                                message: v.isActive
+                                                    ? 'Na rotação diária'
+                                                    : 'Fora da rotação',
+                                                child: Switch(
+                                                  value: v.isActive,
+                                                  onChanged: (value) =>
+                                                      _toggleActive(v, value),
                                                 ),
+                                              ),
                                               IconButton(
                                                 icon: const Icon(
                                                   Icons.edit,
