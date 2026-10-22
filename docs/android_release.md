@@ -13,6 +13,10 @@ Regra central: **uma versão do app já instalada nunca pode quebrar por causa d
 
 ## Chave de assinatura
 
+**Atalho:** `powershell -ExecutionPolicy Bypass -File scriptsndroid_setup_signing.ps1` faz os passos 1, 3 e 4
+(instala Java e GitHub CLI se faltarem, gera a chave fora do repositório e cadastra os secrets).
+Rode você mesmo: a senha é digitada só no seu terminal.
+
 1. Gerar a chave de upload (uma vez, fora do repositório):
 
    ```bash
