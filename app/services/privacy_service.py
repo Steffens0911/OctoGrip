@@ -5,6 +5,9 @@ a pessoa (nome, e-mail, senha, avatar, biometria) e preservamos registros histó
 de forma de-identificada (pontos, presenças, execuções). A LGPD admite a anonimização
 como alternativa à exclusão (art. 12) e isso mantém a integridade referencial das
 estatísticas da academia.
+
+O conteúdo do feed da academia (fotos, comentários, curtidas) é **apagado de fato**, com os
+arquivos de imagem: uma foto identifica a pessoa e não há como anonimizá-la.
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from app.models import (
     UserLoginDay,
     UserTrophyEarned,
 )
-from app.services import consent_service
+from app.services import consent_service, photos_service
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +107,9 @@ async def anonymize_user(db: AsyncSession, user: User) -> None:
     # Remove tokens de push (deixar de notificar e de rastrear o dispositivo).
     await db.execute(delete(UserDeviceToken).where(UserDeviceToken.user_id == user.id))
 
+    # Feed da academia (OctoPhotos): fotos, comentários, curtidas e menções saem de fato.
+    feed_academy_ids, feed_files = await photos_service.erase_user_photo_content(db, user.id)
+
     # Anonimiza identificadores diretos.
     user.email = f"removido-{uuid4().hex}@anonimizado.invalid"
     user.name = "Usuário removido"
@@ -123,6 +129,16 @@ async def anonymize_user(db: AsyncSession, user: User) -> None:
         )
 
     await db.commit()
+
+    # Arquivos só depois do commit: se ele falhar, nenhuma imagem some de um post que continua no banco.
+    for path in feed_files:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Não foi possível apagar arquivo de foto do feed: %s", path, exc_info=True)
+    for academy_id in feed_academy_ids:
+        await photos_service.invalidate_feed_cache(academy_id)
+
     logger.info(
         "Conta anonimizada (direito de eliminação)",
         extra={"event_type": "account_anonymized", "user_id": str(user.id)},

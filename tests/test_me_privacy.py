@@ -84,3 +84,93 @@ async def test_delete_account_anonymizes(client: AsyncClient, db: AsyncSession, 
     assert user.password_hash is None
     assert user.facial_photo_url is None
     assert user.account_frozen is True
+
+
+async def test_delete_account_erases_feed_content(
+    client: AsyncClient,
+    db: AsyncSession,
+    aluno_user: User,
+    professor_user: User,
+    aluno_headers: dict,
+):
+    """Fotos, comentários, curtidas e menções do titular saem do feed; arquivos são apagados."""
+    from uuid import uuid4
+
+    from app.models.academy_photo import AcademyPhoto, AcademyPhotoComment, AcademyPhotoLike
+    from app.services.photos_service import media_url_to_path
+
+    tag = uuid4().hex[:8]
+    image_url, thumb_url = f"/media/photos/test-{tag}.jpg", f"/media/photos/test-{tag}_thumb.jpg"
+    files = [media_url_to_path(image_url), media_url_to_path(thumb_url)]
+    for path in files:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"jpeg")
+
+    aluno_id, professor_id = aluno_user.id, professor_user.id
+    mention = f"@[Aluno Teste|{aluno_id}]"
+    try:
+        own = AcademyPhoto(
+            academy_id=aluno_user.academy_id,
+            author_id=aluno_user.id,
+            image_url=image_url,
+            thumbnail_url=thumb_url,
+            status="ready",
+        )
+        system_post = AcademyPhoto(
+            academy_id=aluno_user.academy_id,
+            author_id=aluno_user.id,
+            status="ready",
+            is_system_post=True,
+            system_post_type="trophy",
+            system_post_ref_id=uuid4(),
+            caption="Aluno Teste conquistou um troféu",
+        )
+        other = AcademyPhoto(
+            academy_id=aluno_user.academy_id,
+            author_id=professor_user.id,
+            status="ready",
+            caption=f"Treino com {mention}",
+            comments_count=2,
+            likes_count=1,
+        )
+        db.add_all([own, system_post, other])
+        await db.flush()
+        db.add_all(
+            [
+                AcademyPhotoComment(photo_id=other.id, author_id=aluno_user.id, body="Valeu, professor!"),
+                AcademyPhotoComment(photo_id=other.id, author_id=professor_user.id, body=f"Boa, {mention}"),
+                AcademyPhotoComment(photo_id=own.id, author_id=professor_user.id, body="Bela foto"),
+                AcademyPhotoLike(photo_id=other.id, user_id=aluno_user.id),
+            ]
+        )
+        await db.commit()
+        own_id, system_id, other_id = own.id, system_post.id, other.id
+
+        r = await client.delete("/me/account", headers=aluno_headers)
+        assert r.status_code == 200
+
+        db.expire_all()
+        assert await db.get(AcademyPhoto, own_id) is None
+        assert await db.get(AcademyPhoto, system_id) is None
+        assert all(not path.exists() for path in files)
+
+        kept = await db.get(AcademyPhoto, other_id)
+        assert kept is not None
+        assert kept.comments_count == 1
+        assert kept.likes_count == 0
+        assert str(aluno_id) in kept.caption and "Aluno Teste" not in kept.caption
+        assert "Usuário removido" in kept.caption
+
+        comments = (
+            (await db.execute(select(AcademyPhotoComment).where(AcademyPhotoComment.photo_id == other_id)))
+            .scalars()
+            .all()
+        )
+        assert [c.author_id for c in comments] == [professor_id]
+        assert comments[0].body == f"Boa, @[Usuário removido|{aluno_id}]"
+
+        likes = (await db.execute(select(AcademyPhotoLike).where(AcademyPhotoLike.user_id == aluno_id))).all()
+        assert likes == []
+    finally:
+        for path in files:
+            path.unlink(missing_ok=True)
