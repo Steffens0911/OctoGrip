@@ -32,8 +32,9 @@ def create_access_token(subject: str | UUID) -> str:
     """Cria JWT com sub = user_id (string)."""
     if isinstance(subject, UUID):
         subject = str(subject)
-    expire = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
-    to_encode = {"sub": subject, "exp": expire}
+    to_encode: dict = {"sub": subject}
+    if settings.JWT_EXPIRE_MINUTES > 0:
+        to_encode["exp"] = datetime.now(UTC) + timedelta(minutes=settings.JWT_EXPIRE_MINUTES)
     return jwt.encode(
         to_encode,
         settings.JWT_SECRET,

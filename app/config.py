@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     # JWT (autenticação)
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
-    # Sessão longa no app (telefone de um só utilizador). Em ambientes partilhados ou
-    # requisitos mais rígidos, defina JWT_EXPIRE_MINUTES menor (ex.: 120) via env.
-    JWT_EXPIRE_MINUTES: int = 60 * 24 * 30  # 30 dias
+    # Sessão sem expiração por padrão (0): o aluno continua logado até sair do app.
+    # Para requisitos mais rígidos, defina JWT_EXPIRE_MINUTES > 0 (ex.: 120) via env.
+    JWT_EXPIRE_MINUTES: int = 0
 
     # CORS
     # Em desenvolvimento, o backend aceita localhost em qualquer porta via allow_origin_regex
