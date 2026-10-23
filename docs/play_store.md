@@ -1,6 +1,8 @@
 # Play Store — ficha, Data safety e classificação
 
 Material pronto para colar na Play Console ao criar o app **OctoGrip** (`br.com.octogrip.app`).
+App criado em 2026-10-23: conta de desenvolvedor `6569729074761733260`, app `4972069362261756446`.
+Imagens prontas para upload em `docs/play_store_assets/` (ícone 512×512 e destaque 1024×500).
 Baseado no código e em `docs/legal/` em 2026-10-22. Itens marcados com **DECIDIR** dependem de você.
 
 ## Antes de enviar (pendências que a revisão da Google pode pegar)
@@ -161,5 +163,5 @@ Declarar uma faixa que não corresponde ao uso real pode levar à remoção do a
 | App de rastreamento de contatos (COVID)? | Não |
 | App governamental? | Não |
 | Recursos financeiros? | Não (o marketplace só abre o WhatsApp da academia; não há pagamento no app) |
-| App de saúde? | Não |
+| App de saúde? | Sim: **Atividade e condicionamento físicos** (acompanha treinos). Sem recursos médicos |
 | Usa ID de publicidade? | Não |
