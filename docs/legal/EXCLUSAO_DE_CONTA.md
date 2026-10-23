@@ -17,7 +17,14 @@ Envie um e-mail para **privacidade@octogrip.com.br** a partir do endereço cadas
 com o assunto **"Excluir minha conta"**. Confirmamos a identidade e concluímos a exclusão em até
 15 dias, avisando por e-mail.
 
-## O que é apagado
+## Apagar só alguns dados, mantendo a conta
+
+- **Dado biométrico facial:** em **Central → Privacidade e meus dados**, toque em **Revogar** no item
+  **Reconhecimento facial (biometria)**. A foto facial e o vetor numérico são apagados na hora; a presença continua por QR Code.
+- **Fotos e comentários no feed da academia:** use **Excluir post** no seu post ou **Excluir** no seu comentário.
+- **Qualquer outro dado:** peça por e-mail para **privacidade@octogrip.com.br**, dizendo o que deseja apagar.
+
+## O que é apagado ao excluir a conta
 
 - Nome, e-mail e senha.
 - Foto de perfil e foto facial.
