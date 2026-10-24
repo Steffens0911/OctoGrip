@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:viewer/features/photos/presentation/pages/student_photos_feed_screen.dart';
+import 'package:viewer/features/photos/presentation/widgets/photo_moderation_actions.dart';
 import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -19,6 +20,7 @@ class PhotoDetailScreen extends StatefulWidget {
     required this.onLike,
     required this.onUnlike,
     required this.onDelete,
+    this.onHidden,
   });
 
   final AcademyPhoto photo;
@@ -28,6 +30,9 @@ class PhotoDetailScreen extends StatefulWidget {
   final VoidCallback onLike;
   final VoidCallback onUnlike;
   final VoidCallback onDelete;
+
+  /// Repassado ao feed quando um autor é bloqueado a partir de um comentário.
+  final ContentHiddenCallback? onHidden;
 
   @override
   State<PhotoDetailScreen> createState() => _PhotoDetailScreenState();
@@ -241,6 +246,20 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
     return raw.startsWith('/') ? '$base$raw' : raw;
   }
 
+  void _onContentHidden({
+    String? photoId,
+    String? commentId,
+    String? blockedAuthorId,
+  }) {
+    if (!mounted) return;
+    setState(() => _comments.removeWhere(
+        (c) => c.id == commentId || c.author.id == blockedAuthorId));
+    if (blockedAuthorId != null) {
+      widget.onHidden?.call(blockedAuthorId: blockedAuthorId);
+      if (blockedAuthorId == _photo.author.id) Navigator.of(context).pop();
+    }
+  }
+
   bool _canDeleteComment(PhotoComment c) =>
       c.author.id == widget.currentUserId || widget.isModerator;
 
@@ -335,6 +354,9 @@ class _PhotoDetailScreenState extends State<PhotoDetailScreen> {
                         academyId: widget.academyId,
                         canDelete: _canDeleteComment(c),
                         onDelete: () => _deleteComment(c),
+                        isOwn: c.author.id == widget.currentUserId,
+                        photoId: _photo.id,
+                        onHidden: _onContentHidden,
                       )),
               ],
             ),
@@ -472,12 +494,18 @@ class _CommentTile extends StatelessWidget {
     required this.academyId,
     required this.canDelete,
     required this.onDelete,
+    required this.isOwn,
+    required this.photoId,
+    this.onHidden,
   });
 
   final PhotoComment comment;
   final String academyId;
   final bool canDelete;
   final VoidCallback onDelete;
+  final bool isOwn;
+  final String photoId;
+  final ContentHiddenCallback? onHidden;
 
   // Novo formato: @[Nome Completo|uuid]
   static final _mentionTagRe =
@@ -587,6 +615,34 @@ class _CommentTile extends StatelessWidget {
               ],
             ),
           ),
+          if (!isOwn)
+            IconButton(
+              key: Key('comment-menu-${comment.id}'),
+              icon: Icon(Icons.more_horiz, size: 18, color: cs.onSurfaceVariant),
+              tooltip: 'Denunciar ou bloquear',
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                builder: (ctx) => SafeArea(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: moderationMenuTiles(
+                      context,
+                      ctx,
+                      academyId: academyId,
+                      photoId: photoId,
+                      commentId: comment.id,
+                      authorId: comment.author.id,
+                      authorName: comment.author.name,
+                      isOwn: isOwn,
+                      onHidden: onHidden,
+                    ),
+                  ),
+                ),
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              visualDensity: VisualDensity.compact,
+            ),
           if (canDelete)
             IconButton(
               icon: Icon(Icons.close, size: 16, color: cs.onSurfaceVariant),

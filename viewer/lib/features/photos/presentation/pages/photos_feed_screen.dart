@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/photos/presentation/pages/new_post_screen.dart';
 import 'package:viewer/features/photos/presentation/providers/photos_providers.dart';
+import 'package:viewer/features/photos/presentation/widgets/photo_moderation_actions.dart';
 import 'package:viewer/features/photos/presentation/widgets/post_card.dart';
 import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/services/api_service.dart';
@@ -147,6 +148,21 @@ class _PhotosFeedScreenState extends ConsumerState<PhotosFeedScreen> {
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppTheme.screenPadding(context),
+                    4,
+                    AppTheme.screenPadding(context),
+                    0,
+                  ),
+                  child: PhotosModerationBar(
+                    academyId: widget.academyId,
+                    isModerator: isModerator,
+                    onChanged: notifier.refresh,
+                  ),
+                ),
+              ),
               if (state.items.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
@@ -202,6 +218,11 @@ class _PhotosFeedScreenState extends ConsumerState<PhotosFeedScreen> {
                               notifier.unlikeOptimistic(photo),
                           onDelete: () => _deletePhoto(photo),
                           onShare: () => _sharePhoto(photo),
+                          onHidden: ({photoId, commentId, blockedAuthorId}) =>
+                              notifier.hideLocally(
+                            photoId: photoId,
+                            authorId: blockedAuthorId,
+                          ),
                         );
                       },
                       childCount: state.items.length +

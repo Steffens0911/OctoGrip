@@ -423,6 +423,11 @@ class StudentPhotosFeedScreen extends ConsumerWidget {
                           await notifier.deleteOptimistic(photo.id);
                         },
                         onShare: null,
+                        onHidden: ({photoId, commentId, blockedAuthorId}) =>
+                            notifier.hideLocally(
+                          photoId: photoId,
+                          authorId: blockedAuthorId,
+                        ),
                       );
                     },
                     childCount: state.items.length + (state.hasMore ? 1 : 0),

@@ -235,6 +235,18 @@ class PhotosFeedNotifier
     }
   }
 
+  /// Tira da lista, sem chamar a API, o post denunciado ([photoId]) ou todos os posts de um
+  /// autor bloqueado ([authorId]). O servidor já os esconde nas próximas leituras.
+  void hideLocally({String? photoId, String? authorId}) {
+    state = state.copyWith(
+      items: state.items
+          .where((p) =>
+              (photoId == null || p.id != photoId) &&
+              (authorId == null || p.author.id != authorId))
+          .toList(),
+    );
+  }
+
   void _updatePhotoInList(
     String photoId,
     AcademyPhoto Function(AcademyPhoto) transform,

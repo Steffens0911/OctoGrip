@@ -20,6 +20,7 @@ import 'package:viewer/models/mission.dart';
 import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/partner.dart';
+import 'package:viewer/models/photo_moderation.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/professor_impact.dart';
 import 'package:viewer/models/technique.dart';
@@ -3941,6 +3942,93 @@ class ApiService {
       final data = await _decodeResponse(r);
       _throwIfNotOk(r, data);
     }
+  }
+
+  // --- Denunciar e bloquear no feed de fotos --------------------------------
+
+  Future<void> _sendPhotoModeration(Future<http.Response> request) async {
+    final r = await _req(request);
+    if (r.statusCode == 201 || r.statusCode == 204) return;
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+  }
+
+  /// Denuncia um post. Denunciar de novo o mesmo post não duplica.
+  Future<void> reportPhoto(String academyId, String photoId,
+      {required String reason, String? details}) async {
+    await _sendPhotoModeration(_client.post(
+      Uri.parse('$baseUrl/academies/$academyId/photos/$photoId/report'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(
+          {'reason': reason, if (details != null) 'details': details}),
+    ));
+    invalidateCache('GET:$baseUrl/academies/$academyId/photos');
+  }
+
+  Future<void> reportPhotoComment(
+      String academyId, String photoId, String commentId,
+      {required String reason, String? details}) async {
+    await _sendPhotoModeration(_client.post(
+      Uri.parse(
+          '$baseUrl/academies/$academyId/photos/$photoId/comments/$commentId/report'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode(
+          {'reason': reason, if (details != null) 'details': details}),
+    ));
+  }
+
+  Future<void> blockPhotoUser(String academyId, String userId) async {
+    await _sendPhotoModeration(_client.put(
+      Uri.parse('$baseUrl/academies/$academyId/photos/blocks/$userId'),
+      headers: await _headers(auth: true),
+    ));
+    invalidateCache('GET:$baseUrl/academies/$academyId/photos');
+  }
+
+  Future<void> unblockPhotoUser(String academyId, String userId) async {
+    await _sendPhotoModeration(_client.delete(
+      Uri.parse('$baseUrl/academies/$academyId/photos/blocks/$userId'),
+      headers: await _headers(auth: true),
+    ));
+    invalidateCache('GET:$baseUrl/academies/$academyId/photos');
+  }
+
+  Future<List<BlockedUser>> getBlockedPhotoUsers(String academyId) async {
+    final r = await _getWithCache(
+      Uri.parse('$baseUrl/academies/$academyId/photos/blocks'),
+      0,
+    );
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data! as List<dynamic>)
+        .map((e) => BlockedUser.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Denúncias da academia (gerente/administrador). [status]: open, removed ou dismissed.
+  Future<List<PhotoReport>> getPhotoReports(String academyId,
+      {String status = 'open'}) async {
+    final uri = Uri.parse('$baseUrl/academies/$academyId/photos/reports')
+        .replace(queryParameters: {'status': status});
+    final r = await _getWithCache(uri, 0);
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    return (data! as List<dynamic>)
+        .map((e) => PhotoReport.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// [action]: `dismiss` mantém o conteúdo; `remove` apaga o post ou comentário.
+  Future<void> resolvePhotoReport(
+      String academyId, String reportId, String action) async {
+    final r = await _req(_client.patch(
+      Uri.parse('$baseUrl/academies/$academyId/photos/reports/$reportId'),
+      headers: await _jsonHeaders(auth: true),
+      body: jsonEncode({'action': action}),
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data);
+    invalidateCache('GET:$baseUrl/academies/$academyId/photos');
   }
 
   Future<List<PhotoRestriction>> getPhotoRestrictions(

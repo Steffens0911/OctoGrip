@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:viewer/app_theme.dart';
 import 'package:viewer/features/photos/presentation/pages/photo_detail_screen.dart';
 import 'package:viewer/features/photos/presentation/pages/student_photos_feed_screen.dart';
+import 'package:viewer/features/photos/presentation/widgets/photo_moderation_actions.dart';
 import 'package:viewer/models/academy_photo.dart';
 import 'package:viewer/services/api_service.dart';
 
@@ -19,6 +20,7 @@ class PostCard extends StatelessWidget {
     required this.onUnlike,
     required this.onDelete,
     this.onShare,
+    this.onHidden,
   });
 
   final AcademyPhoto photo;
@@ -29,6 +31,9 @@ class PostCard extends StatelessWidget {
   final VoidCallback onUnlike;
   final VoidCallback onDelete;
   final VoidCallback? onShare;
+
+  /// Chamado ao denunciar o post ou bloquear o autor (some da lista).
+  final ContentHiddenCallback? onHidden;
 
   bool get _canDelete =>
       photo.author.id == currentUserId || isModerator;
@@ -54,6 +59,8 @@ class PostCard extends StatelessWidget {
             absoluteUrl: _absoluteUrl,
             canDelete: _canDelete,
             onDelete: onDelete,
+            isOwn: photo.author.id == currentUserId,
+            onHidden: onHidden,
           ),
           if (photo.isSystemPost)
             _SystemPostBody(photo: photo, cs: cs, tt: tt)
@@ -73,6 +80,7 @@ class PostCard extends StatelessWidget {
                     onLike: onLike,
                     onUnlike: onUnlike,
                     onDelete: onDelete,
+                    onHidden: onHidden,
                   ),
                 ),
               ),
@@ -105,12 +113,16 @@ class _PostHeader extends StatelessWidget {
     required this.absoluteUrl,
     required this.canDelete,
     required this.onDelete,
+    required this.isOwn,
+    this.onHidden,
   });
 
   final AcademyPhoto photo;
   final String Function(String?) absoluteUrl;
   final bool canDelete;
   final VoidCallback onDelete;
+  final bool isOwn;
+  final ContentHiddenCallback? onHidden;
 
   @override
   Widget build(BuildContext context) {
@@ -193,6 +205,16 @@ class _PostHeader extends StatelessWidget {
                   _confirmDelete(context);
                 },
               ),
+            ...moderationMenuTiles(
+              context,
+              ctx,
+              academyId: photo.academyId,
+              photoId: photo.id,
+              authorId: photo.author.id,
+              authorName: photo.author.name,
+              isOwn: isOwn,
+              onHidden: onHidden,
+            ),
           ],
         ),
       ),

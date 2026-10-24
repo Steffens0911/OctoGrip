@@ -23,6 +23,7 @@ import 'package:viewer/models/mission_history_item.dart';
 import 'package:viewer/models/mission_today.dart';
 import 'package:viewer/models/notification_model.dart';
 import 'package:viewer/models/partner.dart';
+import 'package:viewer/models/photo_moderation.dart';
 import 'package:viewer/models/pre_checkin.dart';
 import 'package:viewer/models/professor.dart';
 import 'package:viewer/models/professor_impact.dart';
@@ -92,6 +93,8 @@ void main() {
     'WeeklyKitOption': () => WeeklyKitOption.fromJson(<String, dynamic>{}),
     'NotificationModel': () => NotificationModel.fromJson(<String, dynamic>{}),
     'Partner': () => Partner.fromJson(<String, dynamic>{}),
+    'PhotoReport': () => PhotoReport.fromJson(<String, dynamic>{}),
+    'BlockedUser': () => BlockedUser.fromJson(<String, dynamic>{}),
     'Confirmant': () => Confirmant.fromJson(<String, dynamic>{}),
     'PreCheckinStatus': () => PreCheckinStatus.fromJson(<String, dynamic>{}),
     'Professor': () => Professor.fromJson(<String, dynamic>{}),
