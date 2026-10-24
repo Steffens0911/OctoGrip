@@ -44,6 +44,12 @@ Rode você mesmo: a senha é digitada só no seu terminal.
 
 ## Publicar uma versão
 
+**Primeira versão (manual):** a Play só aceita envio pela API depois que o primeiro `.aab` foi enviado
+pelo console. GitHub Actions → *Build & Publish Mobile* → *Run workflow* (`platform: android`). O `.aab`
+fica em *Artifacts* da execução (`octogrip-android-<n>`, 30 dias). Na Play Console: *Teste fechado* →
+criar versão → aceitar a Assinatura de apps do Google Play → enviar o `.aab`. Sem o secret
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` o workflow sempre para nos Artifacts.
+
 1. Subir a versão no `viewer/pubspec.yaml` (`1.3.0+12`: o número depois do `+` sobe a cada envio).
 2. `git tag v1.3.0+12 && git push --tags` → `build-mobile.yml` roda os testes, gera o `.aab` e envia
    para a trilha **interna**.

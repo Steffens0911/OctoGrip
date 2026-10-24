@@ -19,15 +19,25 @@ on:
         required: false
         default: '1.0'
         type: string
+      platform:
+        description: 'Plataformas a buildar'
+        required: true
+        default: 'android'
+        type: choice
+        options: [android, ios, both]
 
 jobs:
   # ─── Android ────────────────────────────────────────────────────────────────
   android:
     name: Android — App Bundle
+    if: ${{ github.event_name == 'push' || inputs.platform != 'ios' }}
     runs-on: ubuntu-latest
     environment: secrets
     permissions:
       contents: read
+    env:
+      # Sem a conta de serviço o .aab só fica nos Artifacts (o 1º envio à Play é manual).
+      HAS_PLAY_SERVICE_ACCOUNT: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -70,8 +80,21 @@ jobs:
             --no-pub \
             --dart-define-from-file=tool/dart_define_mobile.json
 
+      # Sempre guarda o .aab: baixe em Actions → execução → Artifacts.
+      - name: Save App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: octogrip-android-${{ github.run_number }}
+          path: viewer/build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Play upload skipped
+        if: ${{ env.HAS_PLAY_SERVICE_ACCOUNT != 'true' }}
+        run: echo "::notice::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON ausente; envie o .aab dos Artifacts à mão na Play Console."
+
       - name: Upload to Google Play
-        if: ${{ github.event.inputs.track != 'production' || github.event.inputs.user_fraction == '1.0' }}
+        if: ${{ env.HAS_PLAY_SERVICE_ACCOUNT == 'true' && (github.event.inputs.track != 'production' || github.event.inputs.user_fraction == '1.0') }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -83,7 +106,7 @@ jobs:
       # Produção com rollout gradual: a Play libera só para a fração informada;
       # o aumento para 100% é feito no console depois de 2–3 dias sem erros no Sentry.
       - name: Upload to Google Play (rollout gradual)
-        if: ${{ github.event.inputs.track == 'production' && github.event.inputs.user_fraction != '1.0' }}
+        if: ${{ env.HAS_PLAY_SERVICE_ACCOUNT == 'true' && github.event.inputs.track == 'production' && github.event.inputs.user_fraction != '1.0' }}
         uses: r0adkll/upload-google-play@v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
@@ -96,6 +119,8 @@ jobs:
   # ─── iOS ────────────────────────────────────────────────────────────────────
   ios:
     name: iOS — IPA
+    # Em tag só roda com a variável de repositório IOS_ENABLED=true (precisa dos secrets da Apple).
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.platform != 'android') || (github.event_name == 'push' && vars.IOS_ENABLED == 'true') }}
     runs-on: macos-latest
     environment: secrets
     permissions:
