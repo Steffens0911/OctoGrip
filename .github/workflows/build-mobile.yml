@@ -84,9 +84,10 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # Sem --no-pub: só com o pub o build regera o GeneratedPluginRegistrant em modo release,
+        # sem plugins de dev_dependencies (integration_test). flutter/flutter#162649.
         run: |
           flutter build appbundle --release \
-            --no-pub \
             --dart-define-from-file=tool/dart_define_mobile.json
 
       # Sempre guarda o .aab: baixe em Actions → execução → Artifacts.
@@ -176,7 +177,6 @@ jobs:
         working-directory: viewer
         run: |
           flutter build ipa --release \
-            --no-pub \
             --dart-define-from-file=tool/dart_define_mobile.json \
             --export-options-plist=ios/ExportOptions.plist
 
