@@ -81,9 +81,9 @@ academia.
 
 | Recurso | Situação |
 | --- | --- |
-| Ícone 512×512 | Pronto em `docs/play_store_assets/icon_512.png`; **falta enviar** |
-| Imagem de destaque 1024×500 | Pronta em `docs/play_store_assets/feature_graphic_1024x500.png`; **falta enviar** |
-| Capturas de tela do celular (mín. 2) | **Falta tirar** no app Android rodando (início, missões, troféus, presença) |
+| Ícone 512×512 | `docs/play_store_assets/icon_512.png` (enviado em 2026-10-24) |
+| Imagem de destaque 1024×500 | `docs/play_store_assets/feature_graphic_1024x500.png` (enviada em 2026-10-24) |
+| Capturas de tela do celular (mín. 2) | 3 enviadas em 2026-10-24 (`screenshot_*.png`, 824×1464): Campo de treinamento, Central e Gestão, do professor da academia vitrine. Para promoção a Google pede 4+ com 1080 px; trocar por capturas do Android rodando com aluno e dados recentes (rodar de novo `seed_demo_showcase.sql`) |
 | Ícone do app no celular | Gerado a partir do ícone web, com ícone adaptativo (Android 8+) |
 
 ## Acesso ao app (para a revisão da Google)
