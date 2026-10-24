@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # O runner ubuntu-latest (Ubuntu 26) traz Java 25, que o Gradle 8.14 não suporta.
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
