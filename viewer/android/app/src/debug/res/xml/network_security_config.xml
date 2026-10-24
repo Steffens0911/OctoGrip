@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SÓ DEBUG: permite HTTP (emulador 10.0.2.2 / rede local) e certificados instalados pelo usuário
+     (proxies de depuração). O build de release usa main/res/xml/network_security_config.xml, que bloqueia os dois. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
