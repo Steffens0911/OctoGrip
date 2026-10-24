@@ -40,7 +40,8 @@ android {
 
     defaultConfig {
         applicationId = "br.com.octogrip.app"
-        minSdk = flutter.minSdkVersion
+        // Android 8.0+: o sentry_flutter 10 exige minSdk 26.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         // versionCode = número depois do "+" no pubspec.yaml; precisa subir a cada envio à Play.
         versionCode = flutter.versionCode

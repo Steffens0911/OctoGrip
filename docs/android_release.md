@@ -8,6 +8,10 @@ Regra central: **uma versão do app já instalada nunca pode quebrar por causa d
 
 - `applicationId` / `namespace`: `br.com.octogrip.app` (`viewer/android/app/build.gradle.kts`).
   Depois do primeiro envio à Play Store, **nunca muda**.
+- `minSdk = 26` (Android 8.0+), exigido pelo `sentry_flutter` 10. `flutter_local_notifications` exige
+  `isCoreLibraryDesugaringEnabled` + `desugar_jdk_libs` no mesmo arquivo.
+- CI: o build Android usa Java 17 (`setup-java`); o `ubuntu-latest` (Ubuntu 26) traz Java 25, que o
+  Gradle 8.14 não aceita.
 - Firebase: o `google-services.json` precisa conter um app Android com o pacote `br.com.octogrip.app`
   (Console Firebase → projeto `octogrip` → Adicionar app → Android). Sem isso o build Android falha
   com "No matching client found for package name".
