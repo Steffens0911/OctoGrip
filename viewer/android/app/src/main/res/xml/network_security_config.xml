@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Permite HTTP (cleartext) para testes locais - base-config garante que todos os destinos aceitem -->
+<!-- Release: só HTTPS e só autoridades do sistema. Para HTTP local em debug, ver
+     debug/res/xml/network_security_config.xml (o set de debug sobrepõe este arquivo). -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>
