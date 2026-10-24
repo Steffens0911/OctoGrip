@@ -42,10 +42,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # O runner ubuntu-latest (Ubuntu 26) traz Java 25, que o Gradle 8.14 não suporta.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Use Java 17 in Flutter
+        run: flutter config --jdk-dir "$JAVA_HOME"
 
       - name: Flutter pub get
         working-directory: viewer
