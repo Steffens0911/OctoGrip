@@ -1,6 +1,9 @@
 -- App Android/iOS: versão mínima, versão mais recente e feature flags por plataforma
 -- (GET /app/config, editável em PUT /admin/app-config/{platform}), e a última versão
 -- do app vista por usuário (header X-App-Version), base do ciclo de depreciação da API.
+--
+-- O bootstrap roda create_all ANTES das migrations: a tabela pode já existir (criada pelo modelo,
+-- possivelmente sem os padrões do banco). Por isso: padrões reafirmados e INSERT com todos os valores.
 
 CREATE TABLE IF NOT EXISTS app_config (
     platform        VARCHAR(16) PRIMARY KEY,
@@ -12,8 +15,14 @@ CREATE TABLE IF NOT EXISTS app_config (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-INSERT INTO app_config (platform, store_url)
-VALUES ('android', 'https://play.google.com/store/apps/details?id=br.com.octogrip.app')
+ALTER TABLE app_config
+    ALTER COLUMN min_version    SET DEFAULT '0.0.0',
+    ALTER COLUMN latest_version SET DEFAULT '0.0.0',
+    ALTER COLUMN feature_flags  SET DEFAULT '{}'::jsonb,
+    ALTER COLUMN updated_at     SET DEFAULT NOW();
+
+INSERT INTO app_config (platform, min_version, latest_version, store_url, feature_flags)
+VALUES ('android', '0.0.0', '0.0.0', 'https://play.google.com/store/apps/details?id=br.com.octogrip.app', '{}'::jsonb)
 ON CONFLICT (platform) DO NOTHING;
 
 ALTER TABLE users
