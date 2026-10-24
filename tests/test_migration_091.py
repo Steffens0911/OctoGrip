@@ -104,3 +104,52 @@ def test_model_created_table_has_database_defaults(conn):
         text("SELECT min_version, latest_version, feature_flags FROM app_config WHERE platform = 'ios'")
     ).one()
     assert (row.min_version, row.latest_version, row.feature_flags) == ("0.0.0", "0.0.0", {})
+
+
+# ─── migration 092 (denúncias e bloqueios) pelo mesmo caminho ───────────────
+
+MIGRATION_092 = Path(__file__).resolve().parent.parent / "migrations" / "092_photo_reports_and_user_blocks.sql"
+
+
+def _run_migration_092(conn) -> None:
+    for statement in _split_statements(MIGRATION_092.read_text(encoding="utf-8")):
+        conn.execute(text(statement + ";"))
+
+
+def test_migration_092_runs_over_tables_created_by_create_all(conn):
+    """Em produção o create_all cria as tabelas antes da migration: ela não pode falhar nem duplicar."""
+    _run_migration_092(conn)
+    _run_migration_092(conn)  # idempotente
+
+    tabelas = {
+        r[0]
+        for r in conn.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables WHERE table_name IN ('academy_photo_reports', 'user_blocks')"
+            )
+        )
+    }
+    assert tabelas == {"academy_photo_reports", "user_blocks"}
+
+
+def test_migration_092_restores_defaults_and_keeps_data_when_table_lacks_them(conn):
+    """Tabela já existente sem os padrões do banco (cenário do bug da 091)."""
+    conn.execute(text("ALTER TABLE academy_photo_reports ALTER COLUMN status DROP DEFAULT"))
+    conn.execute(text("ALTER TABLE academy_photo_reports ALTER COLUMN created_at DROP DEFAULT"))
+    conn.execute(text("ALTER TABLE user_blocks ALTER COLUMN created_at DROP DEFAULT"))
+
+    _run_migration_092(conn)
+
+    defaults = {
+        (r.table_name, r.column_name): r.column_default
+        for r in conn.execute(
+            text(
+                "SELECT table_name, column_name, column_default FROM information_schema.columns "
+                "WHERE (table_name = 'academy_photo_reports' AND column_name IN ('status', 'created_at')) "
+                "OR (table_name = 'user_blocks' AND column_name = 'created_at')"
+            )
+        )
+    }
+    assert "open" in defaults[("academy_photo_reports", "status")]
+    assert "now()" in defaults[("academy_photo_reports", "created_at")].lower()
+    assert "now()" in defaults[("user_blocks", "created_at")].lower()

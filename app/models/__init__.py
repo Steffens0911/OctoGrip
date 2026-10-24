@@ -21,6 +21,7 @@ from app.models.mission_usage import MissionUsage
 from app.models.notification import Notification
 from app.models.partner import Partner
 from app.models.password_reset_token import PasswordResetToken
+from app.models.photo_moderation import AcademyPhotoReport, UserBlock
 from app.models.professor import Professor
 from app.models.soft_delete import SoftDeleteMixin
 from app.models.student_face_embedding import StudentFaceEmbedding
@@ -85,4 +86,6 @@ __all__ = [
     "TrainingSession",
     "TrainingPreCheckin",
     "AppConfig",
+    "AcademyPhotoReport",
+    "UserBlock",
 ]

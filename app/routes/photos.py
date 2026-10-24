@@ -29,6 +29,7 @@ from app.schemas.photos import (
 )
 from app.services.academy_service import get_academy as _get_academy
 from app.services.notification_service import create_notification
+from app.services.photo_moderation_service import get_hidden_content
 from app.services.photos_service import (
     count_user_photos,
     create_comment,
@@ -197,9 +198,13 @@ async def photos_feed(
         # Feed filtrado por autor — não usa cache pois é específico por aluno
         from app.services.photos_service import list_photos_feed
 
+        hidden = await get_hidden_content(db, current_user.id)
+        if author_id in hidden.blocked_author_ids:
+            return PhotoFeedPage(items=[], next_cursor=None)
         photos, next_cursor = await list_photos_feed(
             db, academy_id=academy_id, limit=limit, before_id=cursor, author_id=author_id
         )
+        photos = [p for p in photos if p.id not in hidden.reported_photo_ids]
         photo_ids_typed = [p.id for p in photos]
         liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=photo_ids_typed)
         items = [_photo_to_read(p, liked_ids) for p in photos]
@@ -207,6 +212,13 @@ async def photos_feed(
 
     # Feed geral — usa cache (dados sem liked_by_me; injetado por usuário após)
     cached_items, next_cursor = await list_photos_feed_cached(db, academy_id=academy_id, limit=limit, before_id=cursor)
+    hidden = await get_hidden_content(db, current_user.id)
+    cached_items = [
+        item
+        for item in cached_items
+        if uuid.UUID(item["author"]["id"]) not in hidden.blocked_author_ids
+        and uuid.UUID(item["id"]) not in hidden.reported_photo_ids
+    ]
     photo_ids = [uuid.UUID(item["id"]) for item in cached_items]
     liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=photo_ids)
     items = [_cached_dict_to_read(item, liked_ids) for item in cached_items]
@@ -491,6 +503,10 @@ async def list_photo_comments(
         raise NotFoundError("Post não encontrado.")
 
     comments = await list_comments(db, photo_id=photo_id)
+    hidden = await get_hidden_content(db, current_user.id)
+    comments = [
+        c for c in comments if c.author_id not in hidden.blocked_author_ids and c.id not in hidden.reported_comment_ids
+    ]
     return [
         CommentRead(
             id=c.id,
@@ -720,6 +736,10 @@ async def get_photo_by_id(
 
     photo = await get_academy_photo(db, photo_id)
     if not photo or photo.academy_id != academy_id:
+        raise NotFoundError("Post não encontrado.")
+
+    hidden = await get_hidden_content(db, current_user.id)
+    if photo.author_id in hidden.blocked_author_ids or photo.id in hidden.reported_photo_ids:
         raise NotFoundError("Post não encontrado.")
 
     liked_ids = await get_liked_photo_ids(db, user_id=current_user.id, photo_ids=[photo.id])

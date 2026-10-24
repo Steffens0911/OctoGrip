@@ -41,6 +41,7 @@ from app.routes import (
     missions,
     notifications,
     partners,
+    photo_moderation,
     photos,
     professors,
     reports,
@@ -106,6 +107,8 @@ api_router.include_router(attendance.router, prefix="/attendance", tags=["attend
 api_router.include_router(face_checkin.router, prefix="/attendance", tags=["face-checkin"])
 api_router.include_router(face_recognition.router, prefix="/face-recognition", tags=["face-recognition"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+# photo_moderation ANTES de photos: /photos/reports e /photos/blocks não podem cair em /photos/{photo_id}.
+api_router.include_router(photo_moderation.router, prefix="/academies", tags=["photos-moderation"])
 api_router.include_router(photos.router, prefix="/academies", tags=["photos"])
 api_router.include_router(manual_trophies.router, prefix="/manual-trophies", tags=["manual-trophies"])
 api_router.include_router(enrollment.router, tags=["enrollment"])

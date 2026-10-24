@@ -2227,6 +2227,49 @@
         "title": "AuditLogItem",
         "type": "object"
       },
+      "BlockedUserRead": {
+        "properties": {
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "user_id": {
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id",
+          "name",
+          "created_at"
+        ],
+        "title": "BlockedUserRead",
+        "type": "object"
+      },
       "Body_academy_bulk_import_students_academies__academy_id__students_bulk_import_post": {
         "properties": {
           "file": {
@@ -7340,6 +7383,214 @@
           "entries"
         ],
         "title": "RankingResponse",
+        "type": "object"
+      },
+      "ReportAck": {
+        "properties": {
+          "already_reported": {
+            "default": false,
+            "title": "Already Reported",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "ReportAck",
+        "type": "object"
+      },
+      "ReportCreate": {
+        "properties": {
+          "details": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "reason": {
+            "enum": [
+              "spam",
+              "nudity",
+              "violence",
+              "harassment",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ReportCreate",
+        "type": "object"
+      },
+      "ReportRead": {
+        "properties": {
+          "comment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment Id"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "photo_id": {
+            "format": "uuid",
+            "title": "Photo Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reporter_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporter Name"
+          },
+          "reports_on_target": {
+            "default": 1,
+            "title": "Reports On Target",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "target_author_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Author Id"
+          },
+          "target_author_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Author Name"
+          },
+          "target_removed": {
+            "default": false,
+            "title": "Target Removed",
+            "type": "boolean"
+          },
+          "target_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Text"
+          },
+          "target_thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Thumbnail Url"
+          },
+          "target_type": {
+            "enum": [
+              "photo",
+              "comment"
+            ],
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "reason",
+          "details",
+          "created_at",
+          "photo_id",
+          "target_type"
+        ],
+        "title": "ReportRead",
+        "type": "object"
+      },
+      "ReportResolve": {
+        "properties": {
+          "action": {
+            "enum": [
+              "dismiss",
+              "remove"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "ReportResolve",
         "type": "object"
       },
       "ResetPasswordRequest": {
@@ -12552,6 +12803,159 @@
         ]
       }
     },
+    "/academies/{academy_id}/photos/blocks": {
+      "get": {
+        "operationId": "list_my_blocks_academies__academy_id__photos_blocks_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BlockedUserRead"
+                  },
+                  "title": "Response List My Blocks Academies  Academy Id  Photos Blocks Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List My Blocks",
+        "tags": [
+          "photos-moderation"
+        ]
+      }
+    },
+    "/academies/{academy_id}/photos/blocks/{user_id}": {
+      "delete": {
+        "operationId": "unblock_photo_user_academies__academy_id__photos_blocks__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Unblock Photo User",
+        "tags": [
+          "photos-moderation"
+        ]
+      },
+      "put": {
+        "description": "Bloqueia um usuário: seus posts e comentários deixam de aparecer para você.",
+        "operationId": "block_photo_user_academies__academy_id__photos_blocks__user_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "User Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Block Photo User",
+        "tags": [
+          "photos-moderation"
+        ]
+      }
+    },
     "/academies/{academy_id}/photos/mention-suggestions": {
       "get": {
         "description": "Retorna membros da academia cujo nome começa com q (autocomplete de @menções).",
@@ -12613,6 +13017,145 @@
         "summary": "Mention Suggestions",
         "tags": [
           "photos"
+        ]
+      }
+    },
+    "/academies/{academy_id}/photos/reports": {
+      "get": {
+        "operationId": "list_photo_reports_academies__academy_id__photos_reports_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(open|removed|dismissed)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "open",
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportRead"
+                  },
+                  "title": "Response List Photo Reports Academies  Academy Id  Photos Reports Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Photo Reports",
+        "tags": [
+          "photos-moderation"
+        ]
+      }
+    },
+    "/academies/{academy_id}/photos/reports/{report_id}": {
+      "patch": {
+        "description": "``dismiss`` mantém o conteúdo; ``remove`` apaga o post ou comentário denunciado.",
+        "operationId": "resolve_photo_report_academies__academy_id__photos_reports__report_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "report_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Report Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportResolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resolve Photo Report",
+        "tags": [
+          "photos-moderation"
         ]
       }
     },
@@ -13089,6 +13632,85 @@
         ]
       }
     },
+    "/academies/{academy_id}/photos/{photo_id}/comments/{comment_id}/report": {
+      "post": {
+        "description": "Denuncia um comentário.",
+        "operationId": "report_comment_academies__academy_id__photos__photo_id__comments__comment_id__report_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "comment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Comment Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Comment",
+        "tags": [
+          "photos-moderation"
+        ]
+      }
+    },
     "/academies/{academy_id}/photos/{photo_id}/export": {
       "get": {
         "description": "Retorna a foto com watermark: nome da academia + 'OCTOGRIP' no rodapé.",
@@ -13243,6 +13865,75 @@
         "summary": "Like Post",
         "tags": [
           "photos"
+        ]
+      }
+    },
+    "/academies/{academy_id}/photos/{photo_id}/report": {
+      "post": {
+        "description": "Denuncia um post. O conteúdo some do feed de quem denunciou e os gestores são avisados.",
+        "operationId": "report_photo_academies__academy_id__photos__photo_id__report_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "academy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Academy Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photo_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Photo Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Report Photo",
+        "tags": [
+          "photos-moderation"
         ]
       }
     },

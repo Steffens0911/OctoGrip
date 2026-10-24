@@ -549,6 +549,10 @@ async def erase_user_photo_content(db: AsyncSession, user_id: uuid.UUID) -> tupl
 
     await db.execute(delete(AcademyPhotoComment).where(AcademyPhotoComment.author_id == user_id))
     await db.execute(delete(AcademyPhotoLike).where(AcademyPhotoLike.user_id == user_id))
+    # Bloqueios feitos por ela ou contra ela (preferência de convivência, sem sentido após a anonimização).
+    from app.models.photo_moderation import UserBlock
+
+    await db.execute(delete(UserBlock).where((UserBlock.blocker_id == user_id) | (UserBlock.blocked_id == user_id)))
     if own_post_ids:
         await db.execute(delete(AcademyPhoto).where(AcademyPhoto.id.in_(own_post_ids)))
 
