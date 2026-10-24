@@ -95,8 +95,12 @@ if (-not $gh) {
 }
 Write-Host "  gh: $gh"
 
+# No Windows PowerShell 5.1, stderr de comando nativo com 2>$null vira erro fatal sob "Stop".
+$ErrorActionPreference = "Continue"
 & $gh auth status 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) {
+$ghLogged = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = "Stop"
+if (-not $ghLogged) {
     Write-Host "Faça login no GitHub com a conta dona do repositório $Repo." -ForegroundColor Yellow
     & $gh auth login --hostname github.com --web
     if ($LASTEXITCODE -ne 0) { throw "Login no GitHub não concluído." }
@@ -151,7 +155,9 @@ Set-GhSecret $gh "ANDROID_KEY_ALIAS" $KeyAlias
 Set-GhSecret $gh "ANDROID_KEY_PASSWORD" $password
 $password = $null
 
+$ErrorActionPreference = "Continue"
 $existing = & $gh secret list --repo $Repo --env $GitHubEnvironment 2>$null
+$ErrorActionPreference = "Stop"
 if ($existing -match '^API_BASE_URL\s') {
     Write-Host "  secret API_BASE_URL já existe (mantido)"
 } else {
