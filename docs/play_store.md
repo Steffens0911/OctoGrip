@@ -13,7 +13,9 @@ Baseado no código e em `docs/legal/` em 2026-10-22. Itens marcados com **DECIDI
       Sentry (relatórios de falha do app). O formulário Data safety abaixo declara os dois; a política
       precisa dizer o mesmo. Recomendado passar pela revisão jurídica já pendente.
 - [x] Exclusão de conta apaga também fotos, comentários e curtidas do feed (com os arquivos de imagem).
-- [ ] Publicar a API com a página `/legal/account-deletion/view` (vai no próximo deploy do `main`).
+- [x] Página `/legal/account-deletion/view` publicada na API (conferida em 2026-10-24).
+- [x] Denunciar e bloquear no feed de fotos (política de conteúdo gerado pelo usuário, ver abaixo).
+      Na API desde 2026-10-24; no app entra no **primeiro build** enviado à Play Console.
 
 ## Links pedidos pela Play Console
 
@@ -79,8 +81,8 @@ academia.
 
 | Recurso | Situação |
 | --- | --- |
-| Ícone 512×512 | Usar `viewer/web/icons/Icon-512.png` (já no tamanho exigido) |
-| Imagem de destaque 1024×500 | **Falta criar** (logo sobre o fundo `#262433`) |
+| Ícone 512×512 | Pronto em `docs/play_store_assets/icon_512.png`; **falta enviar** |
+| Imagem de destaque 1024×500 | Pronta em `docs/play_store_assets/feature_graphic_1024x500.png`; **falta enviar** |
 | Capturas de tela do celular (mín. 2) | **Falta tirar** no app Android rodando (início, missões, troféus, presença) |
 | Ícone do app no celular | Gerado a partir do ícone web, com ícone adaptativo (Android 8+) |
 
@@ -145,10 +147,28 @@ específico e serve só para registrar presença.
 | Compras digitais? | Não |
 
 Resultado esperado: classificação livre ou 10+, com o aviso "Interação de usuários".
+Questionário enviado em 2026-10-24.
+
+## Conteúdo gerado pelo usuário (feed de fotos)
+
+A Google exige, para apps com conteúdo gerado pelo usuário, que dê para denunciar e bloquear dentro do
+app e que exista moderação. No Octogrip:
+
+- **Denunciar:** no menu `⋯` de um post ou comentário de outra pessoa → "Denunciar", com motivo (spam,
+  nudez, violência, assédio, outro) e detalhes opcionais. O conteúdo some na hora para quem denunciou.
+- **Bloquear:** no mesmo menu → "Bloquear". Posts e comentários da pessoa deixam de aparecer; ela não é
+  avisada. Para desfazer: "Bloqueados" no topo do feed.
+- **Moderação:** gerentes e administradores da academia recebem notificação a cada denúncia e, em
+  "Denúncias" no topo do feed, mantêm ou removem o conteúdo. O autor sempre pode apagar o próprio post.
+- O feed é fechado: só membros da mesma academia veem e comentam.
+
+Se o revisor perguntar, use o texto acima. A conta de teste (professor da academia vitrine) não é gerente,
+então vê "Denunciar", "Bloquear" e "Bloqueados", mas não a fila de "Denúncias".
 
 ## Público-alvo e conteúdo
 
-**DECIDIR: faixa etária do público-alvo.** Isso muda as exigências da Google:
+**Decidido em 2026-10-24: 13 anos ou mais** (13–15, 16–17 e 18+). Menores de 13 não têm login próprio.
+Para referência, o que muda conforme a faixa:
 
 - **Se nenhum usuário tiver menos de 13 anos:** marque 13–15, 16–17 e 18+. O app segue as regras gerais.
 - **Se academias tiverem turmas infantis usando o app (menores de 13):** marque também as faixas abaixo
