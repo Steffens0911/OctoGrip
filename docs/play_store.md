@@ -121,7 +121,11 @@ O reconhecimento facial é opcional e pode ser ignorado; a presença também fun
 | Informações e desempenho do app → Diagnóstico | Sim | Obrigatório | Análise (versão do app e plataforma) |
 | IDs do dispositivo ou outros → ID do dispositivo | Sim | Opcional | Funcionalidade do app (token de notificação FCM) |
 
-Não coletados: localização, contatos, informações financeiras, saúde e fitness (o app não lê dados
+Declarado também (preenchido na Play Console em 2026-10-24): **Informações sobre condicionamento físico**
+(presença em treino e execuções de técnicas, obrigatório, para a funcionalidade do app), coerente com o
+recurso de saúde "atividade e condicionamento físicos".
+
+Não coletados: localização, contatos, informações financeiras, informações de saúde (o app não lê dados
 de saúde do aparelho), mensagens (e-mail/SMS), áudio, arquivos, agenda, histórico de navegação.
 
 **Dado biométrico:** a Play Console não tem um tipo "biometria". A foto facial entra em *Fotos* e o
