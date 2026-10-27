@@ -390,6 +390,48 @@ void main() {
       expect(res.token, 'tok');
     });
 
+    test('login refaz após 502 do proxy (worker reiniciando) e conclui', () async {
+      final client = setUpApiService();
+      var posts = 0;
+      when(() => client.post(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((_) async {
+        posts++;
+        if (posts == 1) {
+          return http.Response('Bad Gateway', 502, reasonPhrase: 'Bad Gateway');
+        }
+        return jsonOk({'access_token': 'tok', 'streak_bonus_points': 0});
+      });
+      when(() => client.get(any(), headers: any(named: 'headers')))
+          .thenAnswer((_) async => jsonOk({'id': 'u1', 'email': 'a@b.com'}));
+
+      final res = await ApiService().login('a@b.com', 'senha');
+
+      expect(posts, 2, reason: 'login é seguro de repetir em 502');
+      expect(res.token, 'tok');
+    });
+
+    test('login desiste após 3 tentativas com 502 e mostra mensagem amigável',
+        () async {
+      final client = setUpApiService();
+      var posts = 0;
+      when(() => client.post(any(),
+              headers: any(named: 'headers'), body: any(named: 'body')))
+          .thenAnswer((_) async {
+        posts++;
+        return http.Response('Bad Gateway', 502, reasonPhrase: 'Bad Gateway');
+      });
+
+      await expectLater(
+        ApiService().login('a@b.com', 'senha'),
+        throwsA(isA<ApiException>()
+            .having((e) => e.statusCode, 'statusCode', 502)
+            .having((e) => e.message, 'message',
+                'Servidor indisponível no momento. Tente de novo em instantes.')),
+      );
+      expect(posts, 3);
+    });
+
     test('PATCH refaz após ClientException e retorna sucesso', () async {
       final client = setUpApiService(token: 'tok');
       var calls = 0;

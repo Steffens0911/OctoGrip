@@ -257,11 +257,23 @@ class ApiService {
     String email,
     String password,
   ) async {
-    final r = await _req(_client.post(
-      Uri.parse('$baseUrl/auth/login'),
-      headers: await _jsonHeaders(),
-      body: jsonEncode({'email': email, 'password': password}),
-    ));
+    // Ao contrário das mutações em geral, o login é seguro de repetir: o bônus de
+    // sequência só é creditado quando o dia muda. Um 502/503/504 do proxy (worker
+    // da API reiniciando) é retentado em vez de virar "Bad Gateway" na tela.
+    const backoff = [Duration(milliseconds: 500), Duration(milliseconds: 1500)];
+    late http.Response r;
+    for (var attempt = 0;; attempt++) {
+      r = await _req(_client.post(
+        Uri.parse('$baseUrl/auth/login'),
+        headers: await _jsonHeaders(),
+        body: jsonEncode({'email': email, 'password': password}),
+      ));
+      if (!_kTransientStatuses.contains(r.statusCode) ||
+          attempt >= backoff.length) {
+        break;
+      }
+      await Future<void>.delayed(backoff[attempt]);
+    }
     final data = await _decodeResponse(r);
     // noAutoLogout=true: falha no login (ex.: senha errada → 401) nunca deve
     // disparar logout automático — o utilizador pode ter um token antigo guardado
@@ -513,7 +525,10 @@ class ApiService {
     if (r.statusCode == 401 && !noAutoLogout && AuthService().isLoggedIn) {
       unawaited(AuthService().logout(notifyInvalidated: true));
     }
-    String msg = r.reasonPhrase ?? 'Erro ${r.statusCode}';
+    // Resposta do proxy sem JSON (ex.: "Bad Gateway" com a API reiniciando).
+    String msg = _kTransientStatuses.contains(r.statusCode)
+        ? 'Servidor indisponível no momento. Tente de novo em instantes.'
+        : r.reasonPhrase ?? 'Erro ${r.statusCode}';
     String? errorType;
     if (data is Map) {
       final err = data['error'];

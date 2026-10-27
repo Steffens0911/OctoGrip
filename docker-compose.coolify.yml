@@ -70,7 +70,9 @@ services:
     # o pool do proxy (Traefik/Coolify). Sem isto o uvicorn fecha em 5s (default) e
     # o proxy reusa a conexao morta -> 502 / "Failed to fetch" intermitente no app,
     # que some ao repetir a acao. DEVE bater com o Dockerfile e o docker-compose.yml.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools --no-access-log --timeout-keep-alive 120
+    # --workers 2: cada worker usa ~160 MB; com 4 o conjunto passava do mem_limit e o
+    # kernel matava workers em loop ("Child process died") -> 502 no login (2026-10-27).
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --loop uvloop --http httptools --no-access-log --timeout-keep-alive 120
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       PGSSLMODE: ${PGSSLMODE:-disable}
@@ -109,7 +111,8 @@ services:
       - api_media:/app/app_media
       # Caminho no HOST da VPS (fora do Git) onde está o JSON; padrão /srv/octogrip/secrets
       - ${FIREBASE_SECRETS_HOST_PATH:-/srv/octogrip/secrets}:/app/secrets:ro
-    mem_limit: 512m
+    # 2 workers (~320 MB) + processo principal, com folga para picos.
+    mem_limit: 1g
     mem_reservation: 256m
 
   celery-worker-face:
