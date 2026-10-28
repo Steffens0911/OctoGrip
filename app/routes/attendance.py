@@ -6,12 +6,11 @@ from fastapi import APIRouter, Depends, Query, Request, Response, WebSocket, Web
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth_deps import get_current_user, require_aluno_not_frozen
+from app.core.auth_deps import get_current_user, require_aluno_not_frozen, user_from_token
 from app.core.exceptions import ForbiddenError
 from app.core.list_pagination import MAX_LIST_LIMIT
 from app.core.rate_limit import limiter
 from app.core.role_deps import require_read_access, require_write_access
-from app.core.security import decode_access_token
 from app.database import get_db
 from app.models import Academy, AttendanceRecord, AttendanceSession, User
 from app.schemas.attendance import (
@@ -53,7 +52,6 @@ from app.services.attendance_service import (
 from app.services.attendance_service import (
     attendance_ranking as attendance_ranking_service,
 )
-from app.services.user_service import get_user
 
 router = APIRouter()
 
@@ -554,17 +552,7 @@ async def attendance_session_ws(
     token: str = Query(..., min_length=10, description="JWT do utilizador (Bearer sem prefixo)."),
 ):
     """Professor/gestor/admin ouve check-ins em tempo real. Auth via query (limitação de WebSockets)."""
-    sub = decode_access_token(token)
-    if not sub:
-        await websocket.close(code=4001)
-        return
-    try:
-        user_uuid = UUID(sub)
-    except ValueError:
-        await websocket.close(code=4001)
-        return
-
-    user = await get_user(db, user_uuid)
+    user = await user_from_token(db, token)
     if not user:
         await websocket.close(code=4001)
         return

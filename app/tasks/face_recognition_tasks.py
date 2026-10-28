@@ -139,6 +139,30 @@ def _classify_match(similarity: float) -> str:
     return "unknown"
 
 
+# Com várias detecções, o rosto principal precisa ser ao menos N× maior (em área) que o
+# segundo. O detector opencv gera falsos positivos pequenos em fundos com textura.
+_DOMINANT_FACE_MIN_RATIO = 2.0
+
+
+def _face_area(face: dict) -> float:
+    area = face.get("facial_area") or {}
+    try:
+        return max(float(area.get("w", 0)), 0.0) * max(float(area.get("h", 0)), 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _select_dominant_face(faces: list[dict]) -> dict | None:
+    """Devolve o rosto principal da foto de cadastro, ou None se for ambíguo."""
+    if len(faces) == 1:
+        return faces[0]
+    ranked = sorted(faces, key=_face_area, reverse=True)
+    largest, second = _face_area(ranked[0]), _face_area(ranked[1])
+    if largest <= 0 or largest < second * _DOMINANT_FACE_MIN_RATIO:
+        return None
+    return ranked[0]
+
+
 def _read_avatar_bytes(avatar_url: str) -> bytes:
     if avatar_url.startswith("https://"):
         content = requests.get(avatar_url, timeout=20)
@@ -448,14 +472,18 @@ def generate_student_embedding(self, student_id: str) -> None:
             if not faces:
                 logger.warning("Nenhuma face detectada no avatar do aluno %s.", student_id)
                 return
-            if len(faces) > 1:
+            face = _select_dominant_face(faces)
+            if face is None:
                 logger.warning(
-                    "Avatar do aluno %s contém %d faces; embedding não gerado para evitar erro de identidade.",
+                    "Avatar do aluno %s contém %d faces sem rosto dominante; "
+                    "embedding não gerado para evitar erro de identidade.",
                     student_id,
                     len(faces),
                 )
                 return
-            embedding_raw = faces[0].get("embedding")
+            if len(faces) > 1:
+                logger.info("Avatar do aluno %s: %d detecções, usando o rosto dominante.", student_id, len(faces))
+            embedding_raw = face.get("embedding")
             if not embedding_raw:
                 return
             # Normaliza L2 antes de armazenar; process_face_recognition não precisa renormalizar.

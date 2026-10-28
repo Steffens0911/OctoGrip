@@ -226,7 +226,11 @@ class ApiService {
   }
 
   /// Garante que o token foi carregado do storage (importante no web após refresh).
-  Future<void> _ensureAuth() async => await AuthService().ensureLoaded();
+  Future<void> _ensureAuth() async {
+    await AuthService().ensureLoaded();
+    // Sem await: a requisição segue com o token atual (ainda válido) enquanto o novo chega.
+    unawaited(AuthService().refreshTokenIfNeeded());
+  }
 
   /// [realUserOnly] true = não envia X-Impersonate-User (para o admin conseguir listar usuários e voltar da simulação).
   Future<Map<String, String>> _headers(
@@ -321,6 +325,19 @@ class ApiService {
     ));
     final data = await _decodeResponse(r);
     _throwIfNotOk(r, data, true);
+  }
+
+  /// Troca [token] por um novo com a validade renovada (POST /auth/refresh).
+  /// Monta o header à mão: [_headers] dispararia outra renovação.
+  /// Usa noAutoLogout=true: se o token já não vale, o próximo 401 comum faz o logout.
+  Future<String> refreshAccessToken(String token) async {
+    final r = await _req(_client.post(
+      Uri.parse('$baseUrl/auth/refresh'),
+      headers: {'Authorization': 'Bearer $token'},
+    ));
+    final data = await _decodeResponse(r);
+    _throwIfNotOk(r, data, true);
+    return (data! as Map<String, dynamic>)['access_token'] as String;
   }
 
   /// Retorna o usuário logado (requer token).
@@ -4561,6 +4578,9 @@ class ApiService {
     Uint8List frame,
   ) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/face-arrive');
+    // Web manda JPEG (canvas); o app nativo manda PNG (recorte via dart:ui).
+    final isPng = frame.length > 3 &&
+        frame[0] == 0x89 && frame[1] == 0x50 && frame[2] == 0x4E && frame[3] == 0x47;
     // Backoff curto: o aluno está parado em frente ao quiosque esperando.
     const backoff = [Duration(milliseconds: 400), Duration(milliseconds: 1200)];
     for (var attempt = 0;; attempt++) {
@@ -4571,8 +4591,8 @@ class ApiService {
             http.MultipartFile.fromBytes(
               'frame',
               frame,
-              filename: 'frame.jpg',
-              contentType: MediaType('image', 'jpeg'),
+              filename: isPng ? 'frame.png' : 'frame.jpg',
+              contentType: MediaType('image', isPng ? 'png' : 'jpeg'),
             ),
           );
         final streamed = await _client.send(request);

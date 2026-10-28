@@ -48,6 +48,8 @@ dependencies:
   package_info_plus: ^9.0.1
   in_app_update: ^5.0.0
   sentry_flutter: ^10.2.0
+  camera: 0.12.2
+  google_mlkit_face_detection: 0.15.1
 
 dev_dependencies:
   flutter_test:

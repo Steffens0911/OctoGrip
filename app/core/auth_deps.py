@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.app_version import APP_PLATFORM_HEADER, APP_VERSION_HEADER, is_valid_app_version, normalize_platform
 from app.core.exceptions import AccountFrozenError, AuthenticationError, ForbiddenError
 from app.core.middleware import set_request_context
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, token_matches_password
 from app.database import get_db
 from app.models import User
 from app.services.app_config_service import record_app_version
@@ -18,6 +18,21 @@ from app.services.user_service import get_user
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=False)
+
+
+async def user_from_token(db: AsyncSession, token: str) -> User | None:
+    """Usuário dono do JWT, ou None se o token for inválido, vencido ou anterior à troca de senha."""
+    payload = decode_access_token(token)
+    if payload is None:
+        return None
+    try:
+        user_id = UUID(str(payload["sub"]))
+    except ValueError:
+        return None
+    user = await get_user(db, user_id)
+    if user is None or not token_matches_password(payload, user.password_hash):
+        return None
+    return user
 
 
 async def get_current_user(
@@ -28,16 +43,9 @@ async def get_current_user(
     """Exige Bearer JWT válido e retorna o User. Se admin enviar X-Impersonate-User, retorna esse usuário."""
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AuthenticationError("Token de autenticação ausente ou inválido.")
-    user_id_str = decode_access_token(credentials.credentials)
-    if not user_id_str:
-        raise AuthenticationError("Token inválido ou expirado.")
-    try:
-        user_id = UUID(user_id_str)
-    except ValueError:
-        raise AuthenticationError("Token inválido.")
-    real_user = await get_user(db, user_id)
+    real_user = await user_from_token(db, credentials.credentials)
     if not real_user:
-        raise AuthenticationError("Usuário não encontrado.")
+        raise AuthenticationError("Token inválido ou expirado.")
 
     set_request_context(
         user_id=str(real_user.id),
@@ -97,16 +105,9 @@ async def get_real_user(
     rebaixar permissões (ex.: atualizar configurações admin de academia)."""
     if not credentials or credentials.scheme.lower() != "bearer":
         raise AuthenticationError("Token de autenticação ausente ou inválido.")
-    user_id_str = decode_access_token(credentials.credentials)
-    if not user_id_str:
-        raise AuthenticationError("Token inválido ou expirado.")
-    try:
-        user_id = UUID(user_id_str)
-    except ValueError:
-        raise AuthenticationError("Token inválido.")
-    real_user = await get_user(db, user_id)
+    real_user = await user_from_token(db, credentials.credentials)
     if not real_user:
-        raise AuthenticationError("Usuário não encontrado.")
+        raise AuthenticationError("Token inválido ou expirado.")
     return real_user
 
 
@@ -126,11 +127,4 @@ async def get_current_user_optional(
     """Se houver Bearer JWT válido, retorna o User; senão retorna None."""
     if not credentials or credentials.scheme.lower() != "bearer":
         return None
-    user_id_str = decode_access_token(credentials.credentials)
-    if not user_id_str:
-        return None
-    try:
-        user_id = UUID(user_id_str)
-    except ValueError:
-        return None
-    return await get_user(db, user_id)
+    return await user_from_token(db, credentials.credentials)

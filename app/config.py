@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import date
 from zoneinfo import ZoneInfo
 
 from pydantic import field_validator
@@ -23,9 +24,12 @@ class Settings(BaseSettings):
     # JWT (autenticação)
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
-    # Sessão sem expiração por padrão (0): o aluno continua logado até sair do app.
-    # Para requisitos mais rígidos, defina JWT_EXPIRE_MINUTES > 0 (ex.: 120) via env.
-    JWT_EXPIRE_MINUTES: int = 0
+    # Validade do token. O app renova pelo POST /auth/refresh antes de vencer (expiração
+    # deslizante): quem usa o app segue logado; quem fica 30 dias sem abrir faz login de novo.
+    JWT_EXPIRE_MINUTES: int = 60 * 24 * 30
+    # Tokens antigos (sem expiração, emitidos antes da renovação existir) são aceitos até esta
+    # data para o app trocá-los sem deslogar ninguém. Vazio = recusa já.
+    JWT_LEGACY_TOKENS_UNTIL: date | None = date(2026, 12, 31)
 
     # CORS
     # Em desenvolvimento, o backend aceita localhost em qualquer porta via allow_origin_regex
@@ -42,6 +46,20 @@ class Settings(BaseSettings):
 
     # Rate limiting (login)
     LOGIN_RATE_LIMIT: str = "10/minute"
+    # Onde o rate limit e o bloqueio de login guardam as contagens, compartilhadas entre os
+    # workers. Vazio = REDIS_URL; "memory://" = só na memória do processo (testes).
+    RATE_LIMIT_STORAGE_URI: str = ""
+
+    # Proxies reversos (Traefik/Coolify) cujo X-Forwarded-For é confiável para achar o IP real.
+    # Só redes internas: uma conexão vinda de fora nunca escolhe o próprio IP pelo cabeçalho.
+    TRUSTED_PROXY_CIDRS: list[str] = [
+        "127.0.0.0/8",
+        "::1/128",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "fc00::/7",
+    ]
 
     # Fuso para "hoje", sequência de login, semana ISO de turmas, relatórios por dia, etc.
     APP_TIMEZONE: str = "America/Sao_Paulo"
@@ -115,6 +133,22 @@ class Settings(BaseSettings):
             )
         return v
 
+    @field_validator("JWT_EXPIRE_MINUTES")
+    @classmethod
+    def validate_jwt_expire_minutes(cls, v: int) -> int:
+        """Token sem validade não pode mais ser emitido: a sessão longa vem da renovação."""
+        if v <= 0:
+            raise ValueError("JWT_EXPIRE_MINUTES deve ser maior que zero (o app renova o token antes de vencer).")
+        return v
+
+    @field_validator("JWT_LEGACY_TOKENS_UNTIL", mode="before")
+    @classmethod
+    def jwt_legacy_until_coerce_empty(cls, v):
+        """Compose pode passar a variável vazia: equivale a não aceitar tokens antigos."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     @field_validator("JWT_SECRET")
     @classmethod
     def validate_jwt_secret(cls, v: str) -> str:
@@ -172,6 +206,11 @@ class Settings(BaseSettings):
             )
 
         return [o for o in v if o and str(o).strip() != "*"]
+
+    @property
+    def rate_limit_storage_uri(self) -> str:
+        """Storage do rate limit e do bloqueio de login (Redis compartilhado entre workers)."""
+        return self.RATE_LIMIT_STORAGE_URI.strip() or self.REDIS_URL
 
     class Config:
         env_file = ".env"

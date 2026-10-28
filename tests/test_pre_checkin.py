@@ -87,17 +87,17 @@ async def pce_aluno2(db: AsyncSession, pce_academy):
 
 @pytest.fixture
 def pce_prof_headers(pce_professor):
-    return {"Authorization": f"Bearer {create_access_token(pce_professor.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(pce_professor)}"}
 
 
 @pytest.fixture
 def pce_aluno_headers(pce_aluno):
-    return {"Authorization": f"Bearer {create_access_token(pce_aluno.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(pce_aluno)}"}
 
 
 @pytest.fixture
 def pce_aluno2_headers(pce_aluno2):
-    return {"Authorization": f"Bearer {create_access_token(pce_aluno2.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(pce_aluno2)}"}
 
 
 @pytest.fixture

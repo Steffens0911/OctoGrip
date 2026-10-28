@@ -77,7 +77,7 @@ async def pct_aluno(db: AsyncSession, pct_academy):
 
 @pytest.fixture
 def pct_prof_headers(pct_professor):
-    return {"Authorization": f"Bearer {create_access_token(pct_professor.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(pct_professor)}"}
 
 
 @pytest.fixture
@@ -518,7 +518,7 @@ async def test_relatorio_pontualidade_vazio(client, pct_academy, pct_prof_header
 @pytest.mark.asyncio
 async def test_relatorio_pontualidade_acesso_negado_aluno(client, pct_aluno):
     """Aluno não pode acessar o relatório de pontualidade."""
-    headers = {"Authorization": f"Bearer {create_access_token(pct_aluno.id)}"}
+    headers = {"Authorization": f"Bearer {create_access_token(pct_aluno)}"}
     r = await client.get(
         "/reports/punctuality",
         params={"days": 30},

@@ -1,5 +1,6 @@
 import 'dart:async' show StreamSubscription, TimeoutException, Timer, unawaited;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -10,6 +11,8 @@ import 'package:viewer/models/user.dart';
 import 'package:viewer/models/face_recognition.dart';
 import 'package:viewer/screens/academy/face_kiosk_screen.dart';
 import 'package:viewer/services/face_detection_service.dart';
+import 'package:viewer/services/native_kiosk_camera.dart'
+    if (dart.library.html) 'package:viewer/services/native_kiosk_camera_stub.dart';
 import 'package:viewer/screens/academy/face_recognition_checkin_screen.dart';
 import 'package:viewer/screens/academy/review_face_results_screen.dart';
 import 'package:viewer/services/api_service.dart';
@@ -602,6 +605,10 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
   void _openFaceKiosk() {
     final s = _session;
     if (s == null) return;
+    if (!kIsWeb) {
+      _openNativeFaceKiosk(s.id);
+      return;
+    }
 
     final cam = CameraController();
     final detector = WebFaceDetector();
@@ -628,6 +635,25 @@ class _AttendanceSessionScreenState extends State<AttendanceSessionScreen> {
           fetchQr: () => _api.getAttendanceQrToken(s.id, ttlSeconds: 60),
           onFaceArrive: (bytes) => _api.faceArrive(s.id, bytes),
           resumeCamera: () => cam.resume(),
+        ),
+      ),
+    ).then((_) => cam.stop());
+  }
+
+  /// No app (Android) não há HtmlElementView: câmera do pacote camera + ML Kit.
+  void _openNativeFaceKiosk(String sessionId) {
+    final cam = NativeKioskCamera();
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FaceKioskScreen(
+          sessionId: sessionId,
+          setupCamera: (_) => cam.start(),
+          detectFace: cam.detectFace,
+          captureJpeg: cam.takeFrame,
+          buildCameraView: (_) => cam.buildPreview(),
+          fetchQr: () => _api.getAttendanceQrToken(sessionId, ttlSeconds: 60),
+          onFaceArrive: (bytes) => _api.faceArrive(sessionId, bytes),
         ),
       ),
     ).then((_) => cam.stop());

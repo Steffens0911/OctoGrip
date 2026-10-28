@@ -56,7 +56,7 @@ async def _mk_user(db: AsyncSession, *, role: str, academy_id, name: str | None 
 
 
 def _headers(user) -> dict:
-    return {"Authorization": f"Bearer {create_access_token(user.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(user)}"}
 
 
 @pytest.fixture
