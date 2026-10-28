@@ -4578,6 +4578,9 @@ class ApiService {
     Uint8List frame,
   ) async {
     final uri = Uri.parse('$baseUrl/attendance/sessions/$sessionId/face-arrive');
+    // Web manda JPEG (canvas); o app nativo manda PNG (recorte via dart:ui).
+    final isPng = frame.length > 3 &&
+        frame[0] == 0x89 && frame[1] == 0x50 && frame[2] == 0x4E && frame[3] == 0x47;
     // Backoff curto: o aluno está parado em frente ao quiosque esperando.
     const backoff = [Duration(milliseconds: 400), Duration(milliseconds: 1200)];
     for (var attempt = 0;; attempt++) {
@@ -4588,8 +4591,8 @@ class ApiService {
             http.MultipartFile.fromBytes(
               'frame',
               frame,
-              filename: 'frame.jpg',
-              contentType: MediaType('image', 'jpeg'),
+              filename: isPng ? 'frame.png' : 'frame.jpg',
+              contentType: MediaType('image', isPng ? 'png' : 'jpeg'),
             ),
           );
         final streamed = await _client.send(request);

@@ -580,4 +580,29 @@ void main() {
       expect(calls, 1, reason: '409 não é transiente — falha na primeira tentativa');
     });
   });
+
+  group('ApiService — faceArrive formato do frame', () {
+    Future<http.MultipartFile> sentFile(Uint8List frame) async {
+      final client = setUpApiService(token: 'tok');
+      http.MultipartRequest? sent;
+      when(() => client.send(any())).thenAnswer((inv) async {
+        sent = inv.positionalArguments.first as http.MultipartRequest;
+        return streamedJson({'matched': false, 'confidence': 0.1, 'greeting': 'Use o QR'}, 200);
+      });
+      await ApiService().faceArrive('sess1', frame);
+      return sent!.files.single;
+    }
+
+    test('frame JPEG da web vai como image/jpeg', () async {
+      final file = await sentFile(Uint8List.fromList(const [0xFF, 0xD8, 0xFF, 0xE0, 0]));
+      expect(file.contentType.mimeType, 'image/jpeg');
+      expect(file.filename, 'frame.jpg');
+    });
+
+    test('frame PNG do app nativo vai como image/png', () async {
+      final file = await sentFile(Uint8List.fromList(const [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A]));
+      expect(file.contentType.mimeType, 'image/png');
+      expect(file.filename, 'frame.png');
+    });
+  });
 }

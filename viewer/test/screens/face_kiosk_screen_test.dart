@@ -207,6 +207,56 @@ void main() {
       await tester.pump();
       expect(captureCount, 0);
     });
+
+    testWidgets('não empilha detecções quando detectFace demora mais que o intervalo',
+        (tester) async {
+      // No app nativo cada detecção tira uma foto (pode levar mais de 800ms).
+      var calls = 0;
+      final slow = Completer<bool>();
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) async {},
+        detectFace: () {
+          calls++;
+          return slow.future;
+        },
+        captureJpeg: () async => null,
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
+        onFaceArrive: (_) async => _noMatch(),
+      )));
+      await _pumpToReady(tester);
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 800));
+      }
+      expect(calls, 1);
+
+      slow.complete(false);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(calls, 2);
+    });
+
+    testWidgets('falha em detectFace não interrompe o loop de detecção', (tester) async {
+      var calls = 0;
+      await tester.pumpWidget(wrapApp(FaceKioskScreen(
+        sessionId: 'session-1',
+        setupCamera: (_) async {},
+        detectFace: () async {
+          calls++;
+          throw Exception('câmera ocupada');
+        },
+        captureJpeg: () async => null,
+        buildCameraView: (_) => const SizedBox(),
+        fetchQr: () async => _fakeQr(),
+        onFaceArrive: (_) async => _noMatch(),
+      )));
+      await _pumpToReady(tester);
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump(const Duration(milliseconds: 800));
+      expect(calls, 2);
+      expect(find.textContaining('Posicione-se'), findsOneWidget);
+    });
   });
 
   group('FaceKioskScreen — resultado: aluno pontual', () {
@@ -335,6 +385,35 @@ void main() {
       await tester.pump();
       await tester.pump();
       expect(find.textContaining('Permissão de câmera'), findsOneWidget);
+    });
+  });
+
+  group('kioskCameraErrorMessage', () {
+    test('permissão negada no navegador orienta o navegador', () {
+      final msg = kioskCameraErrorMessage(Exception('NotAllowedError'), web: true);
+      expect(msg, contains('Permissão de câmera negada'));
+      expect(msg, contains('navegador'));
+    });
+
+    test('permissão negada no app (CameraAccessDenied) orienta o aparelho', () {
+      final msg = kioskCameraErrorMessage(
+        Exception('CameraException(CameraAccessDenied, Camera access permission was denied.)'),
+        web: false,
+      );
+      expect(msg, contains('Permissão de câmera negada'));
+      expect(msg, contains('aparelho'));
+    });
+
+    test('aparelho sem câmera', () {
+      final msg = kioskCameraErrorMessage(
+        Exception('CameraException(NoCamera, Nenhuma câmera encontrada.)'),
+        web: false,
+      );
+      expect(msg, 'Nenhuma câmera encontrada neste aparelho.');
+    });
+
+    test('erro desconhecido', () {
+      expect(kioskCameraErrorMessage(Exception('boom'), web: false), 'Erro ao acessar câmera.');
     });
   });
 }

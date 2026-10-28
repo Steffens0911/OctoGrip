@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -13,7 +13,8 @@ import 'package:viewer/models/face_checkin.dart';
 /// - [setupCamera] inicializa câmera e registra a platform view para [cameraViewId].
 /// - [detectFace] retorna true se há rosto no frame atual da câmera.
 /// - [captureJpeg] captura o frame atual como JPEG.
-/// - [buildCameraView] retorna o widget de preview (HtmlElementView em produção).
+/// - [buildCameraView] retorna o widget de preview (HtmlElementView na web,
+///   CameraPreview no app — ver NativeKioskCamera).
 /// - [fetchQr] busca/renova o token QR para esta sessão.
 /// - [onFaceArrive] envia o frame ao backend e retorna [FaceArriveResponse].
 class FaceKioskScreen extends StatefulWidget {
@@ -61,6 +62,7 @@ class _FaceKioskScreenState extends State<FaceKioskScreen> {
   String? _qrError;
 
   Timer? _detectionTimer;
+  bool _detecting = false;
   Timer? _resetTimer;
   Timer? _resumeTimer;
   Timer? _qrHeartbeatTimer;
@@ -104,9 +106,7 @@ class _FaceKioskScreenState extends State<FaceKioskScreen> {
       if (!mounted) return;
       setState(() {
         _state = _KioskState.cameraError;
-        _errorMsg = e.toString().contains('NotAllowed') || e.toString().contains('Permission')
-            ? 'Permissão de câmera negada.\nHabilite nas configurações do navegador.'
-            : 'Erro ao acessar câmera.';
+        _errorMsg = kioskCameraErrorMessage(e, web: kIsWeb);
       });
     }
   }
@@ -116,10 +116,20 @@ class _FaceKioskScreenState extends State<FaceKioskScreen> {
   void _startDetectionLoop() {
     _detectionTimer?.cancel();
     _detectionTimer = Timer.periodic(_detectionInterval, (_) async {
-      if (_state != _KioskState.ready) return;
+      // No app nativo cada detecção tira uma foto e pode passar do intervalo:
+      // não empilha uma detecção sobre a outra.
+      if (_detecting || _state != _KioskState.ready) return;
       // Respeita cooldown individual do aluno recém-reconhecido.
       if (_cooldownUntil != null && DateTime.now().isBefore(_cooldownUntil!)) return;
-      final found = await widget.detectFace();
+      _detecting = true;
+      bool found;
+      try {
+        found = await widget.detectFace();
+      } catch (_) {
+        found = false;
+      } finally {
+        _detecting = false;
+      }
       if (!found || _state != _KioskState.ready || !mounted) return;
       setState(() => _state = _KioskState.detected);
       await _captureAndSend();
@@ -129,6 +139,7 @@ class _FaceKioskScreenState extends State<FaceKioskScreen> {
   Future<void> _captureAndSend() async {
     _detectionTimer?.cancel();
     final bytes = await widget.captureJpeg();
+    if (!mounted) return;
     if (bytes == null || bytes.isEmpty) {
       _resetToReady();
       return;
@@ -451,6 +462,21 @@ class _QrCountdownState extends State<_QrCountdown> {
       style: widget.textStyle,
     );
   }
+}
+
+/// Mensagem para falha ao abrir a câmera. Na web o erro vem do getUserMedia
+/// (NotAllowedError); no app, do pacote camera (CameraAccessDenied*, NoCamera).
+@visibleForTesting
+String kioskCameraErrorMessage(Object error, {required bool web}) {
+  final text = error.toString();
+  if (text.contains('NoCamera')) return 'Nenhuma câmera encontrada neste aparelho.';
+  final denied = text.contains('NotAllowed') ||
+      text.contains('Permission') ||
+      text.contains('AccessDenied');
+  if (!denied) return 'Erro ao acessar câmera.';
+  return web
+      ? 'Permissão de câmera negada.\nHabilite nas configurações do navegador.'
+      : 'Permissão de câmera negada.\nHabilite nas configurações do aparelho.';
 }
 
 int _secondsLeft(DateTime exp) {
