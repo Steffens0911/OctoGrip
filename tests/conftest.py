@@ -22,6 +22,8 @@ os.environ["SEED_ON_STARTUP"] = "false"
 os.environ["BACKUP_DOWNLOAD_RATE_LIMIT"] = "200/minute"
 # Vários POST /auth/login na mesma suíte (streak, auth) sem 429.
 os.environ.setdefault("LOGIN_RATE_LIMIT", "200/minute")
+# Contagens do rate limit e do bloqueio de login na memória: um Redis local não guarda estado entre execuções.
+os.environ["RATE_LIMIT_STORAGE_URI"] = "memory://"
 
 from app.config import settings  # noqa: E402
 from app.core.security import create_access_token, hash_password_sync  # noqa: E402
@@ -89,7 +91,7 @@ async def admin_user(db: AsyncSession):
 
 @pytest.fixture
 def admin_token(admin_user) -> str:
-    return create_access_token(admin_user.id)
+    return create_access_token(admin_user)
 
 
 @pytest.fixture
@@ -128,7 +130,7 @@ async def professor_user(db: AsyncSession, academy):
 
 @pytest.fixture
 def professor_token(professor_user) -> str:
-    return create_access_token(professor_user.id)
+    return create_access_token(professor_user)
 
 
 @pytest.fixture
@@ -156,7 +158,7 @@ async def aluno_user(db: AsyncSession, academy):
 
 @pytest.fixture
 def aluno_token(aluno_user) -> str:
-    return create_access_token(aluno_user.id)
+    return create_access_token(aluno_user)
 
 
 @pytest.fixture
@@ -184,7 +186,7 @@ async def gerente_user(db: AsyncSession, academy):
 
 @pytest.fixture
 def gerente_token(gerente_user) -> str:
-    return create_access_token(gerente_user.id)
+    return create_access_token(gerente_user)
 
 
 @pytest.fixture
@@ -212,7 +214,7 @@ async def supervisor_user(db: AsyncSession, academy):
 
 @pytest.fixture
 def supervisor_token(supervisor_user) -> str:
-    return create_access_token(supervisor_user.id)
+    return create_access_token(supervisor_user)
 
 
 @pytest.fixture

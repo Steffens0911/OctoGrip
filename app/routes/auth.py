@@ -2,7 +2,6 @@
 
 import logging
 import secrets
-import time
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, Request
@@ -11,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.app_time import today_in_app_tz
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import get_current_user, get_real_user
+from app.core.client_ip import get_client_ip
 from app.core.exceptions import AppError
+from app.core.login_lockout import login_lockout
 from app.core.metrics import security_events_total
 from app.core.rate_limit import limiter
 from app.core.security import create_access_token, hash_password, verify_password
@@ -41,36 +42,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-_failed_attempts: dict[str, list[float]] = {}
 
-_MAX_ATTEMPTS = settings.ACCOUNT_LOCKOUT_ATTEMPTS
-_LOCKOUT_SECONDS = settings.ACCOUNT_LOCKOUT_MINUTES * 60
-
-
-def _check_lockout(email: str) -> None:
-    """Verifica se o e-mail está bloqueado por muitas tentativas falhas."""
-    key = email.strip().lower()
-    attempts = _failed_attempts.get(key, [])
-    now = time.monotonic()
-    recent = [t for t in attempts if now - t < _LOCKOUT_SECONDS]
-    _failed_attempts[key] = recent
-    if len(recent) >= _MAX_ATTEMPTS:
+async def _check_lockout(email: str, client_ip: str) -> None:
+    """Recusa o login se este e-mail errou a senha demais a partir deste IP."""
+    if await login_lockout.is_locked(email, client_ip):
         security_events_total.labels(event_type="account_locked").inc()
-        logger.warning("Conta bloqueada por tentativas excessivas", extra={"email": email})
+        logger.warning("Conta bloqueada por tentativas excessivas", extra={"email": email, "client_ip": client_ip})
         raise AppError(
             f"Conta temporariamente bloqueada. Tente novamente em {settings.ACCOUNT_LOCKOUT_MINUTES} minutos.",
             status_code=429,
         )
-
-
-def _record_failed_attempt(email: str) -> None:
-    key = email.strip().lower()
-    _failed_attempts.setdefault(key, []).append(time.monotonic())
-
-
-def _clear_failed_attempts(email: str) -> None:
-    key = email.strip().lower()
-    _failed_attempts.pop(key, None)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -81,13 +62,13 @@ async def login(
     db: AsyncSession = Depends(get_db),
 ):
     """Login com e-mail e senha. Retorna JWT."""
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
 
-    _check_lockout(body.email)
+    await _check_lockout(body.email, client_ip)
 
     user = await get_user_by_email(db, body.email)
     if not user or not user.password_hash:
-        _record_failed_attempt(body.email)
+        await login_lockout.record_failure(body.email, client_ip)
         security_events_total.labels(event_type="login_failed_user_not_found").inc()
         logger.warning(
             "Login falhado: usuário não encontrado",
@@ -96,7 +77,7 @@ async def login(
         raise AppError("E-mail ou senha inválidos.", status_code=401)
 
     if not await verify_password(body.password, user.password_hash):
-        _record_failed_attempt(body.email)
+        await login_lockout.record_failure(body.email, client_ip)
         security_events_total.labels(event_type="login_failed_invalid_password").inc()
         logger.warning(
             "Login falhado: senha incorreta",
@@ -104,7 +85,7 @@ async def login(
         )
         raise AppError("E-mail ou senha inválidos.", status_code=401)
 
-    _clear_failed_attempts(body.email)
+    await login_lockout.clear(body.email, client_ip)
 
     # Atualiza last_login_at, regista dia no fuso APP_TIMEZONE e aplica bónus de sequência se aplicável
     user.last_login_at = datetime.now(UTC)
@@ -124,8 +105,18 @@ async def login(
             "streak_bonus_points": streak_bonus_points,
         },
     )
-    token = create_access_token(user.id)
+    token = create_access_token(user)
     return TokenResponse(access_token=token, streak_bonus_points=streak_bonus_points)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token(current_user: User = Depends(get_real_user)):
+    """Troca um token ainda válido por um novo, com a validade renovada (expiração deslizante).
+
+    O app chama antes do token vencer: quem usa o app não precisa logar de novo. Ignora
+    X-Impersonate-User: o token novo é sempre da conta que fez login, nunca da simulada.
+    """
+    return TokenResponse(access_token=create_access_token(current_user))
 
 
 @router.get("/me", response_model=UserRead)

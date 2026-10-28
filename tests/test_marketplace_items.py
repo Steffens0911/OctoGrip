@@ -128,7 +128,7 @@ async def test_me_marketplace_empty_without_academy(
     await db.commit()
     await db.refresh(u)
 
-    tok = create_access_token(u.id)
+    tok = create_access_token(u)
     r_me = await client.get("/me/marketplace_items", headers={"Authorization": f"Bearer {tok}"})
     assert r_me.status_code == 200
     assert r_me.json() == []
@@ -160,7 +160,7 @@ async def test_cross_academy_not_visible_on_me(
     db.add(other_aluno)
     await db.commit()
     await db.refresh(other_aluno)
-    other_headers = {"Authorization": f"Bearer {create_access_token(other_aluno.id)}"}
+    other_headers = {"Authorization": f"Bearer {create_access_token(other_aluno)}"}
 
     r = await client.post("/marketplace_items", headers=professor_headers, json=_item_json())
     assert r.status_code == 201, r.text

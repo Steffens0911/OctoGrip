@@ -72,7 +72,7 @@ async def test_fluxo_completo_execucao(client, aluno_headers, aluno_user, oppone
     # Confirmar execução (como oponente)
     from app.core.security import create_access_token
 
-    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user.id)}"}
+    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user)}"}
 
     r2 = await client.post(
         f"/executions/{execution_id}/confirm",
@@ -154,7 +154,7 @@ async def test_fluxo_completo_trofeu(client, admin_headers, aluno_headers, aluno
     assert r1.status_code == 201
     trophy_id = r1.json()["id"]
 
-    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent.id)}"}
+    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent)}"}
 
     create_r = await client.post(
         "/executions",

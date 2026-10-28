@@ -167,8 +167,8 @@ async def test_completar_licao_multiplos_usuarios(client, db, lesson, technique)
     await db.refresh(user1)
     await db.refresh(user2)
 
-    headers1 = {"Authorization": f"Bearer {create_access_token(user1.id)}"}
-    headers2 = {"Authorization": f"Bearer {create_access_token(user2.id)}"}
+    headers1 = {"Authorization": f"Bearer {create_access_token(user1)}"}
+    headers2 = {"Authorization": f"Bearer {create_access_token(user2)}"}
 
     # Primeiro usuário completa
     r1 = await client.post(

@@ -47,7 +47,7 @@ async def test_listar_pendencias_oponente(client, aluno_headers, opponent_user, 
         },
     )
 
-    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user.id)}"}
+    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user)}"}
     r = await client.get("/executions/pending_confirmations", headers=opponent_headers)
     assert r.status_code == 200
     data = r.json()
@@ -70,7 +70,7 @@ async def test_confirmar_execucao(client, aluno_headers, opponent_user, mission_
     )
     execution_id = create_r.json()["id"]
 
-    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user.id)}"}
+    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user)}"}
     r = await client.post(
         f"/executions/{execution_id}/confirm",
         headers=opponent_headers,
@@ -100,7 +100,7 @@ async def test_rejeitar_execucao(client, aluno_headers, opponent_user, mission_w
     )
     execution_id = create_r.json()["id"]
 
-    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user.id)}"}
+    opponent_headers = {"Authorization": f"Bearer {create_access_token(opponent_user)}"}
     r = await client.post(
         f"/executions/{execution_id}/reject",
         headers=opponent_headers,

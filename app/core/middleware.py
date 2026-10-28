@@ -13,6 +13,7 @@ from starlette.datastructures import MutableHeaders
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.core.client_ip import get_client_ip
 from app.core.metrics import http_errors_total, http_request_duration_seconds, http_requests_total
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
         query_params = dict(request.query_params)
-        client_ip = request.client.host if request.client else None
+        client_ip = get_client_ip(request)
         user_agent = request.headers.get("user-agent")
 
         # Normalizar path para métricas (remover IDs dinâmicos)

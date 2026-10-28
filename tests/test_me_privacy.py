@@ -86,6 +86,13 @@ async def test_delete_account_anonymizes(client: AsyncClient, db: AsyncSession, 
     assert user.account_frozen is True
 
 
+async def test_delete_account_derruba_a_sessao(client: AsyncClient, aluno_headers: dict):
+    """Conta anonimizada: o token que o titular tinha deixa de valer (a senha foi apagada)."""
+    r = await client.delete("/me/account", headers=aluno_headers)
+    assert r.status_code == 200
+    assert (await client.get("/auth/me", headers=aluno_headers)).status_code == 401
+
+
 async def test_delete_account_erases_feed_content(
     client: AsyncClient,
     db: AsyncSession,

@@ -43,7 +43,7 @@ async def _make_user(db: AsyncSession, *, academy: Academy) -> tuple[User, str]:
     db.add(u)
     await db.commit()
     await db.refresh(u)
-    return u, create_access_token(u.id)
+    return u, create_access_token(u)
 
 
 async def _make_photo(

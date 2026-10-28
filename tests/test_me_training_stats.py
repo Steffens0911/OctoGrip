@@ -90,7 +90,7 @@ async def ts_aluno(db: AsyncSession, ts_academy):
 
 @pytest.fixture
 def ts_headers(ts_aluno):
-    return {"Authorization": f"Bearer {create_access_token(ts_aluno.id)}"}
+    return {"Authorization": f"Bearer {create_access_token(ts_aluno)}"}
 
 
 # ---------------------------------------------------------------------------

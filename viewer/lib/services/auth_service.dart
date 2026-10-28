@@ -30,6 +30,12 @@ class AuthService extends ChangeNotifier {
   /// recarregue o token do storage enquanto o logout ainda está em progresso.
   bool _loggingOut = false;
 
+  /// Renovação em andamento (várias requisições ao mesmo tempo disparam uma só).
+  Future<void>? _refreshing;
+  /// Depois de uma falha (sem rede, API fora), espera antes de tentar renovar de novo.
+  DateTime? _nextRefreshAttemptAt;
+  static const _refreshRetryDelay = Duration(minutes: 5);
+
   AuthService._();
 
   String? get token => _token;
@@ -70,6 +76,7 @@ class AuthService extends ChangeNotifier {
     _currentUser = user;
     _impersonatedUserId = impersonatedUserId;
     _effectiveUser = effectiveUser;
+    _nextRefreshAttemptAt = null;
     notifyListeners();
   }
 
@@ -113,6 +120,7 @@ class AuthService extends ChangeNotifier {
     _currentUser = user;
     _impersonatedUserId = null;
     _effectiveUser = null;
+    _nextRefreshAttemptAt = null;
     _randomPartnerShown = false;
     _loginNoticeShown = false;
     await _saveToStorage(token, user);
@@ -137,6 +145,7 @@ class AuthService extends ChangeNotifier {
       _effectiveUser = null;
       _token = null;
       _currentUser = null;
+      _nextRefreshAttemptAt = null;
       _randomPartnerShown = false;
       _loginNoticeShown = false;
       await _clearStorage();
@@ -188,6 +197,63 @@ class AuthService extends ChangeNotifier {
   }
 
   String? get authHeader => _token != null ? 'Bearer $_token' : null;
+
+  /// Renova o JWT quando passou da metade da validade (expiração deslizante): quem usa o
+  /// app não precisa logar de novo. Token antigo sem validade também é trocado.
+  /// Falhas são silenciosas — o token atual segue valendo e um 401 de verdade faz o logout.
+  Future<void> refreshTokenIfNeeded({DateTime? now}) {
+    final token = _token;
+    final at = now ?? DateTime.now();
+    if (token == null || _loggingOut) return Future.value();
+    if (_nextRefreshAttemptAt != null && at.isBefore(_nextRefreshAttemptAt!)) {
+      return Future.value();
+    }
+    if (!tokenNeedsRefresh(token, now: at)) return Future.value();
+    return _refreshing ??= _refresh(token, at).whenComplete(() => _refreshing = null);
+  }
+
+  Future<void> _refresh(String oldToken, DateTime at) async {
+    try {
+      final newToken = await ApiService().refreshAccessToken(oldToken);
+      // Logout ou novo login durante a renovação: o token novo não é mais desta sessão.
+      if (_token != oldToken) return;
+      _token = newToken;
+      _nextRefreshAttemptAt = null;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_keyToken, newToken);
+    } catch (_) {
+      _nextRefreshAttemptAt = at.add(_refreshRetryDelay);
+    }
+  }
+
+  /// true quando o JWT passou da metade da validade ou não tem validade (token antigo).
+  /// Token que não é JWT (ex.: testes) nunca é renovado.
+  @visibleForTesting
+  static bool tokenNeedsRefresh(String token, {required DateTime now}) {
+    final payload = _jwtPayload(token);
+    if (payload == null) return false;
+    final exp = payload['exp'];
+    if (exp is! num) return true;
+    final expiresAt = DateTime.fromMillisecondsSinceEpoch(exp.toInt() * 1000, isUtc: true);
+    final iat = payload['iat'];
+    final issuedAt = iat is num
+        ? DateTime.fromMillisecondsSinceEpoch(iat.toInt() * 1000, isUtc: true)
+        : expiresAt.subtract(const Duration(days: 30));
+    final halfLife = expiresAt.difference(issuedAt) ~/ 2;
+    return !now.toUtc().isBefore(issuedAt.add(halfLife));
+  }
+
+  static Map<String, dynamic>? _jwtPayload(String token) {
+    final parts = token.split('.');
+    if (parts.length != 3) return null;
+    try {
+      final json = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final decoded = jsonDecode(json);
+      return decoded is Map<String, dynamic> ? decoded : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> ensureLoaded() async {
     // Não recarrega o token durante logout: _clearStorage() pode ainda não ter

@@ -168,7 +168,7 @@ async def test_weekly_panel_logins_supervisor_requires_academy_id(client, db, ac
     db.add(supervisor)
     await db.commit()
     await db.refresh(supervisor)
-    headers = {"Authorization": f"Bearer {create_access_token(supervisor.id)}"}
+    headers = {"Authorization": f"Bearer {create_access_token(supervisor)}"}
 
     r = await client.get(
         "/reports/weekly_panel_logins?reference_date=2026-04-05",

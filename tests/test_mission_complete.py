@@ -178,7 +178,7 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
     await db.commit()
     await db.refresh(user2)
 
-    headers1 = {"Authorization": f"Bearer {create_access_token(user2.id)}"}
+    headers1 = {"Authorization": f"Bearer {create_access_token(user2)}"}
 
     r1 = await client.post(
         "/mission_complete",
@@ -199,7 +199,7 @@ async def test_completar_missao_multiplos_usuarios(client, db, academy, mission_
     await db.commit()
     await db.refresh(user3)
 
-    headers2 = {"Authorization": f"Bearer {create_access_token(user3.id)}"}
+    headers2 = {"Authorization": f"Bearer {create_access_token(user3)}"}
     r2 = await client.post(
         "/mission_complete",
         headers=headers2,

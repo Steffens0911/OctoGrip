@@ -17649,6 +17649,33 @@
         ]
       }
     },
+    "/auth/refresh": {
+      "post": {
+        "description": "Troca um token ainda válido por um novo, com a validade renovada (expiração deslizante).\n\nO app chama antes do token vencer: quem usa o app não precisa logar de novo. Ignora\nX-Impersonate-User: o token novo é sempre da conta que fez login, nunca da simulada.",
+        "operationId": "refresh_token_auth_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Refresh Token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/auth/reset-password": {
       "post": {
         "description": "Redefine a senha usando o token recebido por e-mail.",

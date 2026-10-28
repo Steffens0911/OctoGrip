@@ -21,7 +21,7 @@ from app.config import settings
 from app.core.cors_policy import merge_json_response_headers
 from app.core.exceptions import AppError, AuthenticationError, ForbiddenError
 from app.core.rate_limit import limiter
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, token_matches_password
 from app.database import async_engine, sync_engine
 
 logger = logging.getLogger(__name__)
@@ -43,25 +43,25 @@ def _require_admin_bearer_no_db_session(request: Request) -> str:
     if not auth.lower().startswith("bearer "):
         raise AuthenticationError("Token de autenticação ausente ou inválido.")
     token = auth[7:].strip()
-    user_id_str = decode_access_token(token)
-    if not user_id_str:
+    payload = decode_access_token(token)
+    if not payload:
         raise AuthenticationError("Token inválido ou expirado.")
     try:
-        user_id = UUID(user_id_str)
+        user_id = UUID(str(payload["sub"]))
     except ValueError:
         raise AuthenticationError("Token inválido.")
 
     with sync_engine.connect() as conn:
         row = (
             conn.execute(
-                text("SELECT id, role FROM users WHERE id = :uid"),
+                text("SELECT id, role, password_hash FROM users WHERE id = :uid"),
                 {"uid": str(user_id)},
             )
             .mappings()
             .first()
         )
-    if not row:
-        raise AuthenticationError("Usuário não encontrado.")
+    if not row or not token_matches_password(payload, row["password_hash"]):
+        raise AuthenticationError("Token inválido ou expirado.")
     if row.get("role") != "administrador":
         raise ForbiddenError("Acesso negado. Apenas administradores podem acessar este recurso.")
     return str(row["id"])

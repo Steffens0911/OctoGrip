@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth_deps import get_current_user
+from app.core.client_ip import get_client_ip
 from app.database import get_db
 from app.models import User
 from app.models.user_consent import CONSENT_TYPES
@@ -20,12 +21,8 @@ router = APIRouter()
 
 def _client_meta(request: Request) -> tuple[str | None, str | None]:
     """Extrai IP e User-Agent de origem para comprovar consentimento."""
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        ip = forwarded.split(",")[0].strip()
-    else:
-        ip = request.client.host if request.client else None
-    return ip, request.headers.get("user-agent")
+    ip = get_client_ip(request)
+    return (None if ip == "unknown" else ip), request.headers.get("user-agent")
 
 
 def _build_status(current: dict) -> ConsentStatusResponse:
